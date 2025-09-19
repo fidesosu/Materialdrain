@@ -2,15 +2,18 @@ package com.example.materialdrain.ui
 
 import android.app.Application
 import android.content.Context // Added for SharedPreferences
+import android.graphics.BitmapFactory
 import android.media.MediaPlayer // Added for Audio Preview
 import android.net.Uri
 import android.util.Log // Added for Audio Preview Logging
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -20,6 +23,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale // Added for Image Preview
 import androidx.compose.ui.platform.LocalContext
@@ -34,9 +39,12 @@ import com.example.materialdrain.ui.theme.MaterialdrainTheme
 import com.example.materialdrain.viewmodel.FileInfoViewModel
 import com.example.materialdrain.viewmodel.UploadViewModel
 import com.example.materialdrain.viewmodel.ViewModelFactory
+import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import java.io.IOException // Added for Audio Preview
 import java.text.DecimalFormat
+import java.util.concurrent.TimeUnit
 
 // SharedPreferences constants
 private const val PREFS_NAME = "pixeldrain_prefs"
@@ -63,6 +71,19 @@ internal fun formatSize(bytes: Long): String {
         unitIndex++
     }
     return DecimalFormat("#,##0.#").format(size) + " " + units[unitIndex]
+}
+
+// Helper function to format duration in milliseconds to MM:SS or HH:MM:SS
+internal fun formatDurationMillis(millis: Long): String {
+    if (millis < 0) return "00:00"
+    val hours = TimeUnit.MILLISECONDS.toHours(millis)
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % TimeUnit.HOURS.toMinutes(1)
+    val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) % TimeUnit.MINUTES.toSeconds(1)
+    return if (hours > 0) {
+        String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format("%02d:%02d", minutes, seconds)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,10 +113,11 @@ fun MaterialDrainScreen() {
                 }
             }
             uiState.errorMessage?.let {
-                // Only show dialog for general errors, not API key missing if already handled or for preview errors
-                if (!it.contains("API Key", ignoreCase = true) && 
-                    !it.contains("preview", ignoreCase = true) && 
-                    !showDialog && 
+                // Only show dialog for general errors, not API key missing, preview or metadata errors
+                if (!it.contains("API Key", ignoreCase = true) &&
+                    !it.contains("preview", ignoreCase = true) &&
+                    !it.contains("metadata", ignoreCase = true) &&
+                    !showDialog &&
                     currentScreen == Screen.Upload) {
                     dialogTitle = "Upload Error"
                     dialogContent = it
@@ -224,10 +246,11 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabTitles = listOf("Upload File", "Upload Text")
 
-    // State for Audio Preview
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
+    var currentPlaybackTimeMillis by remember { mutableLongStateOf(0L) }
     var audioPreviewError by remember { mutableStateOf<String?>(null) }
+    var isMediaPlayerPreparing by remember { mutableStateOf(false) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -236,79 +259,132 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
             if (uri != null && selectedTabIndex == 0) {
                 uploadViewModel.onTextToUploadChanged("")
             }
-            mediaPlayer?.release()
-            mediaPlayer = null
-            isPlaying = false
-            audioPreviewError = null
+            // Player setup/cleanup is now fully handled by DisposableEffect based on uiState.selectedFileUri
         }
     )
 
-    DisposableEffect(key1 = uiState.selectedFileUri, key2 = context) {
+    DisposableEffect(key1 = uiState.selectedFileUri, key2 = selectedTabIndex, key3 = context) {
+        var localMediaPlayerInstance: MediaPlayer? = null
+
         if (selectedTabIndex == 0 && uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("audio/") == true) {
-            val newPlayer = MediaPlayer()
+            Log.d(TAG_MEDIA_PLAYER, "DisposableEffect: Setting up MediaPlayer for: ${uiState.selectedFileUri}")
+
+            isMediaPlayerPreparing = true
+            mediaPlayer?.release() // Release any existing state player instance
+            mediaPlayer = null
+            isPlaying = false
+            currentPlaybackTimeMillis = 0L
+            audioPreviewError = null
+
+            localMediaPlayerInstance = MediaPlayer()
             try {
-                newPlayer.setDataSource(context, uiState.selectedFileUri!!)
-                newPlayer.prepareAsync()
-                newPlayer.setOnPreparedListener {
-                    mediaPlayer = newPlayer
+                localMediaPlayerInstance.setDataSource(context, uiState.selectedFileUri!!)
+                localMediaPlayerInstance.prepareAsync() // This is asynchronous
+
+                localMediaPlayerInstance.setOnPreparedListener { preparedPlayer ->
+                    Log.d(TAG_MEDIA_PLAYER, "MediaPlayer prepared: ${uiState.selectedFileUri}")
+                    mediaPlayer = preparedPlayer // Update the state variable with the prepared player
+                    isMediaPlayerPreparing = false
                     audioPreviewError = null
-                    Log.d(TAG_MEDIA_PLAYER, "MediaPlayer prepared for: ${uiState.selectedFileUri}")
                 }
-                newPlayer.setOnErrorListener { mp, what, extra ->
+                localMediaPlayerInstance.setOnErrorListener { mp, what, extra ->
                     Log.e(TAG_MEDIA_PLAYER, "MediaPlayer error (what: $what, extra: $extra) for: ${uiState.selectedFileUri}")
-                    audioPreviewError = "Cannot play this audio file."
+                    audioPreviewError = "Cannot play this audio file (error $what, $extra)."
                     mp?.release()
-                    mediaPlayer = null
+                    // Only nullify the main mediaPlayer state if it refers to the one that errored
+                    if (mediaPlayer === mp || mediaPlayer === localMediaPlayerInstance) {
+                        mediaPlayer = null
+                    }
+                    isMediaPlayerPreparing = false
                     isPlaying = false
-                    true 
+                    currentPlaybackTimeMillis = 0L
+                    true // Indicates the error was handled
                 }
-                newPlayer.setOnCompletionListener {
-                    isPlaying = false
+                localMediaPlayerInstance.setOnCompletionListener { mp ->
                     Log.d(TAG_MEDIA_PLAYER, "MediaPlayer playback completed for: ${uiState.selectedFileUri}")
+                    isPlaying = false
+                    currentPlaybackTimeMillis = uiState.audioDurationMillis ?: 0L
+                    // mp.seekTo(0) // Optional: reset to start for replaying, if desired
                 }
             } catch (e: IOException) {
-                Log.e(TAG_MEDIA_PLAYER, "IOException during MediaPlayer setDataSource: ${e.message}", e)
-                audioPreviewError = "Error loading audio file."
-                newPlayer.release() 
+                Log.e(TAG_MEDIA_PLAYER, "IOException during MediaPlayer setup: ${e.message}", e)
+                audioPreviewError = "Error loading audio file (IOException)."
+                localMediaPlayerInstance?.release()
                 mediaPlayer = null
+                isMediaPlayerPreparing = false
                 isPlaying = false
+                currentPlaybackTimeMillis = 0L
             } catch (e: IllegalStateException) {
-                Log.e(TAG_MEDIA_PLAYER, "IllegalStateException for MediaPlayer: ${e.message}", e)
-                audioPreviewError = "Error initializing audio player."
-                newPlayer.release()
+                Log.e(TAG_MEDIA_PLAYER, "IllegalStateException during MediaPlayer setup: ${e.message}", e)
+                audioPreviewError = "Error initializing audio player (IllegalStateException)."
+                localMediaPlayerInstance?.release()
                 mediaPlayer = null
+                isMediaPlayerPreparing = false
                 isPlaying = false
+                currentPlaybackTimeMillis = 0L
+            } catch (e: SecurityException) {
+                Log.e(TAG_MEDIA_PLAYER, "SecurityException during MediaPlayer setup: ${e.message}", e)
+                audioPreviewError = "Permission denied for audio file."
+                localMediaPlayerInstance?.release()
+                mediaPlayer = null
+                isMediaPlayerPreparing = false
+                isPlaying = false
+                currentPlaybackTimeMillis = 0L
             }
         } else {
+            // Not an audio file, wrong tab, or URI is null - cleanup player
+            Log.d(TAG_MEDIA_PLAYER, "DisposableEffect: Cleaning up MediaPlayer (not audio, wrong tab, or null URI).")
             mediaPlayer?.release()
             mediaPlayer = null
             isPlaying = false
+            currentPlaybackTimeMillis = 0L
             audioPreviewError = null
+            isMediaPlayerPreparing = false
         }
+
         onDispose {
-            Log.d(TAG_MEDIA_PLAYER, "DisposableEffect onDispose, releasing MediaPlayer for: ${uiState.selectedFileUri}")
-            mediaPlayer?.release()
+            Log.d(TAG_MEDIA_PLAYER, "DisposableEffect onDispose for ${uiState.selectedFileUri}, releasing players.")
+            localMediaPlayerInstance?.release() // Release the instance being configured if it's still around
+            mediaPlayer?.release() // Release the instance in state
             mediaPlayer = null
+            isMediaPlayerPreparing = false
             isPlaying = false
+            currentPlaybackTimeMillis = 0L
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) { 
+    LaunchedEffect(isPlaying, mediaPlayer, uiState.selectedFileUri, uiState.audioDurationMillis) {
+        if (isPlaying && mediaPlayer != null && mediaPlayer?.isPlaying == true) {
+            while (isActive) {
+                try {
+                    currentPlaybackTimeMillis = mediaPlayer?.currentPosition?.toLong() ?: currentPlaybackTimeMillis
+                } catch (e: IllegalStateException) {
+                    Log.e(TAG_MEDIA_PLAYER, "Error getting currentPosition: ${e.message}")
+                    isPlaying = false
+                    audioPreviewError = "Player error during playback."
+                    isMediaPlayerPreparing = false
+                    mediaPlayer = null // Player is in a bad state
+                    break
+                }
+                awaitFrame()
+                if (!isPlaying || mediaPlayer?.isPlaying == false) break
+            }
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = selectedTabIndex) {
             tabTitles.forEachIndexed { index, title ->
                 Tab(
                     selected = selectedTabIndex == index,
                     onClick = {
                         selectedTabIndex = index
-                        if (index == 0) { 
-                            uploadViewModel.onTextToUploadChanged("") 
-                        } else { 
-                            uploadViewModel.onFileSelected(null, context) 
+                        if (index == 0) {
+                            uploadViewModel.onTextToUploadChanged("")
+                        } else {
+                            uploadViewModel.onFileSelected(null, context)
                         }
-                        mediaPlayer?.release()
-                        mediaPlayer = null
-                        isPlaying = false
-                        audioPreviewError = null
+                        // Player cleanup/reset is handled by DisposableEffect reacting to selectedTabIndex or uiState.selectedFileUri changes
                     },
                     text = { Text(title) }
                 )
@@ -318,12 +394,12 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f) 
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp), 
+                .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp)) 
+            Spacer(modifier = Modifier.height(16.dp))
 
             when (selectedTabIndex) {
                 0 -> { // File Upload Tab Content
@@ -348,6 +424,12 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                 uiState.selectedFileMimeType?.let {
                                     InfoRow("Type:", it)
                                 }
+                                if (uiState.selectedFileMimeType?.startsWith("audio/") == true) {
+                                    uiState.audioDurationMillis?.let { InfoRow("Duration:", formatDurationMillis(it)) }
+                                    uiState.audioBitrate?.let { InfoRow("Bitrate:", "${it / 1000} kbps") }
+                                    uiState.audioArtist?.let { InfoRow("Artist:", it) }
+                                    uiState.audioAlbum?.let { InfoRow("Album:", it) }
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
@@ -360,7 +442,8 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(200.dp)
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 8.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
                                 contentScale = ContentScale.Fit
                             )
                             Spacer(modifier = Modifier.height(16.dp))
@@ -368,40 +451,94 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
 
                         // Audio Preview Section
                         if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("audio/") == true) {
-                            audioPreviewError?.let {
-                                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
-                            }
-                            Button(
-                                onClick = {
-                                    mediaPlayer?.let {
-                                        if (it.isPlaying) {
-                                            it.pause()
-                                            isPlaying = false
-                                        } else {
-                                            try {
-                                                it.start()
-                                                isPlaying = true
-                                            } catch (e: IllegalStateException) {
-                                                Log.e(TAG_MEDIA_PLAYER, "Error starting/resuming media player: ${e.message}", e)
-                                                audioPreviewError = "Could not play audio."
-                                                it.release()
-                                                mediaPlayer = null
-                                                isPlaying = false
+                            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        uiState.audioAlbumArt?.let { albumArtBytes ->
+                                            val bitmap = remember(albumArtBytes) {
+                                                try {
+                                                    BitmapFactory.decodeByteArray(albumArtBytes, 0, albumArtBytes.size)
+                                                } catch (e: Exception) {
+                                                    Log.e(TAG_MEDIA_PLAYER, "Error decoding album art: ${e.message}")
+                                                    null
+                                                }
                                             }
+                                            bitmap?.let {
+                                                Image(
+                                                    bitmap = it.asImageBitmap(),
+                                                    contentDescription = "Album Art",
+                                                    modifier = Modifier
+                                                        .size(64.dp)
+                                                        .clip(RoundedCornerShape(8.dp)),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            } ?: Icon(Icons.Filled.MusicNote, contentDescription = "Album Art Placeholder", modifier = Modifier.size(64.dp))
+                                        } ?: Icon(Icons.Filled.MusicNote, contentDescription = "Album Art Placeholder", modifier = Modifier.size(64.dp))
+
+                                        Spacer(modifier = Modifier.width(16.dp))
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            uiState.audioArtist?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
+                                            uiState.audioAlbum?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                                            Text(
+                                                text = "${formatDurationMillis(currentPlaybackTimeMillis)} / ${formatDurationMillis(uiState.audioDurationMillis ?: 0L)}",
+                                                style = MaterialTheme.typography.labelMedium
+                                            )
                                         }
-                                    } ?: run {
-                                        if (audioPreviewError == null) audioPreviewError = "Audio player not ready or file error."
+                                        FilledTonalIconButton(
+                                            onClick = {
+                                                if (isMediaPlayerPreparing) return@FilledTonalIconButton
+                                                mediaPlayer?.let { player ->
+                                                    if (player.isPlaying) {
+                                                        try {
+                                                          player.pause()
+                                                          isPlaying = false
+                                                        } catch (e: IllegalStateException) {
+                                                            Log.e(TAG_MEDIA_PLAYER, "Error pausing: ${e.message}", e)
+                                                            audioPreviewError = "Player error on pause."
+                                                            player.release()
+                                                            mediaPlayer = null
+                                                            isPlaying = false
+                                                            isMediaPlayerPreparing = false
+                                                            currentPlaybackTimeMillis = 0L
+                                                        }
+                                                    } else {
+                                                        try {
+                                                            player.start()
+                                                            isPlaying = true
+                                                            audioPreviewError = null
+                                                        } catch (e: IllegalStateException) {
+                                                            Log.e(TAG_MEDIA_PLAYER, "Error starting/resuming: ${e.message}", e)
+                                                            audioPreviewError = "Could not play audio."
+                                                            player.release()
+                                                            mediaPlayer = null
+                                                            isPlaying = false
+                                                            isMediaPlayerPreparing = false
+                                                            currentPlaybackTimeMillis = 0L
+                                                        }
+                                                    }
+                                                } ?: run {
+                                                    if (audioPreviewError == null && !isMediaPlayerPreparing) {
+                                                        audioPreviewError = "Player not available. Try selecting file again."
+                                                    }
+                                                }
+                                            },
+                                            enabled = mediaPlayer != null && !isMediaPlayerPreparing,
+                                            modifier = Modifier.size(48.dp)
+                                        ) {
+                                            Icon(
+                                                if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                                contentDescription = if (isPlaying) "Pause audio preview" else "Play audio preview"
+                                            )
+                                        }
                                     }
-                                },
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                                enabled = mediaPlayer != null && audioPreviewError == null
-                            ) {
-                                Icon(
-                                    if (isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                                    contentDescription = if (isPlaying) "Stop audio preview" else "Play audio preview"
-                                )
-                                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                                Text(if (isPlaying) "Stop Preview" else "Play Audio Preview")
+                                    if (isMediaPlayerPreparing) {
+                                        Text("Player preparing...", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                                    }
+                                    audioPreviewError?.let {
+                                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                                    }
+                                }
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                         }
@@ -410,22 +547,22 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                         val mimeType = uiState.selectedFileMimeType
                         val textContent = uiState.selectedFileTextContent
                         if (uiState.selectedFileUri != null && !textContent.isNullOrEmpty() && mimeType != null &&
-                            (mimeType.startsWith("text/") || 
-                             mimeType == "application/json" || 
+                            (mimeType.startsWith("text/") ||
+                             mimeType == "application/json" ||
                              mimeType == "application/xml" ||
-                             mimeType == "application/javascript" || 
-                             mimeType == "application/rss+xml" || 
+                             mimeType == "application/javascript" ||
+                             mimeType == "application/rss+xml" ||
                              mimeType == "application/atom+xml" ||
-                             (mimeType == "application/octet-stream" && 
-                              (uiState.selectedFileName?.endsWith(".txt", true) == true || 
-                               uiState.selectedFileName?.endsWith(".log", true) == true || 
-                               uiState.selectedFileName?.endsWith(".ini", true) == true || 
-                               uiState.selectedFileName?.endsWith(".xml", true) == true || 
+                             (mimeType == "application/octet-stream" &&
+                              (uiState.selectedFileName?.endsWith(".txt", true) == true ||
+                               uiState.selectedFileName?.endsWith(".log", true) == true ||
+                               uiState.selectedFileName?.endsWith(".ini", true) == true ||
+                               uiState.selectedFileName?.endsWith(".xml", true) == true ||
                                uiState.selectedFileName?.endsWith(".json", true) == true ||
                                uiState.selectedFileName?.endsWith(".js", true) == true ||
                                uiState.selectedFileName?.endsWith(".config", true) == true ||
                                uiState.selectedFileName?.endsWith(".md", true) == true ||
-                               uiState.selectedFileName?.endsWith(".csv", true) == true))                              
+                               uiState.selectedFileName?.endsWith(".csv", true) == true))
                             )
                         ) {
                             Text("File Content Preview (First 4KB):", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
@@ -435,16 +572,15 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                 readOnly = true,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(min = 100.dp, max = 200.dp) // Constrain height and allow scroll
+                                    .heightIn(min = 100.dp, max = 200.dp)
                                     .padding(vertical = 8.dp),
-                                textStyle = MaterialTheme.typography.bodySmall // Smaller font for dense text
+                                textStyle = MaterialTheme.typography.bodySmall
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                         }
-                        if (uiState.errorMessage?.contains("preview", ignoreCase = true) == true){
+                        if (uiState.errorMessage?.contains("preview", ignoreCase = true) == true || uiState.errorMessage?.contains("metadata", ignoreCase = true) == true){
                              Text(uiState.errorMessage!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
                         }
-
                     }
                 }
                 1 -> { // Text Upload Tab Content
@@ -479,17 +615,17 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                         }
                     }
                 } ?: run {
-                    if (effectiveTotalSize != null && effectiveTotalSize > 0 && uiState.uploadResult == null && (uiState.selectedFileUri != null || uiState.textToUpload.isNotBlank())) { 
+                    if (effectiveTotalSize != null && effectiveTotalSize > 0 && uiState.uploadResult == null && (uiState.selectedFileUri != null || uiState.textToUpload.isNotBlank())) {
                         Text(
-                            text = "Ready to upload. Total size: ${formatSize(effectiveTotalSize)}", 
-                            style = MaterialTheme.typography.bodyMedium, 
+                            text = "Ready to upload. Total size: ${formatSize(effectiveTotalSize)}",
+                            style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(bottom = 8.dp),
                             textAlign = TextAlign.Center
                         )
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp)) 
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
         val canUpload = (uiState.selectedFileUri != null || uiState.textToUpload.isNotBlank()) && !uiState.isLoading
@@ -498,7 +634,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
             enabled = canUpload,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp) 
+                .padding(16.dp)
         ) {
             Icon(Icons.Filled.FileUpload, contentDescription = null)
             Spacer(Modifier.size(ButtonDefaults.IconSpacing))
@@ -522,13 +658,13 @@ fun FilesScreenContent(fileInfoViewModel: FileInfoViewModel) {
         OutlinedTextField(
             value = uiState.fileIdInput,
             onValueChange = { fileInfoViewModel.onFileIdInputChange(it) },
-            label = { Text("Enter File ID to view details") }, 
+            label = { Text("Enter File ID to view details") },
             modifier = Modifier.fillMaxWidth(),
             isError = uiState.fileInfoErrorMessage?.contains("Please enter a File ID") == true,
             enabled = !uiState.isLoadingFileInfo
         )
         uiState.fileInfoErrorMessage?.let {
-            if (it != "Please enter a File ID.") { 
+            if (it != "Please enter a File ID.") {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
         }
@@ -563,9 +699,9 @@ fun FilesScreenContent(fileInfoViewModel: FileInfoViewModel) {
         } else if (!uiState.isLoadingFileInfo && uiState.fileIdInput.isBlank() && uiState.fileInfoErrorMessage == null) {
              Text("Enter a file ID to see its details.", style = MaterialTheme.typography.bodySmall)
         }
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        Divider()
+        HorizontalDivider()
         Spacer(modifier = Modifier.height(24.dp))
 
         var apiKey by remember { mutableStateOf("") }

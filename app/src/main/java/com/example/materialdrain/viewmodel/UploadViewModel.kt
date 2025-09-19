@@ -2,6 +2,7 @@ package com.example.materialdrain.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
@@ -34,8 +35,61 @@ data class UploadUiState(
     val textToUpload: String = "",
     val selectedFileUri: Uri? = null,      // For preview purposes
     val selectedFileMimeType: String? = null, // For preview type determination
-    val selectedFileTextContent: String? = null // For text file preview
-)
+    val selectedFileTextContent: String? = null, // For text file preview
+    // Audio specific fields
+    val audioDurationMillis: Long? = null,
+    val audioBitrate: Int? = null,
+    val audioArtist: String? = null,
+    val audioAlbum: String? = null,
+    val audioAlbumArt: ByteArray? = null
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as UploadUiState
+
+        if (isLoading != other.isLoading) return false
+        if (uploadResult != other.uploadResult) return false
+        if (errorMessage != other.errorMessage) return false
+        if (selectedFileName != other.selectedFileName) return false
+        if (uploadTotalSizeBytes != other.uploadTotalSizeBytes) return false
+        if (uploadedBytes != other.uploadedBytes) return false
+        if (textToUpload != other.textToUpload) return false
+        if (selectedFileUri != other.selectedFileUri) return false
+        if (selectedFileMimeType != other.selectedFileMimeType) return false
+        if (selectedFileTextContent != other.selectedFileTextContent) return false
+        if (audioDurationMillis != other.audioDurationMillis) return false
+        if (audioBitrate != other.audioBitrate) return false
+        if (audioArtist != other.audioArtist) return false
+        if (audioAlbum != other.audioAlbum) return false
+        if (audioAlbumArt != null) {
+            if (other.audioAlbumArt == null) return false
+            if (!audioAlbumArt.contentEquals(other.audioAlbumArt)) return false
+        } else if (other.audioAlbumArt != null) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = isLoading.hashCode()
+        result = 31 * result + (uploadResult?.hashCode() ?: 0)
+        result = 31 * result + (errorMessage?.hashCode() ?: 0)
+        result = 31 * result + (selectedFileName?.hashCode() ?: 0)
+        result = 31 * result + (uploadTotalSizeBytes?.hashCode() ?: 0)
+        result = 31 * result + uploadedBytes.hashCode()
+        result = 31 * result + textToUpload.hashCode()
+        result = 31 * result + (selectedFileUri?.hashCode() ?: 0)
+        result = 31 * result + (selectedFileMimeType?.hashCode() ?: 0)
+        result = 31 * result + (selectedFileTextContent?.hashCode() ?: 0)
+        result = 31 * result + (audioDurationMillis?.hashCode() ?: 0)
+        result = 31 * result + (audioBitrate ?: 0)
+        result = 31 * result + (audioArtist?.hashCode() ?: 0)
+        result = 31 * result + (audioAlbum?.hashCode() ?: 0)
+        result = 31 * result + (audioAlbumArt?.contentHashCode() ?: 0)
+        return result
+    }
+}
 
 class UploadViewModel(
     private val application: Application,
@@ -46,7 +100,6 @@ class UploadViewModel(
     val uiState: StateFlow<UploadUiState> = _uiState.asStateFlow()
 
     private var apiKey: String = ""
-    // private var selectedFileUriInternal: Uri? = null // Replaced by selectedFileUri in UiState
 
     init {
         Log.d(TAG, "ViewModel initialized")
@@ -66,8 +119,14 @@ class UploadViewModel(
         var newTextContent: String? = null
         var newErrorMessage: String? = null
 
+        // Audio metadata fields
+        var newAudioDurationMillis: Long? = null
+        var newAudioBitrate: Int? = null
+        var newAudioArtist: String? = null
+        var newAudioAlbum: String? = null
+        var newAudioAlbumArt: ByteArray? = null
+
         if (uri != null) {
-            // selectedFileUriInternal = uri // Store internal reference for upload
             try {
                 newMimeType = context.contentResolver.getType(uri)
                 context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
@@ -79,31 +138,29 @@ class UploadViewModel(
                             newFileSizeBytes = cursor.getLong(sizeIndex)
                         } else {
                             Log.w(TAG, "File size is unavailable for URI: $uri")
-                            newFileSizeBytes = null
+                            newFileSizeBytes = null 
                         }
                     }
                 }
 
-                // Try to read text content for preview if it seems like a text file
-                if (newMimeType != null && 
-                    (newMimeType.startsWith("text/") || 
-                     newMimeType == "application/json" || 
+                // Try to read text content for preview
+                if (newMimeType != null &&
+                    (newMimeType.startsWith("text/") ||
+                     newMimeType == "application/json" ||
                      newMimeType == "application/xml" ||
-                     newMimeType == "application/javascript" || 
-                     newMimeType == "application/rss+xml" || 
-                     newMimeType == "application/atom+xml" || 
-                     // common config/log file extensions often default to octet-stream
-                     (newMimeType == "application/octet-stream" && 
-                      (newFileName?.endsWith(".txt", true) == true || 
-                       newFileName?.endsWith(".log", true) == true || 
-                       newFileName?.endsWith(".ini", true) == true || 
-                       newFileName?.endsWith(".xml", true) == true || 
-                       newFileName?.endsWith(".json", true) == true || 
-                       newFileName?.endsWith(".js", true) == true || 
-                       newFileName?.endsWith(".config", true) == true || 
-                       newFileName?.endsWith(".md", true) == true || 
-                       newFileName?.endsWith(".csv", true) == true)) 
-                    )
+                     newMimeType == "application/javascript" ||
+                     newMimeType == "application/rss+xml" ||
+                     newMimeType == "application/atom+xml" ||
+                     (newMimeType == "application/octet-stream" &&
+                      (newFileName?.endsWith(".txt", true) == true ||
+                       newFileName?.endsWith(".log", true) == true ||
+                       newFileName?.endsWith(".ini", true) == true ||
+                       newFileName?.endsWith(".xml", true) == true ||
+                       newFileName?.endsWith(".json", true) == true ||
+                       newFileName?.endsWith(".js", true) == true ||
+                       newFileName?.endsWith(".config", true) == true ||
+                       newFileName?.endsWith(".md", true) == true ||
+                       newFileName?.endsWith(".csv", true) == true)))
                 ) {
                     try {
                         context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -117,7 +174,30 @@ class UploadViewModel(
                         }
                     } catch (e: IOException) {
                         Log.e(TAG, "Error reading text content for preview: ${e.message}", e)
-                        newErrorMessage = "Could not read file for preview."
+                        newErrorMessage = (newErrorMessage ?: "") + " Could not read file for preview."
+                    }
+                }
+
+                // Extract audio metadata if it's an audio file
+                if (newMimeType?.startsWith("audio/") == true) {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(context, uri)
+                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.let {
+                            newAudioDurationMillis = it
+                        }
+                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toIntOrNull()?.let {
+                            newAudioBitrate = it
+                        }
+                        newAudioArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                        newAudioAlbum = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                        newAudioAlbumArt = retriever.embeddedPicture
+                        Log.d(TAG, "Audio metadata: Duration=$newAudioDurationMillis, Bitrate=$newAudioBitrate, Artist=$newAudioArtist, Album=$newAudioAlbum, HasAlbumArt=${newAudioAlbumArt != null}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error extracting audio metadata: ${e.message}", e)
+                        newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve audio metadata."
+                    } finally {
+                        retriever.release()
                     }
                 }
 
@@ -125,24 +205,28 @@ class UploadViewModel(
                 Log.e(TAG, "Error querying file details: ${e.message}", e)
                 newFileName = "Error reading file"
                 newFileSizeBytes = null
-                newMimeType = null
-                newErrorMessage = "Error accessing file details."
+                newMimeType = null 
+                newErrorMessage = (newErrorMessage ?: "") + " Error accessing file details."
             }
             _uiState.update {
                 it.copy(
                     selectedFileName = newFileName,
                     uploadTotalSizeBytes = newFileSizeBytes,
-                    selectedFileUri = uri, // Update URI in state
+                    selectedFileUri = uri,
                     selectedFileMimeType = newMimeType,
-                    selectedFileTextContent = newTextContent, 
-                    textToUpload = "", // Clear text upload field
-                    errorMessage = newErrorMessage ?: it.errorMessage, // Preserve existing error unless new one occurs
+                    selectedFileTextContent = newTextContent,
+                    textToUpload = "", 
+                    errorMessage = newErrorMessage ?: it.errorMessage, 
                     uploadResult = null,
-                    uploadedBytes = 0L
+                    uploadedBytes = 0L,
+                    audioDurationMillis = if (newMimeType?.startsWith("audio/") == true) newAudioDurationMillis else null,
+                    audioBitrate = if (newMimeType?.startsWith("audio/") == true) newAudioBitrate else null,
+                    audioArtist = if (newMimeType?.startsWith("audio/") == true) newAudioArtist else null,
+                    audioAlbum = if (newMimeType?.startsWith("audio/") == true) newAudioAlbum else null,
+                    audioAlbumArt = if (newMimeType?.startsWith("audio/") == true) newAudioAlbumArt else null
                 )
             }
-        } else {
-            // selectedFileUriInternal = null
+        } else { // uri is null
             _uiState.update {
                 it.copy(
                     selectedFileName = null,
@@ -150,43 +234,53 @@ class UploadViewModel(
                     selectedFileUri = null,
                     selectedFileMimeType = null,
                     selectedFileTextContent = null,
-                    errorMessage = null, // Clear errors when file is deselected
+                    errorMessage = null, 
                     uploadResult = null,
-                    uploadedBytes = 0L
+                    uploadedBytes = 0L,
+                    audioDurationMillis = null,
+                    audioBitrate = null,
+                    audioArtist = null,
+                    audioAlbum = null,
+                    audioAlbumArt = null
                 )
             }
         }
-        Log.d(TAG, "File selected: Name: $newFileName, Uri: $uri, Size: $newFileSizeBytes, MIME: $newMimeType, TextPreview: ${newTextContent != null}")
+        Log.d(TAG, "File selected: Name: $newFileName, Uri: $uri, Size: $newFileSizeBytes, MIME: $newMimeType, TextPreview: ${newTextContent != null}, AudioArtist: $newAudioArtist")
     }
 
     fun onTextToUploadChanged(newText: String) {
         var newTextSizeBytes: Long? = null
         if (newText.isNotBlank()) {
             newTextSizeBytes = newText.toByteArray().size.toLong()
-            // If user starts typing text, clear file selection for preview
             _uiState.update {
                 it.copy(
                     textToUpload = newText,
-                    selectedFileName = null,
+                    selectedFileName = null, 
                     uploadTotalSizeBytes = newTextSizeBytes,
                     selectedFileUri = null,
                     selectedFileMimeType = null,
                     selectedFileTextContent = null,
                     errorMessage = null,
                     uploadResult = null,
-                    uploadedBytes = 0L
+                    uploadedBytes = 0L,
+                    audioDurationMillis = null,
+                    audioBitrate = null,
+                    audioArtist = null,
+                    audioAlbum = null,
+                    audioAlbumArt = null
                 )
             }
-        } else {
-            // Text field cleared, potentially revert to showing file info if a file was selected before typing
-            // For simplicity, we just clear the text and its size. If a file was selected, it remains in selectedFileUri.
+        } else { 
              _uiState.update {
                 it.copy(
                     textToUpload = newText,
-                    uploadTotalSizeBytes = if(it.selectedFileUri != null) it.uploadTotalSizeBytes else null, // Keep file size if file still selected
+                    uploadTotalSizeBytes = if(it.selectedFileUri != null) it.uploadTotalSizeBytes else null, 
                     errorMessage = null,
                     uploadResult = null,
                     uploadedBytes = 0L
+                    // Audio fields are not explicitly cleared here assuming if text is cleared,
+                    // and a file was previously selected, its metadata (incl audio) should persist until a new file is chosen or text is typed.
+                    // If explicit clearing of audio is needed when text field is cleared, add them here set to null.
                 )
             }
         }
@@ -213,20 +307,24 @@ class UploadViewModel(
 
     fun upload() {
         val currentTextToUpload = _uiState.value.textToUpload
-        val currentSelectedFileUri = _uiState.value.selectedFileUri // Use URI from UiState
+        val currentSelectedFileUri = _uiState.value.selectedFileUri
 
         if (apiKey.isBlank()) {
             _uiState.update {
                 it.copy(
                     isLoading = false,
                     errorMessage = "API Key is missing. Please set it in Settings.",
-                    // Clear file selection on API key error as well
                     selectedFileName = null, 
                     uploadTotalSizeBytes = null,
                     selectedFileUri = null,
                     selectedFileMimeType = null,
                     selectedFileTextContent = null,
-                    textToUpload = ""
+                    textToUpload = "",
+                    audioDurationMillis = null,
+                    audioBitrate = null,
+                    audioArtist = null,
+                    audioAlbum = null,
+                    audioAlbumArt = null
                 )
             }
             return
@@ -237,12 +335,17 @@ class UploadViewModel(
                 it.copy(
                     isLoading = false,
                     errorMessage = "No file selected or text provided.",
-                     selectedFileName = null, 
+                    selectedFileName = null, 
                     uploadTotalSizeBytes = null,
                     selectedFileUri = null,
                     selectedFileMimeType = null,
                     selectedFileTextContent = null,
-                    textToUpload = ""
+                    textToUpload = "",
+                    audioDurationMillis = null,
+                    audioBitrate = null,
+                    audioArtist = null,
+                    audioAlbum = null,
+                    audioAlbumArt = null
                 )
             }
             return
@@ -289,9 +392,14 @@ class UploadViewModel(
                             uploadTotalSizeBytes = null, 
                             uploadedBytes = finalTotalBytes ?: 0L, 
                             textToUpload = "",
-                            selectedFileUri = null, // Clear URI after successful upload
+                            selectedFileUri = null, 
                             selectedFileMimeType = null,
-                            selectedFileTextContent = null
+                            selectedFileTextContent = null,
+                            audioDurationMillis = null,
+                            audioBitrate = null,
+                            audioArtist = null,
+                            audioAlbum = null,
+                            audioAlbumArt = null
                         )
                     }
                 } else {
@@ -301,11 +409,12 @@ class UploadViewModel(
                             uploadResult = response,
                             errorMessage = response.message ?: response.value ?: "Upload failed with no specific message.",
                             uploadedBytes = 0L
+                            // Keep audio fields on failed upload for now, user might retry or want to see the metadata
                         )
                     }
                 }
             } else {
-                if (_uiState.value.isLoading) {
+                if (_uiState.value.isLoading) { // Only update if still loading and response was null
                      _uiState.update {
                         it.copy(isLoading = false, errorMessage = it.errorMessage ?: "Upload did not return a response.", uploadedBytes = 0L)
                     }
