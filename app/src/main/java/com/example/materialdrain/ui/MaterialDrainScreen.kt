@@ -2,7 +2,9 @@ package com.example.materialdrain.ui
 
 import android.app.Application
 import android.content.Context // Added for SharedPreferences
+import android.media.MediaPlayer // Added for Audio Preview
 import android.net.Uri
+import android.util.Log // Added for Audio Preview Logging
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -19,11 +21,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale // Added for Image Preview
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage // Added for Image Preview
 import com.example.materialdrain.network.FileInfoResponse
 import com.example.materialdrain.network.PixeldrainApiService
 import com.example.materialdrain.ui.theme.MaterialdrainTheme
@@ -31,15 +35,17 @@ import com.example.materialdrain.viewmodel.FileInfoViewModel
 import com.example.materialdrain.viewmodel.UploadViewModel
 import com.example.materialdrain.viewmodel.ViewModelFactory
 import kotlinx.coroutines.flow.collectLatest
+import java.io.IOException // Added for Audio Preview
 import java.text.DecimalFormat
 
 // SharedPreferences constants
 private const val PREFS_NAME = "pixeldrain_prefs"
 private const val API_KEY_PREF = "api_key"
+private const val TAG_MEDIA_PLAYER = "MediaPlayerPreview" // Added for Audio Preview Logging
 
 // Define the screens in the app
 enum class Screen(val title: String, val icon: ImageVector) {
-    Upload("Upload", Icons.Filled.Upload),
+    Upload("Upload", Icons.Filled.FileUpload), // Changed Icon
     Files("Files", Icons.Filled.Folder),
     Lists("Lists", Icons.AutoMirrored.Filled.List),
     Settings("Settings", Icons.Filled.Settings)
@@ -86,7 +92,11 @@ fun MaterialDrainScreen() {
                 }
             }
             uiState.errorMessage?.let {
-                if (!it.contains("API Key") && !showDialog && currentScreen == Screen.Upload) {
+                // Only show dialog for general errors, not API key missing if already handled or for preview errors
+                if (!it.contains("API Key", ignoreCase = true) && 
+                    !it.contains("preview", ignoreCase = true) && 
+                    !showDialog && 
+                    currentScreen == Screen.Upload) {
                     dialogTitle = "Upload Error"
                     dialogContent = it
                     showDialog = true
@@ -214,15 +224,74 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabTitles = listOf("Upload File", "Upload Text")
 
+    // State for Audio Preview
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var audioPreviewError by remember { mutableStateOf<String?>(null) }
+
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
         onResult = { uri: Uri? ->
-            if (uri != null) {
-                uploadViewModel.onFileSelected(uri, context)
-                if (selectedTabIndex == 0) uploadViewModel.onTextToUploadChanged("")
+            uploadViewModel.onFileSelected(uri, context)
+            if (uri != null && selectedTabIndex == 0) {
+                uploadViewModel.onTextToUploadChanged("")
             }
+            mediaPlayer?.release()
+            mediaPlayer = null
+            isPlaying = false
+            audioPreviewError = null
         }
     )
+
+    DisposableEffect(key1 = uiState.selectedFileUri, key2 = context) {
+        if (selectedTabIndex == 0 && uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("audio/") == true) {
+            val newPlayer = MediaPlayer()
+            try {
+                newPlayer.setDataSource(context, uiState.selectedFileUri!!)
+                newPlayer.prepareAsync()
+                newPlayer.setOnPreparedListener {
+                    mediaPlayer = newPlayer
+                    audioPreviewError = null
+                    Log.d(TAG_MEDIA_PLAYER, "MediaPlayer prepared for: ${uiState.selectedFileUri}")
+                }
+                newPlayer.setOnErrorListener { mp, what, extra ->
+                    Log.e(TAG_MEDIA_PLAYER, "MediaPlayer error (what: $what, extra: $extra) for: ${uiState.selectedFileUri}")
+                    audioPreviewError = "Cannot play this audio file."
+                    mp?.release()
+                    mediaPlayer = null
+                    isPlaying = false
+                    true 
+                }
+                newPlayer.setOnCompletionListener {
+                    isPlaying = false
+                    Log.d(TAG_MEDIA_PLAYER, "MediaPlayer playback completed for: ${uiState.selectedFileUri}")
+                }
+            } catch (e: IOException) {
+                Log.e(TAG_MEDIA_PLAYER, "IOException during MediaPlayer setDataSource: ${e.message}", e)
+                audioPreviewError = "Error loading audio file."
+                newPlayer.release() 
+                mediaPlayer = null
+                isPlaying = false
+            } catch (e: IllegalStateException) {
+                Log.e(TAG_MEDIA_PLAYER, "IllegalStateException for MediaPlayer: ${e.message}", e)
+                audioPreviewError = "Error initializing audio player."
+                newPlayer.release()
+                mediaPlayer = null
+                isPlaying = false
+            }
+        } else {
+            mediaPlayer?.release()
+            mediaPlayer = null
+            isPlaying = false
+            audioPreviewError = null
+        }
+        onDispose {
+            Log.d(TAG_MEDIA_PLAYER, "DisposableEffect onDispose, releasing MediaPlayer for: ${uiState.selectedFileUri}")
+            mediaPlayer?.release()
+            mediaPlayer = null
+            isPlaying = false
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) { 
         TabRow(selectedTabIndex = selectedTabIndex) {
@@ -236,6 +305,10 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                         } else { 
                             uploadViewModel.onFileSelected(null, context) 
                         }
+                        mediaPlayer?.release()
+                        mediaPlayer = null
+                        isPlaying = false
+                        audioPreviewError = null
                     },
                     text = { Text(title) }
                 )
@@ -272,10 +345,107 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                 uiState.uploadTotalSizeBytes?.let {
                                     InfoRow("Size:", formatSize(it))
                                 }
+                                uiState.selectedFileMimeType?.let {
+                                    InfoRow("Type:", it)
+                                }
                             }
                         }
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Image Preview Section
+                        if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("image/") == true) {
+                            AsyncImage(
+                                model = uiState.selectedFileUri,
+                                contentDescription = "Selected image preview",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .padding(vertical = 8.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+
+                        // Audio Preview Section
+                        if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("audio/") == true) {
+                            audioPreviewError?.let {
+                                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
+                            }
+                            Button(
+                                onClick = {
+                                    mediaPlayer?.let {
+                                        if (it.isPlaying) {
+                                            it.pause()
+                                            isPlaying = false
+                                        } else {
+                                            try {
+                                                it.start()
+                                                isPlaying = true
+                                            } catch (e: IllegalStateException) {
+                                                Log.e(TAG_MEDIA_PLAYER, "Error starting/resuming media player: ${e.message}", e)
+                                                audioPreviewError = "Could not play audio."
+                                                it.release()
+                                                mediaPlayer = null
+                                                isPlaying = false
+                                            }
+                                        }
+                                    } ?: run {
+                                        if (audioPreviewError == null) audioPreviewError = "Audio player not ready or file error."
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                enabled = mediaPlayer != null && audioPreviewError == null
+                            ) {
+                                Icon(
+                                    if (isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+                                    contentDescription = if (isPlaying) "Stop audio preview" else "Play audio preview"
+                                )
+                                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                                Text(if (isPlaying) "Stop Preview" else "Play Audio Preview")
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+
+                        // Text File Preview Section
+                        val mimeType = uiState.selectedFileMimeType
+                        val textContent = uiState.selectedFileTextContent
+                        if (uiState.selectedFileUri != null && !textContent.isNullOrEmpty() && mimeType != null &&
+                            (mimeType.startsWith("text/") || 
+                             mimeType == "application/json" || 
+                             mimeType == "application/xml" ||
+                             mimeType == "application/javascript" || 
+                             mimeType == "application/rss+xml" || 
+                             mimeType == "application/atom+xml" ||
+                             (mimeType == "application/octet-stream" && 
+                              (uiState.selectedFileName?.endsWith(".txt", true) == true || 
+                               uiState.selectedFileName?.endsWith(".log", true) == true || 
+                               uiState.selectedFileName?.endsWith(".ini", true) == true || 
+                               uiState.selectedFileName?.endsWith(".xml", true) == true || 
+                               uiState.selectedFileName?.endsWith(".json", true) == true ||
+                               uiState.selectedFileName?.endsWith(".js", true) == true ||
+                               uiState.selectedFileName?.endsWith(".config", true) == true ||
+                               uiState.selectedFileName?.endsWith(".md", true) == true ||
+                               uiState.selectedFileName?.endsWith(".csv", true) == true))                              
+                            )
+                        ) {
+                            Text("File Content Preview (First 4KB):", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                            OutlinedTextField(
+                                value = textContent,
+                                onValueChange = {}, // Read-only
+                                readOnly = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 100.dp, max = 200.dp) // Constrain height and allow scroll
+                                    .padding(vertical = 8.dp),
+                                textStyle = MaterialTheme.typography.bodySmall // Smaller font for dense text
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                        if (uiState.errorMessage?.contains("preview", ignoreCase = true) == true){
+                             Text(uiState.errorMessage!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
+                        }
+
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
                 }
                 1 -> { // Text Upload Tab Content
                     OutlinedTextField(
@@ -286,7 +456,6 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                         maxLines = 10,
                         enabled = !uiState.isLoading
                     )
-                    // Spacer(modifier = Modifier.height(16.dp)) // Removed Spacer
                 }
             }
 
@@ -310,7 +479,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                         }
                     }
                 } ?: run {
-                    if (effectiveTotalSize != null && effectiveTotalSize > 0 && uiState.uploadResult == null) { 
+                    if (effectiveTotalSize != null && effectiveTotalSize > 0 && uiState.uploadResult == null && (uiState.selectedFileUri != null || uiState.textToUpload.isNotBlank())) { 
                         Text(
                             text = "Ready to upload. Total size: ${formatSize(effectiveTotalSize)}", 
                             style = MaterialTheme.typography.bodyMedium, 
@@ -320,19 +489,18 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp)) // Spacer at the end of scrollable content
+            Spacer(modifier = Modifier.height(16.dp)) 
         }
 
-        // Upload Button - outside the scrollable area, at the bottom
-        val canUpload = (uiState.selectedFileName != null || uiState.textToUpload.isNotBlank()) && !uiState.isLoading
+        val canUpload = (uiState.selectedFileUri != null || uiState.textToUpload.isNotBlank()) && !uiState.isLoading
         Button(
             onClick = { uploadViewModel.upload() },
             enabled = canUpload,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp) // Padding for the button section
+                .padding(16.dp) 
         ) {
-            Icon(Icons.Filled.FileUpload, contentDescription = null) // Changed icon here
+            Icon(Icons.Filled.FileUpload, contentDescription = null)
             Spacer(Modifier.size(ButtonDefaults.IconSpacing))
             Text("Upload")
         }

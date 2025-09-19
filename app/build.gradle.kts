@@ -52,6 +52,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0") // Added ViewModel Compose
+    implementation("io.coil-kt:coil-compose:2.7.0") // Added Coil for image loading
 
     // Ktor Client Dependencies
     implementation("io.ktor:ktor-client-core:3.3.0")
