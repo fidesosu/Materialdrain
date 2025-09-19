@@ -39,7 +39,7 @@ private const val API_KEY_PREF = "api_key"
 
 // Define the screens in the app
 enum class Screen(val title: String, val icon: ImageVector) {
-    Upload("Upload", Icons.Filled.ArrowUpward),
+    Upload("Upload", Icons.Filled.Upload),
     Files("Files", Icons.Filled.Folder),
     Lists("Lists", Icons.AutoMirrored.Filled.List),
     Settings("Settings", Icons.Filled.Settings)
@@ -128,18 +128,15 @@ fun MaterialDrainScreen() {
             }
         },
         floatingActionButton = {
-            if (currentScreen == Screen.Upload) {
-                FloatingActionButton(onClick = { uploadViewModel.upload() }) {
-                    Icon(Icons.Filled.ArrowUpward, contentDescription = "Upload")
-                }
-            }
+            // No FAB for Upload screen; moved to a standard button within UploadScreenContent
+            // Other screens could have FABs defined here if needed in the future.
         }
     ) { paddingValues ->
         Box(modifier = Modifier.padding(paddingValues)) {
             when (currentScreen) {
                 Screen.Upload -> UploadScreenContent(
                     uploadViewModel = uploadViewModel,
-                    onShowDialog = { title, content -> // Retained for future use if specific dialogs are needed from here
+                    onShowDialog = { title, content ->
                         dialogTitle = title
                         dialogContent = content
                         showDialog = true
@@ -222,23 +219,22 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
         onResult = { uri: Uri? ->
             if (uri != null) {
                 uploadViewModel.onFileSelected(uri, context)
-                // Ensure text field is cleared when a file is selected for this tab
                 if (selectedTabIndex == 0) uploadViewModel.onTextToUploadChanged("")
             }
         }
     )
 
-    Column(modifier = Modifier.fillMaxSize()) { // Main column for TabRow and content
+    Column(modifier = Modifier.fillMaxSize()) { 
         TabRow(selectedTabIndex = selectedTabIndex) {
             tabTitles.forEachIndexed { index, title ->
                 Tab(
                     selected = selectedTabIndex == index,
                     onClick = {
                         selectedTabIndex = index
-                        if (index == 0) { // File tab selected
-                            uploadViewModel.onTextToUploadChanged("") // Clear text input
-                        } else { // Text tab selected
-                            uploadViewModel.onFileSelected(null, context) // Clear file selection
+                        if (index == 0) { 
+                            uploadViewModel.onTextToUploadChanged("") 
+                        } else { 
+                            uploadViewModel.onFileSelected(null, context) 
                         }
                     },
                     text = { Text(title) }
@@ -246,18 +242,18 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
             }
         }
 
-        // Content area below tabs
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f) // Allow this column to take available space
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
+                .weight(1f) 
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp), 
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(modifier = Modifier.height(16.dp)) 
+
             when (selectedTabIndex) {
                 0 -> { // File Upload Tab Content
-                    Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = { filePickerLauncher.launch("*/*") },
                         modifier = Modifier.fillMaxWidth()
@@ -276,14 +272,12 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                 uiState.uploadTotalSizeBytes?.let {
                                     InfoRow("Size:", formatSize(it))
                                 }
-                                // You could try to get and display MIME type here if available from ViewModel or Uri
                             }
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                 }
                 1 -> { // Text Upload Tab Content
-                    Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
                         value = uiState.textToUpload,
                         onValueChange = { uploadViewModel.onTextToUploadChanged(it) },
@@ -292,11 +286,10 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                         maxLines = 10,
                         enabled = !uiState.isLoading
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    // Spacer(modifier = Modifier.height(16.dp)) // Removed Spacer
                 }
             }
 
-            // Common Upload Status/Result Display
             val totalSizeBytes = uiState.uploadTotalSizeBytes
             val textToUpload = uiState.textToUpload
             val effectiveTotalSize = if (selectedTabIndex == 0) totalSizeBytes else if (textToUpload.isNotBlank()) textToUpload.toByteArray().size.toLong() else null
@@ -327,7 +320,21 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                     }
                 }
             }
-           // Spacer(modifier = Modifier.weight(1f)) // Removed to allow content to naturally flow; FAB is separate
+            Spacer(modifier = Modifier.height(16.dp)) // Spacer at the end of scrollable content
+        }
+
+        // Upload Button - outside the scrollable area, at the bottom
+        val canUpload = (uiState.selectedFileName != null || uiState.textToUpload.isNotBlank()) && !uiState.isLoading
+        Button(
+            onClick = { uploadViewModel.upload() },
+            enabled = canUpload,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp) // Padding for the button section
+        ) {
+            Icon(Icons.Filled.FileUpload, contentDescription = null) // Changed icon here
+            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+            Text("Upload")
         }
     }
 }
@@ -342,7 +349,6 @@ fun FilesScreenContent(fileInfoViewModel: FileInfoViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-        // Removed "View Single File Info" title
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
@@ -393,8 +399,6 @@ fun FilesScreenContent(fileInfoViewModel: FileInfoViewModel) {
         Spacer(modifier = Modifier.height(24.dp))
         Divider()
         Spacer(modifier = Modifier.height(24.dp))
-
-        // Removed "My Files" title
 
         var apiKey by remember { mutableStateOf("") }
         LaunchedEffect(Unit) { 
@@ -510,7 +514,6 @@ fun ListsScreenContent(onShowDialog: (String, String) -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-        // Removed "Manage Lists" title
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(value = newListFileIds, onValueChange = { newListFileIds = it }, label = { Text("Enter File IDs for new list (comma-separated)") }, modifier = Modifier.fillMaxWidth())
@@ -549,7 +552,6 @@ fun SettingsScreenContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center 
     ) {
-        // Removed "App Settings" title
         Spacer(modifier = Modifier.height(24.dp))
 
         OutlinedTextField(value = apiKeyInput, onValueChange = { apiKeyInput = it }, label = { Text("Pixeldrain API Key") }, modifier = Modifier.fillMaxWidth())
