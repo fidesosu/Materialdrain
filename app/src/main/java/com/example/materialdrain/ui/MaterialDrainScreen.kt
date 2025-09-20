@@ -78,12 +78,15 @@ import com.example.materialdrain.viewmodel.DownloadStatus
 import android.content.ClipboardManager
 import android.util.Log
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.format.DateTimeParseException // For safe parsing
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.zIndex
 
 // SharedPreferences constants
 private const val PREFS_NAME = "pixeldrain_prefs"
@@ -174,8 +177,8 @@ fun MaterialDrainScreen() {
                 if (!it.contains("API Key", ignoreCase = true) &&
                     !it.contains("preview", ignoreCase = true) &&
                     !it.contains("metadata", ignoreCase = true) &&
-                    !showGenericDialog && 
-                    !fileInfoUiState.showEnterFileIdDialog && 
+                    !showGenericDialog &&
+                    !fileInfoUiState.showEnterFileIdDialog &&
                     currentScreen == Screen.Upload) {
                     genericDialogTitle = "Upload Error"
                     genericDialogContent = it
@@ -222,7 +225,7 @@ fun MaterialDrainScreen() {
     if (fileInfoUiState.apiKeyMissingError && currentScreen == Screen.Files &&
         !fileInfoUiState.userFilesListErrorMessage.isNullOrBlank() &&
         !showGenericDialog && !fileInfoUiState.showDeleteConfirmDialog && !fileInfoUiState.showEnterFileIdDialog && fileInfoUiState.fileInfo == null) {
-         LaunchedEffect(fileInfoUiState.apiKeyMissingError, currentScreen, fileInfoUiState.userFilesListErrorMessage) {
+        LaunchedEffect(fileInfoUiState.apiKeyMissingError, currentScreen, fileInfoUiState.userFilesListErrorMessage) {
             if (fileInfoUiState.userFilesListErrorMessage!!.contains("API Key", ignoreCase = true)) {
                 genericDialogTitle = "API Key Required for Files"
                 genericDialogContent = fileInfoUiState.userFilesListErrorMessage!!
@@ -308,12 +311,17 @@ fun MaterialDrainScreen() {
             }
         },
         snackbarHost = {
-            SnackbarHost(hostState = snackbarHostState) { data ->
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .offset(y = 72.dp) // Added offset here
+                    .zIndex(1f)
+            ) { data ->
                 Snackbar(
                     snackbarData = data,
-                    containerColor = MaterialTheme.colorScheme.inverseSurface,
-                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                    actionColor = MaterialTheme.colorScheme.inversePrimary
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    actionColor = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -358,8 +366,8 @@ fun MaterialDrainScreen() {
                 if (genericDialogTitle == "Upload Failed" || genericDialogTitle == "Upload Error"){
                     uploadViewModel.clearUploadResult()
                 }
-                 if (genericDialogContent.contains("API Key") && uploadUiState.errorMessage?.contains("API Key") == true) {
-                     uploadViewModel.clearApiKeyError()
+                if (genericDialogContent.contains("API Key") && uploadUiState.errorMessage?.contains("API Key") == true) {
+                    uploadViewModel.clearApiKeyError()
                 }
                 if (genericDialogTitle.contains("API Key Required for Files")) {
                     fileInfoViewModel.clearUserFilesError()
@@ -371,16 +379,16 @@ fun MaterialDrainScreen() {
             confirmButton = {
                 Button(onClick = {
                     showGenericDialog = false
-                     if (genericDialogTitle == "Upload Failed" || genericDialogTitle == "Upload Error"){
+                    if (genericDialogTitle == "Upload Failed" || genericDialogTitle == "Upload Error"){
                         uploadViewModel.clearUploadResult()
                     }
-                     if (genericDialogContent.contains("API Key") && uploadUiState.errorMessage?.contains("API Key") == true) {
+                    if (genericDialogContent.contains("API Key") && uploadUiState.errorMessage?.contains("API Key") == true) {
                         uploadViewModel.clearApiKeyError()
                     }
                     if (genericDialogTitle.contains("API Key Required for Files")) {
                         fileInfoViewModel.clearUserFilesError()
                         fileInfoViewModel.clearApiKeyMissingError()
-                         if (genericDialogContent.contains("Settings")) {
+                        if (genericDialogContent.contains("Settings")) {
                             currentScreen = Screen.Settings
                         }
                     }
