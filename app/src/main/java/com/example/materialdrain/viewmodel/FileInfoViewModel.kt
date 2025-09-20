@@ -33,6 +33,25 @@ enum class SortableField {
     UPLOAD_DATE
 }
 
+// --- Download State Management ---
+enum class DownloadStatus {
+    PENDING,
+    DOWNLOADING,
+    COMPLETED,
+    FAILED
+}
+
+data class FileDownloadState(
+    val fileId: String,
+    val fileName: String,
+    val totalBytes: Long?,
+    val downloadedBytes: Long = 0L,
+    val progressFraction: Float = 0f,
+    val status: DownloadStatus = DownloadStatus.PENDING,
+    val message: String? = null // For individual success/error messages
+)
+// --- End Download State Management ---
+
 data class FileInfoUiState(
     // For single file info
     val isLoadingFileInfo: Boolean = false,
@@ -63,11 +82,9 @@ data class FileInfoUiState(
     val filterQuery: String = "",
     val showFilterInput: Boolean = false,
 
-    // For file download
-    val isDownloadingFile: Boolean = false,
-    val fileToDownloadInfo: FileInfoResponse? = null, // Info of the file being downloaded
-    val fileDownloadedBytes: Long = 0L, // Bytes downloaded so far
-    val fileDownloadProgress: Float = 0f, // 0.0 to 1.0
+    // For multiple file downloads
+    val activeDownloads: Map<String, FileDownloadState> = emptyMap(),
+    // General messages, can be deprecated if per-file messages are sufficient
     val fileDownloadSuccessMessage: String? = null,
     val fileDownloadErrorMessage: String? = null
 )
@@ -184,7 +201,17 @@ class FileInfoViewModel(
         _uiState.update { it.copy(isLoadingDeleteFile = true, deleteFileErrorMessage = null, deleteFileSuccessMessage = null) }
         viewModelScope.launch {
             when (val response = pixeldrainApiService.deleteFile(apiKey, fileId)) {
-                is ApiResponse.Success -> _uiState.update { it.copy(isLoadingDeleteFile = false, showDeleteConfirmDialog = false, fileIdToDelete = null, deleteFileSuccessMessage = response.data.message ?: "File deleted successfully.", userFilesList = _uiState.value.userFilesList.filterNot { item -> item.id == fileId }, fileInfo = if (_uiState.value.fileInfo?.id == fileId) null else _uiState.value.fileInfo) }
+                is ApiResponse.Success -> _uiState.update { 
+                    it.copy(
+                        isLoadingDeleteFile = false, 
+                        showDeleteConfirmDialog = false, 
+                        fileIdToDelete = null, 
+                        deleteFileSuccessMessage = response.data.message ?: "File deleted successfully.", 
+                        userFilesList = _uiState.value.userFilesList.filterNot { item -> item.id == fileId }, 
+                        fileInfo = if (_uiState.value.fileInfo?.id == fileId) null else _uiState.value.fileInfo,
+                        activeDownloads = it.activeDownloads.filterNot { entry -> entry.key == fileId } // Also remove from active downloads
+                    )
+                }
                 is ApiResponse.Error -> _uiState.update { it.copy(isLoadingDeleteFile = false, showDeleteConfirmDialog = false, fileIdToDelete = null, deleteFileErrorMessage = response.errorDetails.message ?: response.errorDetails.value ?: "Unknown error deleting file.") }
             }
         }
@@ -194,80 +221,104 @@ class FileInfoViewModel(
 
     // --- File Download Functions ---
     fun initiateDownloadFile(file: FileInfoResponse) {
-        if (_uiState.value.isDownloadingFile && _uiState.value.fileToDownloadInfo?.id == file.id) return // Prevent multiple downloads of the same file
+        if (_uiState.value.activeDownloads[file.id]?.status == DownloadStatus.DOWNLOADING || 
+            _uiState.value.activeDownloads[file.id]?.status == DownloadStatus.PENDING) {
+            Log.d(TAG, "Download for ${file.id} already in progress or pending.")
+            return // Prevent multiple downloads of the same file if already active
+        }
 
+        val newDownloadState = FileDownloadState(
+            fileId = file.id,
+            fileName = file.name,
+            totalBytes = file.size, // Assuming FileInfoResponse.size is the total
+            status = DownloadStatus.PENDING
+        )
         _uiState.update {
-            it.copy(
-                isDownloadingFile = true,
-                fileToDownloadInfo = file,
-                fileDownloadedBytes = 0L,
-                fileDownloadProgress = 0f,
-                fileDownloadSuccessMessage = null,
-                fileDownloadErrorMessage = null
-            )
+            it.copy(activeDownloads = it.activeDownloads + (file.id to newDownloadState))
         }
 
         viewModelScope.launch {
             try {
+                // Update status to DOWNLOADING before starting
+                _uiState.update { currentState ->
+                    val updatedDownload = currentState.activeDownloads[file.id]?.copy(status = DownloadStatus.DOWNLOADING)
+                    if (updatedDownload != null) {
+                        currentState.copy(activeDownloads = currentState.activeDownloads + (file.id to updatedDownload))
+                    } else currentState
+                }
+
                 when (val response = pixeldrainApiService.downloadFileBytes(file.id) { bytesRead, totalBytes ->
                     val progress = if (totalBytes != null && totalBytes > 0) {
                         (bytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
                     } else {
                         0f // Indeterminate or starting
                     }
-                    _uiState.update { currentState -> 
-                        currentState.copy(
-                            fileDownloadedBytes = bytesRead, 
-                            fileDownloadProgress = progress
-                        ) 
+                    _uiState.update { currentState ->
+                        val updatedDownload = currentState.activeDownloads[file.id]?.copy(
+                            downloadedBytes = bytesRead,
+                            progressFraction = progress,
+                            totalBytes = totalBytes ?: currentState.activeDownloads[file.id]?.totalBytes // Keep original total if callback provides null
+                        )
+                        if (updatedDownload != null) {
+                            currentState.copy(activeDownloads = currentState.activeDownloads + (file.id to updatedDownload))
+                        } else currentState
                     }
                 }) {
                     is ApiResponse.Success -> {
                         val savedUri = saveBytesToDownloads(file.name, file.mimeType, response.data)
+                        val finalStatus: DownloadStatus
+                        val message: String
                         if (savedUri != null) {
-                            _uiState.update {
-                                it.copy(
-                                    isDownloadingFile = false,
-                                    fileDownloadSuccessMessage = "File '${file.name}' downloaded to Downloads folder.",
-                                    fileToDownloadInfo = null, // Clear after successful download
-                                    fileDownloadedBytes = file.size, // Show full size on completion
-                                    fileDownloadProgress = 1f
-                                )
-                            }
+                            finalStatus = DownloadStatus.COMPLETED
+                            message = "File '${file.name}' downloaded to Downloads folder."
+                            // Optionally set general success message for snackbar
+                             _uiState.update { it.copy(fileDownloadSuccessMessage = message) }
                         } else {
-                            _uiState.update {
-                                it.copy(
-                                    isDownloadingFile = false,
-                                    fileDownloadErrorMessage = "Failed to save '${file.name}' to device.",
-                                    fileToDownloadInfo = null,
-                                    fileDownloadedBytes = 0L, // Reset on save error
-                                    fileDownloadProgress = 0f // Reset progress on save error
-                                )
-                            }
+                            finalStatus = DownloadStatus.FAILED
+                            message = "Failed to save '${file.name}' to device."
+                            // Optionally set general error message for snackbar
+                             _uiState.update { it.copy(fileDownloadErrorMessage = message) }
+                        }
+                        _uiState.update { currentState ->
+                            val updatedDownload = currentState.activeDownloads[file.id]?.copy(
+                                status = finalStatus,
+                                message = message,
+                                downloadedBytes = if (finalStatus == DownloadStatus.COMPLETED) file.size else currentState.activeDownloads[file.id]?.downloadedBytes ?: 0L,
+                                progressFraction = if (finalStatus == DownloadStatus.COMPLETED) 1f else currentState.activeDownloads[file.id]?.progressFraction ?: 0f
+                            )
+                            if (updatedDownload != null) {
+                                currentState.copy(activeDownloads = currentState.activeDownloads + (file.id to updatedDownload))
+                            } else currentState
                         }
                     }
                     is ApiResponse.Error -> {
-                        _uiState.update {
-                            it.copy(
-                                isDownloadingFile = false,
-                                fileDownloadErrorMessage = response.errorDetails.message ?: "Download failed.",
-                                fileToDownloadInfo = null,
-                                fileDownloadedBytes = 0L, 
-                                fileDownloadProgress = 0f
+                        val errorMsg = response.errorDetails.message ?: "Download failed."
+                        _uiState.update { currentState ->
+                            val updatedDownload = currentState.activeDownloads[file.id]?.copy(
+                                status = DownloadStatus.FAILED,
+                                message = errorMsg
                             )
+                             // Optionally set general error message for snackbar
+                            _uiState.update { it.copy(fileDownloadErrorMessage = errorMsg) }
+                            if (updatedDownload != null) {
+                                currentState.copy(activeDownloads = currentState.activeDownloads + (file.id to updatedDownload))
+                            } else currentState
                         }
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error during file download process for ${file.id}: ${e.message}", e)
-                _uiState.update {
-                    it.copy(
-                        isDownloadingFile = false,
-                        fileDownloadErrorMessage = "Download error: ${e.localizedMessage ?: "An unexpected error occurred."}",
-                        fileToDownloadInfo = null,
-                        fileDownloadedBytes = 0L,
-                        fileDownloadProgress = 0f
+                val errorMsg = "Download error: ${e.localizedMessage ?: "An unexpected error occurred."}"
+                _uiState.update { currentState ->
+                    val updatedDownload = currentState.activeDownloads[file.id]?.copy(
+                        status = DownloadStatus.FAILED,
+                        message = errorMsg
                     )
+                    // Optionally set general error message for snackbar
+                    _uiState.update { it.copy(fileDownloadErrorMessage = errorMsg) }
+                    if (updatedDownload != null) {
+                        currentState.copy(activeDownloads = currentState.activeDownloads + (file.id to updatedDownload))
+                    } else currentState
                 }
             }
         }
@@ -284,16 +335,9 @@ class FileInfoViewModel(
                     put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                     put(MediaStore.MediaColumns.IS_PENDING, 1)
                 } else {
-                    // This else block might be less relevant given minSdk 32 (Android S)
-                    // but kept for robustness if minSdk were ever lowered below Q.
-                    // On API < 29, you'd write to a file path obtained from Environment.getExternalStoragePublicDirectory()
-                    // and then use MediaScannerConnection to make it visible, or use the _data column if allowed.
-                    // However, with minSdk 32, Q's MediaStore approach is standard.
                     val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                     val file = java.io.File(downloadsDir, fileName)
-                    // Note: Writing directly to file.absolutePath and then using MediaStore.Images.Media.insertImage
-                    // or similar for other file types was common for pre-Q. For Q+, the IS_PENDING method is preferred.
-                    put(MediaStore.MediaColumns.DATA, file.absolutePath) // This is legacy for Q+
+                    put(MediaStore.MediaColumns.DATA, file.absolutePath) 
                 }
             }
 
@@ -311,25 +355,29 @@ class FileInfoViewModel(
                         contentResolver.update(destUri, contentValues, null, null)
                     }
                 }
-            } catch (e: Exception) { // Catch generic Exception as various issues can occur
+            } catch (e: Exception) { 
                 Log.e(TAG, "Failed to save file '$fileName' to Downloads: ${e.message}", e)
-                uri?.let { contentResolver.delete(it, null, null) } // Clean up pending entry if write failed
+                uri?.let { contentResolver.delete(it, null, null) } 
                 uri = null
             }
             uri
         }
     }
 
+    // Clears general download messages
     fun clearDownloadMessages() {
         _uiState.update {
             it.copy(
                 fileDownloadSuccessMessage = null,
                 fileDownloadErrorMessage = null
-                // Optionally reset progress and currently downloading file if it's not actively downloading:
-                // fileToDownloadInfo = if(it.isDownloadingFile) it.fileToDownloadInfo else null,
-                // fileDownloadedBytes = if(it.isDownloadingFile) it.fileDownloadedBytes else 0L,
-                // fileDownloadProgress = if(it.isDownloadingFile) it.fileDownloadProgress else 0f
             )
+        }
+    }
+
+    // Clears a specific download state from the active map (e.g., when UI dismisses it)
+    fun clearDownloadState(fileId: String) {
+        _uiState.update { currentState ->
+            currentState.copy(activeDownloads = currentState.activeDownloads - fileId)
         }
     }
 }

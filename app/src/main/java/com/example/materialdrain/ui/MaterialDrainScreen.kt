@@ -74,6 +74,16 @@ import java.text.DecimalFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import androidx.compose.material3.MenuAnchorType // Added for MenuAnchorType
+import com.example.materialdrain.viewmodel.DownloadStatus
+import android.content.ClipboardManager
+import android.util.Log
+import androidx.compose.foundation.layout.padding
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.time.format.DateTimeParseException // For safe parsing
+import androidx.compose.ui.text.style.TextOverflow
 
 // SharedPreferences constants
 private const val PREFS_NAME = "pixeldrain_prefs"
@@ -112,6 +122,22 @@ internal fun formatDurationMillis(millis: Long): String {
         String.format("%02d:%02d:%02d", hours, minutes, seconds)
     } else {
         String.format("%02d:%02d", minutes, seconds)
+    }
+}
+
+// Helper function to format API date-time strings (add this near your other helper functions)
+internal fun formatApiDateTimeString(dateTimeString: String?): String {
+    if (dateTimeString.isNullOrBlank()) {
+        return "N/A"
+    }
+    return try {
+        val parsedDateTime = LocalDateTime.parse(dateTimeString, DateTimeFormatter.ISO_DATE_TIME)
+        val formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
+            .withZone(ZoneId.systemDefault()) // Use system's default time zone
+        parsedDateTime.atZone(ZoneId.of("UTC")).withZoneSameInstant(ZoneId.systemDefault()).format(formatter)
+    } catch (e: DateTimeParseException) {
+        Log.e("DateTimeFormat", "Error parsing date: $dateTimeString", e)
+        dateTimeString // Fallback to original string if parsing fails
     }
 }
 
@@ -586,7 +612,11 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
             }
         }
         Column(
-            modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -615,7 +645,11 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                         if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("image/") == true) {
-                            AsyncImage(model = uiState.selectedFileUri, contentDescription = "Selected image preview", modifier = Modifier.fillMaxWidth().height(200.dp).padding(vertical = 8.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Fit)
+                            AsyncImage(model = uiState.selectedFileUri, contentDescription = "Selected image preview", modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .padding(vertical = 8.dp)
+                                .clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Fit)
                         }
                         if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("audio/") == true) {
                             AudioPlayerPreview(
@@ -666,7 +700,10 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                         }
                         uiState.selectedFileTextContent?.takeIf { it.isNotBlank() }?.let {
                             Text("Content Preview (4KB Max):", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top=8.dp, bottom=4.dp))
-                            OutlinedTextField(value = it, onValueChange = {}, readOnly = true, modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp, max = 200.dp).padding(vertical=8.dp), textStyle = MaterialTheme.typography.bodySmall)
+                            OutlinedTextField(value = it, onValueChange = {}, readOnly = true, modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 100.dp, max = 200.dp)
+                                .padding(vertical = 8.dp), textStyle = MaterialTheme.typography.bodySmall)
                         }
                         if (uiState.errorMessage?.contains("preview", true) == true || uiState.errorMessage?.contains("metadata", true) == true) {
                             Text(uiState.errorMessage!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom=8.dp))
@@ -674,7 +711,9 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                     }
                 }
                 1 -> { // Text Upload Tab
-                    OutlinedTextField(value = uiState.textToUpload, onValueChange = uploadViewModel::onTextToUploadChanged, label = { Text("Paste text here") }, modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 150.dp), maxLines = 10, enabled = !uiState.isLoading)
+                    OutlinedTextField(value = uiState.textToUpload, onValueChange = uploadViewModel::onTextToUploadChanged, label = { Text("Paste text here") }, modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 150.dp), maxLines = 10, enabled = !uiState.isLoading)
                 }
             }
             // REMOVED old CircularProgressIndicator and progress text from here
@@ -690,7 +729,9 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
-        Button(onClick = uploadViewModel::upload, enabled = (uiState.selectedFileUri != null || uiState.textToUpload.isNotBlank()) && !uiState.isLoading, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Button(onClick = uploadViewModel::upload, enabled = (uiState.selectedFileUri != null || uiState.textToUpload.isNotBlank()) && !uiState.isLoading, modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)) {
             Icon(Icons.Filled.FileUpload, contentDescription = "Upload")
             Spacer(Modifier.size(ButtonDefaults.IconSpacing))
             Text("Upload")
@@ -718,7 +759,9 @@ fun SortControls(uiState: com.example.materialdrain.viewmodel.FileInfoUiState, f
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         ExposedDropdownMenuBox(
@@ -732,7 +775,9 @@ fun SortControls(uiState: com.example.materialdrain.viewmodel.FileInfoUiState, f
                 readOnly = true,
                 label = { Text("Sort by") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth()
+                modifier = Modifier
+                    .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                    .fillMaxWidth()
             )
             ExposedDropdownMenu(
                 expanded = expanded,
@@ -862,7 +907,9 @@ fun FilesScreenContent(
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth()
+                modifier = Modifier
+                    .padding(vertical = 8.dp)
+                    .fillMaxWidth()
             )
         } else {
             Button(
@@ -889,7 +936,9 @@ fun FilesScreenContent(
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth()
+                    modifier = Modifier
+                        .padding(vertical = 8.dp)
+                        .fillMaxWidth()
                 )
             }
         }
@@ -898,7 +947,9 @@ fun FilesScreenContent(
             SortControls(uiState = uiState, fileInfoViewModel = fileInfoViewModel)
             LazyColumn(
                 state = listState, 
-                modifier = Modifier.fillMaxWidth().weight(1f), 
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
                 items(
@@ -939,50 +990,166 @@ fun FilesScreenContent(
 
 @Composable
 fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoViewModel, context: Context) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
-            AsyncImage(
-                model = "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail?width=128&height=128",
-                contentDescription = "File thumbnail",
-                modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp).clip(RoundedCornerShape(8.dp)).align(Alignment.CenterHorizontally),
-                contentScale = ContentScale.Fit,
-                error = rememberVectorPainter(Icons.Filled.BrokenImage)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text("File Details:", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-            InfoRow("ID:", fileInfo.id, true)
-            InfoRow("Name:", fileInfo.name)
-            InfoRow("Size:", formatSize(fileInfo.size))
-            fileInfo.mimeType?.let { InfoRow("MIME Type:", it) }
-            InfoRow("Upload Date:", fileInfo.dateUpload)
-            fileInfo.views?.let { InfoRow("Views:", it.toString()) }
-            fileInfo.downloads?.let { InfoRow("Downloads:", it.toString()) }
-            fileInfo.hashSha256?.let { InfoRow("SHA256:", it, true) }
+    val localClipboardManager = LocalContext.current.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope() // Make sure coroutineScope is available
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                Button(onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://pixeldrain.com/api/file/${fileInfo.id}?download"))
-                    context.startActivity(intent)
-                }) {
-                    Icon(Icons.Filled.Download, contentDescription = "Download")
-                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                    Text("Download")
-                }
-                if (fileInfo.canEdit == true) {
-                    Button(
-                        onClick = { fileInfoViewModel.initiateDeleteFile(fileInfo.id) },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    ) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Delete")
-                        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                        Text("Delete")
-                    }
+    val fileUrl = "https://pixeldrain.com/u/${fileInfo.id}"
+    // val downloadUrl = "https://pixeldrain.com/api/file/${fileInfo.id}?download" // Not needed for in-app download
+
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Column as the root to stack the Header Row and the main content
+        Column {
+            // Top Row for File Name and Close Button
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, top = 0.dp, end = 4.dp, bottom = 0.dp), // Explicit padding
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween // Pushes title and icon apart
+            ) {
+                Text(
+                    text = fileInfo.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .weight(1f, fill = false) // Allow text to take space but not push icon too far if text is short
+                        .padding(start = 16.dp, top = 0.dp, end = 4.dp, bottom = 0.dp), // Padding for the text itself
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                IconButton(
+                    onClick = { fileInfoViewModel.clearFileInfoDisplay() },
+                    modifier = Modifier.padding(vertical = 4.dp) // Minimal padding for the icon button itself
+                ) {
+                    Icon(Icons.Filled.Close, contentDescription = "Close")
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            TextButton(onClick = { fileInfoViewModel.clearFileInfoDisplay() }, modifier = Modifier.align(Alignment.End)) {
-                Text("Close")
+
+            // Main content column
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp) // Horizontal padding for content
+                    .padding(bottom = 16.dp) // Bottom padding for content
+                // No explicit top padding here, relies on spacing from Row above and elements below
+            ) {
+                // Section 1: Scrollable content (details + action buttons)
+                Column(
+                    modifier = Modifier
+                        .weight(1f) // Takes available vertical space, scrolls if needed
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    // The large file name Text composable has been removed from here
+
+                    AsyncImage(
+                        model = "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail?width=256&height=256",
+                        contentDescription = "File thumbnail",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 150.dp, max = 250.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .align(Alignment.CenterHorizontally)
+                            .padding(top = 8.dp, bottom = 8.dp), // Adjusted top padding
+                        contentScale = ContentScale.Fit,
+                        error = rememberVectorPainter(Icons.Filled.ImageNotSupported)
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                    Text("File Details", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+                    InfoRow("ID:", fileInfo.id, true)
+                    InfoRow("Size:", formatSize(fileInfo.size))
+                    fileInfo.mimeType?.let { InfoRow("Type:", it) }
+                    InfoRow("Upload Date:", formatApiDateTimeString(fileInfo.dateUpload))
+                    fileInfo.dateLastView?.let { InfoRow("Last View:", formatApiDateTimeString(it)) }
+                    fileInfo.views?.let { InfoRow("Views:", it.toString()) }
+                    fileInfo.downloads?.let { InfoRow("Downloads:", it.toString()) }
+                    fileInfo.hashSha256?.let { InfoRow("SHA256:", it, true) }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                    Text("Actions", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 12.dp))
+
+                    Button( // SHARE
+                        onClick = {
+                            val sendIntent: Intent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_TEXT, fileUrl)
+                                type = "text/plain"
+                            }
+                            val shareIntent = Intent.createChooser(sendIntent, null)
+                            context.startActivity(shareIntent)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.Share, contentDescription = "Share Link")
+                        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                        Text("Share", maxLines = 1)
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    OutlinedButton( // COPY LINK
+                        onClick = {
+                            val clip = android.content.ClipData.newPlainText("Pixeldrain URL", fileUrl)
+                            localClipboardManager.setPrimaryClip(clip)
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Link copied to clipboard!")
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.ContentCopy, contentDescription = "Copy Link")
+                        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                        Text("Copy Link", maxLines = 1)
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Button( // DOWNLOAD
+                        onClick = {
+                            fileInfoViewModel.initiateDownloadFile(fileInfo)
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Download started for ${fileInfo.name}")
+                            }
+                            // Optionally close the dialog after starting download
+                            fileInfoViewModel.clearFileInfoDisplay()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.Download, contentDescription = "Download")
+                        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                        Text("Download", maxLines = 1)
+                    }
+
+                    if (fileInfo.canEdit == true) { // DELETE
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { fileInfoViewModel.initiateDeleteFile(fileInfo.id) },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Delete")
+                            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                            Text("Delete", maxLines = 1)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(top = 4.dp)
+                ) {
+                    SnackbarHost(hostState = snackbarHostState) { data ->
+                        Snackbar(
+                            snackbarData = data,
+                            containerColor = MaterialTheme.colorScheme.inverseSurface,
+                            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                        )
+                    }
+                }
             }
         }
     }
@@ -990,42 +1157,56 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
 
 @Composable
 fun UserFileListItemCard(
-    fileInfo: FileInfoResponse, 
-    fileInfoViewModel: FileInfoViewModel, 
-    context: Context, // Retained context as it might be used for other things later
+    fileInfo: FileInfoResponse,
+    fileInfoViewModel: FileInfoViewModel,
+    context: Context, // Retained context
     onClick: () -> Unit
 ) {
-    val uiState by fileInfoViewModel.uiState.collectAsState() // Collect FileInfoUiState here
-    val isCurrentlyDownloadingThisItem = uiState.isDownloadingFile && uiState.fileToDownloadInfo?.id == fileInfo.id
+    val uiState by fileInfoViewModel.uiState.collectAsState()
+    val downloadState = uiState.activeDownloads[fileInfo.id] // Get specific download state
+
+    // Define isDownloadingThisItem and showProgressSection here using safe calls
+    val isDownloadingThisItem = downloadState?.status == DownloadStatus.DOWNLOADING || downloadState?.status == DownloadStatus.PENDING
+    val showProgressSection = downloadState != null &&
+            downloadState.status != DownloadStatus.COMPLETED &&
+            downloadState.status != DownloadStatus.FAILED
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clickable(onClick = onClick) 
+            .clickable(onClick = onClick)
     ) {
-        Column(modifier = Modifier.padding(bottom = if (isCurrentlyDownloadingThisItem) 0.dp else 16.dp)) { // Adjust bottom padding
+        Column(modifier = Modifier.padding(bottom = if (showProgressSection) 0.dp else 16.dp)) {
             Row(
-                modifier = Modifier.padding(start=16.dp, end=16.dp, top=16.dp, bottom = if(isCurrentlyDownloadingThisItem) 8.dp else 16.dp),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = if (showProgressSection) 8.dp else 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AsyncImage(
                     model = "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail?width=64&height=64",
                     contentDescription = "File thumbnail",
-                    modifier = Modifier.size(64.dp).clip(RoundedCornerShape(4.dp)),
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(4.dp)),
                     contentScale = ContentScale.Crop,
                     error = rememberVectorPainter(Icons.Filled.BrokenImage)
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(fileInfo.name, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                    Text(
+                        text = fileInfo.name, // The file name
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1, // Ensure it's a single line
+                        overflow = TextOverflow.Ellipsis // Add ellipsis if it overflows
+                    )
                     Text(formatSize(fileInfo.size), style = MaterialTheme.typography.bodySmall)
                     Text("Uploaded: ${fileInfo.dateUpload.substringBefore('T')}", style = MaterialTheme.typography.bodySmall)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 IconButton(
                     onClick = { fileInfoViewModel.initiateDownloadFile(fileInfo) },
-                    enabled = !isCurrentlyDownloadingThisItem
+                    // Use the correctly scoped 'isDownloadingThisItem'
+                    enabled = !isDownloadingThisItem && downloadState?.status != DownloadStatus.COMPLETED
                 ) {
                     Icon(Icons.Filled.Download, contentDescription = "Download File")
                 }
@@ -1035,31 +1216,75 @@ fun UserFileListItemCard(
                     }
                 }
             }
-            if (isCurrentlyDownloadingThisItem) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 4.dp, top = 0.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Downloading...",
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                    uiState.fileToDownloadInfo?.size?.let {
+
+            // downloadState is already confirmed non-null for showProgressSection to be true
+            // but for direct access inside this block, an explicit null check or safe call is good practice.
+            if (downloadState != null && showProgressSection) {
+                Column(modifier = Modifier.animateContentSize()) { // Animate size changes
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, bottom = 4.dp, top = 0.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val statusText = when (downloadState.status) {
+                            DownloadStatus.PENDING -> "Download pending..."
+                            DownloadStatus.DOWNLOADING -> "Downloading..."
+                            // Completed and Failed statuses are handled by showProgressSection,
+                            // but we still need to provide text if they somehow pass through or for the dismiss button logic later
+                            DownloadStatus.COMPLETED -> downloadState.message ?: "Download completed!"
+                            DownloadStatus.FAILED -> downloadState.message ?: "Download failed."
+                        }
                         Text(
-                            text = "${formatSize(uiState.fileDownloadedBytes)} / ${formatSize(it)}",
+                            text = statusText,
                             style = MaterialTheme.typography.labelSmall,
+                            color = if (downloadState.status == DownloadStatus.FAILED) MaterialTheme.colorScheme.error else LocalContentColor.current
+                        )
+                        if (downloadState.status == DownloadStatus.DOWNLOADING || downloadState.status == DownloadStatus.PENDING) {
+                            downloadState.totalBytes?.let { total ->
+                                Text(
+                                    text = "${formatSize(downloadState.downloadedBytes)} / ${formatSize(total)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
+                        }
+                    }
+                    if (downloadState.status == DownloadStatus.DOWNLOADING || downloadState.status == DownloadStatus.PENDING) {
+                        LinearProgressIndicator(
+                            progress = { downloadState.progressFraction },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
                         )
                     }
                 }
-                LinearProgressIndicator(
-                    progress = { uiState.fileDownloadProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 8.dp) // Add padding for the bar itself
-                )
+            } else if (downloadState != null && (downloadState.status == DownloadStatus.COMPLETED || downloadState.status == DownloadStatus.FAILED)) {
+                // This block is for the "Dismiss" button when not in PENDING or DOWNLOADING, but still having a state
+                Column(modifier = Modifier.animateContentSize()) {
+                    Row( // Display final status message
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, bottom = 4.dp, top = 0.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = downloadState.message ?: if (downloadState.status == DownloadStatus.COMPLETED) "Download completed!" else "Download failed.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (downloadState.status == DownloadStatus.FAILED) MaterialTheme.colorScheme.error else LocalContentColor.current
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(
+                        onClick = { fileInfoViewModel.clearDownloadState(fileInfo.id) },
+                        modifier = Modifier
+                            .align(Alignment.End)
+                            .padding(end = 8.dp, bottom = 0.dp)
+                    ) {
+                        Text("Dismiss", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
         }
     }
@@ -1083,7 +1308,9 @@ fun AudioPlayerPreview(
     onDragEnd: () -> Unit,
     onDragCancel: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    Card(modifier = Modifier
+        .fillMaxWidth()
+        .padding(vertical = 8.dp)) {
         Column(modifier = Modifier.padding(bottom = 0.dp)) {
             Row(
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
@@ -1091,7 +1318,9 @@ fun AudioPlayerPreview(
             ) {
                 uiState.audioAlbumArt?.let {
                     val bitmap = remember(it) { try { BitmapFactory.decodeByteArray(it, 0, it.size) } catch (e: Exception) { null } }
-                    bitmap?.let {bmp -> Image(bitmap = bmp.asImageBitmap(), contentDescription = "Album Art", modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop) }
+                    bitmap?.let {bmp -> Image(bitmap = bmp.asImageBitmap(), contentDescription = "Album Art", modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop) }
                         ?: Icon(Icons.Filled.MusicNote, contentDescription = "Album Art Placeholder", modifier = Modifier.size(64.dp))
                 } ?: Icon(Icons.Filled.MusicNote, contentDescription = "Album Art Placeholder", modifier = Modifier.size(64.dp))
                 Spacer(modifier = Modifier.width(16.dp))
@@ -1123,13 +1352,27 @@ fun AudioPlayerPreview(
             if (mediaPlayer != null || isMediaPlayerPreparing) {
                 Box(
                     contentAlignment = Alignment.BottomCenter,
-                    modifier = Modifier.fillMaxWidth().height(24.dp)
-                        .onSizeChanged { onSeekBarWidthChanged(it.width) } 
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(24.dp)
+                        .onSizeChanged { onSeekBarWidthChanged(it.width) }
                         .pointerInput(mediaPlayer, totalDuration, progressBarWidthPx) {
                             if (mediaPlayer == null || totalDuration <= 0L || progressBarWidthPx <= 0) return@pointerInput
                             detectHorizontalDragGestures(
-                                onDragStart = { offset -> onDragStart(offset, totalDuration, progressBarWidthPx) },
-                                onHorizontalDrag = { change, _ -> onDrag(change, totalDuration, progressBarWidthPx) },
+                                onDragStart = { offset ->
+                                    onDragStart(
+                                        offset,
+                                        totalDuration,
+                                        progressBarWidthPx
+                                    )
+                                },
+                                onHorizontalDrag = { change, _ ->
+                                    onDrag(
+                                        change,
+                                        totalDuration,
+                                        progressBarWidthPx
+                                    )
+                                },
                                 onDragEnd = onDragEnd,
                                 onDragCancel = onDragCancel
                             )
@@ -1144,14 +1387,31 @@ fun AudioPlayerPreview(
 
 @Composable
 fun InfoRow(label: String, value: String, isValueSelectable: Boolean = false) {
-    Row(modifier = Modifier.padding(vertical = 4.dp)) {
-        Text(label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(0.4f))
+    Row(
+        modifier = Modifier.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically // Align label and value nicely
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier
+                .defaultMinSize(minWidth = 90.dp) // Give label adequate, consistent space
+                .padding(end = 8.dp)
+        )
         if (isValueSelectable) {
-             SelectionContainer {
-                Text(value, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(0.6f))
+            SelectionContainer {
+                Text(
+                    value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f) // Value takes remaining space and can wrap
+                )
             }
         } else {
-            Text(value, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(0.6f))
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f) // Value takes remaining space and can wrap
+            )
         }
     }
 }
@@ -1161,7 +1421,10 @@ fun ListsScreenContent(onShowDialog: (String, String) -> Unit) {
     var listId by remember { mutableStateOf("") }
     var newListFileIds by remember { mutableStateOf("") }
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
@@ -1199,7 +1462,9 @@ fun SettingsScreenContent(
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
