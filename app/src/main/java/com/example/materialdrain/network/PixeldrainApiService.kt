@@ -14,6 +14,7 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.onDownload // Added for download progress
 import io.ktor.client.plugins.onUpload // Corrected import for onUpload
 import io.ktor.client.request.delete // Added for deleteFile
 import io.ktor.client.request.get
@@ -104,7 +105,7 @@ class PixeldrainApiService {
             json(jsonFormatter, contentType = ContentType.Text.Plain) // For error responses that might be plain text
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = HttpTimeout.INFINITE_TIMEOUT_MS // Allow very long total request time for uploads
+            requestTimeoutMillis = HttpTimeout.INFINITE_TIMEOUT_MS // Allow very long total request time for uploads/downloads
             connectTimeoutMillis = 30000L  // 30 seconds for initial connection
             socketTimeoutMillis = 900000L   // 15 minutes for inactivity between data packets
         }
@@ -114,12 +115,11 @@ class PixeldrainApiService {
                     Log.d("KTOR_HTTP_CLIENT", message)
                 }
             }
-            level = LogLevel.HEADERS // Use LogLevel.BODY for debugging uploads, but be mindful of large file data in logs
+            level = LogLevel.HEADERS 
         }
         install(HttpRequestRetry) {
-            retryOnServerErrors(maxRetries = 2) // Reduced retries for uploads
+            retryOnServerErrors(maxRetries = 2) 
             retryOnExceptionIf { _, cause ->
-                // Don't retry client-side timeouts for uploads, but do retry other IOExceptions
                 cause is IOException && cause !is java.net.SocketTimeoutException
             }
         }
@@ -129,7 +129,7 @@ class PixeldrainApiService {
         apiKey: String,
         fileName: String,
         fileBytes: ByteArray,
-        onProgress: (bytesSent: Long, totalBytes: Long?) -> Unit // New progress callback
+        onProgress: (bytesSent: Long, totalBytes: Long?) -> Unit
     ): FileUploadResponse {
         val basicAuth = "Basic " + Base64.encodeToString(":$apiKey".toByteArray(), Base64.NO_WRAP)
         return try {
@@ -166,7 +166,7 @@ class PixeldrainApiService {
         fileName: String,
         fileUri: Uri,
         context: Context,
-        onProgress: (bytesSent: Long, totalBytes: Long?) -> Unit // New progress callback
+        onProgress: (bytesSent: Long, totalBytes: Long?) -> Unit
     ): FileUploadResponse {
         val contentResolver = context.contentResolver
         val basicAuth = "Basic " + Base64.encodeToString(":$apiKey".toByteArray(), Base64.NO_WRAP)
@@ -201,17 +201,16 @@ class PixeldrainApiService {
                 }
                 setBody(
                     OutputStreamContent(
-                        body = { // This is a suspend OutputStream.() -> Unit lambda
+                        body = { 
                             contentResolver.openInputStream(fileUri)?.use { inputStream ->
-                                inputStream.copyTo(this) // 'this' is the OutputStream Ktor provides for writing
+                                inputStream.copyTo(this) 
                             } ?: throw IOException("Failed to open input stream for URI after initial check.")
                         },
                         contentType = ContentType.parse(mimeType),
-                        contentLength = fileSize // Provide contentLength to Ktor; it will use chunked transfer if null
+                        contentLength = fileSize 
                     )
                 )
                 onUpload { bytesSentTotal, contentLength ->
-                    // Pass the contentLength from Ktor if available, otherwise fallback to our pre-calculated fileSize
                     onProgress(bytesSentTotal, contentLength ?: fileSize)
                 }
             }
@@ -245,6 +244,49 @@ class PixeldrainApiService {
             Log.e("PIXEL_API_SERVICE", "Exception for GET file info: ${e.message}", e)
             val errorMsg = e.message ?: "Network request failed or failed to parse error response"
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_file_info", message = errorMsg))
+        }
+    }
+
+    suspend fun downloadFileBytes(
+        fileId: String,
+        onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit
+    ): ApiResponse<ByteArray> {
+        if (fileId.isBlank()) {
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "file_id_missing", message = "File ID is required to download a file."))
+        }
+        return try {
+            val response: HttpResponse = client.get {
+                url {
+                    protocol = URLProtocol.HTTPS
+                    host = "pixeldrain.com"
+                    path("api/file", fileId) // Direct file download endpoint
+                }
+                // The onDownload block in the request scope is used to monitor the progress of receiving the response body.
+                onDownload { bytesSentTotal, contentLength ->
+                    onProgress(bytesSentTotal, contentLength)
+                }
+            }
+
+            if (response.status == HttpStatusCode.OK) {
+                // body<ByteArray>() will read the entire response body into memory.
+                // The onDownload listener should have been invoked during this process by Ktor.
+                val bytes = response.body<ByteArray>()
+                // If onDownload wasn't precise or if we want a final confirmation:
+                // onProgress(bytes.size.toLong(), bytes.size.toLong()) // This might be redundant if onDownload works as expected
+                ApiResponse.Success(bytes)
+            } else {
+                try {
+                    // Attempt to parse error response as JSON, common for Pixeldrain API
+                    ApiResponse.Error(response.body<FileUploadResponse>())
+                } catch (e: Exception) {
+                    // Fallback if error response is not the expected JSON structure
+                    ApiResponse.Error(FileUploadResponse(success = false, value = "download_failed_status_${response.status.value}", message = "Download failed: ${response.status.description}"))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PIXEL_API_SERVICE", "Exception during GET file download: ${e.message}", e)
+            val errorMsg = e.message ?: "Network request failed or failed to parse response"
+            ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_file_download", message = errorMsg))
         }
     }
 
@@ -295,9 +337,8 @@ class PixeldrainApiService {
                     append(HttpHeaders.Authorization, basicAuth)
                 }
             }
-            // DELETE API returns FileUploadResponse structure for both success and error
             val responseBody = response.body<FileUploadResponse>()
-            if (responseBody.success) { // Typically status code 200 OK for successful delete
+            if (responseBody.success) { 
                 ApiResponse.Success(responseBody)
             } else {
                 ApiResponse.Error(responseBody)
@@ -305,7 +346,6 @@ class PixeldrainApiService {
         } catch (e: Exception) {
             Log.e("PIXEL_API_SERVICE", "Exception during DELETE file: ${e.message}", e)
             val errorMsg = e.message ?: "Network request failed or failed to parse error/success response"
-            // Ensure we return the FileUploadResponse structure even for exceptions
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_delete_file", message = errorMsg))
         }
     }

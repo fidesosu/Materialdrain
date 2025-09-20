@@ -180,6 +180,19 @@ fun MaterialDrainScreen() {
         }
     }
 
+    LaunchedEffect(fileInfoUiState.fileDownloadSuccessMessage) {
+        fileInfoUiState.fileDownloadSuccessMessage?.let {
+            snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Long)
+            fileInfoViewModel.clearDownloadMessages()
+        }
+    }
+    LaunchedEffect(fileInfoUiState.fileDownloadErrorMessage) {
+        fileInfoUiState.fileDownloadErrorMessage?.let {
+            snackbarHostState.showSnackbar("Download failed: $it", duration = SnackbarDuration.Long)
+            fileInfoViewModel.clearDownloadMessages()
+        }
+    }
+
     if (fileInfoUiState.apiKeyMissingError && currentScreen == Screen.Files &&
         !fileInfoUiState.userFilesListErrorMessage.isNullOrBlank() &&
         !showGenericDialog && !fileInfoUiState.showDeleteConfirmDialog && !fileInfoUiState.showEnterFileIdDialog && fileInfoUiState.fileInfo == null) {
@@ -899,7 +912,7 @@ fun FilesScreenContent(
                         UserFileListItemCard(
                             fileInfo = file,
                             fileInfoViewModel = fileInfoViewModel,
-                            context = context,
+                            context = context, // context is already available in FilesScreenContent scope
                             onClick = {
                                 if (uiState.showFilterInput) {
                                     fileInfoViewModel.setFilterInputVisible(false)
@@ -979,40 +992,74 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
 fun UserFileListItemCard(
     fileInfo: FileInfoResponse, 
     fileInfoViewModel: FileInfoViewModel, 
-    context: Context,
+    context: Context, // Retained context as it might be used for other things later
     onClick: () -> Unit
 ) {
+    val uiState by fileInfoViewModel.uiState.collectAsState() // Collect FileInfoUiState here
+    val isCurrentlyDownloadingThisItem = uiState.isDownloadingFile && uiState.fileToDownloadInfo?.id == fileInfo.id
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clickable(onClick = onClick) 
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(
-                model = "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail?width=64&height=64",
-                contentDescription = "File thumbnail",
-                modifier = Modifier.size(64.dp).clip(RoundedCornerShape(4.dp)),
-                contentScale = ContentScale.Crop,
-                error = rememberVectorPainter(Icons.Filled.BrokenImage)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(fileInfo.name, style = MaterialTheme.typography.titleSmall, maxLines = 1)
-                Text(formatSize(fileInfo.size), style = MaterialTheme.typography.bodySmall)
-                Text("Uploaded: ${fileInfo.dateUpload.substringBefore('T')}", style = MaterialTheme.typography.bodySmall)
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            IconButton(onClick = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://pixeldrain.com/api/file/${fileInfo.id}?download"))
-                context.startActivity(intent)
-            }) {
-                Icon(Icons.Filled.Download, contentDescription = "Download File")
-            }
-            if (fileInfo.canEdit == true) {
-                IconButton(onClick = { fileInfoViewModel.initiateDeleteFile(fileInfo.id) }) {
-                    Icon(Icons.Filled.DeleteOutline, contentDescription = "Delete File", tint = MaterialTheme.colorScheme.error)
+        Column(modifier = Modifier.padding(bottom = if (isCurrentlyDownloadingThisItem) 0.dp else 16.dp)) { // Adjust bottom padding
+            Row(
+                modifier = Modifier.padding(start=16.dp, end=16.dp, top=16.dp, bottom = if(isCurrentlyDownloadingThisItem) 8.dp else 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AsyncImage(
+                    model = "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail?width=64&height=64",
+                    contentDescription = "File thumbnail",
+                    modifier = Modifier.size(64.dp).clip(RoundedCornerShape(4.dp)),
+                    contentScale = ContentScale.Crop,
+                    error = rememberVectorPainter(Icons.Filled.BrokenImage)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(fileInfo.name, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                    Text(formatSize(fileInfo.size), style = MaterialTheme.typography.bodySmall)
+                    Text("Uploaded: ${fileInfo.dateUpload.substringBefore('T')}", style = MaterialTheme.typography.bodySmall)
                 }
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = { fileInfoViewModel.initiateDownloadFile(fileInfo) },
+                    enabled = !isCurrentlyDownloadingThisItem
+                ) {
+                    Icon(Icons.Filled.Download, contentDescription = "Download File")
+                }
+                if (fileInfo.canEdit == true) {
+                    IconButton(onClick = { fileInfoViewModel.initiateDeleteFile(fileInfo.id) }) {
+                        Icon(Icons.Filled.DeleteOutline, contentDescription = "Delete File", tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+            if (isCurrentlyDownloadingThisItem) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 4.dp, top = 0.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Downloading...",
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                    uiState.fileToDownloadInfo?.size?.let {
+                        Text(
+                            text = "${formatSize(uiState.fileDownloadedBytes)} / ${formatSize(it)}",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
+                LinearProgressIndicator(
+                    progress = { uiState.fileDownloadProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 8.dp) // Add padding for the bar itself
+                )
             }
         }
     }
