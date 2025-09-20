@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.Materialdrain" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Main application theme. -->
+    <style name="Theme.Materialdrain" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Material You dynamic colors will be inherited from the Material 3 parent.
+             You can override specific colors here if needed, but for dynamic
+             theming, inheriting is often sufficient. -->
+    </style>
+
+    <!-- Splash Screen Theme -->
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <!-- Changed to use a system attribute that can reflect Material You colors -->
+        <item name="windowSplashScreenBackground">?android:attr/colorBackground</item>
+        <!-- Changed the animated icon to the new splash specific padded version -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_icon_padded</item>
+        <item name="postSplashScreenTheme">@style/Theme.Materialdrain</item>
+    </style>
 </resources>
