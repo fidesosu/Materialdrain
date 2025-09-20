@@ -30,6 +30,7 @@ import io.ktor.http.URLProtocol
 import io.ktor.http.content.OutputStreamContent // Added for streaming
 import io.ktor.http.path
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.utils.io.jvm.javaio.copyTo
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -247,6 +248,51 @@ class PixeldrainApiService {
         }
     }
 
+    suspend fun downloadFileToOutputStream(
+        fileId: String,
+        outputStream: java.io.OutputStream, // Accepts an OutputStream to write to
+        onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit
+    ): ApiResponse<Long> { // Returns total bytes written on success
+        if (fileId.isBlank()) {
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "file_id_missing", message = "File ID is required to download a file."))
+        }
+        return try {
+            val httpResponse = client.get {
+                url {
+                    protocol = URLProtocol.HTTPS
+                    host = "pixeldrain.com"
+                    path("api/file", fileId)
+                }
+                // Ktor's onDownload plugin tracks progress of receiving the response body
+                onDownload { bytesDownloaded, contentLength ->
+                    onProgress(bytesDownloaded, contentLength)
+                }
+            }
+
+            if (httpResponse.status == HttpStatusCode.OK) {
+                val channel: io.ktor.utils.io.ByteReadChannel = httpResponse.body()
+                // Stream the data from the channel directly to the provided outputStream
+                // The channel.copyTo(outputStream) is a suspending function.
+                // The outputStream is NOT closed here; the caller is responsible for its lifecycle.
+                val bytesCopied = channel.copyTo(outputStream)
+                ApiResponse.Success(bytesCopied)
+            } else {
+                try {
+                    // Attempt to parse error response as JSON
+                    ApiResponse.Error(httpResponse.body<FileUploadResponse>())
+                } catch (e: Exception) {
+                    // Fallback if error response is not the expected JSON structure
+                    ApiResponse.Error(FileUploadResponse(success = false, value = "download_failed_status_${httpResponse.status.value}", message = "Download failed: ${httpResponse.status.description}"))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PIXEL_API_SERVICE", "Exception during GET file download to stream: ${e.message}", e)
+            val errorMsg = e.message ?: "Network request failed or failed to parse response"
+            ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_file_download_stream", message = errorMsg))
+        }
+    }
+
+    // Existing downloadFileBytes function (now less optimal for large files)
     suspend fun downloadFileBytes(
         fileId: String,
         onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit
@@ -261,25 +307,18 @@ class PixeldrainApiService {
                     host = "pixeldrain.com"
                     path("api/file", fileId) // Direct file download endpoint
                 }
-                // The onDownload block in the request scope is used to monitor the progress of receiving the response body.
                 onDownload { bytesSentTotal, contentLength ->
                     onProgress(bytesSentTotal, contentLength)
                 }
             }
 
             if (response.status == HttpStatusCode.OK) {
-                // body<ByteArray>() will read the entire response body into memory.
-                // The onDownload listener should have been invoked during this process by Ktor.
-                val bytes = response.body<ByteArray>()
-                // If onDownload wasn't precise or if we want a final confirmation:
-                // onProgress(bytes.size.toLong(), bytes.size.toLong()) // This might be redundant if onDownload works as expected
+                val bytes = response.body<ByteArray>() // Reads entire file into memory
                 ApiResponse.Success(bytes)
             } else {
                 try {
-                    // Attempt to parse error response as JSON, common for Pixeldrain API
                     ApiResponse.Error(response.body<FileUploadResponse>())
                 } catch (e: Exception) {
-                    // Fallback if error response is not the expected JSON structure
                     ApiResponse.Error(FileUploadResponse(success = false, value = "download_failed_status_${response.status.value}", message = "Download failed: ${response.status.description}"))
                 }
             }
