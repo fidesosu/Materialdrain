@@ -42,7 +42,7 @@ Materialdrain is a modern Android client for Pixeldrain, built with Jetpack Comp
 
 1.  Clone the repository:
     ```bash
-    git clone https://your-repository-url/materialdrain.git
+    git clone https://github.com/fidesosu/Materialdrain.git
     ```
 2.  Open the project in Android Studio (latest stable version recommended).
 3.  The project uses Gradle for dependency management. Sync the project with Gradle files.
