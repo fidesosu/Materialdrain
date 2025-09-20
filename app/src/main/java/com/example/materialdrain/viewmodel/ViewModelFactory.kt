@@ -16,7 +16,8 @@ class ViewModelFactory(
             return UploadViewModel(application, pixeldrainApiService) as T
         }
         if (modelClass.isAssignableFrom(FileInfoViewModel::class.java)) {
-            return FileInfoViewModel(pixeldrainApiService) as T
+            // Pass application to FileInfoViewModel
+            return FileInfoViewModel(application, pixeldrainApiService) as T
         }
         // Add more ViewModels here as needed
         // if (modelClass.isAssignableFrom(AnotherViewModel::class.java)) {

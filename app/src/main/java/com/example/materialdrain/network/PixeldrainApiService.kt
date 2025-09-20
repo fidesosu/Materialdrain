@@ -2,6 +2,7 @@ package com.example.materialdrain.network
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns // Added for file size
 import android.util.Base64
 import android.util.Log
 import io.ktor.client.HttpClient
@@ -13,6 +14,8 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.onUpload // Corrected import for onUpload
+import io.ktor.client.request.delete // Added for deleteFile
 import io.ktor.client.request.get
 import io.ktor.client.request.headers
 import io.ktor.client.request.put
@@ -23,6 +26,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLProtocol
+import io.ktor.http.content.OutputStreamContent // Added for streaming
 import io.ktor.http.path
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.SerialName
@@ -87,6 +91,9 @@ data class FileInfoResponse(
 class PixeldrainApiService {
 
     private val client = HttpClient(CIO) {
+        engine {
+            // Explicit engine configuration block (can be empty)
+        }
         install(ContentNegotiation) {
             val jsonFormatter = Json {
                 prettyPrint = true
@@ -94,12 +101,12 @@ class PixeldrainApiService {
                 ignoreUnknownKeys = true
             }
             json(jsonFormatter, contentType = ContentType.Application.Json)
-            json(jsonFormatter, contentType = ContentType.Text.Plain)
+            json(jsonFormatter, contentType = ContentType.Text.Plain) // For error responses that might be plain text
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 60000 // 1 minute for general requests
-            connectTimeoutMillis = 15000  // 15 seconds
-            socketTimeoutMillis = 15000   // 15 seconds
+            requestTimeoutMillis = HttpTimeout.INFINITE_TIMEOUT_MS // Allow very long total request time for uploads
+            connectTimeoutMillis = 30000L  // 30 seconds for initial connection
+            socketTimeoutMillis = 900000L   // 15 minutes for inactivity between data packets
         }
         install(Logging) {
             logger = object : Logger {
@@ -107,12 +114,13 @@ class PixeldrainApiService {
                     Log.d("KTOR_HTTP_CLIENT", message)
                 }
             }
-            level = LogLevel.HEADERS
+            level = LogLevel.HEADERS // Use LogLevel.BODY for debugging uploads, but be mindful of large file data in logs
         }
         install(HttpRequestRetry) {
-            retryOnServerErrors(maxRetries = 3)
+            retryOnServerErrors(maxRetries = 2) // Reduced retries for uploads
             retryOnExceptionIf { _, cause ->
-                cause is IOException || cause is java.util.concurrent.TimeoutException
+                // Don't retry client-side timeouts for uploads, but do retry other IOExceptions
+                cause is IOException && cause !is java.net.SocketTimeoutException
             }
         }
     }
@@ -120,7 +128,8 @@ class PixeldrainApiService {
     suspend fun uploadFile(
         apiKey: String,
         fileName: String,
-        fileBytes: ByteArray
+        fileBytes: ByteArray,
+        onProgress: (bytesSent: Long, totalBytes: Long?) -> Unit // New progress callback
     ): FileUploadResponse {
         val basicAuth = "Basic " + Base64.encodeToString(":$apiKey".toByteArray(), Base64.NO_WRAP)
         return try {
@@ -133,19 +142,22 @@ class PixeldrainApiService {
                 headers {
                     append(HttpHeaders.Authorization, basicAuth)
                     append(HttpHeaders.ContentType, ContentType.Application.OctetStream.toString())
+                    append(HttpHeaders.ContentLength, fileBytes.size.toString())
                 }
                 setBody(fileBytes)
-                // timeout { requestTimeoutMillis = 300000 } // Removed to fix compilation error
+                onUpload { bytesSentTotal, contentLength ->
+                    onProgress(bytesSentTotal, contentLength)
+                }
             }
             if (response.status == HttpStatusCode.Created) {
-                response.body<FileUploadPutSuccessResponse>()
-                FileUploadResponse(success = true, id = response.body<FileUploadPutSuccessResponse>().id)
+                val successBody = response.body<FileUploadPutSuccessResponse>()
+                FileUploadResponse(success = true, id = successBody.id)
             } else {
                 response.body<FileUploadResponse>()
             }
         } catch (e: Exception) {
-            Log.e("PIXEL_API_SERVICE", "Exception during PUT text upload: ${e.message}", e)
-            FileUploadResponse(success = false, value = "network_exception_upload_text", message = e.message ?: "Network request failed")
+            Log.e("PIXEL_API_SERVICE", "Exception during PUT text/byte array upload: ${e.message}", e)
+            FileUploadResponse(success = false, value = "network_exception_upload_bytearray", message = e.message ?: "Network request failed")
         }
     }
 
@@ -153,14 +165,26 @@ class PixeldrainApiService {
         apiKey: String,
         fileName: String,
         fileUri: Uri,
-        context: Context
+        context: Context,
+        onProgress: (bytesSent: Long, totalBytes: Long?) -> Unit // New progress callback
     ): FileUploadResponse {
         val contentResolver = context.contentResolver
-        val inputStream = contentResolver.openInputStream(fileUri)
-            ?: return FileUploadResponse(success = false, value = "uri_error", message = "Failed to open input stream for URI.")
-        val fileBytes = inputStream.use { it.readBytes() }
         val basicAuth = "Basic " + Base64.encodeToString(":$apiKey".toByteArray(), Base64.NO_WRAP)
         val mimeType = contentResolver.getType(fileUri) ?: ContentType.Application.OctetStream.toString()
+
+        var fileSize: Long? = null
+        try {
+            contentResolver.query(fileUri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (!cursor.isNull(sizeIndex)) {
+                        fileSize = cursor.getLong(sizeIndex)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("PIXEL_API_SERVICE", "Could not determine file size for Content-Length: ${e.message}")
+        }
 
         return try {
             val response: HttpResponse = client.put {
@@ -171,10 +195,25 @@ class PixeldrainApiService {
                 }
                 headers {
                     append(HttpHeaders.Authorization, basicAuth)
-                    append(HttpHeaders.ContentType, mimeType)
+                    fileSize?.let {
+                        append(HttpHeaders.ContentLength, it.toString())
+                    }
                 }
-                setBody(fileBytes)
-                // timeout { requestTimeoutMillis = 300000 } // Removed to fix compilation error
+                setBody(
+                    OutputStreamContent(
+                        body = { // This is a suspend OutputStream.() -> Unit lambda
+                            contentResolver.openInputStream(fileUri)?.use { inputStream ->
+                                inputStream.copyTo(this) // 'this' is the OutputStream Ktor provides for writing
+                            } ?: throw IOException("Failed to open input stream for URI after initial check.")
+                        },
+                        contentType = ContentType.parse(mimeType),
+                        contentLength = fileSize // Provide contentLength to Ktor; it will use chunked transfer if null
+                    )
+                )
+                onUpload { bytesSentTotal, contentLength ->
+                    // Pass the contentLength from Ktor if available, otherwise fallback to our pre-calculated fileSize
+                    onProgress(bytesSentTotal, contentLength ?: fileSize)
+                }
             }
             if (response.status == HttpStatusCode.Created) {
                 val successBody = response.body<FileUploadPutSuccessResponse>()
@@ -183,8 +222,8 @@ class PixeldrainApiService {
                 response.body<FileUploadResponse>()
             }
         } catch (e: Exception) {
-            Log.e("PIXEL_API_SERVICE", "Exception during PUT URI upload: ${e.message}", e)
-            FileUploadResponse(success = false, value = "network_exception_upload_uri", message = e.message ?: "Network request failed")
+            Log.e("PIXEL_API_SERVICE", "Exception during PUT URI upload (streaming): ${e.message}", e)
+            FileUploadResponse(success = false, value = "network_exception_upload_uri_stream", message = e.message ?: "Network request failed or stream error")
         }
     }
 
@@ -234,6 +273,40 @@ class PixeldrainApiService {
             Log.e("PIXEL_API_SERVICE", "Exception for GET user files: ${e.message}", e)
             val errorMsg = e.message ?: "Network request failed or failed to parse error response"
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_user_files", message = errorMsg))
+        }
+    }
+
+    suspend fun deleteFile(apiKey: String, fileId: String): ApiResponse<FileUploadResponse> {
+        if (apiKey.isBlank()) {
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "API Key is required to delete files."))
+        }
+        if (fileId.isBlank()) {
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "file_id_missing", message = "File ID is required to delete a file."))
+        }
+        val basicAuth = "Basic " + Base64.encodeToString(":$apiKey".toByteArray(), Base64.NO_WRAP)
+        return try {
+            val response: HttpResponse = client.delete {
+                url {
+                    protocol = URLProtocol.HTTPS
+                    host = "pixeldrain.com"
+                    path("api/file", fileId)
+                }
+                headers {
+                    append(HttpHeaders.Authorization, basicAuth)
+                }
+            }
+            // DELETE API returns FileUploadResponse structure for both success and error
+            val responseBody = response.body<FileUploadResponse>()
+            if (responseBody.success) { // Typically status code 200 OK for successful delete
+                ApiResponse.Success(responseBody)
+            } else {
+                ApiResponse.Error(responseBody)
+            }
+        } catch (e: Exception) {
+            Log.e("PIXEL_API_SERVICE", "Exception during DELETE file: ${e.message}", e)
+            val errorMsg = e.message ?: "Network request failed or failed to parse error/success response"
+            // Ensure we return the FileUploadResponse structure even for exceptions
+            ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_delete_file", message = errorMsg))
         }
     }
 }

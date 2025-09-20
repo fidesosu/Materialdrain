@@ -32,11 +32,17 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
-    }
+    // kotlinOptions {
+    //     jvmTarget = "11"
+    // } // This block is removed
     buildFeatures {
         compose = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
     }
 }
 
@@ -51,16 +57,18 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
+    // implementation(libs.androidx.compose.foundation) // This line is removed
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0") // Added ViewModel Compose
     implementation("io.coil-kt:coil-compose:2.7.0") // Added Coil for image loading
+    implementation(libs.google.android.material) // Added Material Components for XML themes
 
     // Ktor Client Dependencies
-    implementation("io.ktor:ktor-client-core:3.3.0")
-    implementation("io.ktor:ktor-client-cio:3.3.0") // CIO engine for Android
-    implementation("io.ktor:ktor-client-content-negotiation:3.3.0")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.0")
-    implementation("io.ktor:ktor-client-auth:3.3.0")
-    implementation("io.ktor:ktor-client-logging:3.3.0") // Optional but good for debugging
+    implementation("io.ktor:ktor-client-core:2.3.11")
+    implementation("io.ktor:ktor-client-cio:2.3.11") // CIO engine for Android
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.11")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.11")
+    implementation("io.ktor:ktor-client-auth:2.3.11")
+    implementation("io.ktor:ktor-client-logging:2.3.11") // Optional but good for debugging
 
     // Kotlinx Serialization runtime (needed for Ktor's JSON serialization)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
@@ -72,4 +80,5 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    implementation("androidx.core:core-splashscreen:1.0.1")
 }
