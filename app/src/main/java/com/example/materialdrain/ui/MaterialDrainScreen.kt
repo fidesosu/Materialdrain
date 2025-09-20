@@ -9,6 +9,7 @@ import android.util.Log // Added for Audio Preview Logging
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,10 +27,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale // Added for Image Preview
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage // Added for Image Preview
@@ -97,7 +102,7 @@ fun MaterialDrainScreen() {
     val application = LocalContext.current.applicationContext as Application
     val pixeldrainApiService = remember { PixeldrainApiService() }
     val viewModelFactory = remember { ViewModelFactory(application, pixeldrainApiService) }
-    
+
     val uploadViewModel: UploadViewModel = viewModel(factory = viewModelFactory)
     val fileInfoViewModel: FileInfoViewModel = viewModel(factory = viewModelFactory)
 
@@ -129,7 +134,7 @@ fun MaterialDrainScreen() {
 
     val uploadUiState by uploadViewModel.uiState.collectAsState()
     if (uploadUiState.errorMessage?.contains("API Key is missing") == true && currentScreen != Screen.Settings) {
-        LaunchedEffect(uploadUiState.errorMessage) { 
+        LaunchedEffect(uploadUiState.errorMessage) {
             dialogTitle = "API Key Required"
             dialogContent = "Please set your API Key in the Settings screen."
             showDialog = true
@@ -149,7 +154,7 @@ fun MaterialDrainScreen() {
                 }
             }
         },
-        snackbarHost = { 
+        snackbarHost = {
             SnackbarHost(hostState = snackbarHostState) { data ->
                 Snackbar(
                     snackbarData = data,
@@ -197,10 +202,10 @@ fun MaterialDrainScreen() {
 
     if (showDialog) {
         AlertDialog(
-            onDismissRequest = { 
-                showDialog = false 
+            onDismissRequest = {
+                showDialog = false
                 if (dialogTitle == "Upload Failed" || dialogTitle == "Upload Error"){
-                    uploadViewModel.clearUploadResult() 
+                    uploadViewModel.clearUploadResult()
                 }
                 if (dialogContent.contains("API Key") && uploadViewModel.uiState.value.errorMessage?.contains("API Key") == true) {
                      uploadViewModel.clearApiKeyError()
@@ -209,8 +214,8 @@ fun MaterialDrainScreen() {
             title = { Text(dialogTitle) },
             text = { Text(dialogContent) },
             confirmButton = {
-                Button(onClick = { 
-                    showDialog = false 
+                Button(onClick = {
+                    showDialog = false
                      if (dialogTitle == "Upload Failed" || dialogTitle == "Upload Error"){
                         uploadViewModel.clearUploadResult()
                     }
@@ -252,6 +257,12 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
     var audioPreviewError by remember { mutableStateOf<String?>(null) }
     var isMediaPlayerPreparing by remember { mutableStateOf(false) }
 
+    var isUserScrubbing by remember { mutableStateOf(false) }
+    var userSeekPositionMillis by remember { mutableLongStateOf(0L) }
+    var progressBarWidthPx by remember { mutableStateOf(0) }
+    var playbackTimeAtDragStart by remember { mutableLongStateOf(0L) }
+    var initialTouchX by remember { mutableFloatStateOf(0f) }
+
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
         onResult = { uri: Uri? ->
@@ -259,7 +270,17 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
             if (uri != null && selectedTabIndex == 0) {
                 uploadViewModel.onTextToUploadChanged("")
             }
-            // Player setup/cleanup is now fully handled by DisposableEffect based on uiState.selectedFileUri
+            // Reset all audio preview states on new file selection
+            mediaPlayer?.release()
+            mediaPlayer = null
+            isPlaying = false
+            currentPlaybackTimeMillis = 0L
+            audioPreviewError = null
+            isMediaPlayerPreparing = false
+            isUserScrubbing = false
+            userSeekPositionMillis = 0L
+            playbackTimeAtDragStart = 0L
+            initialTouchX = 0f
         }
     )
 
@@ -270,20 +291,24 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
             Log.d(TAG_MEDIA_PLAYER, "DisposableEffect: Setting up MediaPlayer for: ${uiState.selectedFileUri}")
 
             isMediaPlayerPreparing = true
-            mediaPlayer?.release() // Release any existing state player instance
+            mediaPlayer?.release()
             mediaPlayer = null
             isPlaying = false
             currentPlaybackTimeMillis = 0L
             audioPreviewError = null
+            isUserScrubbing = false
+            userSeekPositionMillis = 0L
+            playbackTimeAtDragStart = 0L
+            initialTouchX = 0f
 
             localMediaPlayerInstance = MediaPlayer()
             try {
                 localMediaPlayerInstance.setDataSource(context, uiState.selectedFileUri!!)
-                localMediaPlayerInstance.prepareAsync() // This is asynchronous
+                localMediaPlayerInstance.prepareAsync()
 
                 localMediaPlayerInstance.setOnPreparedListener { preparedPlayer ->
                     Log.d(TAG_MEDIA_PLAYER, "MediaPlayer prepared: ${uiState.selectedFileUri}")
-                    mediaPlayer = preparedPlayer // Update the state variable with the prepared player
+                    mediaPlayer = preparedPlayer
                     isMediaPlayerPreparing = false
                     audioPreviewError = null
                 }
@@ -291,83 +316,86 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                     Log.e(TAG_MEDIA_PLAYER, "MediaPlayer error (what: $what, extra: $extra) for: ${uiState.selectedFileUri}")
                     audioPreviewError = "Cannot play this audio file (error $what, $extra)."
                     mp?.release()
-                    // Only nullify the main mediaPlayer state if it refers to the one that errored
                     if (mediaPlayer === mp || mediaPlayer === localMediaPlayerInstance) {
                         mediaPlayer = null
                     }
                     isMediaPlayerPreparing = false
                     isPlaying = false
                     currentPlaybackTimeMillis = 0L
-                    true // Indicates the error was handled
+                    isUserScrubbing = false
+                    userSeekPositionMillis = 0L
+                    playbackTimeAtDragStart = 0L
+                    initialTouchX = 0f
+                    true
                 }
                 localMediaPlayerInstance.setOnCompletionListener { mp ->
                     Log.d(TAG_MEDIA_PLAYER, "MediaPlayer playback completed for: ${uiState.selectedFileUri}")
                     isPlaying = false
                     currentPlaybackTimeMillis = uiState.audioDurationMillis ?: 0L
-                    // mp.seekTo(0) // Optional: reset to start for replaying, if desired
+                    isUserScrubbing = false
                 }
-            } catch (e: IOException) {
-                Log.e(TAG_MEDIA_PLAYER, "IOException during MediaPlayer setup: ${e.message}", e)
-                audioPreviewError = "Error loading audio file (IOException)."
+            } catch (e: Exception) {
+                Log.e(TAG_MEDIA_PLAYER, "Exception during MediaPlayer setup: ${e.message}", e)
+                audioPreviewError = when (e) {
+                    is IOException -> "Error loading audio file (I/O)."
+                    is IllegalStateException -> "Error initializing audio player (State)."
+                    is SecurityException -> "Permission denied for audio file."
+                    else -> "Unknown error setting up audio player."
+                }
                 localMediaPlayerInstance?.release()
                 mediaPlayer = null
                 isMediaPlayerPreparing = false
                 isPlaying = false
                 currentPlaybackTimeMillis = 0L
-            } catch (e: IllegalStateException) {
-                Log.e(TAG_MEDIA_PLAYER, "IllegalStateException during MediaPlayer setup: ${e.message}", e)
-                audioPreviewError = "Error initializing audio player (IllegalStateException)."
-                localMediaPlayerInstance?.release()
-                mediaPlayer = null
-                isMediaPlayerPreparing = false
-                isPlaying = false
-                currentPlaybackTimeMillis = 0L
-            } catch (e: SecurityException) {
-                Log.e(TAG_MEDIA_PLAYER, "SecurityException during MediaPlayer setup: ${e.message}", e)
-                audioPreviewError = "Permission denied for audio file."
-                localMediaPlayerInstance?.release()
-                mediaPlayer = null
-                isMediaPlayerPreparing = false
-                isPlaying = false
-                currentPlaybackTimeMillis = 0L
+                isUserScrubbing = false
+                userSeekPositionMillis = 0L
+                playbackTimeAtDragStart = 0L
+                initialTouchX = 0f
             }
         } else {
-            // Not an audio file, wrong tab, or URI is null - cleanup player
-            Log.d(TAG_MEDIA_PLAYER, "DisposableEffect: Cleaning up MediaPlayer (not audio, wrong tab, or null URI).")
+            Log.d(TAG_MEDIA_PLAYER, "DisposableEffect: Cleaning up MediaPlayer (not audio tab or no URI).")
             mediaPlayer?.release()
             mediaPlayer = null
             isPlaying = false
             currentPlaybackTimeMillis = 0L
             audioPreviewError = null
             isMediaPlayerPreparing = false
+            isUserScrubbing = false
+            userSeekPositionMillis = 0L
+            playbackTimeAtDragStart = 0L
+            initialTouchX = 0f
         }
 
         onDispose {
             Log.d(TAG_MEDIA_PLAYER, "DisposableEffect onDispose for ${uiState.selectedFileUri}, releasing players.")
-            localMediaPlayerInstance?.release() // Release the instance being configured if it's still around
-            mediaPlayer?.release() // Release the instance in state
+            localMediaPlayerInstance?.release()
+            mediaPlayer?.release()
             mediaPlayer = null
             isMediaPlayerPreparing = false
             isPlaying = false
             currentPlaybackTimeMillis = 0L
+            isUserScrubbing = false
+            userSeekPositionMillis = 0L
+            playbackTimeAtDragStart = 0L
+            initialTouchX = 0f
         }
     }
 
-    LaunchedEffect(isPlaying, mediaPlayer, uiState.selectedFileUri, uiState.audioDurationMillis) {
-        if (isPlaying && mediaPlayer != null && mediaPlayer?.isPlaying == true) {
+    LaunchedEffect(isPlaying, mediaPlayer, uiState.selectedFileUri, uiState.audioDurationMillis, isUserScrubbing) {
+        if (isPlaying && !isUserScrubbing && mediaPlayer != null && mediaPlayer?.isPlaying == true) {
             while (isActive) {
                 try {
-                    currentPlaybackTimeMillis = mediaPlayer?.currentPosition?.toLong() ?: currentPlaybackTimeMillis
+                    if (!isUserScrubbing && mediaPlayer?.isPlaying == true) {
+                        currentPlaybackTimeMillis = mediaPlayer?.currentPosition?.toLong() ?: currentPlaybackTimeMillis
+                    }
                 } catch (e: IllegalStateException) {
                     Log.e(TAG_MEDIA_PLAYER, "Error getting currentPosition: ${e.message}")
                     isPlaying = false
                     audioPreviewError = "Player error during playback."
-                    isMediaPlayerPreparing = false
-                    mediaPlayer = null // Player is in a bad state
                     break
                 }
                 awaitFrame()
-                if (!isPlaying || mediaPlayer?.isPlaying == false) break
+                if (!isPlaying || mediaPlayer?.isPlaying == false || isUserScrubbing) break
             }
         }
     }
@@ -383,8 +411,17 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                             uploadViewModel.onTextToUploadChanged("")
                         } else {
                             uploadViewModel.onFileSelected(null, context)
+                            mediaPlayer?.release()
+                            mediaPlayer = null
+                            isPlaying = false
+                            currentPlaybackTimeMillis = 0L
+                            audioPreviewError = null
+                            isMediaPlayerPreparing = false
                         }
-                        // Player cleanup/reset is handled by DisposableEffect reacting to selectedTabIndex or uiState.selectedFileUri changes
+                        isUserScrubbing = false
+                        userSeekPositionMillis = 0L
+                        playbackTimeAtDragStart = 0L
+                        initialTouchX = 0f
                     },
                     text = { Text(title) }
                 )
@@ -434,7 +471,6 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                         }
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Image Preview Section
                         if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("image/") == true) {
                             AsyncImage(
                                 model = uiState.selectedFileUri,
@@ -449,29 +485,19 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                             Spacer(modifier = Modifier.height(16.dp))
                         }
 
-                        // Audio Preview Section
                         if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("audio/") == true) {
                             Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(modifier = Modifier.padding(bottom = 0.dp)) { // Ensure no extra bottom padding inside the card for the progress bar
+                                    Row(
+                                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         uiState.audioAlbumArt?.let { albumArtBytes ->
                                             val bitmap = remember(albumArtBytes) {
-                                                try {
-                                                    BitmapFactory.decodeByteArray(albumArtBytes, 0, albumArtBytes.size)
-                                                } catch (e: Exception) {
-                                                    Log.e(TAG_MEDIA_PLAYER, "Error decoding album art: ${e.message}")
-                                                    null
-                                                }
+                                                try { BitmapFactory.decodeByteArray(albumArtBytes, 0, albumArtBytes.size) } catch (e: Exception) { null }
                                             }
                                             bitmap?.let {
-                                                Image(
-                                                    bitmap = it.asImageBitmap(),
-                                                    contentDescription = "Album Art",
-                                                    modifier = Modifier
-                                                        .size(64.dp)
-                                                        .clip(RoundedCornerShape(8.dp)),
-                                                    contentScale = ContentScale.Crop
-                                                )
+                                                Image(bitmap = it.asImageBitmap(), contentDescription = "Album Art", modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
                                             } ?: Icon(Icons.Filled.MusicNote, contentDescription = "Album Art Placeholder", modifier = Modifier.size(64.dp))
                                         } ?: Icon(Icons.Filled.MusicNote, contentDescription = "Album Art Placeholder", modifier = Modifier.size(64.dp))
 
@@ -479,9 +505,9 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
 
                                         Column(modifier = Modifier.weight(1f)) {
                                             uiState.audioArtist?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
-                                            uiState.audioAlbum?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                                            uiState.audioAlbum?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 4.dp)) }
                                             Text(
-                                                text = "${formatDurationMillis(currentPlaybackTimeMillis)} / ${formatDurationMillis(uiState.audioDurationMillis ?: 0L)}",
+                                                text = "${formatDurationMillis( (if (isUserScrubbing) userSeekPositionMillis else currentPlaybackTimeMillis).coerceAtMost(uiState.audioDurationMillis ?: 0L) )} / ${formatDurationMillis(uiState.audioDurationMillis ?: 0L)}",
                                                 style = MaterialTheme.typography.labelMedium
                                             )
                                         }
@@ -489,6 +515,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                             onClick = {
                                                 if (isMediaPlayerPreparing) return@FilledTonalIconButton
                                                 mediaPlayer?.let { player ->
+                                                    val totalDuration = uiState.audioDurationMillis ?: Long.MAX_VALUE
                                                     if (player.isPlaying) {
                                                         try {
                                                           player.pause()
@@ -496,54 +523,109 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                                         } catch (e: IllegalStateException) {
                                                             Log.e(TAG_MEDIA_PLAYER, "Error pausing: ${e.message}", e)
                                                             audioPreviewError = "Player error on pause."
-                                                            player.release()
-                                                            mediaPlayer = null
-                                                            isPlaying = false
-                                                            isMediaPlayerPreparing = false
-                                                            currentPlaybackTimeMillis = 0L
                                                         }
                                                     } else {
                                                         try {
+                                                            val currentTimeToPlayFrom = if (isUserScrubbing) userSeekPositionMillis else currentPlaybackTimeMillis
+                                                            if (currentTimeToPlayFrom >= totalDuration - 100 && totalDuration > 0 && !isUserScrubbing) {
+                                                                player.seekTo(0)
+                                                                currentPlaybackTimeMillis = 0L
+                                                                userSeekPositionMillis = 0L
+                                                            }
+                                                            // Ensure seek happens if scrubbing changed position before play
+                                                            if (isUserScrubbing || player.currentPosition.toLong() != currentTimeToPlayFrom) {
+                                                                // player.seekTo(currentTimeToPlayFrom.toInt()) // Already handled by onDragEnd for scrubbing
+                                                            }
                                                             player.start()
                                                             isPlaying = true
                                                             audioPreviewError = null
                                                         } catch (e: IllegalStateException) {
                                                             Log.e(TAG_MEDIA_PLAYER, "Error starting/resuming: ${e.message}", e)
                                                             audioPreviewError = "Could not play audio."
-                                                            player.release()
-                                                            mediaPlayer = null
-                                                            isPlaying = false
-                                                            isMediaPlayerPreparing = false
-                                                            currentPlaybackTimeMillis = 0L
                                                         }
                                                     }
                                                 } ?: run {
-                                                    if (audioPreviewError == null && !isMediaPlayerPreparing) {
-                                                        audioPreviewError = "Player not available. Try selecting file again."
-                                                    }
+                                                    if (audioPreviewError == null && !isMediaPlayerPreparing) audioPreviewError = "Player not available. Try selecting file again."
                                                 }
                                             },
                                             enabled = mediaPlayer != null && !isMediaPlayerPreparing,
                                             modifier = Modifier.size(48.dp)
                                         ) {
-                                            Icon(
-                                                if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                                contentDescription = if (isPlaying) "Pause audio preview" else "Play audio preview"
-                                            )
+                                            Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (isPlaying) "Pause" else "Play")
                                         }
                                     }
                                     if (isMediaPlayerPreparing) {
-                                        Text("Player preparing...", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                                        Text("Player preparing...", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 0.dp, start = 16.dp, end = 16.dp, bottom = 8.dp))
                                     }
                                     audioPreviewError?.let {
-                                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 0.dp, start = 16.dp, end = 16.dp, bottom = 8.dp))
+                                    }
+
+                                    val totalDuration = uiState.audioDurationMillis ?: 0L
+                                    val progressFraction = {
+                                        val currentPos = if (isUserScrubbing) userSeekPositionMillis else currentPlaybackTimeMillis
+                                        if (totalDuration > 0L) (currentPos.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f) else 0f
+                                    }
+
+                                    if (mediaPlayer != null || isMediaPlayerPreparing) {
+                                        Box(
+                                            contentAlignment = Alignment.BottomCenter, // Align progress bar to bottom
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(24.dp)
+                                                .onSizeChanged { size -> progressBarWidthPx = size.width }
+                                                .pointerInput(mediaPlayer, totalDuration, progressBarWidthPx) {
+                                                    if (mediaPlayer == null || totalDuration <= 0L || progressBarWidthPx <= 0) return@pointerInput
+                                                    detectHorizontalDragGestures(
+                                                        onDragStart = { offset ->
+                                                            isUserScrubbing = true
+                                                            initialTouchX = offset.x
+                                                            val initialPercentage = (offset.x / progressBarWidthPx).coerceIn(0f, 1f)
+                                                            val tappedTimeMillis = (initialPercentage * totalDuration).toLong()
+
+                                                            userSeekPositionMillis = tappedTimeMillis
+                                                            playbackTimeAtDragStart = tappedTimeMillis // Base for relative drag
+                                                        },
+                                                        onHorizontalDrag = { change, _ ->
+                                                            if (!isUserScrubbing) return@detectHorizontalDragGestures
+
+                                                            val currentDragX = change.position.x
+                                                            val dragDeltaX = currentDragX - initialTouchX
+                                                            val timeDeltaMillis = (dragDeltaX / progressBarWidthPx) * totalDuration
+
+                                                            userSeekPositionMillis = (playbackTimeAtDragStart + timeDeltaMillis).toLong().coerceIn(0L, totalDuration)
+                                                            change.consume()
+                                                        },
+                                                        onDragEnd = {
+                                                            if (!isUserScrubbing) return@detectHorizontalDragGestures
+                                                            mediaPlayer?.let {
+                                                                try {
+                                                                    it.seekTo(userSeekPositionMillis.toInt())
+                                                                    currentPlaybackTimeMillis = userSeekPositionMillis
+                                                                } catch (e: IllegalStateException) {
+                                                                    Log.e(TAG_MEDIA_PLAYER, "Error seeking on drag end: ${e.message}", e)
+                                                                    audioPreviewError = "Player error during seek."
+                                                                }
+                                                            }
+                                                            isUserScrubbing = false
+                                                        },
+                                                        onDragCancel = {
+                                                            isUserScrubbing = false
+                                                        }
+                                                    )
+                                                }
+                                        ) {
+                                            LinearProgressIndicator(
+                                                progress = progressFraction,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
                                     }
                                 }
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                         }
 
-                        // Text File Preview Section
                         val mimeType = uiState.selectedFileMimeType
                         val textContent = uiState.selectedFileTextContent
                         if (uiState.selectedFileUri != null && !textContent.isNullOrEmpty() && mimeType != null &&
@@ -568,12 +650,9 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                             Text("File Content Preview (First 4KB):", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
                             OutlinedTextField(
                                 value = textContent,
-                                onValueChange = {}, // Read-only
+                                onValueChange = {},
                                 readOnly = true,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 100.dp, max = 200.dp)
-                                    .padding(vertical = 8.dp),
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp, max = 200.dp).padding(vertical = 8.dp),
                                 textStyle = MaterialTheme.typography.bodySmall
                             )
                             Spacer(modifier = Modifier.height(16.dp))
@@ -632,9 +711,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
         Button(
             onClick = { uploadViewModel.upload() },
             enabled = canUpload,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
         ) {
             Icon(Icons.Filled.FileUpload, contentDescription = null)
             Spacer(Modifier.size(ButtonDefaults.IconSpacing))
@@ -705,7 +782,7 @@ fun FilesScreenContent(fileInfoViewModel: FileInfoViewModel) {
         Spacer(modifier = Modifier.height(24.dp))
 
         var apiKey by remember { mutableStateOf("") }
-        LaunchedEffect(Unit) { 
+        LaunchedEffect(Unit) {
             val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             apiKey = sharedPrefs.getString(API_KEY_PREF, "") ?: ""
         }
@@ -740,7 +817,7 @@ fun FilesScreenContent(fileInfoViewModel: FileInfoViewModel) {
         }
 
         if (uiState.userFilesList.isNotEmpty()) {
-            LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) { 
+            LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                 items(uiState.userFilesList) { file ->
                     UserFileListItem(fileInfo = file)
                 }
@@ -774,7 +851,7 @@ fun FileInfoDetails(fileInfo: FileInfoResponse) {
             InfoRow("Name:", fileInfo.name)
             InfoRow("Size:", formatSize(fileInfo.size))
             fileInfo.mimeType?.let { InfoRow("MIME Type:", it) }
-            InfoRow("Upload Date:", fileInfo.dateUpload) 
+            InfoRow("Upload Date:", fileInfo.dateUpload)
             fileInfo.views?.let { InfoRow("Views:", it.toString()) }
             fileInfo.downloads?.let { InfoRow("Downloads:", it.toString()) }
             fileInfo.bandwidthUsed?.let { InfoRow("Bandwidth Used (Free):", formatSize(it)) }
@@ -839,8 +916,8 @@ fun ListsScreenContent(onShowDialog: (String, String) -> Unit) {
 
 @Composable
 fun SettingsScreenContent(
-    uploadViewModel: UploadViewModel, 
-    fileInfoViewModel: FileInfoViewModel, 
+    uploadViewModel: UploadViewModel,
+    fileInfoViewModel: FileInfoViewModel,
     onShowDialog: (String, String) -> Unit
 ) {
     var apiKeyInput by remember { mutableStateOf("") }
@@ -854,22 +931,22 @@ fun SettingsScreenContent(
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center 
+        verticalArrangement = Arrangement.Center
     ) {
         Spacer(modifier = Modifier.height(24.dp))
 
         OutlinedTextField(value = apiKeyInput, onValueChange = { apiKeyInput = it }, label = { Text("Pixeldrain API Key") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(16.dp))
         Button(
-            onClick = { 
+            onClick = {
                 val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 with(sharedPrefs.edit()) {
                     putString(API_KEY_PREF, apiKeyInput)
                     apply()
                 }
-                uploadViewModel.updateApiKey(apiKeyInput) 
-                fileInfoViewModel.fetchUserFiles(apiKeyInput) 
-                onShowDialog("Settings Saved", "API Key saved successfully.") 
+                uploadViewModel.updateApiKey(apiKeyInput)
+                fileInfoViewModel.fetchUserFiles(apiKeyInput)
+                onShowDialog("Settings Saved", "API Key saved successfully.")
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = apiKeyInput.isNotBlank()
