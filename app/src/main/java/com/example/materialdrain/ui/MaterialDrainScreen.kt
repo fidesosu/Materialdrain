@@ -1214,7 +1214,7 @@ fun UserFileListItemCard(
                 IconButton(
                     onClick = { fileInfoViewModel.initiateDownloadFile(fileInfo) },
                     // Use the correctly scoped 'isDownloadingThisItem'
-                    enabled = !isDownloadingThisItem && downloadState?.status != DownloadStatus.COMPLETED
+                    enabled = !isDownloadingThisItem
                 ) {
                     Icon(Icons.Filled.Download, contentDescription = "Download File")
                 }
@@ -1267,7 +1267,7 @@ fun UserFileListItemCard(
                         )
                     }
                 }
-            } else if (downloadState != null && (downloadState.status == DownloadStatus.COMPLETED || downloadState.status == DownloadStatus.FAILED)) {
+            } else if (downloadState != null && downloadState.status == DownloadStatus.FAILED) {
                 // This block is for the "Dismiss" button when not in PENDING or DOWNLOADING, but still having a state
                 Column(modifier = Modifier.animateContentSize()) {
                     Row( // Display final status message
