@@ -51,5 +51,4 @@ Materialdrain is a modern Android client for Pixeldrain, built with Jetpack Comp
 ## Future Work (Potential)
 
 *   Implement the "Lists" feature for creating and managing Pixeldrain lists.
-*   Advanced file metadata editing.
 *   More robust error handling and user feedback.
