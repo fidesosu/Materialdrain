@@ -60,6 +60,7 @@ dependencies {
     implementation(libs.androidx.compose.foundation) // This line is un-commented
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0") // Added ViewModel Compose
     implementation("io.coil-kt:coil-compose:2.7.0") // Added Coil for image loading
+    implementation("io.coil-kt:coil-gif:2.7.0") // Added for GIF support with Coil
     implementation(libs.google.android.material) // Added Material Components for XML themes
 
     // Ktor Client Dependencies
@@ -72,6 +73,10 @@ dependencies {
 
     // Kotlinx Serialization runtime (needed for Ktor's JSON serialization)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
+    // Media3 (ExoPlayer)
+    implementation("androidx.media3:media3-exoplayer:1.8.0")
+    implementation("androidx.media3:media3-ui:1.8.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -2,7 +2,6 @@ package com.example.materialdrain.ui.screens
 
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -65,6 +64,7 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -94,7 +94,7 @@ fun SortControls(uiState: FileInfoUiState, fileInfoViewModel: FileInfoViewModel)
 
     var expanded by remember { mutableStateOf(false) }
     val currentSortOptionText = remember(uiState.sortField, uiState.sortAscending) {
-        sortOptions.find { it.field == uiState.sortField && it.ascending == uiState.sortAscending }?.displayText 
+        sortOptions.find { it.field == uiState.sortField && it.ascending == uiState.sortAscending }?.displayText
             ?: (if (uiState.sortField == SortableField.UPLOAD_DATE && !uiState.sortAscending) "Date (Newest)" else "Sort by...")
     }
 
@@ -139,7 +139,8 @@ fun SortControls(uiState: FileInfoUiState, fileInfoViewModel: FileInfoViewModel)
 
 @Composable
 fun FilesScreenContent(
-    fileInfoViewModel: FileInfoViewModel
+    fileInfoViewModel: FileInfoViewModel,
+    onFileSelected: () -> Unit // Added callback for navigation
 ) {
     val uiState by fileInfoViewModel.uiState.collectAsState()
     val context = LocalContext.current // context is still needed for UserFileListItemCard
@@ -162,7 +163,7 @@ fun FilesScreenContent(
                 SortableField.SIZE -> compareBy { it.size }
                 SortableField.UPLOAD_DATE -> compareBy { it.dateUpload }
             }
-            
+
             if (uiState.sortAscending) {
                 filteredList.sortedWith(comparator)
             } else {
@@ -170,7 +171,7 @@ fun FilesScreenContent(
             }
         }
     }
-    
+
     LaunchedEffect(uiState.showFilterInput) {
         if (uiState.showFilterInput) {
             filterFocusRequester.requestFocus()
@@ -213,8 +214,8 @@ fun FilesScreenContent(
                 }),
                 trailingIcon = {
                     if (uiState.filterQuery.isNotEmpty()) {
-                        IconButton(onClick = { 
-                            fileInfoViewModel.onFilterQueryChanged("") 
+                        IconButton(onClick = {
+                            fileInfoViewModel.onFilterQueryChanged("")
                             keyboardController?.hide()
                         }) {
                             Icon(Icons.Filled.Clear, contentDescription = "Clear filter")
@@ -231,9 +232,9 @@ fun FilesScreenContent(
             CircularProgressIndicator()
             Text("Fetching file info...", modifier = Modifier.padding(top = 8.dp))
         } else if (uiState.fileInfoErrorMessage != null &&
-                 uiState.fileInfoErrorMessage != "Please enter or select a File ID." &&
-                 !uiState.showEnterFileIdDialog &&
-                 !uiState.isLoadingUserFiles && !uiState.showFilterInput) {
+            uiState.fileInfoErrorMessage != "Please enter or select a File ID." &&
+            !uiState.showEnterFileIdDialog &&
+            !uiState.isLoadingUserFiles && !uiState.showFilterInput) {
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 uiState.fileInfoErrorMessage!!,
@@ -246,7 +247,7 @@ fun FilesScreenContent(
         Spacer(modifier = Modifier.height(8.dp))
 
         if (uiState.apiKeyMissingError) {
-             Text(
+            Text(
                 "API Key is missing. Please set it in Settings to load and manage your files.",
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium,
@@ -262,9 +263,9 @@ fun FilesScreenContent(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (uiState.isLoadingUserFiles && displayedFiles.isEmpty() && uiState.filterQuery.isBlank()) {
-                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                     Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                     Text("Loading Files...")
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text("Loading Files...")
                 } else {
                     Icon(Icons.Filled.Refresh, contentDescription = "Refresh Files")
                     Spacer(Modifier.size(ButtonDefaults.IconSpacing))
@@ -274,8 +275,8 @@ fun FilesScreenContent(
         }
 
         uiState.userFilesListErrorMessage?.let {
-            if (!uiState.apiKeyMissingError) { 
-                 Text(
+            if (!uiState.apiKeyMissingError) {
+                Text(
                     it,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
@@ -290,14 +291,14 @@ fun FilesScreenContent(
         if (displayedFiles.isNotEmpty()) {
             SortControls(uiState = uiState, fileInfoViewModel = fileInfoViewModel)
             LazyColumn(
-                state = listState, 
+                state = listState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
                 items(
-                    items = displayedFiles, 
+                    items = displayedFiles,
                     key = { it.id },
                     contentType = { "fileInfoCard" }
                 ) { file ->
@@ -307,15 +308,16 @@ fun FilesScreenContent(
                         UserFileListItemCard(
                             fileInfo = file,
                             fileInfoViewModel = fileInfoViewModel,
-                            context = context, // Pass context here
+                            context = context,
                             onClick = {
                                 if (uiState.showFilterInput) {
                                     fileInfoViewModel.setFilterInputVisible(false)
                                 }
                                 fileInfoViewModel.fetchFileInfoById(file.id)
+                                onFileSelected() // Call the navigation callback
                             }
                         )
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
                     }
                 }
             }
@@ -336,11 +338,11 @@ fun FilesScreenContent(
 fun UserFileListItemCard(
     fileInfo: FileInfoResponse,
     fileInfoViewModel: FileInfoViewModel,
-    context: Context, // Added context as parameter
+    context: Context,
     onClick: () -> Unit
 ) {
     val uiState by fileInfoViewModel.uiState.collectAsState()
-    val downloadState = uiState.activeDownloads[fileInfo.id] // Get specific download state
+    val downloadState = uiState.activeDownloads[fileInfo.id]
 
     val isDownloadingThisItem = downloadState?.status == DownloadStatus.DOWNLOADING || downloadState?.status == DownloadStatus.PENDING
     val showProgressSection = downloadState != null &&
@@ -350,54 +352,58 @@ fun UserFileListItemCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 2.dp)
             .clickable(onClick = onClick)
     ) {
-        Column(modifier = Modifier.padding(bottom = if (showProgressSection) 0.dp else 16.dp)) {
+        Column(modifier = Modifier.padding(bottom = if (showProgressSection) 0.dp else 12.dp)) {
             Row(
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = if (showProgressSection) 8.dp else 16.dp),
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = if (showProgressSection) 4.dp else 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AsyncImage(
-                    model = "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail?width=64&height=64",
+                    model = "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail",
                     contentDescription = "File thumbnail",
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(48.dp)
                         .clip(RoundedCornerShape(4.dp)),
                     contentScale = ContentScale.Crop,
                     error = rememberVectorPainter(Icons.Filled.BrokenImage)
                 )
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = fileInfo.name, // The file name
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1, // Ensure it's a single line
-                        overflow = TextOverflow.Ellipsis // Add ellipsis if it overflows
+                        text = fileInfo.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(formatSize(fileInfo.size), style = MaterialTheme.typography.bodySmall)
                     Text("Uploaded: ${fileInfo.dateUpload.substringBefore('T')}", style = MaterialTheme.typography.bodySmall)
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 IconButton(
                     onClick = { fileInfoViewModel.initiateDownloadFile(fileInfo) },
-                    enabled = !isDownloadingThisItem
+                    enabled = !isDownloadingThisItem,
+                    modifier = Modifier.size(40.dp)
                 ) {
-                    Icon(Icons.Filled.Download, contentDescription = "Download File")
+                    Icon(Icons.Filled.Download, contentDescription = "Download File", modifier = Modifier.size(20.dp))
                 }
                 if (fileInfo.canEdit == true) {
-                    IconButton(onClick = { fileInfoViewModel.initiateDeleteFile(fileInfo.id) }) {
-                        Icon(Icons.Filled.DeleteOutline, contentDescription = "Delete File", tint = MaterialTheme.colorScheme.error)
+                    IconButton(
+                        onClick = { fileInfoViewModel.initiateDeleteFile(fileInfo.id) },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(Icons.Filled.DeleteOutline, contentDescription = "Delete File", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
                     }
                 }
             }
 
             if (downloadState != null && showProgressSection) {
-                Column(modifier = Modifier.animateContentSize()) { 
+                Column { // Removed Modifier.animateContentSize()
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 16.dp, end = 16.dp, bottom = 4.dp, top = 0.dp),
+                            .padding(start = 12.dp, end = 12.dp, bottom = 2.dp, top = 0.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -417,6 +423,9 @@ fun UserFileListItemCard(
                                 Text(
                                     text = "${formatSize(downloadState.downloadedBytes)} / ${formatSize(total)}",
                                     style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier.width(120.dp),
+                                    textAlign = TextAlign.End
                                 )
                             }
                         }
@@ -426,16 +435,16 @@ fun UserFileListItemCard(
                             progress = { downloadState.progressFraction },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                                .padding(start = 12.dp, end = 12.dp, bottom = 4.dp)
                         )
                     }
                 }
             } else if (downloadState != null && downloadState.status == DownloadStatus.FAILED) {
-                Column(modifier = Modifier.animateContentSize()) {
-                    Row( 
+                Column {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 16.dp, end = 16.dp, bottom = 4.dp, top = 0.dp),
+                            .padding(start = 12.dp, end = 12.dp, bottom = 2.dp, top = 0.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -445,12 +454,11 @@ fun UserFileListItemCard(
                             color = if (downloadState.status == DownloadStatus.FAILED) MaterialTheme.colorScheme.error else LocalContentColor.current
                         )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
                     TextButton(
                         onClick = { fileInfoViewModel.clearDownloadState(fileInfo.id) },
                         modifier = Modifier
                             .align(Alignment.End)
-                            .padding(end = 8.dp, bottom = 0.dp)
+                            .padding(end = 8.dp, bottom = 0.dp, top = 0.dp)
                     ) {
                         Text("Dismiss", style = MaterialTheme.typography.labelSmall)
                     }

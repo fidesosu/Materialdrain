@@ -1,10 +1,8 @@
 package com.example.materialdrain.ui
 
 import android.app.Application
-import android.content.Context // Kept for LocalContext.current.applicationContext
-import android.content.Intent // Kept for Scaffold's when block (indirectly, if dialogs ever need it, though current moved ones do not directly trigger intents from here)
-import android.net.Uri // Kept for similar reasons as Intent
 import android.util.Log
+import androidx.activity.compose.BackHandler // Added import for BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -13,9 +11,10 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollConfiguration // Added import
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.layout.* // Corrected import
-// Removed HorizontalPager imports
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -24,14 +23,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog // Kept for FileInfoDetailsCard dialog wrapper
+// import androidx.compose.ui.window.Dialog // Dialog import removed
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.materialdrain.network.PixeldrainApiService
-import com.example.materialdrain.ui.dialogs.EnterFileIdDialog // IMPORT THE MOVED DIALOG
-import com.example.materialdrain.ui.dialogs.FileInfoDetailsCard // IMPORT THE MOVED DIALOG/CARD
+import com.example.materialdrain.ui.dialogs.EnterFileIdDialog
+import com.example.materialdrain.ui.dialogs.FileInfoDetailsCard
 import com.example.materialdrain.ui.screens.FilesScreenContent
 import com.example.materialdrain.ui.screens.ListsScreenContent
 import com.example.materialdrain.ui.screens.SettingsScreenContent
@@ -41,9 +41,6 @@ import com.example.materialdrain.viewmodel.FileInfoViewModel
 import com.example.materialdrain.viewmodel.UploadViewModel
 import com.example.materialdrain.viewmodel.ViewModelFactory
 import kotlinx.coroutines.flow.collectLatest
-// Removed distinctUntilChanged and snapshotFlow as they were pager-specific // formatSize is now in ui.Utils
-import kotlinx.coroutines.launch
-import java.text.DecimalFormat
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -51,9 +48,10 @@ import java.time.format.FormatStyle
 import java.time.format.DateTimeParseException
 
 // Define the screens in the app
-enum class Screen(val title: String, val icon: ImageVector) {
+enum class Screen(val title: String, val icon: ImageVector, val hasDetailsPage: Boolean = false) {
     Upload("Upload", Icons.Filled.FileUpload),
-    Files("Files", Icons.Filled.Folder),
+    Files("Files", Icons.Filled.Folder, true), // Mark that Files can navigate to a detail page
+    FileDetail("File Details", Icons.Filled.Description), // New screen for file details
     Lists("Lists", Icons.AutoMirrored.Filled.List),
     Settings("Settings", Icons.Filled.Settings)
 }
@@ -77,8 +75,7 @@ internal fun formatApiDateTimeString(dateTimeString: String?): String {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MaterialDrainScreen() {
-    var currentScreen by remember { mutableStateOf(Screen.Upload) }
-    // activeLogicScreen removed, pagerState removed
+    var currentScreen by remember { mutableStateOf<Screen>(Screen.Upload) }
 
     var showGenericDialog by remember { mutableStateOf(false) }
     var genericDialogContent by remember { mutableStateOf("") }
@@ -95,19 +92,34 @@ fun MaterialDrainScreen() {
     val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
     val uploadUiState by uploadViewModel.uiState.collectAsState()
 
-    // Removed pager-related LaunchedEffects
+    // Handle system back press for FileDetail screen
+    if (currentScreen == Screen.FileDetail) {
+        BackHandler(enabled = true) {
+            currentScreen = Screen.Files
+            // fileInfoViewModel.clearFileInfoDisplay() // Optionally clear, or rely on LaunchedEffect
+        }
+    }
 
-    // Simplified LaunchedEffect for ViewModel logic based on currentScreen
     LaunchedEffect(currentScreen) {
         Log.d("MaterialDrainScreen", "currentScreen changed to: ${currentScreen.name}")
-        if (currentScreen != Screen.Files) {
-            fileInfoViewModel.clearFileInfoDisplay()
-            fileInfoViewModel.clearUserFilesError()
-            fileInfoViewModel.clearApiKeyMissingError()
-            fileInfoViewModel.setFilterInputVisible(false)
-        } else {
-            Log.d("MaterialDrainScreen", "currentScreen is Files, loading API key.")
-            fileInfoViewModel.loadApiKey()
+        when (currentScreen) {
+            Screen.Files -> {
+                fileInfoViewModel.loadApiKey()
+                // If coming from FileDetail, fileInfo might still be set, which is fine.
+                // Filter visibility should be managed by its own state or reset if needed.
+            }
+            Screen.FileDetail -> {
+                // Ensure filter is hidden on detail screen
+                fileInfoViewModel.setFilterInputVisible(false)
+            }
+            else -> { // Upload, Lists, Settings
+                if (currentScreen != Screen.FileDetail) { // Don'''t clear if we are on file detail
+                    fileInfoViewModel.clearFileInfoDisplay() // Clear if navigating away from Files/FileDetail to other main screens
+                }
+                fileInfoViewModel.clearUserFilesError()
+                fileInfoViewModel.clearApiKeyMissingError()
+                fileInfoViewModel.setFilterInputVisible(false)
+            }
         }
     }
 
@@ -126,7 +138,7 @@ fun MaterialDrainScreen() {
                     !it.contains("metadata", ignoreCase = true) &&
                     !showGenericDialog &&
                     !fileInfoUiState.showEnterFileIdDialog &&
-                    currentScreen == Screen.Upload) { // Logic now uses currentScreen
+                    currentScreen == Screen.Upload) {
                     genericDialogTitle = "Upload Error"
                     genericDialogContent = it
                     showGenericDialog = true
@@ -135,9 +147,8 @@ fun MaterialDrainScreen() {
         }
     }
 
-    // API Key dialog for Upload screen, triggered by currentScreen
     if (uploadUiState.errorMessage?.contains("API Key is missing") == true && currentScreen == Screen.Upload && !fileInfoUiState.showEnterFileIdDialog) {
-        LaunchedEffect(uploadUiState.errorMessage, currentScreen) { // Keyed by currentScreen
+        LaunchedEffect(uploadUiState.errorMessage, currentScreen) {
             genericDialogTitle = "API Key Required for Upload"
             genericDialogContent = "Please set your API Key in the Settings screen to upload files."
             showGenericDialog = true
@@ -148,6 +159,9 @@ fun MaterialDrainScreen() {
         fileInfoUiState.deleteFileSuccessMessage?.let {
             snackbarHostState.showSnackbar(it)
             fileInfoViewModel.clearDeleteMessages()
+            if (currentScreen == Screen.FileDetail) { // If on detail page, navigate back after delete
+                currentScreen = Screen.Files
+            }
         }
     }
     LaunchedEffect(fileInfoUiState.deleteFileErrorMessage) {
@@ -170,13 +184,12 @@ fun MaterialDrainScreen() {
         }
     }
 
-    // API Key dialog for Files screen, triggered by currentScreen
-    if (fileInfoUiState.apiKeyMissingError && currentScreen == Screen.Files &&
+    if (fileInfoUiState.apiKeyMissingError && (currentScreen == Screen.Files || currentScreen == Screen.FileDetail) &&
         !fileInfoUiState.userFilesListErrorMessage.isNullOrBlank() &&
-        !showGenericDialog && !fileInfoUiState.showDeleteConfirmDialog && !fileInfoUiState.showEnterFileIdDialog && fileInfoUiState.fileInfo == null) {
-        LaunchedEffect(fileInfoUiState.apiKeyMissingError, currentScreen, fileInfoUiState.userFilesListErrorMessage) { // Keyed by currentScreen
+        !showGenericDialog && !fileInfoUiState.showDeleteConfirmDialog && !fileInfoUiState.showEnterFileIdDialog) {
+        LaunchedEffect(fileInfoUiState.apiKeyMissingError, currentScreen, fileInfoUiState.userFilesListErrorMessage) {
             if (fileInfoUiState.userFilesListErrorMessage!!.contains("API Key", ignoreCase = true)) {
-                genericDialogTitle = "API Key Required for Files"
+                genericDialogTitle = if (currentScreen == Screen.FileDetail) "API Key Required" else "API Key Required for Files"
                 genericDialogContent = fileInfoUiState.userFilesListErrorMessage!!
                 showGenericDialog = true
             }
@@ -192,9 +205,18 @@ fun MaterialDrainScreen() {
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(currentScreen.title, modifier = Modifier.weight(1f)) // Uses currentScreen
+                            Text(
+                                text = if (currentScreen == Screen.FileDetail) {
+                                    fileInfoUiState.fileInfo?.name ?: Screen.FileDetail.title
+                                } else {
+                                    currentScreen.title
+                                },
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                             AnimatedVisibility(
-                                visible = currentScreen == Screen.Upload && uploadUiState.isLoading, // Uses currentScreen
+                                visible = currentScreen == Screen.Upload && uploadUiState.isLoading,
                                 enter = fadeIn(animationSpec = tween(300)),
                                 exit = fadeOut(animationSpec = tween(300))
                             ) {
@@ -211,10 +233,20 @@ fun MaterialDrainScreen() {
                                 )
                             }
                         }
+                    },
+                    navigationIcon = {
+                        if (currentScreen == Screen.FileDetail) {
+                            IconButton(onClick = {
+                                currentScreen = Screen.Files
+                                // fileInfoViewModel.clearFileInfoDisplay() // Optionally clear here or rely on LaunchedEffect
+                            }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Files")
+                            }
+                        }
                     }
                 )
                 AnimatedVisibility(
-                    visible = currentScreen == Screen.Upload && uploadUiState.isLoading, // Uses currentScreen
+                    visible = currentScreen == Screen.Upload && uploadUiState.isLoading,
                     enter = fadeIn(animationSpec = tween(150)),
                     exit = fadeOut(animationSpec = tween(150))
                 ) {
@@ -235,15 +267,17 @@ fun MaterialDrainScreen() {
             }
         },
         bottomBar = {
-            BottomNavigationBar(currentScreen) { selectedScreen ->
-                if (currentScreen != selectedScreen) {
-                    currentScreen = selectedScreen // This will trigger LaunchedEffect(currentScreen)
+            AnimatedVisibility(visible = currentScreen != Screen.FileDetail) { // Hide for FileDetail
+                BottomNavigationBar(currentScreen) { selectedScreen ->
+                    if (currentScreen != selectedScreen) {
+                        currentScreen = selectedScreen
+                    }
                 }
             }
         },
         floatingActionButton = {
             AnimatedVisibility(
-                visible = currentScreen == Screen.Files, // FAB visibility now uses currentScreen
+                visible = currentScreen == Screen.Files,
                 enter = scaleIn(animationSpec = tween(300)),
                 exit = scaleOut(animationSpec = tween(300))
             ) {
@@ -261,7 +295,7 @@ fun MaterialDrainScreen() {
             SnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier
-                    .offset(y = 72.dp)
+                    .offset(y = if (currentScreen != Screen.FileDetail) 72.dp else 0.dp) // Adjust offset if bottom bar hidden
                     .zIndex(1f)
             ) { data ->
                 Snackbar(
@@ -273,11 +307,11 @@ fun MaterialDrainScreen() {
             }
         }
     ) { paddingValues ->
-        CompositionLocalProvider(LocalOverscrollConfiguration provides null) { // Added CompositionLocalProvider
+        CompositionLocalProvider(LocalOverscrollFactory provides null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
+                    .padding(paddingValues) // This padding is important for Scaffold content
             ) {
                 when (currentScreen) {
                     Screen.Upload -> UploadScreenContent(
@@ -289,8 +323,33 @@ fun MaterialDrainScreen() {
                         }
                     )
                     Screen.Files -> FilesScreenContent(
-                        fileInfoViewModel = fileInfoViewModel
+                        fileInfoViewModel = fileInfoViewModel,
+                        onFileSelected = { // This will be passed to FilesScreenContent
+                            // ViewModel should already have fetched/set this file info
+                            currentScreen = Screen.FileDetail
+                        }
                     )
+                    Screen.FileDetail -> {
+                        fileInfoUiState.fileInfo?.let { info ->
+                            FileInfoDetailsCard(
+                                fileInfo = info,
+                                fileInfoViewModel = fileInfoViewModel,
+                                context = LocalContext.current
+                            )
+                        } ?: run {
+                            // Show a loading or error state if fileInfo is null for some reason
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                if (fileInfoUiState.isLoadingFileInfo) {
+                                    CircularProgressIndicator()
+                                } else {
+                                    Text("File details not available. Please go back and select a file.")
+                                    LaunchedEffect(Unit) { // Auto navigate back if no info
+                                        currentScreen = Screen.Files
+                                    }
+                                }
+                            }
+                        }
+                    }
                     Screen.Lists -> ListsScreenContent(
                         onShowDialog = { title, content ->
                             genericDialogTitle = title
@@ -322,7 +381,7 @@ fun MaterialDrainScreen() {
                 if (genericDialogContent.contains("API Key") && uploadUiState.errorMessage?.contains("API Key") == true) {
                     uploadViewModel.clearApiKeyError()
                 }
-                if (genericDialogTitle.contains("API Key Required for Files")) {
+                if (genericDialogTitle.contains("API Key Required")) { // Broader match for API key dialogs
                     fileInfoViewModel.clearUserFilesError()
                     fileInfoViewModel.clearApiKeyMissingError()
                 }
@@ -338,13 +397,13 @@ fun MaterialDrainScreen() {
                     if (genericDialogContent.contains("API Key") && uploadUiState.errorMessage?.contains("API Key") == true) {
                         uploadViewModel.clearApiKeyError()
                     }
-                    if (genericDialogTitle.contains("API Key Required for Files")) {
+                    if (genericDialogTitle.contains("API Key Required")) { // Broader match for API key dialogs
                         fileInfoViewModel.clearUserFilesError()
                         fileInfoViewModel.clearApiKeyMissingError()
                         if (genericDialogContent.contains("Settings")) {
                             val settingsScreen = Screen.Settings
                             if (currentScreen != settingsScreen) {
-                                currentScreen = settingsScreen // Triggers LaunchedEffect(currentScreen)
+                                currentScreen = settingsScreen
                             }
                         }
                     }
@@ -355,11 +414,7 @@ fun MaterialDrainScreen() {
         )
     }
 
-    if (fileInfoUiState.fileInfo != null && currentScreen == Screen.Files && !fileInfoUiState.showFilterInput) {
-        Dialog(onDismissRequest = { fileInfoViewModel.clearFileInfoDisplay() }) {
-            FileInfoDetailsCard(fileInfo = fileInfoUiState.fileInfo!!, fileInfoViewModel = fileInfoViewModel, context = LocalContext.current)
-        }
-    }
+    // Removed the Dialog wrapper for FileInfoDetailsCard as it'''s now a screen
 
     if (fileInfoUiState.showDeleteConfirmDialog) {
         AlertDialog(
@@ -391,12 +446,13 @@ fun MaterialDrainScreen() {
 @Composable
 fun BottomNavigationBar(currentScreen: Screen, onScreenSelected: (Screen) -> Unit) {
     NavigationBar {
-        Screen.entries.forEach { screen ->
+        // Filter out FileDetail from bottom navigation items
+        Screen.entries.filter { it != Screen.FileDetail }.forEach { screen ->
             NavigationBarItem(
                 icon = { Icon(screen.icon, contentDescription = screen.title) },
                 label = { Text(screen.title) },
                 selected = currentScreen == screen,
-                onClick = { onScreenSelected(screen) } // This now solely drives screen changes
+                onClick = { onScreenSelected(screen) }
             )
         }
     }

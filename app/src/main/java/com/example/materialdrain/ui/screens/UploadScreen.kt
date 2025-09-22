@@ -1,92 +1,57 @@
 package com.example.materialdrain.ui.screens
 
-import android.content.Context
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.net.Uri
+import android.util.Log
+import android.view.View // Added for View.GONE
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Android // Added for APK placeholder
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.BrokenImage
-import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PictureAsPdf // Added for PDF placeholder
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.DefaultTimeBar
+import androidx.media3.ui.PlayerView
+import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
+import coil.decode.ImageDecoderDecoder
 import coil.request.ImageRequest
+import com.example.materialdrain.ui.dialogs.InfoRow
 import com.example.materialdrain.ui.formatDurationMillis
 import com.example.materialdrain.ui.formatSize
-import com.example.materialdrain.ui.dialogs.InfoRow
 import com.example.materialdrain.viewmodel.UploadUiState
 import com.example.materialdrain.viewmodel.UploadViewModel
 import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.isActive
-import android.util.Log
 
 private const val TAG_MEDIA_PLAYER = "MediaPlayerPreview"
 
@@ -117,14 +82,67 @@ fun ClickablePreviewOverlay(onClick: () -> Unit) {
 }
 
 @Composable
+@androidx.media3.common.util.UnstableApi
+fun VideoPlayerControls(videoUri: Uri) {
+    val context = LocalContext.current
+    val playedColor = MaterialTheme.colorScheme.primary.toArgb()
+    val scrubberColor = MaterialTheme.colorScheme.primary.toArgb()
+    val bufferedColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f).toArgb()
+    val unplayedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f).toArgb()
+
+    val exoPlayer = remember {
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(MediaItem.fromUri(videoUri))
+            prepare()
+            playWhenReady = false // User clicks play
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            exoPlayer.release()
+        }
+    }
+
+    AndroidView(
+        factory = { ctx ->
+            PlayerView(ctx).apply {
+                player = exoPlayer
+                useController = true // Ensure controller is used
+
+                // Customize progress bar colors
+                val timeBar = findViewById<DefaultTimeBar>(androidx.media3.ui.R.id.exo_progress)
+                timeBar?.setPlayedColor(playedColor)
+                timeBar?.setScrubberColor(scrubberColor)
+                timeBar?.setBufferedColor(bufferedColor)
+                timeBar?.setUnplayedColor(unplayedColor)
+
+                // Hide unwanted buttons
+                findViewById<View>(androidx.media3.ui.R.id.exo_settings)?.visibility = View.GONE
+                findViewById<View>(androidx.media3.ui.R.id.exo_prev)?.visibility = View.GONE
+                findViewById<View>(androidx.media3.ui.R.id.exo_next)?.visibility = View.GONE
+                findViewById<View>(androidx.media3.ui.R.id.exo_rew)?.visibility = View.GONE
+                findViewById<View>(androidx.media3.ui.R.id.exo_ffwd)?.visibility = View.GONE
+                 // Also hide subtitle button as it's often next to settings
+                findViewById<View>(androidx.media3.ui.R.id.exo_subtitle)?.visibility = View.GONE
+                // Hide fullscreen button if it's the one in the controls, as the dialog handles fullscreen
+                findViewById<View>(androidx.media3.ui.R.id.exo_fullscreen)?.visibility = View.GONE
+
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    )
+}
+
+@Composable
 fun FullScreenMediaPreviewDialog(
-    imageUri: Uri? = null,
-    videoThumbnail: ByteArray? = null,
+    previewUri: Uri?,
+    previewMimeType: String?,
     onDismissRequest: () -> Unit
 ) {
     Dialog(
         onDismissRequest = onDismissRequest,
-        properties = DialogProperties(usePlatformDefaultWidth = false) // Allow dialog to be full screen
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Box(
             modifier = Modifier
@@ -133,29 +151,61 @@ fun FullScreenMediaPreviewDialog(
                 .clickable { onDismissRequest() }, // Dismiss on background click
             contentAlignment = Alignment.Center
         ) {
-            if (imageUri != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(imageUri)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Fullscreen Image Preview",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentScale = ContentScale.Fit,
-                    onError = { onDismissRequest() } // Dismiss if image fails to load
-                )
-            } else if (videoThumbnail != null) {
-                val bitmap = remember(videoThumbnail) { BitmapFactory.decodeByteArray(videoThumbnail, 0, videoThumbnail.size) }
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "Fullscreen Video Thumbnail Preview",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentScale = ContentScale.Fit
-                )
+            if (previewUri != null) {
+                when {
+                    previewMimeType?.startsWith("video/") == true -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp)
+                                .clickable(enabled = true) {}
+                        ) {
+                            @androidx.media3.common.util.UnstableApi
+                            VideoPlayerControls(videoUri = previewUri)
+                        }
+                    }
+                    previewMimeType == "image/gif" -> {
+                        val context = LocalContext.current
+                        val imageLoader = remember {
+                            ImageLoader.Builder(context)
+                                .components {
+                                    add(ImageDecoderDecoder.Factory())
+                                }
+                                .build()
+                        }
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(previewUri)
+                                .crossfade(true)
+                                .build(),
+                            imageLoader = imageLoader,
+                            contentDescription = "Fullscreen GIF Preview",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                    previewMimeType?.startsWith("image/") == true -> {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(previewUri)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Fullscreen Image Preview",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            contentScale = ContentScale.Fit,
+                            onError = { onDismissRequest() }
+                        )
+                    }
+                    else -> {
+                        Text("Unsupported preview type", color = Color.White)
+                    }
+                }
+            } else {
+                Text("Preview unavailable", color = Color.White)
             }
         }
     }
@@ -180,16 +230,16 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
     var playbackTimeAtDragStart by remember { mutableLongStateOf(0L) }
     var initialTouchX by remember { mutableFloatStateOf(0f) }
 
-    var imageUriForFullScreen by remember { mutableStateOf<Uri?>(null) }
-    var videoThumbnailForFullScreen by remember { mutableStateOf<ByteArray?>(null) }
+    var fullScreenPreviewUri by remember { mutableStateOf<Uri?>(null) }
+    var fullScreenPreviewMimeType by remember { mutableStateOf<String?>(null) }
 
-    if (imageUriForFullScreen != null || videoThumbnailForFullScreen != null) {
+    if (fullScreenPreviewUri != null) {
         FullScreenMediaPreviewDialog(
-            imageUri = imageUriForFullScreen,
-            videoThumbnail = videoThumbnailForFullScreen,
+            previewUri = fullScreenPreviewUri,
+            previewMimeType = fullScreenPreviewMimeType,
             onDismissRequest = {
-                imageUriForFullScreen = null
-                videoThumbnailForFullScreen = null
+                fullScreenPreviewUri = null
+                fullScreenPreviewMimeType = null
             }
         )
     }
@@ -246,7 +296,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
             } catch (e: Exception) {
                 audioPreviewError = "Error setting up audio player."
                 Log.e(TAG_MEDIA_PLAYER, "Error setting up audio player for URI: ${uiState.selectedFileUri}", e)
-                localMediaPlayerInstance?.release()
+                localMediaPlayerInstance.release()
                 mediaPlayer = null
                 isMediaPlayerPreparing = false
             }
@@ -273,17 +323,17 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
         if (isPlaying && !isUserScrubbing && mediaPlayer != null && mediaPlayer?.isPlaying == true) {
             while (isActive) {
                 try {
-                    if (!isUserScrubbing && mediaPlayer?.isPlaying == true) { 
+                    if (!isUserScrubbing && mediaPlayer?.isPlaying == true) {
                         currentPlaybackTimeMillis = mediaPlayer?.currentPosition?.toLong() ?: currentPlaybackTimeMillis
                     }
                 } catch (e: IllegalStateException) {
-                    Log.w(TAG_MEDIA_PLAYER, "MediaPlayeraccess error during playback: ${e.message}")
-                    isPlaying = false 
+                    Log.w(TAG_MEDIA_PLAYER, "MediaPlayer access error during playback: ${e.message}")
+                    isPlaying = false
                     audioPreviewError = "Player error."
-                    break 
+                    break
                 }
-                awaitFrame() 
-                if (!isPlaying || mediaPlayer?.isPlaying == false || isUserScrubbing) break 
+                awaitFrame()
+                if (!isPlaying || mediaPlayer?.isPlaying == false || isUserScrubbing) break
             }
         }
     }
@@ -296,7 +346,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                     onClick = {
                         selectedTabIndex = index
                         if (index == 0) uploadViewModel.onTextToUploadChanged("")
-                        else uploadViewModel.onFileSelected(null, context) 
+                        else uploadViewModel.onFileSelected(null, context)
                     },
                     text = { Text(title) }
                 )
@@ -312,7 +362,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
         ) {
             Spacer(modifier = Modifier.height(16.dp))
             when (selectedTabIndex) {
-                0 -> { 
+                0 -> {
                     Button(onClick = { filePickerLauncher.launch("*/*") }, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Filled.AttachFile, contentDescription = "Select File")
                         Spacer(Modifier.size(ButtonDefaults.IconSpacing))
@@ -326,14 +376,14 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                 InfoRow("Name:", uiState.selectedFileName ?: "N/A")
                                 uiState.uploadTotalSizeBytes?.let { s -> InfoRow("Size:", formatSize(s)) }
                                 uiState.selectedFileMimeType?.let { mt -> InfoRow("Type:", mt) }
-                                
+
                                 if (uiState.selectedFileMimeType?.startsWith("audio/") == true) {
                                     uiState.audioDurationMillis?.let { d -> InfoRow("Duration:", formatDurationMillis(d)) }
                                     uiState.audioBitrate?.let { b -> InfoRow("Bitrate:", "${b / 1000} kbps") }
                                     uiState.audioArtist?.let { a -> InfoRow("Artist:", a) }
                                     uiState.audioAlbum?.let { al -> InfoRow("Album:", al) }
                                 }
-                                
+
                                 if (uiState.selectedFileMimeType?.startsWith("video/") == true) {
                                     uiState.videoDurationMillis?.let { d -> InfoRow("Duration:", formatDurationMillis(d)) }
                                 }
@@ -349,7 +399,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                             }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
-                        
+
                         if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("image/") == true) {
                             Card(
                                 modifier = Modifier
@@ -359,7 +409,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Box(
-                                    modifier = Modifier.fillMaxSize(), // Removed clickable here, handled by overlay
+                                    modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     val imageRequest = ImageRequest.Builder(LocalContext.current)
@@ -371,8 +421,8 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                     AsyncImage(
                                         model = imageRequest,
                                         contentDescription = "Selected image preview",
-                                        modifier = Modifier.fillMaxSize(), 
-                                        contentScale = ContentScale.Crop, 
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop,
                                         onState = { state -> imageState = state }
                                     )
 
@@ -380,24 +430,27 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                         is AsyncImagePainter.State.Loading -> CircularProgressIndicator(modifier = Modifier.size(48.dp))
                                         is AsyncImagePainter.State.Error -> Icon(Icons.Filled.BrokenImage, contentDescription = "Error loading image", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
                                         is AsyncImagePainter.State.Success -> {
-                                            ClickablePreviewOverlay { imageUriForFullScreen = uiState.selectedFileUri }
+                                            ClickablePreviewOverlay {
+                                                fullScreenPreviewUri = uiState.selectedFileUri
+                                                fullScreenPreviewMimeType = uiState.selectedFileMimeType
+                                            }
                                         }
-                                        else -> {} 
+                                        else -> {}
                                     }
                                 }
                             }
                         }
-                        
+
                         if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("video/") == true) {
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .aspectRatio(16f / 9f) 
+                                    .aspectRatio(16f / 9f)
                                     .padding(vertical = 8.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Box(
-                                    modifier = Modifier.fillMaxSize(), // Removed clickable here
+                                    modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     uiState.videoThumbnail?.let {
@@ -408,17 +461,20 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                             modifier = Modifier.fillMaxSize(),
                                             contentScale = ContentScale.Crop
                                         )
-                                        ClickablePreviewOverlay { videoThumbnailForFullScreen = uiState.videoThumbnail }
+                                        ClickablePreviewOverlay {
+                                            fullScreenPreviewUri = uiState.selectedFileUri
+                                            fullScreenPreviewMimeType = uiState.selectedFileMimeType
+                                        }
                                     } ?: Icon(Icons.Filled.Videocam, contentDescription = "Video thumbnail placeholder", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
-                        
+
                         if (uiState.selectedFileUri != null && uiState.selectedFileMimeType == "application/pdf" && uiState.pdfPageCount != null) {
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(100.dp) 
+                                    .height(100.dp)
                                     .padding(vertical = 8.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
@@ -435,7 +491,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                              Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(min = 80.dp) 
+                                    .heightIn(min = 80.dp)
                                     .padding(vertical = 8.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
@@ -448,33 +504,33 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                         Image(
                                             bitmap = bitmap.asImageBitmap(),
                                             contentDescription = "APK icon preview",
-                                            modifier = Modifier.size(64.dp), 
+                                            modifier = Modifier.size(64.dp),
                                             contentScale = ContentScale.Fit
                                         )
                                     } ?: Icon(Icons.Filled.Android, contentDescription = "APK File", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
-                        
+
                         if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("audio/") == true) {
                             AudioPlayerPreview(
-                                uiState = uiState, 
-                                mediaPlayer = mediaPlayer, 
-                                isPlaying = isPlaying, 
-                                currentPlaybackTimeMillis = currentPlaybackTimeMillis, 
-                                userSeekPositionMillis = userSeekPositionMillis, 
-                                audioPreviewError = audioPreviewError, 
-                                isMediaPlayerPreparing = isMediaPlayerPreparing, 
-                                isUserScrubbing = isUserScrubbing, 
+                                uiState = uiState,
+                                mediaPlayer = mediaPlayer,
+                                isPlaying = isPlaying,
+                                currentPlaybackTimeMillis = currentPlaybackTimeMillis,
+                                userSeekPositionMillis = userSeekPositionMillis,
+                                audioPreviewError = audioPreviewError,
+                                isMediaPlayerPreparing = isMediaPlayerPreparing,
+                                isUserScrubbing = isUserScrubbing,
                                 progressBarWidthPx = progressBarWidthPx,
                                 onPlayPause = {
                                     if (isMediaPlayerPreparing) return@AudioPlayerPreview
                                     mediaPlayer?.let {
                                         if (it.isPlaying) { it.pause(); isPlaying = false }
                                         else {
-                                            if(isUserScrubbing) { 
+                                            if(isUserScrubbing) {
                                                 it.seekTo(userSeekPositionMillis.toInt())
-                                                currentPlaybackTimeMillis = userSeekPositionMillis 
+                                                currentPlaybackTimeMillis = userSeekPositionMillis
                                             }
                                             else if (currentPlaybackTimeMillis >= (uiState.audioDurationMillis ?: Long.MAX_VALUE) - 100 && (uiState.audioDurationMillis ?: 0L) > 0) {
                                                 it.seekTo(0)
@@ -492,24 +548,24 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                     initialTouchX = offset.x
                                     val initialPercentage = (offset.x / currentWidthPx).coerceIn(0f, 1f)
                                     userSeekPositionMillis = (initialPercentage * totalDuration).toLong()
-                                    playbackTimeAtDragStart = userSeekPositionMillis 
+                                    playbackTimeAtDragStart = userSeekPositionMillis
                                 },
                                 onDrag = { change, totalDuration, currentWidthPx ->
                                     val currentDragX = change.position.x
-                                    val dragDeltaX = currentDragX - initialTouchX 
+                                    val dragDeltaX = currentDragX - initialTouchX
                                     val timeDeltaMillis = (dragDeltaX / currentWidthPx) * totalDuration
                                     userSeekPositionMillis = (playbackTimeAtDragStart + timeDeltaMillis).toLong().coerceIn(0L, totalDuration)
                                     change.consume()
                                 },
                                 onDragEnd = {
                                     mediaPlayer?.seekTo(userSeekPositionMillis.toInt())
-                                    currentPlaybackTimeMillis = userSeekPositionMillis 
+                                    currentPlaybackTimeMillis = userSeekPositionMillis
                                     isUserScrubbing = false
                                 },
                                 onDragCancel = { isUserScrubbing = false }
                             )
                         }
-                        
+
                         uiState.selectedFileTextContent?.takeIf { it.isNotBlank() }?.let {
                             Text("Content Preview (4KB Max):", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top=8.dp, bottom=4.dp))
                             OutlinedTextField(value = it, onValueChange = {}, readOnly = true, modifier = Modifier
@@ -522,14 +578,14 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                         }
                     }
                 }
-                1 -> { 
+                1 -> {
                     OutlinedTextField(value = uiState.textToUpload, onValueChange = uploadViewModel::onTextToUploadChanged, label = { Text("Paste text here") }, modifier = Modifier
                         .fillMaxWidth()
                         .defaultMinSize(minHeight = 150.dp), maxLines = 10, enabled = !uiState.isLoading)
                 }
             }
-            
-            if (!uiState.isLoading) { 
+
+            if (!uiState.isLoading) {
                 uiState.uploadResult?.let {
                     if (it.success) Text("Success! ID: ${it.id}", color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom=8.dp), textAlign = TextAlign.Center)
                 } ?: run {
@@ -557,7 +613,7 @@ fun AudioPlayerPreview(
     mediaPlayer: MediaPlayer?,
     isPlaying: Boolean,
     currentPlaybackTimeMillis: Long,
-    userSeekPositionMillis: Long, 
+    userSeekPositionMillis: Long,
     audioPreviewError: String?,
     isMediaPlayerPreparing: Boolean,
     isUserScrubbing: Boolean,
@@ -572,7 +628,7 @@ fun AudioPlayerPreview(
     Card(modifier = Modifier
         .fillMaxWidth()
         .padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(bottom = 0.dp)) { 
+        Column(modifier = Modifier.padding(bottom = 0.dp)) {
             Row(
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -595,7 +651,7 @@ fun AudioPlayerPreview(
                 }
                 FilledTonalIconButton(
                     onClick = onPlayPause,
-                    enabled = mediaPlayer != null && !isMediaPlayerPreparing, 
+                    enabled = mediaPlayer != null && !isMediaPlayerPreparing,
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (isPlaying) "Pause" else "Play")
@@ -605,20 +661,20 @@ fun AudioPlayerPreview(
             audioPreviewError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top=0.dp, start=16.dp, end=16.dp, bottom=8.dp)) }
 
             val totalDuration = uiState.audioDurationMillis ?: 0L
-            val progressFraction = { 
+            val progressFraction = @Composable {
                 val currentPos = if (isUserScrubbing) userSeekPositionMillis else currentPlaybackTimeMillis
                 if (totalDuration > 0L) (currentPos.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f) else 0f
             }
 
             if (mediaPlayer != null || isMediaPlayerPreparing) {
                 Box(
-                    contentAlignment = Alignment.BottomCenter, 
+                    contentAlignment = Alignment.BottomCenter,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(24.dp) 
-                        .onSizeChanged { onSeekBarWidthChanged(it.width) } 
-                        .pointerInput(mediaPlayer, totalDuration, progressBarWidthPx) { 
-                            if (mediaPlayer == null || totalDuration <= 0L || progressBarWidthPx <= 0) return@pointerInput 
+                        .height(24.dp)
+                        .onSizeChanged { onSeekBarWidthChanged(it.width) }
+                        .pointerInput(mediaPlayer, totalDuration, progressBarWidthPx) {
+                            if (mediaPlayer == null || totalDuration <= 0L || progressBarWidthPx <= 0) return@pointerInput
                             detectHorizontalDragGestures(
                                 onDragStart = { offset ->
                                     onDragStart(
@@ -639,7 +695,7 @@ fun AudioPlayerPreview(
                             )
                         }
                 ) {
-                    LinearProgressIndicator(progress = progressFraction, modifier = Modifier.fillMaxWidth()) 
+                    LinearProgressIndicator(progress = progressFraction(), modifier = Modifier.fillMaxWidth())
                 }
             }
         }
