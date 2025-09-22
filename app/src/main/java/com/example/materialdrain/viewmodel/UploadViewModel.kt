@@ -2,8 +2,15 @@ package com.example.materialdrain.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
+import android.graphics.Bitmap // Added for video thumbnail
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.pdf.PdfRenderer
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build // Added for API level check for getPrimaryImage
+import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -16,6 +23,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
+import java.io.ByteArrayOutputStream // Added for video thumbnail
+import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStreamReader
 
@@ -24,6 +34,9 @@ private const val PREFS_NAME = "pixeldrain_prefs"
 private const val API_KEY_PREF = "api_key"
 private const val TAG = "PIXEL_VM_DEBUG" // Tag for Logcat
 private const val TEXT_PREVIEW_MAX_LENGTH = 4096 // Max 4KB for text preview
+private const val VIDEO_THUMBNAIL_QUALITY = 75 // JPEG quality for video thumbnails
+private const val VIDEO_THUMBNAIL_TARGET_TIME_US = 1_000_000L // 1 second for thumbnail
+private const val APK_THUMBNAIL_QUALITY = 75 // JPEG quality for APK icons
 
 data class UploadUiState(
     val isLoading: Boolean = false,
@@ -41,7 +54,16 @@ data class UploadUiState(
     val audioBitrate: Int? = null,
     val audioArtist: String? = null,
     val audioAlbum: String? = null,
-    val audioAlbumArt: ByteArray? = null
+    val audioAlbumArt: ByteArray? = null,
+    // Video specific fields
+    val videoThumbnail: ByteArray? = null,
+    val videoDurationMillis: Long? = null,
+    // PDF specific fields
+    val pdfPageCount: Int? = null,
+    // APK specific fields
+    val apkVersionName: String? = null,
+    val apkPackageName: String? = null,
+    val apkIcon: ByteArray? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -67,6 +89,18 @@ data class UploadUiState(
             if (other.audioAlbumArt == null) return false
             if (!audioAlbumArt.contentEquals(other.audioAlbumArt)) return false
         } else if (other.audioAlbumArt != null) return false
+        if (videoDurationMillis != other.videoDurationMillis) return false
+        if (videoThumbnail != null) {
+            if (other.videoThumbnail == null) return false
+            if (!videoThumbnail.contentEquals(other.videoThumbnail)) return false
+        } else if (other.videoThumbnail != null) return false
+        if (pdfPageCount != other.pdfPageCount) return false
+        if (apkVersionName != other.apkVersionName) return false
+        if (apkPackageName != other.apkPackageName) return false
+        if (apkIcon != null) {
+            if (other.apkIcon == null) return false
+            if (!apkIcon.contentEquals(other.apkIcon)) return false
+        } else if (other.apkIcon != null) return false
 
         return true
     }
@@ -87,6 +121,12 @@ data class UploadUiState(
         result = 31 * result + (audioArtist?.hashCode() ?: 0)
         result = 31 * result + (audioAlbum?.hashCode() ?: 0)
         result = 31 * result + (audioAlbumArt?.contentHashCode() ?: 0)
+        result = 31 * result + (videoDurationMillis?.hashCode() ?: 0)
+        result = 31 * result + (videoThumbnail?.contentHashCode() ?: 0)
+        result = 31 * result + (pdfPageCount ?: 0)
+        result = 31 * result + (apkVersionName?.hashCode() ?: 0)
+        result = 31 * result + (apkPackageName?.hashCode() ?: 0)
+        result = 31 * result + (apkIcon?.contentHashCode() ?: 0)
         return result
     }
 }
@@ -125,6 +165,14 @@ class UploadViewModel(
         var newAudioAlbum: String? = null
         var newAudioAlbumArt: ByteArray? = null
 
+        var newVideoThumbnail: ByteArray? = null
+        var newVideoDurationMillis: Long? = null
+
+        var newPdfPageCount: Int? = null
+        var newApkVersionName: String? = null
+        var newApkPackageName: String? = null
+        var newApkIcon: ByteArray? = null
+
         if (uri != null) {
             try {
                 newMimeType = context.contentResolver.getType(uri)
@@ -149,7 +197,7 @@ class UploadViewModel(
                      newMimeType == "application/javascript" ||
                      newMimeType == "application/rss+xml" ||
                      newMimeType == "application/atom+xml" ||
-                     (newMimeType == "application/octet-stream" &&
+                     (newMimeType == "application/octet-stream" && // For octet-stream, check common text extensions
                       (newFileName?.endsWith(".txt", true) == true ||
                        newFileName?.endsWith(".log", true) == true ||
                        newFileName?.endsWith(".ini", true) == true ||
@@ -197,6 +245,100 @@ class UploadViewModel(
                     }
                 }
 
+                if (newMimeType?.startsWith("video/") == true) {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(context, uri)
+                        newVideoDurationMillis = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+                        var bitmap: Bitmap? = null
+                        bitmap = retriever.getFrameAtTime(VIDEO_THUMBNAIL_TARGET_TIME_US, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        if (bitmap == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            bitmap = retriever.getPrimaryImage()
+                        }
+                        if (bitmap == null) {
+                            bitmap = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        }
+                        bitmap?.let {
+                            val baos = ByteArrayOutputStream()
+                            it.compress(Bitmap.CompressFormat.JPEG, VIDEO_THUMBNAIL_QUALITY, baos)
+                            newVideoThumbnail = baos.toByteArray()
+                            it.recycle()
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error extracting video metadata/thumbnail: ${e.message}", e)
+                        newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve video metadata or thumbnail."
+                    } finally {
+                        retriever.release()
+                    }
+                }
+
+                if (newMimeType == "application/pdf") {
+                    var pfd: ParcelFileDescriptor? = null
+                    var renderer: PdfRenderer? = null
+                    try {
+                        pfd = context.contentResolver.openFileDescriptor(uri, "r")
+                        pfd?.let {
+                            renderer = PdfRenderer(it)
+                            newPdfPageCount = renderer?.pageCount
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error getting PDF page count: ${e.message}", e)
+                        newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve PDF details."
+                    } finally {
+                        renderer?.close()
+                        pfd?.close()
+                    }
+                }
+
+                if (newMimeType == "application/vnd.android.package-archive") {
+                    var tempApkFile: File? = null
+                    try {
+                        // PackageManager needs a file path, so copy from URI to a temp file if it's a content URI
+                        val apkPath = if (uri.scheme == "content") {
+                            val tempFileName = "temp_apk_preview_${System.currentTimeMillis()}.apk"
+                            tempApkFile = File(context.cacheDir, tempFileName)
+                            context.contentResolver.openInputStream(uri)?.use { input ->
+                                FileOutputStream(tempApkFile).use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                            tempApkFile.absolutePath
+                        } else {
+                            uri.path // Assume it's already a file path
+                        }
+
+                        apkPath?.let {
+                            val pm = context.packageManager
+                            val packageInfo: PackageInfo? = pm.getPackageArchiveInfo(it, PackageManager.GET_META_DATA)
+                            if (packageInfo != null) {
+                                newApkVersionName = packageInfo.versionName
+                                newApkPackageName = packageInfo.packageName
+                                packageInfo.applicationInfo?.let { appInfo ->
+                                    // Necessary for getApplicationIcon to work with an archive file
+                                    appInfo.sourceDir = apkPath
+                                    appInfo.publicSourceDir = apkPath
+                                    val iconDrawable = pm.getApplicationIcon(appInfo)
+                                    if (iconDrawable is BitmapDrawable) {
+                                        val bitmap = iconDrawable.bitmap
+                                        val baos = ByteArrayOutputStream()
+                                        bitmap.compress(Bitmap.CompressFormat.JPEG, APK_THUMBNAIL_QUALITY, baos)
+                                        newApkIcon = baos.toByteArray()
+                                        // Bitmap doesn't need explicit recycle here as it's from system
+                                    }
+                                }
+                            } else {
+                                newErrorMessage = (newErrorMessage ?: "") + " Could not parse APK details."
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error extracting APK info: ${e.message}", e)
+                        newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve APK details."
+                    } finally {
+                        tempApkFile?.delete() // Clean up temp file
+                    }
+                }
+
+
             } catch (e: Exception) {
                 Log.e(TAG, "Error querying file details: ${e.message}", e)
                 newFileName = "Error reading file"
@@ -207,19 +349,29 @@ class UploadViewModel(
             _uiState.update {
                 it.copy(
                     selectedFileName = newFileName,
-                    uploadTotalSizeBytes = newFileSizeBytes, // Initialize total size here
+                    uploadTotalSizeBytes = newFileSizeBytes,
                     selectedFileUri = uri,
                     selectedFileMimeType = newMimeType,
-                    selectedFileTextContent = newTextContent,
+                    selectedFileTextContent = if (newMimeType?.startsWith("text/") == true || (newMimeType == "application/octet-stream" && newTextContent != null) ) newTextContent else null,
                     textToUpload = "",
                     errorMessage = newErrorMessage ?: it.errorMessage,
                     uploadResult = null,
-                    uploadedBytes = 0L, // Reset progress
+                    uploadedBytes = 0L,
+                    // Audio fields
                     audioDurationMillis = if (newMimeType?.startsWith("audio/") == true) newAudioDurationMillis else null,
                     audioBitrate = if (newMimeType?.startsWith("audio/") == true) newAudioBitrate else null,
                     audioArtist = if (newMimeType?.startsWith("audio/") == true) newAudioArtist else null,
                     audioAlbum = if (newMimeType?.startsWith("audio/") == true) newAudioAlbum else null,
-                    audioAlbumArt = if (newMimeType?.startsWith("audio/") == true) newAudioAlbumArt else null
+                    audioAlbumArt = if (newMimeType?.startsWith("audio/") == true) newAudioAlbumArt else null,
+                    // Video fields
+                    videoThumbnail = if (newMimeType?.startsWith("video/") == true) newVideoThumbnail else null,
+                    videoDurationMillis = if (newMimeType?.startsWith("video/") == true) newVideoDurationMillis else null,
+                    // PDF fields
+                    pdfPageCount = if (newMimeType == "application/pdf") newPdfPageCount else null,
+                    // APK fields
+                    apkVersionName = if (newMimeType == "application/vnd.android.package-archive") newApkVersionName else null,
+                    apkPackageName = if (newMimeType == "application/vnd.android.package-archive") newApkPackageName else null,
+                    apkIcon = if (newMimeType == "application/vnd.android.package-archive") newApkIcon else null
                 )
             }
         } else {
@@ -237,7 +389,13 @@ class UploadViewModel(
                     audioBitrate = null,
                     audioArtist = null,
                     audioAlbum = null,
-                    audioAlbumArt = null
+                    audioAlbumArt = null,
+                    videoThumbnail = null,
+                    videoDurationMillis = null,
+                    pdfPageCount = null,
+                    apkVersionName = null,
+                    apkPackageName = null,
+                    apkIcon = null
                 )
             }
         }
@@ -251,28 +409,35 @@ class UploadViewModel(
                 it.copy(
                     textToUpload = newText,
                     selectedFileName = null,
-                    uploadTotalSizeBytes = newTextSizeBytes, // Initialize total size for text
+                    uploadTotalSizeBytes = newTextSizeBytes,
                     selectedFileUri = null,
                     selectedFileMimeType = null,
                     selectedFileTextContent = null,
                     errorMessage = null,
                     uploadResult = null,
-                    uploadedBytes = 0L, // Reset progress
+                    uploadedBytes = 0L,
                     audioDurationMillis = null,
                     audioBitrate = null,
                     audioArtist = null,
                     audioAlbum = null,
-                    audioAlbumArt = null
+                    audioAlbumArt = null,
+                    videoThumbnail = null,
+                    videoDurationMillis = null,
+                    pdfPageCount = null,
+                    apkVersionName = null,
+                    apkPackageName = null,
+                    apkIcon = null
                 )
             }
         } else {
              _uiState.update {
                 it.copy(
                     textToUpload = newText,
-                    uploadTotalSizeBytes = if(it.selectedFileUri != null) it.uploadTotalSizeBytes else null,
+                    uploadTotalSizeBytes = if(it.selectedFileUri != null) it.uploadTotalSizeBytes else null, // Keep existing file size if a file is selected
                     errorMessage = null,
                     uploadResult = null,
                     uploadedBytes = 0L
+                    // If clearing text, don't clear selected file info unless explicitly done by onFileSelected(null,...)
                 )
             }
         }
@@ -304,7 +469,6 @@ class UploadViewModel(
                 it.copy(
                     isLoading = false,
                     errorMessage = "API Key is missing. Please set it in Settings.",
-                    // Clear fields that indicate a pending upload
                     selectedFileName = null,
                     uploadTotalSizeBytes = null,
                     selectedFileUri = null,
@@ -315,7 +479,13 @@ class UploadViewModel(
                     audioBitrate = null,
                     audioArtist = null,
                     audioAlbum = null,
-                    audioAlbumArt = null
+                    audioAlbumArt = null,
+                    videoThumbnail = null,
+                    videoDurationMillis = null,
+                    pdfPageCount = null,
+                    apkVersionName = null,
+                    apkPackageName = null,
+                    apkIcon = null
                 )
             }
             return
@@ -336,15 +506,20 @@ class UploadViewModel(
                     audioBitrate = null,
                     audioArtist = null,
                     audioAlbum = null,
-                    audioAlbumArt = null
+                    audioAlbumArt = null,
+                    videoThumbnail = null,
+                    videoDurationMillis = null,
+                    pdfPageCount = null,
+                    apkVersionName = null,
+                    apkPackageName = null,
+                    apkIcon = null
                 )
             }
             return
         }
 
-        // Ensure total size is set correctly before starting the upload
         val totalBytesForUpload = if (currentSelectedFileUri != null) {
-            _uiState.value.uploadTotalSizeBytes // Should have been set by onFileSelected
+            _uiState.value.uploadTotalSizeBytes
         } else if (currentTextToUpload.isNotBlank()) {
             currentTextToUpload.toByteArray().size.toLong()
         } else {
@@ -363,7 +538,6 @@ class UploadViewModel(
                 _uiState.update {
                     it.copy(
                         uploadedBytes = bytesSent,
-                        // Prefer totalBytes from Ktor's callback if available, otherwise stick to what was initially set
                         uploadTotalSizeBytes = receivedTotalBytes ?: it.uploadTotalSizeBytes
                     )
                 }
@@ -386,7 +560,6 @@ class UploadViewModel(
                 Log.e(TAG, "Upload failed for $operationType. Exception: ${e.message}", e)
                 _uiState.update {
                     it.copy(isLoading = false, errorMessage = "Upload failed: ${e.message ?: "Unknown error"}")
-                    // Don't reset uploadedBytes here, so user sees the last progress before failure
                 }
                 null
             }
@@ -394,7 +567,6 @@ class UploadViewModel(
             if (response != null) {
                 if (response.success) {
                     _uiState.update {
-                        // On success, set uploadedBytes to total to show 100%
                         val finalTotalBytes = it.uploadTotalSizeBytes
                         it.copy(
                             isLoading = false,
@@ -402,7 +574,7 @@ class UploadViewModel(
                             errorMessage = null,
                             selectedFileName = null,
                             uploadTotalSizeBytes = null,
-                            uploadedBytes = finalTotalBytes ?: 0L, // Mark as complete
+                            uploadedBytes = finalTotalBytes ?: 0L, 
                             textToUpload = "",
                             selectedFileUri = null,
                             selectedFileMimeType = null,
@@ -411,7 +583,13 @@ class UploadViewModel(
                             audioBitrate = null,
                             audioArtist = null,
                             audioAlbum = null,
-                            audioAlbumArt = null
+                            audioAlbumArt = null,
+                            videoThumbnail = null,
+                            videoDurationMillis = null,
+                            pdfPageCount = null,
+                            apkVersionName = null,
+                            apkPackageName = null,
+                            apkIcon = null
                         )
                     }
                 } else {
@@ -420,15 +598,13 @@ class UploadViewModel(
                             isLoading = false,
                             uploadResult = response,
                             errorMessage = response.message ?: response.value ?: "Upload failed with no specific message."
-                            // Keep uploadedBytes as is on failure to show last progress
                         )
                     }
                 }
-            } else { // response is null (likely due to an exception caught above)
+            } else { 
                 if (_uiState.value.isLoading) {
                      _uiState.update {
                         it.copy(isLoading = false, errorMessage = it.errorMessage ?: "Upload did not return a response.")
-                         // Keep uploadedBytes as is
                     }
                 }
             }

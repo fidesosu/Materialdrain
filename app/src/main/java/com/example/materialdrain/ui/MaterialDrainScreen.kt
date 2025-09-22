@@ -12,7 +12,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.LocalOverscrollConfiguration // Added import
+import androidx.compose.foundation.layout.* // Corrected import
 // Removed HorizontalPager imports
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -40,7 +41,7 @@ import com.example.materialdrain.viewmodel.FileInfoViewModel
 import com.example.materialdrain.viewmodel.UploadViewModel
 import com.example.materialdrain.viewmodel.ViewModelFactory
 import kotlinx.coroutines.flow.collectLatest
-// Removed distinctUntilChanged and snapshotFlow as they were pager-specific
+// Removed distinctUntilChanged and snapshotFlow as they were pager-specific // formatSize is now in ui.Utils
 import kotlinx.coroutines.launch
 import java.text.DecimalFormat
 import java.time.LocalDateTime
@@ -55,20 +56,6 @@ enum class Screen(val title: String, val icon: ImageVector) {
     Files("Files", Icons.Filled.Folder),
     Lists("Lists", Icons.AutoMirrored.Filled.List),
     Settings("Settings", Icons.Filled.Settings)
-}
-
-// Helper function to format size in bytes to a human-readable string
-internal fun formatSize(bytes: Long): String {
-    if (bytes < 0) return "0 B"
-    if (bytes == 0L) return "0 B"
-    val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    var size = bytes.toDouble()
-    var unitIndex = 0
-    while (size >= 1024 && unitIndex < units.size - 1) {
-        size /= 1024
-        unitIndex++
-    }
-    return DecimalFormat("#,##0.#").format(size) + " " + units[unitIndex]
 }
 
 // Helper function to format API date-time strings
@@ -286,40 +273,41 @@ fun MaterialDrainScreen() {
             }
         }
     ) { paddingValues ->
-        // HorizontalPager removed, content now driven by a when statement on currentScreen
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            when (currentScreen) {
-                Screen.Upload -> UploadScreenContent(
-                    uploadViewModel = uploadViewModel,
-                    onShowDialog = { title, content ->
-                        genericDialogTitle = title
-                        genericDialogContent = content
-                        showGenericDialog = true
-                    }
-                )
-                Screen.Files -> FilesScreenContent(
-                    fileInfoViewModel = fileInfoViewModel
-                )
-                Screen.Lists -> ListsScreenContent(
-                    onShowDialog = { title, content ->
-                        genericDialogTitle = title
-                        genericDialogContent = content
-                        showGenericDialog = true
-                    }
-                )
-                Screen.Settings -> SettingsScreenContent(
-                    uploadViewModel = uploadViewModel,
-                    fileInfoViewModel = fileInfoViewModel,
-                    onShowDialog = { title, content ->
-                        genericDialogTitle = title
-                        genericDialogContent = content
-                        showGenericDialog = true
-                    }
-                )
+        CompositionLocalProvider(LocalOverscrollConfiguration provides null) { // Added CompositionLocalProvider
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                when (currentScreen) {
+                    Screen.Upload -> UploadScreenContent(
+                        uploadViewModel = uploadViewModel,
+                        onShowDialog = { title, content ->
+                            genericDialogTitle = title
+                            genericDialogContent = content
+                            showGenericDialog = true
+                        }
+                    )
+                    Screen.Files -> FilesScreenContent(
+                        fileInfoViewModel = fileInfoViewModel
+                    )
+                    Screen.Lists -> ListsScreenContent(
+                        onShowDialog = { title, content ->
+                            genericDialogTitle = title
+                            genericDialogContent = content
+                            showGenericDialog = true
+                        }
+                    )
+                    Screen.Settings -> SettingsScreenContent(
+                        uploadViewModel = uploadViewModel,
+                        fileInfoViewModel = fileInfoViewModel,
+                        onShowDialog = { title, content ->
+                            genericDialogTitle = title
+                            genericDialogContent = content
+                            showGenericDialog = true
+                        }
+                    )
+                }
             }
         }
     }
@@ -421,4 +409,3 @@ fun DefaultPreviewMaterialDrainScreen() {
         MaterialDrainScreen()
     }
 }
-

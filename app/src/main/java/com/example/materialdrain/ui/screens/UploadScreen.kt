@@ -7,11 +7,14 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,22 +24,30 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Android // Added for APK placeholder
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PictureAsPdf // Added for PDF placeholder
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -53,7 +64,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -61,29 +74,90 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
-import com.example.materialdrain.ui.dialogs.InfoRow // Corrected import
+import coil.compose.AsyncImagePainter
+import coil.request.ImageRequest
+import com.example.materialdrain.ui.formatDurationMillis
 import com.example.materialdrain.ui.formatSize
-import com.example.materialdrain.viewmodel.UploadViewModel
+import com.example.materialdrain.ui.dialogs.InfoRow
 import com.example.materialdrain.viewmodel.UploadUiState
+import com.example.materialdrain.viewmodel.UploadViewModel
 import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.isActive
-import java.io.IOException
-import java.util.concurrent.TimeUnit
 import android.util.Log
 
-private const val TAG_MEDIA_PLAYER = "MediaPlayerPreview" // Added for Audio Preview Logging
+private const val TAG_MEDIA_PLAYER = "MediaPlayerPreview"
 
-// Helper function to format duration in milliseconds to MM:SS or HH:MM:SS
-internal fun formatDurationMillis(millis: Long): String {
-    if (millis < 0) return "00:00"
-    val hours = TimeUnit.MILLISECONDS.toHours(millis)
-    val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % TimeUnit.HOURS.toMinutes(1)
-    val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) % TimeUnit.MINUTES.toSeconds(1)
-    return if (hours > 0) {
-        String.format("%02d:%02d:%02d", hours, minutes, seconds)
-    } else {
-        String.format("%02d:%02d", minutes, seconds)
+@Composable
+fun ClickablePreviewOverlay(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(onClick = onClick)
+            .padding(8.dp),
+        contentAlignment = Alignment.BottomEnd
+    ) {
+        Surface(
+            modifier = Modifier
+                .size(32.dp)
+                .alpha(0.7f),
+            shape = CircleShape,
+            color = Color.Black.copy(alpha = 0.5f)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Fullscreen,
+                contentDescription = "View Fullscreen",
+                tint = Color.White,
+                modifier = Modifier.padding(4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun FullScreenMediaPreviewDialog(
+    imageUri: Uri? = null,
+    videoThumbnail: ByteArray? = null,
+    onDismissRequest: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(usePlatformDefaultWidth = false) // Allow dialog to be full screen
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.8f))
+                .clickable { onDismissRequest() }, // Dismiss on background click
+            contentAlignment = Alignment.Center
+        ) {
+            if (imageUri != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(imageUri)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Fullscreen Image Preview",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    contentScale = ContentScale.Fit,
+                    onError = { onDismissRequest() } // Dismiss if image fails to load
+                )
+            } else if (videoThumbnail != null) {
+                val bitmap = remember(videoThumbnail) { BitmapFactory.decodeByteArray(videoThumbnail, 0, videoThumbnail.size) }
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Fullscreen Video Thumbnail Preview",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    contentScale = ContentScale.Fit
+                )
+            }
+        }
     }
 }
 
@@ -105,6 +179,20 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
     var progressBarWidthPx by remember { mutableStateOf(0) }
     var playbackTimeAtDragStart by remember { mutableLongStateOf(0L) }
     var initialTouchX by remember { mutableFloatStateOf(0f) }
+
+    var imageUriForFullScreen by remember { mutableStateOf<Uri?>(null) }
+    var videoThumbnailForFullScreen by remember { mutableStateOf<ByteArray?>(null) }
+
+    if (imageUriForFullScreen != null || videoThumbnailForFullScreen != null) {
+        FullScreenMediaPreviewDialog(
+            imageUri = imageUriForFullScreen,
+            videoThumbnail = videoThumbnailForFullScreen,
+            onDismissRequest = {
+                imageUriForFullScreen = null
+                videoThumbnailForFullScreen = null
+            }
+        )
+    }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -185,17 +273,17 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
         if (isPlaying && !isUserScrubbing && mediaPlayer != null && mediaPlayer?.isPlaying == true) {
             while (isActive) {
                 try {
-                    if (!isUserScrubbing && mediaPlayer?.isPlaying == true) { // Re-check isUserScrubbing and isPlaying
+                    if (!isUserScrubbing && mediaPlayer?.isPlaying == true) { 
                         currentPlaybackTimeMillis = mediaPlayer?.currentPosition?.toLong() ?: currentPlaybackTimeMillis
                     }
                 } catch (e: IllegalStateException) {
                     Log.w(TAG_MEDIA_PLAYER, "MediaPlayeraccess error during playback: ${e.message}")
-                    isPlaying = false // Stop trying to update
+                    isPlaying = false 
                     audioPreviewError = "Player error."
-                    break // Exit loop
+                    break 
                 }
-                awaitFrame() // wait for the next frame
-                if (!isPlaying || mediaPlayer?.isPlaying == false || isUserScrubbing) break // Exit if state changes
+                awaitFrame() 
+                if (!isPlaying || mediaPlayer?.isPlaying == false || isUserScrubbing) break 
             }
         }
     }
@@ -238,22 +326,136 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                 InfoRow("Name:", uiState.selectedFileName ?: "N/A")
                                 uiState.uploadTotalSizeBytes?.let { s -> InfoRow("Size:", formatSize(s)) }
                                 uiState.selectedFileMimeType?.let { mt -> InfoRow("Type:", mt) }
+                                
                                 if (uiState.selectedFileMimeType?.startsWith("audio/") == true) {
                                     uiState.audioDurationMillis?.let { d -> InfoRow("Duration:", formatDurationMillis(d)) }
                                     uiState.audioBitrate?.let { b -> InfoRow("Bitrate:", "${b / 1000} kbps") }
                                     uiState.audioArtist?.let { a -> InfoRow("Artist:", a) }
                                     uiState.audioAlbum?.let { al -> InfoRow("Album:", al) }
                                 }
+                                
+                                if (uiState.selectedFileMimeType?.startsWith("video/") == true) {
+                                    uiState.videoDurationMillis?.let { d -> InfoRow("Duration:", formatDurationMillis(d)) }
+                                }
+
+                                if (uiState.selectedFileMimeType == "application/pdf") {
+                                    uiState.pdfPageCount?.let { pc -> InfoRow("Pages:", pc.toString()) }
+                                }
+
+                                if (uiState.selectedFileMimeType == "application/vnd.android.package-archive") {
+                                    uiState.apkPackageName?.let { pn -> InfoRow("Package:", pn) }
+                                    uiState.apkVersionName?.let { vn -> InfoRow("Version:", vn) }
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
+                        
                         if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("image/") == true) {
-                            AsyncImage(model = uiState.selectedFileUri, contentDescription = "Selected image preview", modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
-                                .padding(vertical = 8.dp)
-                                .clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Fit)
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(16f / 9f)
+                                    .padding(vertical = 8.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(), // Removed clickable here, handled by overlay
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    val imageRequest = ImageRequest.Builder(LocalContext.current)
+                                        .data(uiState.selectedFileUri)
+                                        .crossfade(true)
+                                        .build()
+                                    var imageState by remember { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Loading(null)) }
+
+                                    AsyncImage(
+                                        model = imageRequest,
+                                        contentDescription = "Selected image preview",
+                                        modifier = Modifier.fillMaxSize(), 
+                                        contentScale = ContentScale.Crop, 
+                                        onState = { state -> imageState = state }
+                                    )
+
+                                    when (imageState) {
+                                        is AsyncImagePainter.State.Loading -> CircularProgressIndicator(modifier = Modifier.size(48.dp))
+                                        is AsyncImagePainter.State.Error -> Icon(Icons.Filled.BrokenImage, contentDescription = "Error loading image", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
+                                        is AsyncImagePainter.State.Success -> {
+                                            ClickablePreviewOverlay { imageUriForFullScreen = uiState.selectedFileUri }
+                                        }
+                                        else -> {} 
+                                    }
+                                }
+                            }
                         }
+                        
+                        if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("video/") == true) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(16f / 9f) 
+                                    .padding(vertical = 8.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(), // Removed clickable here
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    uiState.videoThumbnail?.let {
+                                        val bitmap = remember(it) { BitmapFactory.decodeByteArray(it, 0, it.size) }
+                                        Image(
+                                            bitmap = bitmap.asImageBitmap(),
+                                            contentDescription = "Video thumbnail preview",
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                        ClickablePreviewOverlay { videoThumbnailForFullScreen = uiState.videoThumbnail }
+                                    } ?: Icon(Icons.Filled.Videocam, contentDescription = "Video thumbnail placeholder", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                        
+                        if (uiState.selectedFileUri != null && uiState.selectedFileMimeType == "application/pdf" && uiState.pdfPageCount != null) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(100.dp) 
+                                    .padding(vertical = 8.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Filled.PictureAsPdf, contentDescription = "PDF File", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+
+                        if (uiState.selectedFileUri != null && uiState.selectedFileMimeType == "application/vnd.android.package-archive") {
+                             Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 80.dp) 
+                                    .padding(vertical = 8.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    uiState.apkIcon?.let {
+                                        val bitmap = remember(it) { BitmapFactory.decodeByteArray(it, 0, it.size) }
+                                        Image(
+                                            bitmap = bitmap.asImageBitmap(),
+                                            contentDescription = "APK icon preview",
+                                            modifier = Modifier.size(64.dp), 
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    } ?: Icon(Icons.Filled.Android, contentDescription = "APK File", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+                        
                         if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("audio/") == true) {
                             AudioPlayerPreview(
                                 uiState = uiState, 
@@ -270,11 +472,10 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                     mediaPlayer?.let {
                                         if (it.isPlaying) { it.pause(); isPlaying = false }
                                         else {
-                                            if(isUserScrubbing) { // If scrubbing, apply scrubbed position before playing
+                                            if(isUserScrubbing) { 
                                                 it.seekTo(userSeekPositionMillis.toInt())
-                                                currentPlaybackTimeMillis = userSeekPositionMillis // Update current time to reflect seek
+                                                currentPlaybackTimeMillis = userSeekPositionMillis 
                                             }
-                                            // If at end, restart from beginning
                                             else if (currentPlaybackTimeMillis >= (uiState.audioDurationMillis ?: Long.MAX_VALUE) - 100 && (uiState.audioDurationMillis ?: 0L) > 0) {
                                                 it.seekTo(0)
                                                 currentPlaybackTimeMillis = 0L
@@ -289,27 +490,26 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                 onDragStart = { offset, totalDuration, currentWidthPx ->
                                     isUserScrubbing = true
                                     initialTouchX = offset.x
-                                    // Calculate the initial percentage based on touch offset
                                     val initialPercentage = (offset.x / currentWidthPx).coerceIn(0f, 1f)
                                     userSeekPositionMillis = (initialPercentage * totalDuration).toLong()
-                                    playbackTimeAtDragStart = userSeekPositionMillis // Store this to calculate drag relative to it
+                                    playbackTimeAtDragStart = userSeekPositionMillis 
                                 },
                                 onDrag = { change, totalDuration, currentWidthPx ->
                                     val currentDragX = change.position.x
-                                    val dragDeltaX = currentDragX - initialTouchX // How much finger moved from initial touch
-                                    // Calculate time delta based on how much the drag position changed *relative to the bar width*
+                                    val dragDeltaX = currentDragX - initialTouchX 
                                     val timeDeltaMillis = (dragDeltaX / currentWidthPx) * totalDuration
                                     userSeekPositionMillis = (playbackTimeAtDragStart + timeDeltaMillis).toLong().coerceIn(0L, totalDuration)
                                     change.consume()
                                 },
                                 onDragEnd = {
                                     mediaPlayer?.seekTo(userSeekPositionMillis.toInt())
-                                    currentPlaybackTimeMillis = userSeekPositionMillis // Reflect the seek in current time
+                                    currentPlaybackTimeMillis = userSeekPositionMillis 
                                     isUserScrubbing = false
                                 },
                                 onDragCancel = { isUserScrubbing = false }
                             )
                         }
+                        
                         uiState.selectedFileTextContent?.takeIf { it.isNotBlank() }?.let {
                             Text("Content Preview (4KB Max):", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top=8.dp, bottom=4.dp))
                             OutlinedTextField(value = it, onValueChange = {}, readOnly = true, modifier = Modifier
@@ -322,14 +522,14 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                         }
                     }
                 }
-                1 -> { // Text Upload Tab
+                1 -> { 
                     OutlinedTextField(value = uiState.textToUpload, onValueChange = uploadViewModel::onTextToUploadChanged, label = { Text("Paste text here") }, modifier = Modifier
                         .fillMaxWidth()
                         .defaultMinSize(minHeight = 150.dp), maxLines = 10, enabled = !uiState.isLoading)
                 }
             }
-            // REMOVED old CircularProgressIndicator and progress text from here
-            if (!uiState.isLoading) { // Show success/ready messages only when not actively loading
+            
+            if (!uiState.isLoading) { 
                 uiState.uploadResult?.let {
                     if (it.success) Text("Success! ID: ${it.id}", color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom=8.dp), textAlign = TextAlign.Center)
                 } ?: run {
@@ -372,7 +572,7 @@ fun AudioPlayerPreview(
     Card(modifier = Modifier
         .fillMaxWidth()
         .padding(vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(bottom = 0.dp)) { // Ensure bottom padding is 0 for the card's column
+        Column(modifier = Modifier.padding(bottom = 0.dp)) { 
             Row(
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -389,14 +589,13 @@ fun AudioPlayerPreview(
                     uiState.audioArtist?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
                     uiState.audioAlbum?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom=4.dp)) }
                     Text(
-                        // Display the correct time based on whether user is scrubbing or not
                         text = "${formatDurationMillis( (if (isUserScrubbing) userSeekPositionMillis else currentPlaybackTimeMillis).coerceAtMost(uiState.audioDurationMillis ?: 0L) )} / ${formatDurationMillis(uiState.audioDurationMillis ?: 0L)}",
                         style = MaterialTheme.typography.labelMedium
                     )
                 }
                 FilledTonalIconButton(
                     onClick = onPlayPause,
-                    enabled = mediaPlayer != null && !isMediaPlayerPreparing, // Should be enabled once player is prepared
+                    enabled = mediaPlayer != null && !isMediaPlayerPreparing, 
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (isPlaying) "Pause" else "Play")
@@ -406,22 +605,20 @@ fun AudioPlayerPreview(
             audioPreviewError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top=0.dp, start=16.dp, end=16.dp, bottom=8.dp)) }
 
             val totalDuration = uiState.audioDurationMillis ?: 0L
-            // Correctly calculate progress based on whether user is scrubbing or normal playback
             val progressFraction = { 
                 val currentPos = if (isUserScrubbing) userSeekPositionMillis else currentPlaybackTimeMillis
                 if (totalDuration > 0L) (currentPos.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f) else 0f
             }
 
-            // Show progress bar only if player is ready or preparing (to avoid flicker)
             if (mediaPlayer != null || isMediaPlayerPreparing) {
                 Box(
-                    contentAlignment = Alignment.BottomCenter, // Align progress bar to bottom of box
+                    contentAlignment = Alignment.BottomCenter, 
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(24.dp) // Given height for the touch area and progress bar
-                        .onSizeChanged { onSeekBarWidthChanged(it.width) } // Get width for drag calculations
-                        .pointerInput(mediaPlayer, totalDuration, progressBarWidthPx) { // Keys for re-launching pointer input
-                            if (mediaPlayer == null || totalDuration <= 0L || progressBarWidthPx <= 0) return@pointerInput // Guard clause
+                        .height(24.dp) 
+                        .onSizeChanged { onSeekBarWidthChanged(it.width) } 
+                        .pointerInput(mediaPlayer, totalDuration, progressBarWidthPx) { 
+                            if (mediaPlayer == null || totalDuration <= 0L || progressBarWidthPx <= 0) return@pointerInput 
                             detectHorizontalDragGestures(
                                 onDragStart = { offset ->
                                     onDragStart(
