@@ -9,10 +9,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+// Removed HorizontalPager imports
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
@@ -39,6 +40,7 @@ import com.example.materialdrain.viewmodel.FileInfoViewModel
 import com.example.materialdrain.viewmodel.UploadViewModel
 import com.example.materialdrain.viewmodel.ViewModelFactory
 import kotlinx.coroutines.flow.collectLatest
+// Removed distinctUntilChanged and snapshotFlow as they were pager-specific
 import kotlinx.coroutines.launch
 import java.text.DecimalFormat
 import java.time.LocalDateTime
@@ -89,6 +91,8 @@ internal fun formatApiDateTimeString(dateTimeString: String?): String {
 @Composable
 fun MaterialDrainScreen() {
     var currentScreen by remember { mutableStateOf(Screen.Upload) }
+    // activeLogicScreen removed, pagerState removed
+
     var showGenericDialog by remember { mutableStateOf(false) }
     var genericDialogContent by remember { mutableStateOf("") }
     var genericDialogTitle by remember { mutableStateOf("") }
@@ -104,36 +108,18 @@ fun MaterialDrainScreen() {
     val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
     val uploadUiState by uploadViewModel.uiState.collectAsState()
 
-    val screens = Screen.entries
-    val pagerState = rememberPagerState { screens.size }
-    val coroutineScope = rememberCoroutineScope()
+    // Removed pager-related LaunchedEffects
 
-    // Effect to update currentScreen when pager swipes to a new page
-    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
-        if (!pagerState.isScrollInProgress) {
-            val swipedToScreen = screens[pagerState.currentPage]
-            if (currentScreen != swipedToScreen) {
-                currentScreen = swipedToScreen // This will trigger the LaunchedEffect(currentScreen)
-            }
-        }
-    }
-
-    // Effect to scroll pager when currentScreen changes (e.g., from BottomNavBar)
-    // AND to handle side-effects of screen changes
+    // Simplified LaunchedEffect for ViewModel logic based on currentScreen
     LaunchedEffect(currentScreen) {
-        if (pagerState.currentPage != currentScreen.ordinal) {
-            coroutineScope.launch {
-                pagerState.animateScrollToPage(currentScreen.ordinal)
-            }
-        }
-
-        // ViewModel and other side-effects based on the new currentScreen
+        Log.d("MaterialDrainScreen", "currentScreen changed to: ${currentScreen.name}")
         if (currentScreen != Screen.Files) {
             fileInfoViewModel.clearFileInfoDisplay()
             fileInfoViewModel.clearUserFilesError()
             fileInfoViewModel.clearApiKeyMissingError()
             fileInfoViewModel.setFilterInputVisible(false)
         } else {
+            Log.d("MaterialDrainScreen", "currentScreen is Files, loading API key.")
             fileInfoViewModel.loadApiKey()
         }
     }
@@ -153,7 +139,7 @@ fun MaterialDrainScreen() {
                     !it.contains("metadata", ignoreCase = true) &&
                     !showGenericDialog &&
                     !fileInfoUiState.showEnterFileIdDialog &&
-                    currentScreen == Screen.Upload) {
+                    currentScreen == Screen.Upload) { // Logic now uses currentScreen
                     genericDialogTitle = "Upload Error"
                     genericDialogContent = it
                     showGenericDialog = true
@@ -162,8 +148,9 @@ fun MaterialDrainScreen() {
         }
     }
 
+    // API Key dialog for Upload screen, triggered by currentScreen
     if (uploadUiState.errorMessage?.contains("API Key is missing") == true && currentScreen == Screen.Upload && !fileInfoUiState.showEnterFileIdDialog) {
-        LaunchedEffect(uploadUiState.errorMessage, currentScreen) {
+        LaunchedEffect(uploadUiState.errorMessage, currentScreen) { // Keyed by currentScreen
             genericDialogTitle = "API Key Required for Upload"
             genericDialogContent = "Please set your API Key in the Settings screen to upload files."
             showGenericDialog = true
@@ -196,10 +183,11 @@ fun MaterialDrainScreen() {
         }
     }
 
+    // API Key dialog for Files screen, triggered by currentScreen
     if (fileInfoUiState.apiKeyMissingError && currentScreen == Screen.Files &&
         !fileInfoUiState.userFilesListErrorMessage.isNullOrBlank() &&
         !showGenericDialog && !fileInfoUiState.showDeleteConfirmDialog && !fileInfoUiState.showEnterFileIdDialog && fileInfoUiState.fileInfo == null) {
-        LaunchedEffect(fileInfoUiState.apiKeyMissingError, currentScreen, fileInfoUiState.userFilesListErrorMessage) {
+        LaunchedEffect(fileInfoUiState.apiKeyMissingError, currentScreen, fileInfoUiState.userFilesListErrorMessage) { // Keyed by currentScreen
             if (fileInfoUiState.userFilesListErrorMessage!!.contains("API Key", ignoreCase = true)) {
                 genericDialogTitle = "API Key Required for Files"
                 genericDialogContent = fileInfoUiState.userFilesListErrorMessage!!
@@ -217,9 +205,9 @@ fun MaterialDrainScreen() {
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(currentScreen.title, modifier = Modifier.weight(1f))
+                            Text(currentScreen.title, modifier = Modifier.weight(1f)) // Uses currentScreen
                             AnimatedVisibility(
-                                visible = currentScreen == Screen.Upload && uploadUiState.isLoading,
+                                visible = currentScreen == Screen.Upload && uploadUiState.isLoading, // Uses currentScreen
                                 enter = fadeIn(animationSpec = tween(300)),
                                 exit = fadeOut(animationSpec = tween(300))
                             ) {
@@ -239,7 +227,7 @@ fun MaterialDrainScreen() {
                     }
                 )
                 AnimatedVisibility(
-                    visible = currentScreen == Screen.Upload && uploadUiState.isLoading,
+                    visible = currentScreen == Screen.Upload && uploadUiState.isLoading, // Uses currentScreen
                     enter = fadeIn(animationSpec = tween(150)),
                     exit = fadeOut(animationSpec = tween(150))
                 ) {
@@ -267,7 +255,11 @@ fun MaterialDrainScreen() {
             }
         },
         floatingActionButton = {
-            if (currentScreen == Screen.Files) {
+            AnimatedVisibility(
+                visible = currentScreen == Screen.Files, // FAB visibility now uses currentScreen
+                enter = scaleIn(animationSpec = tween(300)),
+                exit = scaleOut(animationSpec = tween(300))
+            ) {
                 FloatingActionButton(
                     onClick = { fileInfoViewModel.toggleFilterInput() }
                 ) {
@@ -294,15 +286,13 @@ fun MaterialDrainScreen() {
             }
         }
     ) { paddingValues ->
-        HorizontalPager(
-            state = pagerState,
+        // HorizontalPager removed, content now driven by a when statement on currentScreen
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
-            key = { pageIndex -> screens[pageIndex].name }
-        ) { pageIndex ->
-            val screenToShow = screens[pageIndex]
-            when (screenToShow) {
+                .padding(paddingValues)
+        ) {
+            when (currentScreen) {
                 Screen.Upload -> UploadScreenContent(
                     uploadViewModel = uploadViewModel,
                     onShowDialog = { title, content ->
@@ -364,9 +354,10 @@ fun MaterialDrainScreen() {
                         fileInfoViewModel.clearUserFilesError()
                         fileInfoViewModel.clearApiKeyMissingError()
                         if (genericDialogContent.contains("Settings")) {
-                            // Ensure pager syncs if currentScreen is changed directly here
                             val settingsScreen = Screen.Settings
-                            if (currentScreen != settingsScreen) currentScreen = settingsScreen
+                            if (currentScreen != settingsScreen) {
+                                currentScreen = settingsScreen // Triggers LaunchedEffect(currentScreen)
+                            }
                         }
                     }
                 }) {
@@ -417,7 +408,7 @@ fun BottomNavigationBar(currentScreen: Screen, onScreenSelected: (Screen) -> Uni
                 icon = { Icon(screen.icon, contentDescription = screen.title) },
                 label = { Text(screen.title) },
                 selected = currentScreen == screen,
-                onClick = { onScreenSelected(screen) }
+                onClick = { onScreenSelected(screen) } // This now solely drives screen changes
             )
         }
     }
