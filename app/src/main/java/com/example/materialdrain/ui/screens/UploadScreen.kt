@@ -265,7 +265,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
         var localMediaPlayerInstance: MediaPlayer? = null
         if (selectedTabIndex == 0 && uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("audio/") == true) {
             isMediaPlayerPreparing = true
-            mediaPlayer?.release()
+            mediaPlayer?.release() // Release previous instance if any
             mediaPlayer = null
             isPlaying = false
             currentPlaybackTimeMillis = 0L
@@ -279,28 +279,36 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                 localMediaPlayerInstance.setOnPreparedListener {
                     mediaPlayer = it
                     isMediaPlayerPreparing = false
+                    // currentPlaybackTimeMillis = 0L // Reset time on new preparation
                 }
                 localMediaPlayerInstance.setOnErrorListener { mp, what, extra ->
                     audioPreviewError = "Cannot play audio (error $what, $extra)."
                     Log.e(TAG_MEDIA_PLAYER, "MediaPlayer Error: what=$what, extra=$extra for URI: ${uiState.selectedFileUri}")
                     mp?.release()
-                    if (mediaPlayer == mp) mediaPlayer = null
+                    if (mediaPlayer == mp) { // Clear our state variable if it was this instance
+                        mediaPlayer = null
+                    }
                     isMediaPlayerPreparing = false
-                    isPlaying = false
-                    true
+                    isPlaying = false // Crucial: update isPlaying state
+                    true // Error handled
                 }
-                localMediaPlayerInstance.setOnCompletionListener {
+                localMediaPlayerInstance.setOnCompletionListener { mp ->
                     isPlaying = false
-                    currentPlaybackTimeMillis = uiState.audioDurationMillis ?: 0L
+                    val duration = uiState.audioDurationMillis ?: 0L
+                    currentPlaybackTimeMillis = duration
+                    Log.d(TAG_MEDIA_PLAYER, "MediaPlayer playback completed. Time set to: $duration")
+                    // mp.seekTo(0) // Optionally reset player position to start, if re-play is desired from start
                 }
             } catch (e: Exception) {
-                audioPreviewError = "Error setting up audio player."
+                audioPreviewError = "Error setting up audio player: ${e.message}"
                 Log.e(TAG_MEDIA_PLAYER, "Error setting up audio player for URI: ${uiState.selectedFileUri}", e)
                 localMediaPlayerInstance.release()
-                mediaPlayer = null
+                mediaPlayer = null // Ensure media player state is cleared on error
                 isMediaPlayerPreparing = false
+                isPlaying = false
             }
         } else {
+            // Not an audio file or tab changed, release any existing player
             mediaPlayer?.release()
             mediaPlayer = null
             isPlaying = false
@@ -311,6 +319,8 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
         }
         onDispose {
             localMediaPlayerInstance?.release()
+            // Double check: mediaPlayer might be a new instance from onPrepared, 
+            // so direct mediaPlayer?.release() here is important too.
             mediaPlayer?.release()
             mediaPlayer = null
             isMediaPlayerPreparing = false
@@ -323,17 +333,21 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
         if (isPlaying && !isUserScrubbing && mediaPlayer != null && mediaPlayer?.isPlaying == true) {
             while (isActive) {
                 try {
-                    if (!isUserScrubbing && mediaPlayer?.isPlaying == true) {
+                    // Only update if still playing and not scrubbing
+                    if (isPlaying && !isUserScrubbing && mediaPlayer?.isPlaying == true) {
                         currentPlaybackTimeMillis = mediaPlayer?.currentPosition?.toLong() ?: currentPlaybackTimeMillis
                     }
                 } catch (e: IllegalStateException) {
                     Log.w(TAG_MEDIA_PLAYER, "MediaPlayer access error during playback: ${e.message}")
-                    isPlaying = false
-                    audioPreviewError = "Player error."
+                    isPlaying = false // Stop updates if player is in a bad state
+                    audioPreviewError = "Player error during update."
+                    break // Exit loop
+                }
+                awaitFrame() // Wait for the next frame to update UI smoothly
+                // Check conditions again before next iteration or to break
+                if (!isPlaying || mediaPlayer?.isPlaying == false || isUserScrubbing) {
                     break
                 }
-                awaitFrame()
-                if (!isPlaying || mediaPlayer?.isPlaying == false || isUserScrubbing) break
             }
         }
     }
@@ -533,6 +547,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                                 currentPlaybackTimeMillis = userSeekPositionMillis
                                             }
                                             else if (currentPlaybackTimeMillis >= (uiState.audioDurationMillis ?: Long.MAX_VALUE) - 100 && (uiState.audioDurationMillis ?: 0L) > 0) {
+                                                // If near the end, restart from beginning
                                                 it.seekTo(0)
                                                 currentPlaybackTimeMillis = 0L
                                             }
@@ -661,7 +676,8 @@ fun AudioPlayerPreview(
             audioPreviewError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top=0.dp, start=16.dp, end=16.dp, bottom=8.dp)) }
 
             val totalDuration = uiState.audioDurationMillis ?: 0L
-            val progressFraction = @Composable {
+            // Calculate progress based on whether user is scrubbing or from current playback time
+            val progress = remember(isUserScrubbing, userSeekPositionMillis, currentPlaybackTimeMillis, totalDuration) {
                 val currentPos = if (isUserScrubbing) userSeekPositionMillis else currentPlaybackTimeMillis
                 if (totalDuration > 0L) (currentPos.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f) else 0f
             }
@@ -695,7 +711,7 @@ fun AudioPlayerPreview(
                             )
                         }
                 ) {
-                    LinearProgressIndicator(progress = progressFraction(), modifier = Modifier.fillMaxWidth())
+                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth()) // Use lambda for progress
                 }
             }
         }

@@ -92,6 +92,12 @@ fun MaterialDrainScreen() {
     val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
     val uploadUiState by uploadViewModel.uiState.collectAsState()
 
+    // Initial file fetch on app launch
+    LaunchedEffect(Unit) { // Runs once when MaterialDrainScreen is first composed
+        Log.d("MaterialDrainScreen", "Initial composition. ViewModels should handle their own initial data loading via init blocks.")
+        // fileInfoViewModel.loadApiKey() // Removed: ViewModel's init now handles this.
+    }
+
     // Handle system back press for FileDetail screen
     if (currentScreen == Screen.FileDetail) {
         BackHandler(enabled = true) {
@@ -104,9 +110,9 @@ fun MaterialDrainScreen() {
         Log.d("MaterialDrainScreen", "currentScreen changed to: ${currentScreen.name}")
         when (currentScreen) {
             Screen.Files -> {
-                fileInfoViewModel.loadApiKey()
-                // If coming from FileDetail, fileInfo might still be set, which is fine.
-                // Filter visibility should be managed by its own state or reset if needed.
+                // fileInfoViewModel.loadApiKey() // Call is made on initial composition now, or when settings change it.
+                                            // Still, if user navigates to Files and API key was just set, this might be useful.
+                                            // For now, relying on initial load and settings screen to update.
             }
             Screen.FileDetail -> {
                 // Ensure filter is hidden on detail screen
