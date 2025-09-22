@@ -4,13 +4,15 @@ import android.app.Application
 import android.content.Context // Kept for LocalContext.current.applicationContext
 import android.content.Intent // Kept for Scaffold's when block (indirectly, if dialogs ever need it, though current moved ones do not directly trigger intents from here)
 import android.net.Uri // Kept for similar reasons as Intent
-import android.util.Log 
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween 
-import androidx.compose.animation.fadeIn 
-import androidx.compose.animation.fadeOut 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState // Used by a when case that's not moved
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
@@ -23,29 +25,27 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog // Kept for FileInfoDetailsCard dialog wrapper
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.materialdrain.network.PixeldrainApiService
+import com.example.materialdrain.ui.dialogs.EnterFileIdDialog // IMPORT THE MOVED DIALOG
+import com.example.materialdrain.ui.dialogs.FileInfoDetailsCard // IMPORT THE MOVED DIALOG/CARD
+import com.example.materialdrain.ui.screens.FilesScreenContent
+import com.example.materialdrain.ui.screens.ListsScreenContent
+import com.example.materialdrain.ui.screens.SettingsScreenContent
+import com.example.materialdrain.ui.screens.UploadScreenContent
 import com.example.materialdrain.ui.theme.MaterialdrainTheme
 import com.example.materialdrain.viewmodel.FileInfoViewModel
 import com.example.materialdrain.viewmodel.UploadViewModel
 import com.example.materialdrain.viewmodel.ViewModelFactory
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import java.text.DecimalFormat
-import androidx.compose.foundation.layout.padding
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.format.DateTimeParseException
-import androidx.compose.ui.zIndex
-import com.example.materialdrain.ui.screens.UploadScreenContent
-import com.example.materialdrain.ui.screens.FilesScreenContent
-import com.example.materialdrain.ui.screens.ListsScreenContent
-import com.example.materialdrain.ui.screens.SettingsScreenContent
-import com.example.materialdrain.ui.dialogs.EnterFileIdDialog // IMPORT THE MOVED DIALOG
-import com.example.materialdrain.ui.dialogs.FileInfoDetailsCard // IMPORT THE MOVED DIALOG/CARD
 
 // Define the screens in the app
 enum class Screen(val title: String, val icon: ImageVector) {
@@ -85,7 +85,7 @@ internal fun formatApiDateTimeString(dateTimeString: String?): String {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MaterialDrainScreen() {
     var currentScreen by remember { mutableStateOf(Screen.Upload) }
@@ -103,6 +103,40 @@ fun MaterialDrainScreen() {
     val snackbarHostState = remember { SnackbarHostState() }
     val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
     val uploadUiState by uploadViewModel.uiState.collectAsState()
+
+    val screens = Screen.entries
+    val pagerState = rememberPagerState { screens.size }
+    val coroutineScope = rememberCoroutineScope()
+
+    // Effect to update currentScreen when pager swipes to a new page
+    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
+        if (!pagerState.isScrollInProgress) {
+            val swipedToScreen = screens[pagerState.currentPage]
+            if (currentScreen != swipedToScreen) {
+                currentScreen = swipedToScreen // This will trigger the LaunchedEffect(currentScreen)
+            }
+        }
+    }
+
+    // Effect to scroll pager when currentScreen changes (e.g., from BottomNavBar)
+    // AND to handle side-effects of screen changes
+    LaunchedEffect(currentScreen) {
+        if (pagerState.currentPage != currentScreen.ordinal) {
+            coroutineScope.launch {
+                pagerState.animateScrollToPage(currentScreen.ordinal)
+            }
+        }
+
+        // ViewModel and other side-effects based on the new currentScreen
+        if (currentScreen != Screen.Files) {
+            fileInfoViewModel.clearFileInfoDisplay()
+            fileInfoViewModel.clearUserFilesError()
+            fileInfoViewModel.clearApiKeyMissingError()
+            fileInfoViewModel.setFilterInputVisible(false)
+        } else {
+            fileInfoViewModel.loadApiKey()
+        }
+    }
 
     LaunchedEffect(key1 = uploadViewModel) {
         uploadViewModel.uiState.collectLatest { uiState ->
@@ -226,15 +260,9 @@ fun MaterialDrainScreen() {
             }
         },
         bottomBar = {
-            BottomNavigationBar(currentScreen) { screen ->
-                currentScreen = screen
-                if (screen != Screen.Files) {
-                    fileInfoViewModel.clearFileInfoDisplay()
-                    fileInfoViewModel.clearUserFilesError()
-                    fileInfoViewModel.clearApiKeyMissingError()
-                    fileInfoViewModel.setFilterInputVisible(false)
-                } else {
-                    fileInfoViewModel.loadApiKey()
+            BottomNavigationBar(currentScreen) { selectedScreen ->
+                if (currentScreen != selectedScreen) {
+                    currentScreen = selectedScreen // This will trigger LaunchedEffect(currentScreen)
                 }
             }
         },
@@ -266,8 +294,15 @@ fun MaterialDrainScreen() {
             }
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues)) {
-            when (currentScreen) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            key = { pageIndex -> screens[pageIndex].name }
+        ) { pageIndex ->
+            val screenToShow = screens[pageIndex]
+            when (screenToShow) {
                 Screen.Upload -> UploadScreenContent(
                     uploadViewModel = uploadViewModel,
                     onShowDialog = { title, content ->
@@ -329,7 +364,9 @@ fun MaterialDrainScreen() {
                         fileInfoViewModel.clearUserFilesError()
                         fileInfoViewModel.clearApiKeyMissingError()
                         if (genericDialogContent.contains("Settings")) {
-                            currentScreen = Screen.Settings
+                            // Ensure pager syncs if currentScreen is changed directly here
+                            val settingsScreen = Screen.Settings
+                            if (currentScreen != settingsScreen) currentScreen = settingsScreen
                         }
                     }
                 }) {
@@ -366,11 +403,6 @@ fun MaterialDrainScreen() {
         )
     }
 
-    // EnterFileIdDialog is called from FilesScreenContent or FAB if we decide to add a FAB action for it.
-    // For now, it might be triggered by a button within FilesScreenContent if that screen needs it.
-    // Or, if it's a global action, its visibility could be controlled by a state in FileInfoViewModel.
-    // The current implementation calls fileInfoViewModel.showEnterFileIdDialog() which updates uiState.showEnterFileIdDialog
-    // We need to ensure that EnterFileIdDialog is displayed based on this state.
     if (fileInfoUiState.showEnterFileIdDialog) {
         EnterFileIdDialog(fileInfoViewModel = fileInfoViewModel)
     }

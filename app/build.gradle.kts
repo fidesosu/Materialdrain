@@ -57,7 +57,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
-    // implementation(libs.androidx.compose.foundation) // This line is removed
+    implementation(libs.androidx.compose.foundation) // This line is un-commented
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0") // Added ViewModel Compose
     implementation("io.coil-kt:coil-compose:2.7.0") // Added Coil for image loading
     implementation(libs.google.android.material) // Added Material Components for XML themes
