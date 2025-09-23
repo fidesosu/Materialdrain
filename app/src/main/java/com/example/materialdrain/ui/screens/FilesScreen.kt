@@ -355,7 +355,7 @@ fun UserFileListItemCard(
             .padding(vertical = 2.dp)
             .clickable(onClick = onClick)
     ) {
-        Column(modifier = Modifier.padding(bottom = if (showProgressSection) 0.dp else 12.dp)) {
+        Column {
             Row(
                 modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = if (showProgressSection) 4.dp else 12.dp),
                 verticalAlignment = Alignment.CenterVertically
