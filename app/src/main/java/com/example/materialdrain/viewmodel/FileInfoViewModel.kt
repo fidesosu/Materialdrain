@@ -79,7 +79,7 @@ data class FileInfoUiState(
     val isLoadingDeleteFile: Boolean = false,
     val deleteFileSuccessMessage: String? = null,
     val deleteFileErrorMessage: String? = null,
-    val showDeleteConfirmDialog: Boolean = false,
+    val initiateDeleteFile: Boolean = false,
     val fileIdToDelete: String? = null,
 
     val apiKeyMissingError: Boolean = false,
@@ -314,12 +314,12 @@ class FileInfoViewModel(
     fun setFilterInputVisible(isVisible: Boolean) { _uiState.update { it.copy(showFilterInput = isVisible) } }
 
     // --- File Deletion Functions ---
-    fun initiateDeleteFile(fileId: String) { _uiState.update { it.copy(showDeleteConfirmDialog = true, fileIdToDelete = fileId) } }
-    fun cancelDeleteFile() { _uiState.update { it.copy(showDeleteConfirmDialog = false, fileIdToDelete = null, deleteFileErrorMessage = null) } }
+    fun initiateDeleteFile(fileId: String) { _uiState.update { it.copy(initiateDeleteFile = true, fileIdToDelete = fileId) } } // Renamed from initiateDeleteFile
+    fun cancelDeleteFile() { _uiState.update { it.copy(initiateDeleteFile = false, fileIdToDelete = null, deleteFileErrorMessage = null) } }
     fun confirmDeleteFile() {
         val fileId = _uiState.value.fileIdToDelete ?: return
         if (apiKey.isBlank()) {
-            _uiState.update { it.copy(showDeleteConfirmDialog = false, deleteFileErrorMessage = "API Key is missing. Cannot delete file.", apiKeyMissingError = true) }
+            _uiState.update { it.copy(initiateDeleteFile = false, deleteFileErrorMessage = "API Key is missing. Cannot delete file.", apiKeyMissingError = true) }
             return
         }
         _uiState.update { it.copy(isLoadingDeleteFile = true, deleteFileErrorMessage = null, deleteFileSuccessMessage = null) }
@@ -330,7 +330,7 @@ class FileInfoViewModel(
                     if (newFileInfo == null) clearTextPreviewStates() // Clear preview if the current file was deleted
                     it.copy(
                         isLoadingDeleteFile = false,
-                        showDeleteConfirmDialog = false,
+                        initiateDeleteFile = false,
                         fileIdToDelete = null,
                         deleteFileSuccessMessage = response.data.message ?: "File deleted successfully.",
                         userFilesList = _uiState.value.userFilesList.filterNot { item -> item.id == fileId },
@@ -338,7 +338,7 @@ class FileInfoViewModel(
                         activeDownloads = it.activeDownloads.filterNot { entry -> entry.key == fileId } // Also remove from active downloads
                     )
                 }
-                is ApiResponse.Error -> _uiState.update { it.copy(isLoadingDeleteFile = false, showDeleteConfirmDialog = false, fileIdToDelete = null, deleteFileErrorMessage = response.errorDetails.message ?: response.errorDetails.value ?: "Unknown error deleting file.") }
+                is ApiResponse.Error -> _uiState.update { it.copy(isLoadingDeleteFile = false, initiateDeleteFile = false, fileIdToDelete = null, deleteFileErrorMessage = response.errorDetails.message ?: response.errorDetails.value ?: "Unknown error deleting file.") }
             }
         }
     }

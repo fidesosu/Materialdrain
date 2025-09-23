@@ -28,6 +28,9 @@ import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone // Added
+import androidx.compose.material.icons.filled.ErrorOutline // Added
+import androidx.compose.material.icons.filled.Image // Added
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -72,7 +75,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.materialdrain.network.FileInfoResponse
-import com.example.materialdrain.ui.formatSize // Import from com.example.materialdrain.ui
+import com.example.materialdrain.ui.formatApiDateTimeString // Keep this if used for date display
+import com.example.materialdrain.ui.formatSize
+import com.example.materialdrain.viewmodel.FileDownloadState // Added
 import com.example.materialdrain.viewmodel.DownloadStatus
 import com.example.materialdrain.viewmodel.FileInfoUiState
 import com.example.materialdrain.viewmodel.FileInfoViewModel
@@ -140,10 +145,10 @@ fun SortControls(uiState: FileInfoUiState, fileInfoViewModel: FileInfoViewModel)
 @Composable
 fun FilesScreenContent(
     fileInfoViewModel: FileInfoViewModel,
-    onFileSelected: () -> Unit // Added callback for navigation
+    onFileSelected: () -> Unit
 ) {
     val uiState by fileInfoViewModel.uiState.collectAsState()
-    val context = LocalContext.current // context is still needed for UserFileListItemCard
+    val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val filterFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
@@ -176,9 +181,6 @@ fun FilesScreenContent(
         if (uiState.showFilterInput) {
             filterFocusRequester.requestFocus()
             keyboardController?.show()
-        } else {
-            // Consider hiding keyboard if filter input becomes not visible
-            // keyboardController?.hide() // This might be too aggressive, depends on desired UX
         }
     }
 
@@ -225,8 +227,6 @@ fun FilesScreenContent(
             )
         }
 
-        // This section for loading/error messages for single file info (dialog based) might be less relevant here
-        // if this composable is only for the list. Consider if this logic belongs to the main screen.
         if (uiState.isLoadingFileInfo && uiState.fileInfo == null && displayedFiles.isEmpty() && !uiState.showFilterInput) {
             Spacer(modifier = Modifier.height(16.dp))
             CircularProgressIndicator()
@@ -292,33 +292,29 @@ fun FilesScreenContent(
             SortControls(uiState = uiState, fileInfoViewModel = fileInfoViewModel)
             LazyColumn(
                 state = listState,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(bottom = 16.dp)
+                modifier = Modifier.weight(1f), // Changed from fillMaxWidth().weight(1f)
+                contentPadding = PaddingValues(vertical = 8.dp) // Changed from bottom = 16.dp
             ) {
                 items(
                     items = displayedFiles,
-                    key = { it.id },
-                    contentType = { "fileInfoCard" }
+                    key = { file -> file.id },
+                    contentType = { "fileInfoCard" } // Keep contentType if useful for performance tools
                 ) { file ->
-                    Column(
-                        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = tween<IntOffset>(durationMillis = 700))
-                    ) {
-                        UserFileListItemCard(
-                            fileInfo = file,
-                            fileInfoViewModel = fileInfoViewModel,
-                            context = context,
-                            onClick = {
-                                if (uiState.showFilterInput) {
-                                    fileInfoViewModel.setFilterInputVisible(false)
-                                }
-                                fileInfoViewModel.fetchFileInfoById(file.id)
-                                onFileSelected() // Call the navigation callback
+                    val currentDownloadState = uiState.activeDownloads[file.id]
+                    UserFileListItemCard(
+                        fileInfo = file,
+                        downloadState = currentDownloadState,
+                        context = context, // Context is stable
+                        fileInfoViewModel = fileInfoViewModel,
+                        onFileSelected = { // This is the onClick for the Card
+                            if (uiState.showFilterInput) { // Check uiState from FilesScreenContent
+                                fileInfoViewModel.setFilterInputVisible(false)
                             }
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
-                    }
+                            fileInfoViewModel.fetchFileInfo(file.id) // Corrected: Use fetchFileInfo with file.id
+                            onFileSelected() // Propagate the navigation callback
+                        }
+                    )
+                    HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 }
             }
         } else if (!uiState.isLoadingUserFiles && !uiState.apiKeyMissingError && uiState.userFilesListErrorMessage == null) {
@@ -337,132 +333,133 @@ fun FilesScreenContent(
 @Composable
 fun UserFileListItemCard(
     fileInfo: FileInfoResponse,
-    fileInfoViewModel: FileInfoViewModel,
-    context: Context,
-    onClick: () -> Unit
+    downloadState: FileDownloadState?, // Changed from uiState: FileInfoUiState
+    context: Context, // Context is usually stable and fine to pass
+    fileInfoViewModel: FileInfoViewModel, // For triggering actions
+    onFileSelected: () -> Unit // Callback for item click
 ) {
-    val uiState by fileInfoViewModel.uiState.collectAsState()
-    val downloadState = uiState.activeDownloads[fileInfo.id]
-
-    val isDownloadingThisItem = downloadState?.status == DownloadStatus.DOWNLOADING || downloadState?.status == DownloadStatus.PENDING
-    val showProgressSection = downloadState != null &&
-            downloadState.status != DownloadStatus.COMPLETED &&
-            downloadState.status != DownloadStatus.FAILED
+    val thumbnailUrl = "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail"
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp)
-            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp)
+            .clickable { // onClick lambda is now part of the Card itself
+                fileInfoViewModel.fetchFileInfo(fileInfo.id) // Corrected: Use fetchFileInfo with fileInfo.id
+                onFileSelected()
+            },
+        shape = RoundedCornerShape(8.dp)
     ) {
         Column {
             Row(
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = if (showProgressSection) 4.dp else 12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AsyncImage(
-                    model = "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail",
-                    contentDescription = "File thumbnail",
+                    model = thumbnailUrl,
+                    contentDescription = "${fileInfo.name} thumbnail",
                     modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(4.dp)),
+                        .size(60.dp)
+                        .clip(RoundedCornerShape(6.dp)),
                     contentScale = ContentScale.Crop,
-                    error = rememberVectorPainter(Icons.Filled.BrokenImage)
+                    error = rememberVectorPainter(Icons.Filled.BrokenImage),
+                    placeholder = rememberVectorPainter(Icons.Filled.Image) // Added placeholder
                 )
+
                 Spacer(modifier = Modifier.width(12.dp))
+
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = fileInfo.name,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(formatSize(fileInfo.size), style = MaterialTheme.typography.bodySmall)
-                    Text("Uploaded: ${fileInfo.dateUpload.substringBefore('T')}", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        text = "Size: ${formatSize(fileInfo.size)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    // Optional: Display upload date
+                     Text(
+                         text = "Uploaded: ${formatApiDateTimeString(fileInfo.dateUpload)}",
+                         style = MaterialTheme.typography.bodySmall,
+                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                     )
                 }
-                Spacer(modifier = Modifier.width(4.dp))
-                IconButton(
-                    onClick = { fileInfoViewModel.initiateDownloadFile(fileInfo) },
-                    enabled = !isDownloadingThisItem,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(Icons.Filled.Download, contentDescription = "Download File", modifier = Modifier.size(20.dp))
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                if (downloadState != null && downloadState.status != DownloadStatus.COMPLETED && downloadState.status != DownloadStatus.PENDING) {
+                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.size(40.dp)) {
+                        if (downloadState.status == DownloadStatus.DOWNLOADING) {
+                            CircularProgressIndicator(
+                                progress = { downloadState.progressFraction },
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Text(
+                                "${(downloadState.progressFraction * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else if (downloadState.status == DownloadStatus.FAILED) {
+                            Icon(
+                                Icons.Filled.ErrorOutline,
+                                contentDescription = "Download failed",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                } else {
+                     IconButton(
+                        onClick = { fileInfoViewModel.initiateDownloadFile(fileInfo) }, // Corrected: Use initiateDownloadFile with FileInfoResponse
+                        enabled = downloadState?.status != DownloadStatus.DOWNLOADING,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            if (downloadState?.status == DownloadStatus.COMPLETED) Icons.Filled.DownloadDone else Icons.Filled.Download,
+                            contentDescription = if (downloadState?.status == DownloadStatus.COMPLETED) "Downloaded" else "Download file",
+                            tint = if (downloadState?.status == DownloadStatus.COMPLETED) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
-                if (fileInfo.canEdit == true) {
+
+                if (fileInfo.canEdit == true) { // Check canEdit, as in original
                     IconButton(
                         onClick = { fileInfoViewModel.initiateDeleteFile(fileInfo.id) },
                         modifier = Modifier.size(40.dp)
                     ) {
-                        Icon(Icons.Filled.DeleteOutline, contentDescription = "Delete File", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Filled.DeleteOutline,
+                            contentDescription = "Delete file",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
                 }
             }
-
-            if (downloadState != null && showProgressSection) {
-                Column { // Removed Modifier.animateContentSize()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 12.dp, end = 12.dp, bottom = 2.dp, top = 0.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        val statusText = when (downloadState.status) {
-                            DownloadStatus.PENDING -> "Download pending..."
-                            DownloadStatus.DOWNLOADING -> "Downloading..."
-                            DownloadStatus.COMPLETED -> downloadState.message ?: "Download completed!"
-                            DownloadStatus.FAILED -> downloadState.message ?: "Download failed."
-                        }
-                        Text(
-                            text = statusText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (downloadState.status == DownloadStatus.FAILED) MaterialTheme.colorScheme.error else LocalContentColor.current
-                        )
-                        if (downloadState.status == DownloadStatus.DOWNLOADING || downloadState.status == DownloadStatus.PENDING) {
-                            downloadState.totalBytes?.let { total ->
-                                Text(
-                                    text = "${formatSize(downloadState.downloadedBytes)} / ${formatSize(total)}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.width(120.dp),
-                                    textAlign = TextAlign.End
-                                )
-                            }
-                        }
-                    }
-                    if (downloadState.status == DownloadStatus.DOWNLOADING || downloadState.status == DownloadStatus.PENDING) {
-                        LinearProgressIndicator(
-                            progress = { downloadState.progressFraction },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 12.dp, end = 12.dp, bottom = 4.dp)
-                        )
-                    }
-                }
-            } else if (downloadState != null && downloadState.status == DownloadStatus.FAILED) {
-                Column {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 12.dp, end = 12.dp, bottom = 2.dp, top = 0.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = downloadState.message ?: if (downloadState.status == DownloadStatus.COMPLETED) "Download completed!" else "Download failed.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (downloadState.status == DownloadStatus.FAILED) MaterialTheme.colorScheme.error else LocalContentColor.current
-                        )
-                    }
-                    TextButton(
-                        onClick = { fileInfoViewModel.clearDownloadState(fileInfo.id) },
-                        modifier = Modifier
-                            .align(Alignment.End)
-                            .padding(end = 8.dp, bottom = 0.dp, top = 0.dp)
-                    ) {
-                        Text("Dismiss", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
+            if (downloadState?.status == DownloadStatus.DOWNLOADING) {
+                LinearProgressIndicator(
+                    progress = { downloadState.progressFraction },
+                    modifier = Modifier.fillMaxWidth().height(2.dp).padding(horizontal = 8.dp, vertical = 2.dp) // Added padding
+                )
+            }
+             // Optional: Display full status message for failed/completed if desired
+            if (downloadState != null && (downloadState.status == DownloadStatus.FAILED || downloadState.status == DownloadStatus.COMPLETED)) {
+                 downloadState.message?.let {
+                     Text(
+                         text = it,
+                         style = MaterialTheme.typography.labelSmall,
+                         color = if (downloadState.status == DownloadStatus.FAILED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                         modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 4.dp).fillMaxWidth(),
+                         textAlign = TextAlign.Center
+                     )
+                 }
             }
         }
     }

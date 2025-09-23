@@ -192,7 +192,7 @@ fun MaterialDrainScreen() {
 
     if (fileInfoUiState.apiKeyMissingError && (currentScreen == Screen.Files || currentScreen == Screen.FileDetail) &&
         !fileInfoUiState.userFilesListErrorMessage.isNullOrBlank() &&
-        !showGenericDialog && !fileInfoUiState.showDeleteConfirmDialog && !fileInfoUiState.showEnterFileIdDialog) {
+        !showGenericDialog && !fileInfoUiState.initiateDeleteFile && !fileInfoUiState.showEnterFileIdDialog) {
         LaunchedEffect(fileInfoUiState.apiKeyMissingError, currentScreen, fileInfoUiState.userFilesListErrorMessage) {
             if (fileInfoUiState.userFilesListErrorMessage!!.contains("API Key", ignoreCase = true)) {
                 genericDialogTitle = if (currentScreen == Screen.FileDetail) "API Key Required" else "API Key Required for Files"
@@ -422,7 +422,7 @@ fun MaterialDrainScreen() {
 
     // Removed the Dialog wrapper for FileInfoDetailsCard as it'''s now a screen
 
-    if (fileInfoUiState.showDeleteConfirmDialog) {
+    if (fileInfoUiState.initiateDeleteFile) {
         AlertDialog(
             onDismissRequest = { fileInfoViewModel.cancelDeleteFile() },
             title = { Text("Confirm Deletion") },
