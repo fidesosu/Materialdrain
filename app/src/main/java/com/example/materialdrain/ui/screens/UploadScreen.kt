@@ -4,16 +4,12 @@ import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.net.Uri
 import android.util.Log
-// import android.view.View // View.GONE is no longer used directly in this file by moved components
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-// import androidx.compose.foundation.background // No longer directly used by moved components
-import androidx.compose.foundation.clickable // Still used by Column click
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-// import androidx.compose.foundation.shape.CircleShape // No longer directly used by moved components
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -22,44 +18,33 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-// import androidx.compose.ui.draw.alpha // No longer directly used by moved components
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color // Still used
 import androidx.compose.ui.graphics.asImageBitmap
-// import androidx.compose.ui.graphics.toArgb // No longer directly used by moved components
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-// import androidx.compose.ui.viewinterop.AndroidView // No longer directly used by moved components
-// import androidx.compose.ui.window.Dialog // No longer directly used by moved components
-// import androidx.compose.ui.window.DialogProperties // No longer directly used by moved components
-// import androidx.media3.common.MediaItem // No longer directly used by moved components
-// import androidx.media3.exoplayer.ExoPlayer // No longer directly used by moved components
-// import androidx.media3.ui.DefaultTimeBar // No longer directly used by moved components
-// import androidx.media3.ui.PlayerView // No longer directly used by moved components
-import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
-import coil.decode.ImageDecoderDecoder
 import coil.request.ImageRequest
 import com.example.materialdrain.ui.dialogs.InfoRow
 import com.example.materialdrain.ui.formatDurationMillis
 import com.example.materialdrain.ui.formatSize
-import com.example.materialdrain.ui.shared.* // Added import for shared composables
+import com.example.materialdrain.ui.shared.*
 import com.example.materialdrain.viewmodel.UploadUiState
 import com.example.materialdrain.viewmodel.UploadViewModel
 import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.isActive
 
 private const val TAG_MEDIA_PLAYER = "MediaPlayerPreview"
+private const val TAG_COIL = "CoilImageLoader" // Added for Coil logging
 
 // ClickablePreviewOverlay, VideoPlayerControls, and FullScreenMediaPreviewDialog are removed from here
 
 @Composable
-fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String, String) -> Unit) {
+fun UploadScreenContent(uploadViewModel: UploadViewModel) {
     val uiState by uploadViewModel.uiState.collectAsState()
     val context = LocalContext.current
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -270,6 +255,9 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                     val imageRequest = ImageRequest.Builder(LocalContext.current)
                                         .data(uiState.selectedFileUri)
                                         .crossfade(true)
+                                        .listener(onError = { _, result ->
+                                            Log.e(TAG_COIL, "Error loading image: ${uiState.selectedFileUri}", result.throwable)
+                                        })
                                         .build()
                                     var imageState by remember { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Loading(null)) }
 
@@ -489,7 +477,7 @@ fun AudioPlayerPreview(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 uiState.audioAlbumArt?.let {
-                    val bitmap = remember(it) { try { BitmapFactory.decodeByteArray(it, 0, it.size) } catch (e: Exception) { null } }
+                    val bitmap = remember(it) { try { BitmapFactory.decodeByteArray(it, 0, it.size) } catch (_: Exception) { null } }
                     bitmap?.let {bmp -> Image(bitmap = bmp.asImageBitmap(), contentDescription = "Album Art", modifier = Modifier
                         .size(64.dp)
                         .clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop) }

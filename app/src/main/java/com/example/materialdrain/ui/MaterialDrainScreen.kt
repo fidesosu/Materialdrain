@@ -10,7 +10,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.LocalOverscrollConfiguration // Added import
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.layout.* // Corrected import
 import androidx.compose.material.icons.Icons
@@ -321,12 +320,7 @@ fun MaterialDrainScreen() {
             ) {
                 when (currentScreen) {
                     Screen.Upload -> UploadScreenContent(
-                        uploadViewModel = uploadViewModel,
-                        onShowDialog = { title, content ->
-                            genericDialogTitle = title
-                            genericDialogContent = content
-                            showGenericDialog = true
-                        }
+                        uploadViewModel = uploadViewModel
                     )
                     Screen.Files -> FilesScreenContent(
                         fileInfoViewModel = fileInfoViewModel,

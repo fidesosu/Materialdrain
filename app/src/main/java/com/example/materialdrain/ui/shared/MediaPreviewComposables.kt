@@ -36,9 +36,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.util.EventLogger // Added import for EventLogger
 import androidx.media3.ui.DefaultTimeBar
@@ -87,12 +89,16 @@ fun VideoPlayerControls(videoUri: Uri, thumbnailUrl: String?, modifier: Modifier
     val unplayedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f).toArgb()
 
     val exoPlayer = remember(videoUri) {
-        val simpleCache = ExoPlayerCache.getInstance(context)
-        val cacheDataSourceFactory = CacheDataSource.Factory()
-            .setCache(simpleCache)
-            .setUpstreamDataSourceFactory(DefaultHttpDataSource.Factory())
-            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-        val mediaSourceFactory = ProgressiveMediaSource.Factory(cacheDataSourceFactory)
+        val mediaSourceFactory: MediaSource.Factory = if (videoUri.scheme == "content") {
+            ProgressiveMediaSource.Factory(DefaultDataSource.Factory(context))
+        } else {
+            val simpleCache = ExoPlayerCache.getInstance(context)
+            val cacheDataSourceFactory = CacheDataSource.Factory()
+                .setCache(simpleCache)
+                .setUpstreamDataSourceFactory(DefaultHttpDataSource.Factory())
+                .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+            ProgressiveMediaSource.Factory(cacheDataSourceFactory)
+        }
 
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(mediaSourceFactory)
