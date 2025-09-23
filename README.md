@@ -1,42 +1,51 @@
 # Materialdrain
 
-Materialdrain is a modern Android client for Pixeldrain, built with Jetpack Compose and Material 3. It provides a native interface for uploading, managing, and viewing your Pixeldrain files.
+Materialdrain is a modern Android client for Pixeldrain, built with Jetpack Compose and Material 3. It offers a native interface for uploading, managing, and viewing your Pixeldrain files.
 
 ## Features
 
-*   **File Upload:**
-    *   Upload files from your device.
-    *   Directly paste and upload text snippets.
-    *   Progress tracking for uploads.
-    *   Preview for selected image, text, and audio files before uploading.
+*   **File Uploads:**
+    *   Upload files directly from your device.
+    *   Paste and upload text snippets.
+    *   Track upload progress with byte counts.
+    *   **Comprehensive Previews:**
+        *   Interactive previews for images, GIFs, videos (with playback), and audio (with playback controls) before uploading.
+        *   Text content preview for common text-based file types.
+        *   Icon representation for APKs (app icon) and PDFs.
+        *   Display of relevant metadata during selection (e.g., audio tags, video duration).
 *   **File Management:**
-    *   View a list of your uploaded files.
+    *   View your list of uploaded files, with thumbnails for media.
     *   Sort files by name, size, or upload date (ascending/descending).
     *   Filter files by name.
-    *   View detailed information for each file (name, size, MIME type, upload date, views, downloads, SHA256 hash).
-    *   Download files directly.
-    *   Delete files (if `can_edit` permission is available).
+    *   **Detailed File Information & Previews:**
+        *   Access comprehensive details for each file (name, size, MIME type, upload date, views, downloads, SHA256 hash).
+        *   View full-screen, interactive previews for images, GIFs, and videos.
+        *   Preview content of text-based files directly.
+    *   Download files to your device with progress indication.
+    *   Delete files (requires `can_edit` permission).
 *   **User Interface:**
-    *   Clean, modern UI based on Material 3 components and theming (including dynamic color support).
-    *   Tab-based navigation for Upload, Files, Lists (placeholder), and Settings.
-    *   Responsive screen layouts.
-    *   Informative dialogs for errors, confirmations, and API key input.
+    *   Clean, contemporary UI leveraging Material 3 components and theming, including dynamic color support.
+    *   Intuitive tab-based navigation: Upload, Files, Lists (placeholder), and Settings.
+    *   Responsive layouts for various screen sizes.
+    *   Clear dialogs for errors, confirmations, and API key input.
 *   **Settings:**
-    *   Configure your Pixeldrain API key for authenticated access.
+    *   Configure your Pixeldrain API key for authenticated account access.
 
 ## Tech Stack & Key Libraries
 
-*   **Kotlin:** Primary programming language.
-*   **Jetpack Compose:** Modern declarative UI toolkit for Android.
-*   **Material 3:** Latest design system for UI components and theming.
-*   **Ktor Client:** For making HTTP requests to the Pixeldrain API (uploads, file info, user files).
+Materialdrain utilizes a modern Android development stack:
+
+*   **Kotlin:** The primary programming language.
+*   **Jetpack Compose:** For building a declarative UI.
+*   **Material 3:** The latest design system for UI components and theming.
+*   **Ktor Client:** For handling HTTP requests to the Pixeldrain API, featuring:
     *   Content negotiation with `kotlinx.serialization`.
-    *   Streaming for file uploads.
-*   **ViewModel:** Part of Android Jetpack's Architecture Components for managing UI-related data.
+    *   Efficient streaming for file uploads.
+*   **ViewModel:** From Android Jetpack's Architecture Components, for managing UI-related data.
 *   **Coroutines & Flow:** For asynchronous operations and reactive data streams.
-*   **Coil:** For image loading (thumbnails).
-*   **Android Core KTX:** Kotlin extensions for a more idiomatic Kotlin experience.
-*   **Splash Screen API:** For a smooth app startup experience.
+*   **Coil:** For optimized image loading (e.g., thumbnails).
+*   **Android Core KTX:** Kotlin extensions for enhanced Android development.
+*   **Splash Screen API:** For a smooth application startup experience.
 
 ## Setup
 
@@ -44,11 +53,11 @@ Materialdrain is a modern Android client for Pixeldrain, built with Jetpack Comp
     ```bash
     git clone https://github.com/fidesosu/Materialdrain.git
     ```
-2.  Open the project in Android Studio (latest stable version recommended).
-3.  The project uses Gradle for dependency management. Sync the project with Gradle files.
-4.  To use features that require authentication (like viewing your files or uploading to your account), you will need to obtain a Pixeldrain API key and enter it in the app's Settings screen.
+2.  Open the project in Android Studio (current stable version recommended).
+3.  Sync the project with its Gradle files.
+4.  To use authenticated features (like managing your files or uploading to your account), obtain a Pixeldrain API key and enter it in the app's Settings screen.
 
-## Future Work (Potential)
+## Future Work
 
 *   Implement the "Lists" feature for creating and managing Pixeldrain lists.
-*   More robust error handling and user feedback.
+*   Enhance error handling and user feedback mechanisms.
