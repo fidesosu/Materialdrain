@@ -36,7 +36,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.util.EventLogger // Added import for EventLogger
 import androidx.media3.ui.DefaultTimeBar
 import androidx.media3.ui.PlayerView
 import coil.ImageLoader
@@ -45,6 +49,7 @@ import coil.decode.ImageDecoderDecoder
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.target.Target
+import com.example.materialdrain.util.ExoPlayerCache // Import the cache
 
 @Composable
 fun ClickablePreviewOverlay(onClick: () -> Unit) {
@@ -82,11 +87,21 @@ fun VideoPlayerControls(videoUri: Uri, thumbnailUrl: String?, modifier: Modifier
     val unplayedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f).toArgb()
 
     val exoPlayer = remember(videoUri) {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(videoUri))
-            prepare()
-            playWhenReady = true
-        }
+        val simpleCache = ExoPlayerCache.getInstance(context)
+        val cacheDataSourceFactory = CacheDataSource.Factory()
+            .setCache(simpleCache)
+            .setUpstreamDataSourceFactory(DefaultHttpDataSource.Factory())
+            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        val mediaSourceFactory = ProgressiveMediaSource.Factory(cacheDataSourceFactory)
+
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .build().apply {
+                addAnalyticsListener(EventLogger()) // Add EventLogger here
+                setMediaItem(MediaItem.fromUri(videoUri))
+                prepare()
+                playWhenReady = true
+            }
     }
 
     var artworkDrawable by remember { mutableStateOf<Drawable?>(null) }
