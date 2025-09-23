@@ -4,16 +4,16 @@ import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.net.Uri
 import android.util.Log
-import android.view.View // Added for View.GONE
+// import android.view.View // View.GONE is no longer used directly in this file by moved components
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+// import androidx.compose.foundation.background // No longer directly used by moved components
+import androidx.compose.foundation.clickable // Still used by Column click
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+// import androidx.compose.foundation.shape.CircleShape // No longer directly used by moved components
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -22,24 +22,24 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+// import androidx.compose.ui.draw.alpha // No longer directly used by moved components
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Color // Still used
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.toArgb
+// import androidx.compose.ui.graphics.toArgb // No longer directly used by moved components
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.media3.common.MediaItem
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.DefaultTimeBar
-import androidx.media3.ui.PlayerView
+// import androidx.compose.ui.viewinterop.AndroidView // No longer directly used by moved components
+// import androidx.compose.ui.window.Dialog // No longer directly used by moved components
+// import androidx.compose.ui.window.DialogProperties // No longer directly used by moved components
+// import androidx.media3.common.MediaItem // No longer directly used by moved components
+// import androidx.media3.exoplayer.ExoPlayer // No longer directly used by moved components
+// import androidx.media3.ui.DefaultTimeBar // No longer directly used by moved components
+// import androidx.media3.ui.PlayerView // No longer directly used by moved components
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
@@ -48,6 +48,7 @@ import coil.request.ImageRequest
 import com.example.materialdrain.ui.dialogs.InfoRow
 import com.example.materialdrain.ui.formatDurationMillis
 import com.example.materialdrain.ui.formatSize
+import com.example.materialdrain.ui.shared.* // Added import for shared composables
 import com.example.materialdrain.viewmodel.UploadUiState
 import com.example.materialdrain.viewmodel.UploadViewModel
 import kotlinx.coroutines.android.awaitFrame
@@ -55,161 +56,7 @@ import kotlinx.coroutines.isActive
 
 private const val TAG_MEDIA_PLAYER = "MediaPlayerPreview"
 
-@Composable
-fun ClickablePreviewOverlay(onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .clickable(onClick = onClick)
-            .padding(8.dp),
-        contentAlignment = Alignment.BottomEnd
-    ) {
-        Surface(
-            modifier = Modifier
-                .size(32.dp)
-                .alpha(0.7f),
-            shape = CircleShape,
-            color = Color.Black.copy(alpha = 0.5f)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Fullscreen,
-                contentDescription = "View Fullscreen",
-                tint = Color.White,
-                modifier = Modifier.padding(4.dp)
-            )
-        }
-    }
-}
-
-@Composable
-@androidx.media3.common.util.UnstableApi
-fun VideoPlayerControls(videoUri: Uri) {
-    val context = LocalContext.current
-    val playedColor = MaterialTheme.colorScheme.primary.toArgb()
-    val scrubberColor = MaterialTheme.colorScheme.primary.toArgb()
-    val bufferedColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f).toArgb()
-    val unplayedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f).toArgb()
-
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(videoUri))
-            prepare()
-            playWhenReady = false // User clicks play
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            exoPlayer.release()
-        }
-    }
-
-    AndroidView(
-        factory = { ctx ->
-            PlayerView(ctx).apply {
-                player = exoPlayer
-                useController = true // Ensure controller is used
-
-                // Customize progress bar colors
-                val timeBar = findViewById<DefaultTimeBar>(androidx.media3.ui.R.id.exo_progress)
-                timeBar?.setPlayedColor(playedColor)
-                timeBar?.setScrubberColor(scrubberColor)
-                timeBar?.setBufferedColor(bufferedColor)
-                timeBar?.setUnplayedColor(unplayedColor)
-
-                // Hide unwanted buttons
-                findViewById<View>(androidx.media3.ui.R.id.exo_settings)?.visibility = View.GONE
-                findViewById<View>(androidx.media3.ui.R.id.exo_prev)?.visibility = View.GONE
-                findViewById<View>(androidx.media3.ui.R.id.exo_next)?.visibility = View.GONE
-                findViewById<View>(androidx.media3.ui.R.id.exo_rew)?.visibility = View.GONE
-                findViewById<View>(androidx.media3.ui.R.id.exo_ffwd)?.visibility = View.GONE
-                // Also hide subtitle button as it's often next to settings
-                findViewById<View>(androidx.media3.ui.R.id.exo_subtitle)?.visibility = View.GONE
-                // Hide fullscreen button if it's the one in the controls, as the dialog handles fullscreen
-                findViewById<View>(androidx.media3.ui.R.id.exo_fullscreen)?.visibility = View.GONE
-
-            }
-        },
-        modifier = Modifier.fillMaxSize()
-    )
-}
-
-@Composable
-fun FullScreenMediaPreviewDialog(
-    previewUri: Uri?,
-    previewMimeType: String?,
-    onDismissRequest: () -> Unit
-) {
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.8f))
-                .clickable { onDismissRequest() }, // Dismiss on background click
-            contentAlignment = Alignment.Center
-        ) {
-            if (previewUri != null) {
-                when {
-                    previewMimeType?.startsWith("video/") == true -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(8.dp)
-                                .clickable(enabled = true) {}
-                        ) {
-                            @androidx.media3.common.util.UnstableApi
-                            VideoPlayerControls(videoUri = previewUri)
-                        }
-                    }
-                    previewMimeType == "image/gif" -> {
-                        val context = LocalContext.current
-                        val imageLoader = remember {
-                            ImageLoader.Builder(context)
-                                .components {
-                                    add(ImageDecoderDecoder.Factory())
-                                }
-                                .build()
-                        }
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(previewUri)
-                                .crossfade(true)
-                                .build(),
-                            imageLoader = imageLoader,
-                            contentDescription = "Fullscreen GIF Preview",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
-                    previewMimeType?.startsWith("image/") == true -> {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(previewUri)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = "Fullscreen Image Preview",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            contentScale = ContentScale.Fit,
-                            onError = { onDismissRequest() }
-                        )
-                    }
-                    else -> {
-                        Text("Unsupported preview type", color = Color.White)
-                    }
-                }
-            } else {
-                Text("Preview unavailable", color = Color.White)
-            }
-        }
-    }
-}
+// ClickablePreviewOverlay, VideoPlayerControls, and FullScreenMediaPreviewDialog are removed from here
 
 @Composable
 fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String, String) -> Unit) {
@@ -234,9 +81,10 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
     var fullScreenPreviewMimeType by remember { mutableStateOf<String?>(null) }
 
     if (fullScreenPreviewUri != null) {
-        FullScreenMediaPreviewDialog(
+        FullScreenMediaPreviewDialog( // Now calls the shared composable
             previewUri = fullScreenPreviewUri,
             previewMimeType = fullScreenPreviewMimeType,
+            thumbnailUrl = null, // Passing null as UploadScreen doesn't have a thumbnail URL for its fullscreen
             onDismissRequest = {
                 fullScreenPreviewUri = null
                 fullScreenPreviewMimeType = null
@@ -265,7 +113,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
         var localMediaPlayerInstance: MediaPlayer? = null
         if (selectedTabIndex == 0 && uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("audio/") == true) {
             isMediaPlayerPreparing = true
-            mediaPlayer?.release() // Release previous instance if any
+            mediaPlayer?.release() 
             mediaPlayer = null
             isPlaying = false
             currentPlaybackTimeMillis = 0L
@@ -279,36 +127,33 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                 localMediaPlayerInstance.setOnPreparedListener {
                     mediaPlayer = it
                     isMediaPlayerPreparing = false
-                    // currentPlaybackTimeMillis = 0L // Reset time on new preparation
                 }
                 localMediaPlayerInstance.setOnErrorListener { mp, what, extra ->
                     audioPreviewError = "Cannot play audio (error $what, $extra)."
                     Log.e(TAG_MEDIA_PLAYER, "MediaPlayer Error: what=$what, extra=$extra for URI: ${uiState.selectedFileUri}")
                     mp?.release()
-                    if (mediaPlayer == mp) { // Clear our state variable if it was this instance
+                    if (mediaPlayer == mp) { 
                         mediaPlayer = null
                     }
                     isMediaPlayerPreparing = false
-                    isPlaying = false // Crucial: update isPlaying state
-                    true // Error handled
+                    isPlaying = false 
+                    true 
                 }
                 localMediaPlayerInstance.setOnCompletionListener { mp ->
                     isPlaying = false
                     val duration = uiState.audioDurationMillis ?: 0L
                     currentPlaybackTimeMillis = duration
                     Log.d(TAG_MEDIA_PLAYER, "MediaPlayer playback completed. Time set to: $duration")
-                    // mp.seekTo(0) // Optionally reset player position to start, if re-play is desired from start
                 }
             } catch (e: Exception) {
                 audioPreviewError = "Error setting up audio player: ${e.message}"
                 Log.e(TAG_MEDIA_PLAYER, "Error setting up audio player for URI: ${uiState.selectedFileUri}", e)
                 localMediaPlayerInstance.release()
-                mediaPlayer = null // Ensure media player state is cleared on error
+                mediaPlayer = null 
                 isMediaPlayerPreparing = false
                 isPlaying = false
             }
         } else {
-            // Not an audio file or tab changed, release any existing player
             mediaPlayer?.release()
             mediaPlayer = null
             isPlaying = false
@@ -319,8 +164,6 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
         }
         onDispose {
             localMediaPlayerInstance?.release()
-            // Double check: mediaPlayer might be a new instance from onPrepared,
-            // so direct mediaPlayer?.release() here is important too.
             mediaPlayer?.release()
             mediaPlayer = null
             isMediaPlayerPreparing = false
@@ -333,18 +176,16 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
         if (isPlaying && !isUserScrubbing && mediaPlayer != null && mediaPlayer?.isPlaying == true) {
             while (isActive) {
                 try {
-                    // Only update if still playing and not scrubbing
                     if (isPlaying && !isUserScrubbing && mediaPlayer?.isPlaying == true) {
                         currentPlaybackTimeMillis = mediaPlayer?.currentPosition?.toLong() ?: currentPlaybackTimeMillis
                     }
                 } catch (e: IllegalStateException) {
                     Log.w(TAG_MEDIA_PLAYER, "MediaPlayer access error during playback: ${e.message}")
-                    isPlaying = false // Stop updates if player is in a bad state
+                    isPlaying = false 
                     audioPreviewError = "Player error during update."
-                    break // Exit loop
+                    break 
                 }
-                awaitFrame() // Wait for the next frame to update UI smoothly
-                // Check conditions again before next iteration or to break
+                awaitFrame() 
                 if (!isPlaying || mediaPlayer?.isPlaying == false || isUserScrubbing) {
                     break
                 }
@@ -444,7 +285,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                         is AsyncImagePainter.State.Loading -> CircularProgressIndicator(modifier = Modifier.size(48.dp))
                                         is AsyncImagePainter.State.Error -> Icon(Icons.Filled.BrokenImage, contentDescription = "Error loading image", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
                                         is AsyncImagePainter.State.Success -> {
-                                            ClickablePreviewOverlay {
+                                            ClickablePreviewOverlay { // Now calls the shared composable
                                                 fullScreenPreviewUri = uiState.selectedFileUri
                                                 fullScreenPreviewMimeType = uiState.selectedFileMimeType
                                             }
@@ -475,7 +316,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                             modifier = Modifier.fillMaxSize(),
                                             contentScale = ContentScale.Crop
                                         )
-                                        ClickablePreviewOverlay {
+                                        ClickablePreviewOverlay { // Now calls the shared composable
                                             fullScreenPreviewUri = uiState.selectedFileUri
                                             fullScreenPreviewMimeType = uiState.selectedFileMimeType
                                         }
@@ -547,7 +388,6 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel, onShowDialog: (String,
                                                 currentPlaybackTimeMillis = userSeekPositionMillis
                                             }
                                             else if (currentPlaybackTimeMillis >= (uiState.audioDurationMillis ?: Long.MAX_VALUE) - 100 && (uiState.audioDurationMillis ?: 0L) > 0) {
-                                                // If near the end, restart from beginning
                                                 it.seekTo(0)
                                                 currentPlaybackTimeMillis = 0L
                                             }
@@ -676,7 +516,6 @@ fun AudioPlayerPreview(
             audioPreviewError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top=0.dp, start=16.dp, end=16.dp, bottom=8.dp)) }
 
             val totalDuration = uiState.audioDurationMillis ?: 0L
-            // Calculate progress based on whether user is scrubbing or from current playback time
             val progress = remember(isUserScrubbing, userSeekPositionMillis, currentPlaybackTimeMillis, totalDuration) {
                 val currentPos = if (isUserScrubbing) userSeekPositionMillis else currentPlaybackTimeMillis
                 if (totalDuration > 0L) (currentPos.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f) else 0f
@@ -711,7 +550,7 @@ fun AudioPlayerPreview(
                             )
                         }
                 ) {
-                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth()) // Use lambda for progress
+                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth()) 
                 }
             }
         }

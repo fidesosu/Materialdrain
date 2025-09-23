@@ -4,11 +4,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.graphics.drawable.Drawable
 import android.net.Uri
-import android.view.View
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.clickable // Still used
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,7 +19,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -33,7 +29,6 @@ import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.ImageNotSupported
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Videocam
@@ -51,11 +46,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -65,217 +58,27 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
-import androidx.media3.common.MediaItem
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.DefaultTimeBar
-import androidx.media3.ui.PlayerView
-import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
-import coil.decode.ImageDecoderDecoder
-import coil.imageLoader // Added import for Context.imageLoader extension
 import coil.request.ImageRequest
-import coil.target.Target
 import com.example.materialdrain.network.FileInfoResponse
 import com.example.materialdrain.ui.formatApiDateTimeString
 import com.example.materialdrain.ui.formatSize
+import com.example.materialdrain.ui.shared.* // Added import for shared composables
 import com.example.materialdrain.viewmodel.DownloadStatus
 import com.example.materialdrain.viewmodel.FileInfoViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@Composable
-fun ClickablePreviewOverlay(onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .clip(RoundedCornerShape(12.dp)) // Clip the overlay to match card radius
-            .clickable(onClick = onClick)
-            .padding(8.dp),
-        contentAlignment = Alignment.BottomEnd
-    ) {
-        Surface(
-            modifier = Modifier
-                .size(32.dp)
-                .alpha(0.7f),
-            shape = CircleShape,
-            color = Color.Black.copy(alpha = 0.5f)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Fullscreen,
-                contentDescription = "View Fullscreen",
-                tint = Color.White,
-                modifier = Modifier.padding(4.dp)
-            )
-        }
-    }
-}
-
-@androidx.media3.common.util.UnstableApi // Corrected: Direct annotation
-@Composable
-fun VideoPlayerControls(videoUri: Uri, thumbnailUrl: String?, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val playedColor = MaterialTheme.colorScheme.primary.toArgb()
-    val scrubberColor = MaterialTheme.colorScheme.primary.toArgb()
-    val bufferedColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f).toArgb()
-    val unplayedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f).toArgb()
-
-    val exoPlayer = remember(videoUri) { // Keyed by videoUri to re-create if URI changes
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(videoUri))
-            prepare()
-            playWhenReady = false // User clicks play
-        }
-    }
-
-    var artworkDrawable by remember { mutableStateOf<Drawable?>(null) }
-    val coilImageLoader = context.imageLoader
-
-    LaunchedEffect(thumbnailUrl, coilImageLoader) {
-        if (thumbnailUrl != null) {
-            val request = ImageRequest.Builder(context)
-                .data(thumbnailUrl)
-                .target(object : Target {
-                    override fun onSuccess(result: Drawable) {
-                        artworkDrawable = result
-                    }
-                    override fun onError(error: Drawable?) {
-                        artworkDrawable = null // Or a default error drawable
-                    }
-                })
-                .build()
-            coilImageLoader.enqueue(request)
-        } else {
-            artworkDrawable = null
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            exoPlayer.release()
-        }
-    }
-
-    AndroidView(
-        factory = {
-            PlayerView(it).apply {
-                player = exoPlayer
-                useController = true
-                defaultArtwork = artworkDrawable
-
-                val timeBar = findViewById<DefaultTimeBar>(androidx.media3.ui.R.id.exo_progress)
-                timeBar?.setPlayedColor(playedColor)
-                timeBar?.setScrubberColor(scrubberColor)
-                timeBar?.setBufferedColor(bufferedColor)
-                timeBar?.setUnplayedColor(unplayedColor)
-
-                findViewById<View>(androidx.media3.ui.R.id.exo_settings)?.visibility = View.GONE
-                findViewById<View>(androidx.media3.ui.R.id.exo_subtitle)?.visibility = View.GONE
-                findViewById<View>(androidx.media3.ui.R.id.exo_fullscreen)?.visibility = View.GONE
-                findViewById<View>(androidx.media3.ui.R.id.exo_prev)?.visibility = View.GONE
-                findViewById<View>(androidx.media3.ui.R.id.exo_next)?.visibility = View.GONE
-                findViewById<View>(androidx.media3.ui.R.id.exo_rew)?.visibility = View.GONE
-                findViewById<View>(androidx.media3.ui.R.id.exo_ffwd)?.visibility = View.GONE
-            }
-        },
-        update = { playerView ->
-            playerView.defaultArtwork = artworkDrawable
-        },
-        modifier = modifier
-    )
-}
-
-@androidx.media3.common.util.UnstableApi // Corrected: Direct annotation as it calls VideoPlayerControls
-@Composable
-fun FullScreenMediaPreviewDialog(
-    previewUri: Uri?,
-    previewMimeType: String?,
-    thumbnailUrl: String?,
-    onDismissRequest: () -> Unit
-) {
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.8f))
-                .clickable { onDismissRequest() },
-            contentAlignment = Alignment.Center
-        ) {
-            if (previewUri != null) {
-                Box(
-                    modifier = Modifier.clickable(enabled = false) {}
-                ) {
-                    when {
-                        previewMimeType?.startsWith("video/") == true -> {
-                            VideoPlayerControls(
-                                videoUri = previewUri,
-                                thumbnailUrl = thumbnailUrl,
-                                modifier = Modifier.fillMaxSize().padding(8.dp)
-                            )
-                        }
-                        previewMimeType == "image/gif" -> {
-                            val context = LocalContext.current
-                            val imageLoader = remember {
-                                ImageLoader.Builder(context)
-                                    .components {
-                                        add(ImageDecoderDecoder.Factory())
-                                    }
-                                    .build()
-                            }
-                            AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(previewUri)
-                                    .crossfade(true)
-                                    .build(),
-                                imageLoader = imageLoader,
-                                contentDescription = "Fullscreen GIF Preview",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(16.dp),
-                                contentScale = ContentScale.Fit
-                            )
-                        }
-                        previewMimeType?.startsWith("image/") == true -> {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(previewUri)
-                                    .crossfade(true)
-                                    .build(),
-                                contentDescription = "Fullscreen Image Preview",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(16.dp),
-                                contentScale = ContentScale.Fit,
-                                onError = { onDismissRequest() }
-                            )
-                        }
-                        else -> {
-                            Text("Unsupported preview type for fullscreen.", color = Color.White)
-                        }
-                    }
-                }
-            } else {
-                Text("Preview unavailable.", color = Color.White)
-            }
-        }
-    }
-}
+// ClickablePreviewOverlay and VideoPlayerControls definitions are removed from here.
+// FullScreenMediaPreviewDialog definition was already moved and is now imported from ui.shared.
 
 @Composable
 fun EnterFileIdDialog(fileInfoViewModel: FileInfoViewModel) {
@@ -350,10 +153,10 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
     }
 
     if (fullScreenPreviewUri != null) {
-        FullScreenMediaPreviewDialog(
+        FullScreenMediaPreviewDialog( // Now calls the shared composable
             previewUri = fullScreenPreviewUri,
             previewMimeType = fullScreenPreviewMimeType,
-            thumbnailUrl = actualThumbnailUrl,
+            thumbnailUrl = actualThumbnailUrl, // Pass the actualThumbnailUrl
             onDismissRequest = {
                 fullScreenPreviewUri = null
                 fullScreenPreviewMimeType = null
@@ -364,14 +167,12 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
     val fileUrl = "https://pixeldrain.com/u/${fileInfo.id}"
     val rawFileApiUrl = "https://pixeldrain.com/api/file/${fileInfo.id}"
 
-    Column( // Changed from Card to Column
-        modifier = Modifier.fillMaxSize().padding(16.dp) // Changed modifier for full page
+    Column( 
+        modifier = Modifier.fillMaxSize().padding(16.dp) 
     ) {
-        // Removed the Row with title and close button, title will be in TopAppBar
-
         Column(
             modifier = Modifier
-                .weight(1f) // Takes remaining space and allows scrolling
+                .weight(1f) 
                 .verticalScroll(rememberScrollState())
         ) {
             if (showPreviews) {
@@ -400,7 +201,7 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
                                 is AsyncImagePainter.State.Loading -> CircularProgressIndicator(modifier = Modifier.size(48.dp))
                                 is AsyncImagePainter.State.Error -> Icon(Icons.Filled.BrokenImage, contentDescription = "Error loading image", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
                                 is AsyncImagePainter.State.Success -> {
-                                    ClickablePreviewOverlay {
+                                    ClickablePreviewOverlay { // Now calls the shared composable
                                         fullScreenPreviewUri = rawFileApiUrl.toUri()
                                         fullScreenPreviewMimeType = fileInfo.mimeType
                                     }
@@ -426,7 +227,7 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
                                 contentScale = ContentScale.Crop,
                                 error = rememberVectorPainter(Icons.Filled.Videocam)
                             )
-                            ClickablePreviewOverlay {
+                            ClickablePreviewOverlay { // Now calls the shared composable
                                 fullScreenPreviewUri = rawFileApiUrl.toUri()
                                 fullScreenPreviewMimeType = fileInfo.mimeType
                             }
@@ -534,7 +335,6 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
                             snackbarHostState.showSnackbar("Download started for ${fileInfo.name}")
                         }
                     } else if (downloadState.status == DownloadStatus.PENDING) {
-                        // Optionally allow cancellation here or just rely on disabling
                          coroutineScope.launch {
                             snackbarHostState.showSnackbar("Download is already pending for ${fileInfo.name}")
                         }
@@ -610,17 +410,17 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
                 ) {
                     Icon(Icons.Filled.Delete, contentDescription = "Delete")
                     Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                    Text("Delete File", maxLines = 1) // Changed text for clarity
+                    Text("Delete File", maxLines = 1) 
                 }
             }
-            Spacer(Modifier.height(16.dp)) // Added more space at the bottom
+            Spacer(Modifier.height(16.dp)) 
         }
 
-        Box( // This Box will be at the bottom of the main Column (due to weight(1f) above)
+        Box( 
             modifier = Modifier
-                .fillMaxWidth() // Take full width for the snackbar host
-                .padding(bottom = 8.dp), // Some padding from the very bottom edge
-            contentAlignment = Alignment.BottomCenter // Align SnackbarHost to the bottom center
+                .fillMaxWidth() 
+                .padding(bottom = 8.dp), 
+            contentAlignment = Alignment.BottomCenter 
         ) {
             SnackbarHost(hostState = snackbarHostState) { data ->
                 Snackbar(
