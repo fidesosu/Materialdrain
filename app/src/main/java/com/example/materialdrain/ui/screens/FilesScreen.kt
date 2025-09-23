@@ -183,7 +183,7 @@ fun FilesScreenContent(
 
     LaunchedEffect(uiState.sortField, uiState.sortAscending) {
         if (displayedFiles.isNotEmpty()) {
-            listState.animateScrollToItem(0)
+            listState.scrollToItem(0)
         }
     }
 
