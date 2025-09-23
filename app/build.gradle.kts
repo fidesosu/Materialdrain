@@ -26,6 +26,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -70,6 +71,14 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.11")
     implementation("io.ktor:ktor-client-auth:2.3.11")
     implementation("io.ktor:ktor-client-logging:2.3.11") // Optional but good for debugging
+    implementation("io.ktor:ktor-client-okhttp:2.3.11")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.11")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.11")
+
+    implementation("com.squareup.okhttp3:okhttp:5.1.0")
+
+    // implementation("org.chromium.net:cronet-embedded:119.6045.31")
+    // implementation("com.google.android:cronet-transport-for-okhttp:5.1.0")
 
     // Kotlinx Serialization runtime (needed for Ktor's JSON serialization)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
