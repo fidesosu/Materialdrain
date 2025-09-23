@@ -20,9 +20,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.BufferedOutputStream // Added import
+import java.io.BufferedOutputStream
 import java.io.IOException
 import java.io.OutputStream
+import kotlin.coroutines.cancellation.CancellationException
 
 private const val PREFS_NAME = "pixeldrain_prefs"
 private const val API_KEY_PREF = "api_key"
@@ -108,6 +109,7 @@ class FileInfoViewModel(
     val uiState: StateFlow<FileInfoUiState> = _uiState.asStateFlow()
 
     private var apiKey: String = ""
+    // Removed downloadJobs map
 
     init {
         Log.d(TAG, "ViewModel init: Calling loadApiKey()")
@@ -124,17 +126,15 @@ class FileInfoViewModel(
             _uiState.update { it.copy(apiKeyMissingError = true, userFilesListErrorMessage = "API Key is missing. Please set it in Settings.") }
         } else {
             Log.d(TAG, "loadApiKey: API key is present.")
-            val currentState = _uiState.value // Get current state once for consistent checks
+            val currentState = _uiState.value
             val wasApiKeyMissingError = currentState.apiKeyMissingError
             val wasUserFilesListErrorMessageMissingKey = currentState.userFilesListErrorMessage?.contains("API Key is missing") == true
             Log.d(TAG, "loadApiKey: Current State -> apiKeyMissingError: $wasApiKeyMissingError, userFilesListErrorMessage: '${currentState.userFilesListErrorMessage}'")
 
-            // Condition to clear previous API key errors and potentially fetch files
             if (wasApiKeyMissingError || wasUserFilesListErrorMessageMissingKey) {
                 Log.d(TAG, "loadApiKey: Clearing previous API key related errors.")
                 _uiState.update { it.copy(apiKeyMissingError = false, userFilesListErrorMessage = null) }
 
-                // Re-evaluate state after update for fetch conditions
                 val updatedState = _uiState.value
                 val isUserFilesListEmpty = updatedState.userFilesList.isEmpty()
                 val isNotLoadingUserFiles = !updatedState.isLoadingUserFiles
@@ -149,9 +149,6 @@ class FileInfoViewModel(
                     Log.d(TAG, "loadApiKey (after clearing error): Conditions NOT met for fetchUserFiles(). List empty: $isUserFilesListEmpty, Not loading: $isNotLoadingUserFiles")
                 }
             } else {
-                // This case handles when the ViewModel is initialized, API key is present,
-                // and there were no previous API key errors (e.g., app fresh start with key already set).
-                // We still want to fetch files if the list is empty.
                 val isUserFilesListEmpty = currentState.userFilesList.isEmpty()
                 val isNotLoadingUserFiles = !currentState.isLoadingUserFiles
                 Log.d(TAG, "loadApiKey: No previous API key errors. Checking conditions to fetch files:")
@@ -177,7 +174,6 @@ class FileInfoViewModel(
         }
     }
 
-    // --- Single File Info Functions ---
     fun onFileIdInputChange(newFileId: String) {
         _uiState.update { it.copy(fileIdInput = newFileId) }
         if (newFileId != _uiState.value.fileInfo?.id) {
@@ -240,14 +236,13 @@ class FileInfoViewModel(
             return
         }
         _uiState.update { it.copy(isLoadingFileInfo = true, fileInfo = null, fileInfoErrorMessage = null) }
-        clearTextPreviewStates() // Clear previous preview before fetching new info
+        clearTextPreviewStates()
         viewModelScope.launch {
             when (val response = pixeldrainApiService.getFileInfo(fileId)) {
                 is ApiResponse.Success -> {
                     _uiState.update {
                         it.copy(isLoadingFileInfo = false, fileInfo = response.data, fileIdInput = fileId)
                     }
-                    // After successfully fetching file info, attempt to fetch text preview if applicable
                     fetchTextFilePreviewContent(response.data)
                 }
                 is ApiResponse.Error -> {
@@ -280,7 +275,6 @@ class FileInfoViewModel(
         clearTextPreviewStates()
     }
 
-    // --- User Files List Functions ---
     fun fetchUserFiles() {
         if (apiKey.isBlank()) {
             Log.d(TAG, "fetchUserFiles skipped: API key is blank.")
@@ -305,16 +299,13 @@ class FileInfoViewModel(
     }
     fun clearUserFilesError() { _uiState.update { it.copy(userFilesListErrorMessage = null, apiKeyMissingError = false) } }
 
-    // --- Sorting ---
     fun changeSortOrder(newField: SortableField? = null, newAscending: Boolean? = null) { _uiState.update { it.copy(sortField = newField ?: it.sortField, sortAscending = newAscending ?: it.sortAscending) } }
 
-    // --- Filtering ---
     fun onFilterQueryChanged(newQuery: String) { _uiState.update { it.copy(filterQuery = newQuery) } }
     fun toggleFilterInput() { _uiState.update { it.copy(showFilterInput = !it.showFilterInput) } }
     fun setFilterInputVisible(isVisible: Boolean) { _uiState.update { it.copy(showFilterInput = isVisible) } }
 
-    // --- File Deletion Functions ---
-    fun initiateDeleteFile(fileId: String) { _uiState.update { it.copy(initiateDeleteFile = true, fileIdToDelete = fileId) } } // Renamed from initiateDeleteFile
+    fun initiateDeleteFile(fileId: String) { _uiState.update { it.copy(initiateDeleteFile = true, fileIdToDelete = fileId) } }
     fun cancelDeleteFile() { _uiState.update { it.copy(initiateDeleteFile = false, fileIdToDelete = null, deleteFileErrorMessage = null) } }
     fun confirmDeleteFile() {
         val fileId = _uiState.value.fileIdToDelete ?: return
@@ -327,7 +318,7 @@ class FileInfoViewModel(
             when (val response = pixeldrainApiService.deleteFile(apiKey, fileId)) {
                 is ApiResponse.Success -> _uiState.update {
                     val newFileInfo = if (it.fileInfo?.id == fileId) null else it.fileInfo
-                    if (newFileInfo == null) clearTextPreviewStates() // Clear preview if the current file was deleted
+                    if (newFileInfo == null) clearTextPreviewStates()
                     it.copy(
                         isLoadingDeleteFile = false,
                         initiateDeleteFile = false,
@@ -335,7 +326,7 @@ class FileInfoViewModel(
                         deleteFileSuccessMessage = response.data.message ?: "File deleted successfully.",
                         userFilesList = _uiState.value.userFilesList.filterNot { item -> item.id == fileId },
                         fileInfo = newFileInfo,
-                        activeDownloads = it.activeDownloads.filterNot { entry -> entry.key == fileId } // Also remove from active downloads
+                        activeDownloads = it.activeDownloads.filterNot { entry -> entry.key == fileId }
                     )
                 }
                 is ApiResponse.Error -> _uiState.update { it.copy(isLoadingDeleteFile = false, initiateDeleteFile = false, fileIdToDelete = null, deleteFileErrorMessage = response.errorDetails.message ?: response.errorDetails.value ?: "Unknown error deleting file.") }
@@ -365,20 +356,19 @@ class FileInfoViewModel(
                 uri?.let {
                     val rawOutputStream = contentResolver.openOutputStream(it)
                     if (rawOutputStream != null) {
-                        outputStream = BufferedOutputStream(rawOutputStream) // Wrapped in BufferedOutputStream
+                        outputStream = BufferedOutputStream(rawOutputStream)
                     } else {
-                        // Handle case where rawOutputStream is null, perhaps log or throw
                         Log.e(TAG, "ContentResolver.openOutputStream returned null for $uri")
                     }
                 }
-                if (outputStream == null && uri != null) { // If stream opening failed but URI was created
-                    contentResolver.delete(uri, null, null) // Clean up URI
+                if (outputStream == null && uri != null) { 
+                    contentResolver.delete(uri, null, null) 
                     uri = null
                     throw IOException("Failed to open output stream for $uri")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to prepare download target for '$fileName': ${e.message}", e)
-                uri?.let { contentResolver.delete(it, null, null) } // Cleanup on any error
+                uri?.let { contentResolver.delete(it, null, null) } 
                 return@withContext null to null
             }
             uri to outputStream
@@ -402,18 +392,14 @@ class FileInfoViewModel(
                 try {
                     contentResolver.delete(uri, null, null)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to delete MediaStore entry $uri after failed download: ${e.message}", e)
+                    Log.e(TAG, "Failed to delete MediaStore entry $uri after failed download/cancellation: ${e.message}", e)
                 }
             }
         }
     }
 
     fun initiateDownloadFile(file: FileInfoResponse) {
-        if (_uiState.value.activeDownloads[file.id]?.status == DownloadStatus.DOWNLOADING ||
-            _uiState.value.activeDownloads[file.id]?.status == DownloadStatus.PENDING) {
-            Log.d(TAG, "Download for ${file.id} already in progress or pending.")
-            return
-        }
+        // Removed check for existing active job from downloadJobs map
 
         _uiState.update { currentState ->
             val newDownloadState = FileDownloadState(
@@ -425,18 +411,27 @@ class FileInfoViewModel(
             currentState.copy(activeDownloads = currentState.activeDownloads + (file.id to newDownloadState))
         }
 
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) { // No longer assigning to 'job' variable
             var targetUri: Uri? = null
-            var outputStream: OutputStream? = null // This will now be a BufferedOutputStream if successful
+            var outputStream: OutputStream? = null
             var downloadSuccessful = false
 
             try {
-                val (uri, stream) = prepareDownloadTargetUriAndStream(file.name, file.mimeType)
-                targetUri = uri
-                outputStream = stream
+                _uiState.value.activeDownloads[file.id]?.let { 
+                    targetUri = it.targetUri
+                }
+                if (targetUri == null) { 
+                     val (uri, stream) = prepareDownloadTargetUriAndStream(file.name, file.mimeType)
+                     targetUri = uri
+                     outputStream = stream
+                } else {
+                    application.contentResolver.openOutputStream(targetUri!!)?.let {
+                        outputStream = BufferedOutputStream(it)
+                    }
+                }
 
                 if (targetUri == null || outputStream == null) {
-                    throw IOException("Failed to prepare download target in MediaStore.")
+                    throw IOException("Failed to prepare or re-open download target in MediaStore.")
                 }
 
                 _uiState.update { currentState ->
@@ -449,7 +444,8 @@ class FileInfoViewModel(
                     } else currentState
                 }
 
-                val response = pixeldrainApiService.downloadFileToOutputStream(file.id, outputStream) { bytesRead, totalBytes ->
+                val response = pixeldrainApiService.downloadFileToOutputStream(file.id, outputStream!!) { bytesRead, totalBytes ->
+                    // Removed !coroutineContext.isActive check
                     Log.d(TAG, "onProgress: bytesRead = $bytesRead, totalBytes = $totalBytes, timestamp = ${System.currentTimeMillis()}")
                     val progress = if (totalBytes != null && totalBytes > 0) {
                         (bytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
@@ -459,7 +455,7 @@ class FileInfoViewModel(
                         val updatedDownload = currentDownload?.copy(
                             downloadedBytes = bytesRead,
                             progressFraction = progress,
-                            totalBytes = totalBytes ?: currentDownload.totalBytes // Keep existing totalBytes if new one is null
+                            totalBytes = totalBytes ?: currentDownload.totalBytes
                         )
                         if (updatedDownload != null) {
                             currentState.copy(activeDownloads = currentState.activeDownloads + (file.id to updatedDownload))
@@ -486,36 +482,48 @@ class FileInfoViewModel(
                         }
                     }
                     is ApiResponse.Error -> {
-                        val errorMsg = response.errorDetails.message ?: "Download failed due to API error."
-                        throw IOException(errorMsg)
+                        throw IOException(response.errorDetails.message ?: "Download failed due to API error.")
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error during file download process for ${file.id}: ${e.message}", e)
                 downloadSuccessful = false
-                val errorMsg = "Download error for '${file.name}': ${e.localizedMessage ?: "Unexpected error"}"
+                val errorMsg = if (e is CancellationException) {
+                    Log.i(TAG, "Download for ${file.id} was cancelled by scope.")
+                    "Download for '${file.name}' was cancelled."
+                } else {
+                    Log.e(TAG, "Error during file download process for ${file.id}: ${e.message}", e)
+                    "Download error for '${file.name}': ${e.localizedMessage ?: "Unexpected error"}"
+                }
                 _uiState.update { currentState ->
                     val updatedDownload = currentState.activeDownloads[file.id]?.copy(
                         status = DownloadStatus.FAILED,
-                        message = errorMsg
+                        message = errorMsg,
+                        progressFraction = if (e is CancellationException) 0f else currentState.activeDownloads[file.id]?.progressFraction ?: 0f,
+                        downloadedBytes = if (e is CancellationException) 0L else currentState.activeDownloads[file.id]?.downloadedBytes ?: 0L
                     )
-                    currentState.copy(
-                        activeDownloads = if (updatedDownload != null) currentState.activeDownloads + (file.id to updatedDownload) else currentState.activeDownloads,
-                        fileDownloadErrorMessage = errorMsg
-                    )
+                    if (updatedDownload != null) {
+                        currentState.copy(
+                            activeDownloads = currentState.activeDownloads + (file.id to updatedDownload),
+                            fileDownloadErrorMessage = if (e !is CancellationException) errorMsg else null
+                        )
+                    } else currentState
                 }
             } finally {
                 try {
-                    outputStream?.close() // This will also close the underlying rawOutputStream
+                    outputStream?.close()
                 } catch (e: IOException) {
                     Log.e(TAG, "Error closing output stream for ${file.name}: ${e.message}", e)
                 }
                 targetUri?.let {
                     finalizeMediaStoreEntry(it, downloadSuccessful)
                 }
+                // Removed downloadJobs.remove(file.id)
             }
         }
+        // Removed downloadJobs[file.id] = job
     }
+
+    // Removed fun cancelDownload(fileId: String)
 
     fun clearDownloadMessages() {
         _uiState.update {
@@ -527,9 +535,15 @@ class FileInfoViewModel(
     }
 
     fun clearDownloadState(fileId: String) {
+        // Removed logic related to downloadJobs and cancelDownload
+        val targetUriToClean = _uiState.value.activeDownloads[fileId]?.targetUri
         _uiState.update { currentState ->
             currentState.copy(activeDownloads = currentState.activeDownloads - fileId)
         }
+        targetUriToClean?.let {
+            viewModelScope.launch { finalizeMediaStoreEntry(it, false) } 
+        }
+        // Removed downloadJobs.remove(fileId)
     }
 }
 

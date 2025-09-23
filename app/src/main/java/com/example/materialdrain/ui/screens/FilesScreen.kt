@@ -1,12 +1,12 @@
 package com.example.materialdrain.ui.screens
 
-import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -28,14 +28,16 @@ import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.DownloadDone // Added
-import androidx.compose.material.icons.filled.ErrorOutline // Added
-import androidx.compose.material.icons.filled.Image // Added
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -44,12 +46,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -65,19 +65,17 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.materialdrain.network.FileInfoResponse
-import com.example.materialdrain.ui.formatApiDateTimeString // Keep this if used for date display
+import com.example.materialdrain.ui.formatApiDateTimeString
 import com.example.materialdrain.ui.formatSize
-import com.example.materialdrain.viewmodel.FileDownloadState // Added
+import com.example.materialdrain.viewmodel.FileDownloadState
 import com.example.materialdrain.viewmodel.DownloadStatus
 import com.example.materialdrain.viewmodel.FileInfoUiState
 import com.example.materialdrain.viewmodel.FileInfoViewModel
@@ -148,7 +146,6 @@ fun FilesScreenContent(
     onFileSelected: () -> Unit
 ) {
     val uiState by fileInfoViewModel.uiState.collectAsState()
-    val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val filterFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
@@ -292,26 +289,25 @@ fun FilesScreenContent(
             SortControls(uiState = uiState, fileInfoViewModel = fileInfoViewModel)
             LazyColumn(
                 state = listState,
-                modifier = Modifier.weight(1f), // Changed from fillMaxWidth().weight(1f)
-                contentPadding = PaddingValues(vertical = 8.dp) // Changed from bottom = 16.dp
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(vertical = 8.dp)
             ) {
                 items(
                     items = displayedFiles,
                     key = { file -> file.id },
-                    contentType = { "fileInfoCard" } // Keep contentType if useful for performance tools
+                    contentType = { "fileInfoCard" }
                 ) { file ->
                     val currentDownloadState = uiState.activeDownloads[file.id]
                     UserFileListItemCard(
                         fileInfo = file,
                         downloadState = currentDownloadState,
-                        context = context, // Context is stable
                         fileInfoViewModel = fileInfoViewModel,
-                        onFileSelected = { // This is the onClick for the Card
-                            if (uiState.showFilterInput) { // Check uiState from FilesScreenContent
+                        onFileSelected = {
+                            if (uiState.showFilterInput) {
                                 fileInfoViewModel.setFilterInputVisible(false)
                             }
-                            fileInfoViewModel.fetchFileInfo(file.id) // Corrected: Use fetchFileInfo with file.id
-                            onFileSelected() // Propagate the navigation callback
+                            fileInfoViewModel.fetchFileInfo(file.id)
+                            onFileSelected()
                         }
                     )
                     HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -333,28 +329,33 @@ fun FilesScreenContent(
 @Composable
 fun UserFileListItemCard(
     fileInfo: FileInfoResponse,
-    downloadState: FileDownloadState?, // Changed from uiState: FileInfoUiState
-    context: Context, // Context is usually stable and fine to pass
-    fileInfoViewModel: FileInfoViewModel, // For triggering actions
-    onFileSelected: () -> Unit // Callback for item click
+    downloadState: FileDownloadState?,
+    fileInfoViewModel: FileInfoViewModel,
+    onFileSelected: () -> Unit
 ) {
     val thumbnailUrl = "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail"
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    val showLpiSection = downloadState?.status == DownloadStatus.DOWNLOADING || downloadState?.status == DownloadStatus.PENDING
+    val showStatusMessage = downloadState != null && !showLpiSection && (downloadState.status == DownloadStatus.FAILED || downloadState.status == DownloadStatus.COMPLETED) && downloadState.message != null
+
+    val mainRowBottomPadding = if (showLpiSection || showStatusMessage) 4.dp else 8.dp
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clickable { // onClick lambda is now part of the Card itself
-                fileInfoViewModel.fetchFileInfo(fileInfo.id) // Corrected: Use fetchFileInfo with fileInfo.id
+            .clickable {
+                fileInfoViewModel.fetchFileInfo(fileInfo.id)
                 onFileSelected()
             },
         shape = RoundedCornerShape(8.dp)
     ) {
-        Column {
+        Column(modifier = Modifier.animateContentSize()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = mainRowBottomPadding),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AsyncImage(
@@ -365,7 +366,7 @@ fun UserFileListItemCard(
                         .clip(RoundedCornerShape(6.dp)),
                     contentScale = ContentScale.Crop,
                     error = rememberVectorPainter(Icons.Filled.BrokenImage),
-                    placeholder = rememberVectorPainter(Icons.Filled.Image) // Added placeholder
+                    placeholder = rememberVectorPainter(Icons.Filled.Image)
                 )
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -382,7 +383,6 @@ fun UserFileListItemCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    // Optional: Display upload date
                      Text(
                          text = "Uploaded: ${formatApiDateTimeString(fileInfo.dateUpload)}",
                          style = MaterialTheme.typography.bodySmall,
@@ -392,75 +392,190 @@ fun UserFileListItemCard(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                if (downloadState != null && downloadState.status != DownloadStatus.COMPLETED && downloadState.status != DownloadStatus.PENDING) {
-                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.size(40.dp)) {
-                        if (downloadState.status == DownloadStatus.DOWNLOADING) {
-                            CircularProgressIndicator(
-                                progress = { downloadState.progressFraction },
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
-                            )
-                            Text(
-                                "${(downloadState.progressFraction * 100).toInt()}%",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        } else if (downloadState.status == DownloadStatus.FAILED) {
-                            Icon(
-                                Icons.Filled.ErrorOutline,
-                                contentDescription = "Download failed",
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(24.dp)
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "More options"
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
+                    ) {
+                        val downloadMenuItemText: @Composable () -> Unit
+                        val downloadMenuItemIcon: (@Composable () -> Unit)?
+                        val downloadMenuItemOnClick: () -> Unit
+                        var isDownloadEnabled: Boolean
+
+                        when (downloadState?.status) {
+                            DownloadStatus.DOWNLOADING -> {
+                                downloadMenuItemText = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        CircularProgressIndicator(
+                                            progress = { downloadState.progressFraction },
+                                            modifier = Modifier.size(20.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Downloading...")
+                                    }
+                                }
+                                downloadMenuItemIcon = null
+                                downloadMenuItemOnClick = { menuExpanded = false }
+                                isDownloadEnabled = false
+                            }
+                            DownloadStatus.PENDING -> {
+                                downloadMenuItemText = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(20.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Pending...")
+                                    }
+                                }
+                                downloadMenuItemIcon = null
+                                downloadMenuItemOnClick = { menuExpanded = false }
+                                isDownloadEnabled = false
+                            }
+                            DownloadStatus.COMPLETED -> {
+                                downloadMenuItemText = { Text("Download Again") }
+                                downloadMenuItemIcon = { Icon(Icons.Filled.DownloadDone, "Download again icon", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) }
+                                downloadMenuItemOnClick = {
+                                    fileInfoViewModel.initiateDownloadFile(fileInfo)
+                                    menuExpanded = false
+                                }
+                                isDownloadEnabled = true
+                            }
+                            DownloadStatus.FAILED -> {
+                                downloadMenuItemText = { Text("Retry Download") }
+                                downloadMenuItemIcon = { Icon(Icons.Filled.ErrorOutline, "Retry download icon", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp)) }
+                                downloadMenuItemOnClick = {
+                                    fileInfoViewModel.initiateDownloadFile(fileInfo)
+                                    menuExpanded = false
+                                }
+                                isDownloadEnabled = true
+                            }
+                            else -> { // null for a fresh download
+                                downloadMenuItemText = { Text("Download") }
+                                downloadMenuItemIcon = { Icon(Icons.Filled.Download, "Download icon", modifier = Modifier.size(24.dp)) }
+                                downloadMenuItemOnClick = {
+                                    fileInfoViewModel.initiateDownloadFile(fileInfo)
+                                    menuExpanded = false
+                                }
+                                isDownloadEnabled = true
+                            }
+                        }
+
+                        DropdownMenuItem(
+                            text = downloadMenuItemText,
+                            onClick = downloadMenuItemOnClick,
+                            leadingIcon = downloadMenuItemIcon,
+                            enabled = isDownloadEnabled
+                        )
+
+                        if (fileInfo.canEdit == true) {
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Delete") },
+                                onClick = {
+                                    fileInfoViewModel.initiateDeleteFile(fileInfo.id)
+                                    menuExpanded = false
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Filled.DeleteOutline,
+                                        contentDescription = "Delete file icon",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
                             )
                         }
                     }
-                } else {
-                     IconButton(
-                        onClick = { fileInfoViewModel.initiateDownloadFile(fileInfo) }, // Corrected: Use initiateDownloadFile with FileInfoResponse
-                        enabled = downloadState?.status != DownloadStatus.DOWNLOADING,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            if (downloadState?.status == DownloadStatus.COMPLETED) Icons.Filled.DownloadDone else Icons.Filled.Download,
-                            contentDescription = if (downloadState?.status == DownloadStatus.COMPLETED) "Downloaded" else "Download file",
-                            tint = if (downloadState?.status == DownloadStatus.COMPLETED) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
                 }
+            } // End of main Row
 
-                if (fileInfo.canEdit == true) { // Check canEdit, as in original
-                    IconButton(
-                        onClick = { fileInfoViewModel.initiateDeleteFile(fileInfo.id) },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            Icons.Filled.DeleteOutline,
-                            contentDescription = "Delete file",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-            }
-            if (downloadState?.status == DownloadStatus.DOWNLOADING) {
-                LinearProgressIndicator(
-                    progress = { downloadState.progressFraction },
-                    modifier = Modifier.fillMaxWidth().height(2.dp).padding(horizontal = 8.dp, vertical = 2.dp) // Added padding
+            if (showLpiSection || showStatusMessage) {
+                HorizontalDivider(
+                    thickness = 1.0.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(top = 4.dp) // Add some padding above the divider
                 )
             }
-             // Optional: Display full status message for failed/completed if desired
-            if (downloadState != null && (downloadState.status == DownloadStatus.FAILED || downloadState.status == DownloadStatus.COMPLETED)) {
-                 downloadState.message?.let {
-                     Text(
-                         text = it,
-                         style = MaterialTheme.typography.labelSmall,
-                         color = if (downloadState.status == DownloadStatus.FAILED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                         modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 4.dp).fillMaxWidth(),
-                         textAlign = TextAlign.Center
-                     )
-                 }
+
+            // Progress Indicator and Status Message Section
+            if (showLpiSection) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp) // Padding for the whole LPI section
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (downloadState.status == DownloadStatus.PENDING) "Download pending..." else "Downloading...",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        val totalBytes = downloadState.totalBytes ?: 0L
+                        if (totalBytes > 0) {
+                            Text(
+                                text = "${formatSize(downloadState.downloadedBytes)} / ${formatSize(totalBytes)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        } else if (downloadState.status == DownloadStatus.DOWNLOADING) { // Show percentage if total bytes unknown during download
+                             Text(
+                                text = "${(downloadState.progressFraction * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(2.dp)) // Small space between text and LPI
+                    LinearProgressIndicator(
+                        progress = { downloadState.progressFraction }, // showLpiSection ensures downloadState is not null
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                    )
+                }
+            } else if (showStatusMessage) {
+                if (downloadState.status == DownloadStatus.COMPLETED) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp), // More compact padding
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.DownloadDone,
+                            contentDescription = "Download completed", // Accessibility text
+                            tint = MaterialTheme.colorScheme.primary, // Consistent with menu item
+                            modifier = Modifier.size(24.dp) // Standard icon size
+                        )
+                    }
+                } else if (downloadState.status == DownloadStatus.FAILED) {
+                    // Error message remains as text for clarity
+                    Text(
+                        text = downloadState.message,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 8.dp), // Original padding for error text
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
-        }
-    }
+        } // End of Column (with animateContentSize)
+    } // End of Card
 }
