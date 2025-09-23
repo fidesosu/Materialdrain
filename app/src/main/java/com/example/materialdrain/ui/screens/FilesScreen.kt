@@ -32,11 +32,8 @@ import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularProgressIndicator // Standard Material 3 indicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +47,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -66,7 +65,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -140,6 +138,7 @@ fun SortControls(uiState: FileInfoUiState, fileInfoViewModel: FileInfoViewModel)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FilesScreenContent(
     fileInfoViewModel: FileInfoViewModel,
@@ -149,6 +148,7 @@ fun FilesScreenContent(
     val keyboardController = LocalSoftwareKeyboardController.current
     val filterFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
+    val pullRefreshState = rememberPullToRefreshState()
 
     val displayedFiles by remember(uiState.userFilesList, uiState.sortField, uiState.sortAscending, uiState.filterQuery) {
         derivedStateOf {
@@ -187,94 +187,71 @@ fun FilesScreenContent(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    PullToRefreshBox(
+        isRefreshing = uiState.isLoadingUserFiles,
+        onRefresh = { fileInfoViewModel.fetchUserFiles() },
+        state = pullRefreshState,
+        modifier = Modifier.fillMaxSize(),
     ) {
-        AnimatedVisibility(
-            visible = uiState.showFilterInput,
-            enter = fadeIn(),
-            exit = fadeOut()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            OutlinedTextField(
-                value = uiState.filterQuery,
-                onValueChange = { fileInfoViewModel.onFilterQueryChanged(it) },
-                label = { Text("Filter by name") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-                    .focusRequester(filterFocusRequester),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = {
-                    keyboardController?.hide()
-                }),
-                trailingIcon = {
-                    if (uiState.filterQuery.isNotEmpty()) {
-                        IconButton(onClick = {
-                            fileInfoViewModel.onFilterQueryChanged("")
-                            keyboardController?.hide()
-                        }) {
-                            Icon(Icons.Filled.Clear, contentDescription = "Clear filter")
+            AnimatedVisibility(
+                visible = uiState.showFilterInput,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                OutlinedTextField(
+                    value = uiState.filterQuery,
+                    onValueChange = { fileInfoViewModel.onFilterQueryChanged(it) },
+                    label = { Text("Filter by name") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                        .focusRequester(filterFocusRequester),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        keyboardController?.hide()
+                    }),
+                    trailingIcon = {
+                        if (uiState.filterQuery.isNotEmpty()) {
+                            IconButton(onClick = {
+                                fileInfoViewModel.onFilterQueryChanged("")
+                                keyboardController?.hide()
+                            }) {
+                                Icon(Icons.Filled.Clear, contentDescription = "Clear filter")
+                            }
                         }
                     }
-                }
-            )
-        }
-
-        if (uiState.isLoadingFileInfo && uiState.fileInfo == null && displayedFiles.isEmpty() && !uiState.showFilterInput) {
-            Spacer(modifier = Modifier.height(16.dp))
-            CircularProgressIndicator()
-            Text("Fetching file info...", modifier = Modifier.padding(top = 8.dp))
-        } else if (uiState.fileInfoErrorMessage != null &&
-            uiState.fileInfoErrorMessage != "Please enter or select a File ID." &&
-            !uiState.showEnterFileIdDialog &&
-            !uiState.isLoadingUserFiles && !uiState.showFilterInput) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                uiState.fileInfoErrorMessage!!,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (uiState.apiKeyMissingError) {
-            Text(
-                "API Key is missing. Please set it in Settings to load and manage your files.",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .padding(vertical = 8.dp)
-                    .fillMaxWidth()
-            )
-        } else {
-            Button(
-                onClick = { fileInfoViewModel.fetchUserFiles() },
-                enabled = !uiState.isLoadingUserFiles,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (uiState.isLoadingUserFiles && displayedFiles.isEmpty() && uiState.filterQuery.isBlank()) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                    Text("Loading Files...")
-                } else {
-                    Icon(Icons.Filled.Refresh, contentDescription = "Refresh Files")
-                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                    Text(if (uiState.isLoadingUserFiles) "Refreshing..." else "Refresh My Files")
-                }
+                )
             }
-        }
 
-        uiState.userFilesListErrorMessage?.let {
-            if (!uiState.apiKeyMissingError) {
+            if (uiState.isLoadingFileInfo && uiState.fileInfo == null && displayedFiles.isEmpty() && !uiState.showFilterInput) {
+                Spacer(modifier = Modifier.height(16.dp))
+                CircularProgressIndicator()
+                Text("Fetching file info...", modifier = Modifier.padding(top = 8.dp))
+            } else if (uiState.fileInfoErrorMessage != null &&
+                uiState.fileInfoErrorMessage != "Please enter or select a File ID." &&
+                !uiState.showEnterFileIdDialog &&
+                !uiState.isLoadingUserFiles && !uiState.showFilterInput) {
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    it,
+                    uiState.fileInfoErrorMessage!!,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (uiState.apiKeyMissingError) {
+                Text(
+                    "API Key is missing. Please set it in Settings to load and manage your files.",
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
@@ -282,46 +259,80 @@ fun FilesScreenContent(
                         .padding(vertical = 8.dp)
                         .fillMaxWidth()
                 )
-            }
-        }
-
-        if (displayedFiles.isNotEmpty()) {
-            SortControls(uiState = uiState, fileInfoViewModel = fileInfoViewModel)
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                items(
-                    items = displayedFiles,
-                    key = { file -> file.id },
-                    contentType = { "fileInfoCard" }
-                ) { file ->
-                    val currentDownloadState = uiState.activeDownloads[file.id]
-                    UserFileListItemCard(
-                        fileInfo = file,
-                        downloadState = currentDownloadState,
-                        fileInfoViewModel = fileInfoViewModel,
-                        onFileSelected = {
-                            if (uiState.showFilterInput) {
-                                fileInfoViewModel.setFilterInputVisible(false)
-                            }
-                            fileInfoViewModel.fetchFileInfo(file.id)
-                            onFileSelected()
-                        }
-                    )
-                    HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            } else {
+                if (uiState.isLoadingUserFiles && displayedFiles.isEmpty() && uiState.filterQuery.isBlank()) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp)
+                    ) {
+                        CircularProgressIndicator()
+                        Spacer(Modifier.height(8.dp))
+                        Text("Loading Files...")
+                    }
                 }
             }
-        } else if (!uiState.isLoadingUserFiles && !uiState.apiKeyMissingError && uiState.userFilesListErrorMessage == null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                if (uiState.filterQuery.isNotBlank()) "No files match your filter: \"${uiState.filterQuery}\"."
-                else "No files found. Try refreshing.",
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top=8.dp)
-            )
+
+            uiState.userFilesListErrorMessage?.let {
+                if (!uiState.apiKeyMissingError) {
+                    Text(
+                        it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .padding(vertical = 8.dp)
+                            .fillMaxWidth()
+                    )
+                }
+            }
+
+            if (displayedFiles.isNotEmpty()) {
+                SortControls(uiState = uiState, fileInfoViewModel = fileInfoViewModel)
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    items(
+                        items = displayedFiles,
+                        key = { file -> file.id },
+                        contentType = { "fileInfoCard" }
+                    ) { file ->
+                        val currentDownloadState = uiState.activeDownloads[file.id]
+                        UserFileListItemCard(
+                            fileInfo = file,
+                            downloadState = currentDownloadState,
+                            fileInfoViewModel = fileInfoViewModel,
+                            onFileSelected = {
+                                if (uiState.showFilterInput) {
+                                    fileInfoViewModel.setFilterInputVisible(false)
+                                }
+                                fileInfoViewModel.fetchFileInfo(file.id)
+                                onFileSelected()
+                            }
+                        )
+                        HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    }
+                }
+            } else if (!uiState.isLoadingUserFiles && !uiState.apiKeyMissingError && uiState.userFilesListErrorMessage == null && uiState.filterQuery.isBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "No files found. Try pulling down to refresh.",
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top=8.dp)
+                )
+            } else if (uiState.filterQuery.isNotBlank() && displayedFiles.isEmpty()) {
+                 Spacer(modifier = Modifier.height(8.dp))
+                 Text(
+                    "No files match your filter: \"${uiState.filterQuery}\".",
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top=8.dp)
+                )
+            }
         }
     }
 }
@@ -496,7 +507,7 @@ fun UserFileListItemCard(
                         }
                     }
                 }
-            } // End of main Row
+            }
 
             if (showLpiSection || showStatusMessage) {
                 HorizontalDivider(
@@ -529,14 +540,12 @@ fun UserFileListItemCard(
                                 text = "${formatSize(downloadState.downloadedBytes)} / ${formatSize(totalBytes)}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontFamily = FontFamily.Monospace
                             )
                         } else if (downloadState.status == DownloadStatus.DOWNLOADING) { // Show percentage if total bytes unknown during download
                              Text(
                                 text = "${(downloadState.progressFraction * 100).toInt()}%",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontFamily = FontFamily.Monospace
                             )
                         }
                     }
