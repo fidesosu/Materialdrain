@@ -110,20 +110,58 @@ class FileInfoViewModel(
     private var apiKey: String = ""
 
     init {
+        Log.d(TAG, "ViewModel init: Calling loadApiKey()")
         loadApiKey()
     }
 
     fun loadApiKey() {
         val sharedPrefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         apiKey = sharedPrefs.getString(API_KEY_PREF, "") ?: ""
-        Log.d(TAG, "API Key loaded: ${if (apiKey.isNotBlank()) "Present" else "Missing"}")
+        Log.d(TAG, "loadApiKey called. API Key loaded: '${if (apiKey.isNotBlank()) "PRESENT (not showing value)" else "MISSING"}'")
+
         if (apiKey.isBlank()) {
+            Log.d(TAG, "loadApiKey: API key is blank. Updating UI state for missing key.")
             _uiState.update { it.copy(apiKeyMissingError = true, userFilesListErrorMessage = "API Key is missing. Please set it in Settings.") }
         } else {
-            if (_uiState.value.apiKeyMissingError || _uiState.value.userFilesListErrorMessage?.contains("API Key is missing") == true) {
+            Log.d(TAG, "loadApiKey: API key is present.")
+            val currentState = _uiState.value // Get current state once for consistent checks
+            val wasApiKeyMissingError = currentState.apiKeyMissingError
+            val wasUserFilesListErrorMessageMissingKey = currentState.userFilesListErrorMessage?.contains("API Key is missing") == true
+            Log.d(TAG, "loadApiKey: Current State -> apiKeyMissingError: $wasApiKeyMissingError, userFilesListErrorMessage: '${currentState.userFilesListErrorMessage}'")
+
+            // Condition to clear previous API key errors and potentially fetch files
+            if (wasApiKeyMissingError || wasUserFilesListErrorMessageMissingKey) {
+                Log.d(TAG, "loadApiKey: Clearing previous API key related errors.")
                 _uiState.update { it.copy(apiKeyMissingError = false, userFilesListErrorMessage = null) }
-                if (_uiState.value.userFilesList.isEmpty() && !_uiState.value.isLoadingUserFiles) {
+
+                // Re-evaluate state after update for fetch conditions
+                val updatedState = _uiState.value
+                val isUserFilesListEmpty = updatedState.userFilesList.isEmpty()
+                val isNotLoadingUserFiles = !updatedState.isLoadingUserFiles
+                Log.d(TAG, "loadApiKey (after clearing error): Checking conditions to fetch files:")
+                Log.d(TAG, "loadApiKey (after clearing error): - userFilesList.isEmpty(): $isUserFilesListEmpty")
+                Log.d(TAG, "loadApiKey (after clearing error): - !isLoadingUserFiles: $isNotLoadingUserFiles")
+
+                if (isUserFilesListEmpty && isNotLoadingUserFiles) {
+                    Log.d(TAG, "loadApiKey (after clearing error): Conditions met. Calling fetchUserFiles().")
                     fetchUserFiles()
+                } else {
+                    Log.d(TAG, "loadApiKey (after clearing error): Conditions NOT met for fetchUserFiles(). List empty: $isUserFilesListEmpty, Not loading: $isNotLoadingUserFiles")
+                }
+            } else {
+                // This case handles when the ViewModel is initialized, API key is present,
+                // and there were no previous API key errors (e.g., app fresh start with key already set).
+                // We still want to fetch files if the list is empty.
+                val isUserFilesListEmpty = currentState.userFilesList.isEmpty()
+                val isNotLoadingUserFiles = !currentState.isLoadingUserFiles
+                Log.d(TAG, "loadApiKey: No previous API key errors. Checking conditions to fetch files:")
+                Log.d(TAG, "loadApiKey: - userFilesList.isEmpty(): $isUserFilesListEmpty")
+                Log.d(TAG, "loadApiKey: - !isLoadingUserFiles: $isNotLoadingUserFiles")
+                if (isUserFilesListEmpty && isNotLoadingUserFiles) {
+                    Log.d(TAG, "loadApiKey (no prior error path): Conditions met. Calling fetchUserFiles().")
+                    fetchUserFiles()
+                } else {
+                    Log.d(TAG, "loadApiKey (no prior error path): Conditions NOT met for fetchUserFiles(). List empty: $isUserFilesListEmpty, Not loading: $isNotLoadingUserFiles")
                 }
             }
         }
@@ -249,14 +287,17 @@ class FileInfoViewModel(
             _uiState.update { it.copy(userFilesListErrorMessage = "API Key is required. Please set it in Settings.", isLoadingUserFiles = false, userFilesList = emptyList(), apiKeyMissingError = true) }
             return
         }
+        Log.d(TAG, "fetchUserFiles: Attempting to fetch files with API key.")
         _uiState.update { it.copy(isLoadingUserFiles = true, userFilesListErrorMessage = null, apiKeyMissingError = false) }
         viewModelScope.launch {
             when (val response = pixeldrainApiService.getUserFiles(apiKey)) {
                 is ApiResponse.Success -> {
+                    Log.d(TAG, "fetchUserFiles: Successfully fetched ${response.data.files.size} files.")
                     _uiState.update { it.copy(isLoadingUserFiles = false, userFilesList = response.data.files) }
                 }
                 is ApiResponse.Error -> {
                     val errorMsg = response.errorDetails.message ?: response.errorDetails.value ?: "Unknown error fetching user files"
+                    Log.e(TAG, "fetchUserFiles: Error fetching files: $errorMsg")
                     _uiState.update { it.copy(isLoadingUserFiles = false, userFilesListErrorMessage = errorMsg, apiKeyMissingError = errorMsg.contains("unauthorized", ignoreCase = true) || response.errorDetails.value == "api_key_missing") }
                 }
             }
@@ -327,7 +368,7 @@ class FileInfoViewModel(
                         outputStream = BufferedOutputStream(rawOutputStream) // Wrapped in BufferedOutputStream
                     } else {
                         // Handle case where rawOutputStream is null, perhaps log or throw
-                         Log.e(TAG, "ContentResolver.openOutputStream returned null for $uri")
+                        Log.e(TAG, "ContentResolver.openOutputStream returned null for $uri")
                     }
                 }
                 if (outputStream == null && uri != null) { // If stream opening failed but URI was created
