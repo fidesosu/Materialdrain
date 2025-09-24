@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
@@ -97,7 +96,10 @@ data class FileInfoUiState(
     val activeDownloads: Map<String, FileDownloadState> = emptyMap(),
     // General messages, can be deprecated if per-file messages are sufficient
     val fileDownloadSuccessMessage: String? = null,
-    val fileDownloadErrorMessage: String? = null
+    val fileDownloadErrorMessage: String? = null,
+
+    // Scroll state preservation
+    val shouldPreserveScrollPosition: Boolean = false
 )
 
 class FileInfoViewModel(
@@ -259,11 +261,6 @@ class FileInfoViewModel(
     }
 
     fun fetchFileInfoFromDialogInput() { fetchFileInfo(_uiState.value.fileIdInput) }
-    fun fetchFileInfoById(fileId: String) {
-        clearTextPreviewStates()
-        onFileIdInputChange(fileId)
-        fetchFileInfo(fileId)
-    }
 
     fun clearFileInfoDisplay() {
         _uiState.update { it.copy(fileInfo = null, isLoadingFileInfo = false) }
@@ -425,7 +422,7 @@ class FileInfoViewModel(
                      targetUri = uri
                      outputStream = stream
                 } else {
-                    application.contentResolver.openOutputStream(targetUri!!)?.let {
+                    application.contentResolver.openOutputStream(targetUri)?.let {
                         outputStream = BufferedOutputStream(it)
                     }
                 }
@@ -544,6 +541,10 @@ class FileInfoViewModel(
             viewModelScope.launch { finalizeMediaStoreEntry(it, false) } 
         }
         // Removed downloadJobs.remove(fileId)
+    }
+
+    fun setPreserveScrollPosition(preserve: Boolean) {
+        _uiState.update { it.copy(shouldPreserveScrollPosition = preserve) }
     }
 }
 

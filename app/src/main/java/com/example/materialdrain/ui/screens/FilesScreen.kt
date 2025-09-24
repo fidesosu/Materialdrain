@@ -18,8 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -33,7 +33,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator // Standard Material 3 indicator
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -142,13 +142,14 @@ fun SortControls(uiState: FileInfoUiState, fileInfoViewModel: FileInfoViewModel)
 @Composable
 fun FilesScreenContent(
     fileInfoViewModel: FileInfoViewModel,
-    onFileSelected: () -> Unit
+    onFileSelected: () -> Unit,
+    listState: LazyListState // Accept LazyListState as a parameter
 ) {
     val uiState by fileInfoViewModel.uiState.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
     val filterFocusRequester = remember { FocusRequester() }
-    val listState = rememberLazyListState()
     val pullRefreshState = rememberPullToRefreshState()
+    var isInitialUserFilesLoad by remember { mutableStateOf(true) }
 
     val displayedFiles by remember(uiState.userFilesList, uiState.sortField, uiState.sortAscending, uiState.filterQuery) {
         derivedStateOf {
@@ -181,15 +182,43 @@ fun FilesScreenContent(
         }
     }
 
+    LaunchedEffect(uiState.shouldPreserveScrollPosition) {
+        if (uiState.shouldPreserveScrollPosition) {
+            // If preserving scroll, reset the flag and do nothing else with scroll.
+            // This ensures subsequent sort/refresh actions will scroll to top unless this flag is set again.
+            fileInfoViewModel.setPreserveScrollPosition(false)
+        }
+    }
+
     LaunchedEffect(uiState.sortField, uiState.sortAscending) {
-        if (displayedFiles.isNotEmpty()) {
-            listState.scrollToItem(0)
+        // Only scroll if not currently preserving scroll from a back navigation
+        if (!uiState.shouldPreserveScrollPosition) {
+            if (displayedFiles.isNotEmpty() && listState.firstVisibleItemIndex != 0) {
+                listState.scrollToItem(0)
+            }
+        }
+    }
+
+    LaunchedEffect(uiState.userFilesList) {
+        if (isInitialUserFilesLoad) {
+            if (uiState.userFilesList.isNotEmpty()) { // Mark initial load as done only when data actually arrives
+                isInitialUserFilesLoad = false
+            }
+        } else {
+            // This is a refresh (not the initial load)
+            if (!uiState.shouldPreserveScrollPosition) {
+                if (displayedFiles.isNotEmpty() && listState.firstVisibleItemIndex != 0) {
+                    listState.scrollToItem(0)
+                }
+            }
         }
     }
 
     PullToRefreshBox(
         isRefreshing = uiState.isLoadingUserFiles,
-        onRefresh = { fileInfoViewModel.fetchUserFiles() },
+        onRefresh = { 
+            fileInfoViewModel.fetchUserFiles()
+        },
         state = pullRefreshState,
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -291,7 +320,7 @@ fun FilesScreenContent(
             if (displayedFiles.isNotEmpty()) {
                 SortControls(uiState = uiState, fileInfoViewModel = fileInfoViewModel)
                 LazyColumn(
-                    state = listState,
+                    state = listState, // Use the passed-in listState
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
@@ -327,7 +356,7 @@ fun FilesScreenContent(
             } else if (uiState.filterQuery.isNotBlank() && displayedFiles.isEmpty()) {
                  Spacer(modifier = Modifier.height(8.dp))
                  Text(
-                    "No files match your filter: \"${uiState.filterQuery}\".",
+                    "No files match your filter: '${uiState.filterQuery}'",
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top=8.dp)

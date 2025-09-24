@@ -2,7 +2,7 @@ package com.example.materialdrain.ui
 
 import android.app.Application
 import android.util.Log
-import androidx.activity.compose.BackHandler // Added import for BackHandler
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -11,7 +11,8 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollFactory
-import androidx.compose.foundation.layout.* // Corrected import
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
@@ -25,7 +26,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-// import androidx.compose.ui.window.Dialog // Dialog import removed
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.materialdrain.network.PixeldrainApiService
@@ -47,10 +47,10 @@ import java.time.format.FormatStyle
 import java.time.format.DateTimeParseException
 
 // Define the screens in the app
-enum class Screen(val title: String, val icon: ImageVector, val hasDetailsPage: Boolean = false) {
+enum class Screen(val title: String, val icon: ImageVector) {
     Upload("Upload", Icons.Filled.FileUpload),
-    Files("Files", Icons.Filled.Folder, true), // Mark that Files can navigate to a detail page
-    FileDetail("File Details", Icons.Filled.Description), // New screen for file details
+    Files("Files", Icons.Filled.Folder),
+    FileDetail("File Details", Icons.Filled.Description),
     Lists("Lists", Icons.AutoMirrored.Filled.List),
     Settings("Settings", Icons.Filled.Settings)
 }
@@ -74,7 +74,7 @@ internal fun formatApiDateTimeString(dateTimeString: String?): String {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MaterialDrainScreen() {
-    var currentScreen by remember { mutableStateOf<Screen>(Screen.Upload) }
+    var currentScreen by remember { mutableStateOf(Screen.Upload) }
 
     var showGenericDialog by remember { mutableStateOf(false) }
     var genericDialogContent by remember { mutableStateOf("") }
@@ -91,17 +91,18 @@ fun MaterialDrainScreen() {
     val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
     val uploadUiState by uploadViewModel.uiState.collectAsState()
 
+    val filesScreenListState = rememberLazyListState() // Remember LazyListState here
+
     // Initial file fetch on app launch
     LaunchedEffect(Unit) { // Runs once when MaterialDrainScreen is first composed
         Log.d("MaterialDrainScreen", "Initial composition. ViewModels should handle their own initial data loading via init blocks.")
-        // fileInfoViewModel.loadApiKey() // Removed: ViewModel's init now handles this.
     }
 
     // Handle system back press for FileDetail screen
     if (currentScreen == Screen.FileDetail) {
         BackHandler(enabled = true) {
+            fileInfoViewModel.setPreserveScrollPosition(true) // Preserve scroll before navigating
             currentScreen = Screen.Files
-            // fileInfoViewModel.clearFileInfoDisplay() // Optionally clear, or rely on LaunchedEffect
         }
     }
 
@@ -109,17 +110,15 @@ fun MaterialDrainScreen() {
         Log.d("MaterialDrainScreen", "currentScreen changed to: ${currentScreen.name}")
         when (currentScreen) {
             Screen.Files -> {
-                // fileInfoViewModel.loadApiKey() // Call is made on initial composition now, or when settings change it.
-                // Still, if user navigates to Files and API key was just set, this might be useful.
-                // For now, relying on initial load and settings screen to update.
+                // If coming from FileDetail, scroll state is already preserved.
+                // Otherwise, the default behavior of FilesScreenContent scrolling to top is fine.
             }
             Screen.FileDetail -> {
-                // Ensure filter is hidden on detail screen
                 fileInfoViewModel.setFilterInputVisible(false)
             }
             else -> { // Upload, Lists, Settings
-                if (currentScreen != Screen.FileDetail) { // Don'''t clear if we are on file detail
-                    fileInfoViewModel.clearFileInfoDisplay() // Clear if navigating away from Files/FileDetail to other main screens
+                if (currentScreen != Screen.FileDetail) {
+                    fileInfoViewModel.clearFileInfoDisplay()
                 }
                 fileInfoViewModel.clearUserFilesError()
                 fileInfoViewModel.clearApiKeyMissingError()
@@ -165,6 +164,7 @@ fun MaterialDrainScreen() {
             snackbarHostState.showSnackbar(it)
             fileInfoViewModel.clearDeleteMessages()
             if (currentScreen == Screen.FileDetail) { // If on detail page, navigate back after delete
+                fileInfoViewModel.setPreserveScrollPosition(true) // Preserve scroll before navigating
                 currentScreen = Screen.Files
             }
         }
@@ -192,7 +192,7 @@ fun MaterialDrainScreen() {
     if (fileInfoUiState.apiKeyMissingError && (currentScreen == Screen.Files || currentScreen == Screen.FileDetail) &&
         !fileInfoUiState.userFilesListErrorMessage.isNullOrBlank() &&
         !showGenericDialog && !fileInfoUiState.initiateDeleteFile && !fileInfoUiState.showEnterFileIdDialog) {
-        LaunchedEffect(fileInfoUiState.apiKeyMissingError, currentScreen, fileInfoUiState.userFilesListErrorMessage) {
+        LaunchedEffect(true, currentScreen, fileInfoUiState.userFilesListErrorMessage) {
             if (fileInfoUiState.userFilesListErrorMessage!!.contains("API Key", ignoreCase = true)) {
                 genericDialogTitle = if (currentScreen == Screen.FileDetail) "API Key Required" else "API Key Required for Files"
                 genericDialogContent = fileInfoUiState.userFilesListErrorMessage!!
@@ -242,8 +242,8 @@ fun MaterialDrainScreen() {
                     navigationIcon = {
                         if (currentScreen == Screen.FileDetail) {
                             IconButton(onClick = {
+                                fileInfoViewModel.setPreserveScrollPosition(true) // Preserve scroll before navigating
                                 currentScreen = Screen.Files
-                                // fileInfoViewModel.clearFileInfoDisplay() // Optionally clear here or rely on LaunchedEffect
                             }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Files")
                             }
@@ -324,10 +324,10 @@ fun MaterialDrainScreen() {
                     )
                     Screen.Files -> FilesScreenContent(
                         fileInfoViewModel = fileInfoViewModel,
-                        onFileSelected = { // This will be passed to FilesScreenContent
-                            // ViewModel should already have fetched/set this file info
+                        onFileSelected = { 
                             currentScreen = Screen.FileDetail
-                        }
+                        },
+                        listState = filesScreenListState // Pass the listState here
                     )
                     Screen.FileDetail -> {
                         fileInfoUiState.fileInfo?.let { info ->
@@ -337,13 +337,13 @@ fun MaterialDrainScreen() {
                                 context = LocalContext.current
                             )
                         } ?: run {
-                            // Show a loading or error state if fileInfo is null for some reason
                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 if (fileInfoUiState.isLoadingFileInfo) {
                                     CircularProgressIndicator()
                                 } else {
                                     Text("File details not available. Please go back and select a file.")
                                     LaunchedEffect(Unit) { // Auto navigate back if no info
+                                        fileInfoViewModel.setPreserveScrollPosition(true)
                                         currentScreen = Screen.Files
                                     }
                                 }
@@ -414,8 +414,6 @@ fun MaterialDrainScreen() {
         )
     }
 
-    // Removed the Dialog wrapper for FileInfoDetailsCard as it'''s now a screen
-
     if (fileInfoUiState.initiateDeleteFile) {
         AlertDialog(
             onDismissRequest = { fileInfoViewModel.cancelDeleteFile() },
@@ -446,7 +444,6 @@ fun MaterialDrainScreen() {
 @Composable
 fun BottomNavigationBar(currentScreen: Screen, onScreenSelected: (Screen) -> Unit) {
     NavigationBar {
-        // Filter out FileDetail from bottom navigation items
         Screen.entries.filter { it != Screen.FileDetail }.forEach { screen ->
             NavigationBarItem(
                 icon = { Icon(screen.icon, contentDescription = screen.title) },
