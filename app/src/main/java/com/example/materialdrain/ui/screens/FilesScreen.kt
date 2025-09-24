@@ -379,8 +379,6 @@ fun UserFileListItemCard(
     val showLpiSection = downloadState?.status == DownloadStatus.DOWNLOADING || downloadState?.status == DownloadStatus.PENDING
     val showStatusMessage = downloadState != null && !showLpiSection && (downloadState.status == DownloadStatus.FAILED || downloadState.status == DownloadStatus.COMPLETED) && downloadState.message != null
 
-    val mainRowBottomPadding = if (showLpiSection || showStatusMessage) 4.dp else 8.dp
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -395,15 +393,20 @@ fun UserFileListItemCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = mainRowBottomPadding),
-                verticalAlignment = Alignment.CenterVertically
             ) {
                 AsyncImage(
                     model = thumbnailUrl,
                     contentDescription = "${fileInfo.name} thumbnail",
                     modifier = Modifier
-                        .size(60.dp)
-                        .clip(RoundedCornerShape(6.dp)),
+                        .size(80.dp)
+                        .clip(
+                            RoundedCornerShape(
+                                topStart = 6.dp,
+                                bottomStart = 6.dp,
+                                topEnd = 0.dp,
+                                bottomEnd = 0.dp
+                            )
+                        ),
                     contentScale = ContentScale.Crop,
                     error = rememberVectorPainter(Icons.Filled.BrokenImage),
                     placeholder = rememberVectorPainter(Icons.Filled.Image)
