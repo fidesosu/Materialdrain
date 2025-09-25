@@ -1,34 +1,38 @@
 package com.example.materialdrain.ui.shared
 
+import android.graphics.BitmapFactory
 import android.graphics.drawable.Drawable
+import android.media.MediaPlayer
 import android.net.Uri
+import android.util.Log
 import android.view.View
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Videocam // Added
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -42,16 +46,21 @@ import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
-import androidx.media3.exoplayer.util.EventLogger // Added import for EventLogger
+import androidx.media3.exoplayer.util.EventLogger
 import androidx.media3.ui.DefaultTimeBar
 import androidx.media3.ui.PlayerView
 import coil.ImageLoader
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import coil.decode.ImageDecoderDecoder
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.target.Target
-import com.example.materialdrain.util.ExoPlayerCache // Import the cache
+import com.example.materialdrain.ui.formatDurationMillis
+import com.example.materialdrain.util.ExoPlayerCache
+import com.example.materialdrain.viewmodel.UploadUiState
+
+private const val TAG_COIL = "CoilImageLoaderShared"
 
 @Composable
 fun ClickablePreviewOverlay(onClick: () -> Unit) {
@@ -103,7 +112,7 @@ fun VideoPlayerControls(videoUri: Uri, thumbnailUrl: String?, modifier: Modifier
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(mediaSourceFactory)
             .build().apply {
-                addAnalyticsListener(EventLogger()) // Add EventLogger here
+                addAnalyticsListener(EventLogger())
                 setMediaItem(MediaItem.fromUri(videoUri))
                 prepare()
                 playWhenReady = true
@@ -172,7 +181,7 @@ fun VideoPlayerControls(videoUri: Uri, thumbnailUrl: String?, modifier: Modifier
 fun FullScreenMediaPreviewDialog(
     previewUri: Uri?,
     previewMimeType: String?,
-    thumbnailUrl: String?, // Added thumbnailUrl parameter
+    thumbnailUrl: String?,
     onDismissRequest: () -> Unit
 ) {
     Dialog(
@@ -188,11 +197,11 @@ fun FullScreenMediaPreviewDialog(
         ) {
             if (previewUri != null) {
                 Box(
-                    modifier = Modifier.clickable(enabled = false) {} // Prevent click on content from dismissing
+                    modifier = Modifier.clickable(enabled = false) {}
                 ) {
                     when {
                         previewMimeType?.startsWith("video/") == true -> {
-                            VideoPlayerControls( // This now calls the shared composable
+                            VideoPlayerControls(
                                 videoUri = previewUri,
                                 thumbnailUrl = thumbnailUrl,
                                 modifier = Modifier.fillMaxSize().padding(8.dp)
@@ -231,7 +240,7 @@ fun FullScreenMediaPreviewDialog(
                                     .fillMaxSize()
                                     .padding(16.dp),
                                 contentScale = ContentScale.Fit,
-                                onError = { onDismissRequest() } // Optionally dismiss if image fails to load
+                                onError = { onDismissRequest() }
                             )
                         }
                         else -> {
@@ -241,6 +250,210 @@ fun FullScreenMediaPreviewDialog(
                 }
             } else {
                 Text("Preview unavailable.", color = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+fun AudioPlayerPreview(
+    uiState: UploadUiState,
+    mediaPlayer: MediaPlayer?,
+    isPlaying: Boolean,
+    currentPlaybackTimeMillis: Long,
+    userSeekPositionMillis: Long,
+    audioPreviewError: String?,
+    isMediaPlayerPreparing: Boolean,
+    isUserScrubbing: Boolean,
+    progressBarWidthPx: Int,
+    onPlayPause: () -> Unit,
+    onSeekBarWidthChanged: (Int) -> Unit,
+    onDragStart: (offset: androidx.compose.ui.geometry.Offset, totalDuration: Long, progressBarWidthPx: Int) -> Unit,
+    onDrag: (change: PointerInputChange, totalDuration: Long, progressBarWidthPx: Int) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit
+) {
+    Card(modifier = Modifier
+        .fillMaxWidth()
+        .padding(vertical = 8.dp)) {
+        Column(modifier = Modifier.padding(bottom = 0.dp)) {
+            Row(
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                uiState.audioAlbumArt?.let {
+                    val bitmap = remember(it) { try { BitmapFactory.decodeByteArray(it, 0, it.size) } catch (_: Exception) { null } }
+                    bitmap?.let {bmp -> Image(bitmap = bmp.asImageBitmap(), contentDescription = "Album Art", modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop) }
+                        ?: Icon(Icons.Filled.MusicNote, contentDescription = "Album Art Placeholder", modifier = Modifier.size(64.dp))
+                } ?: Icon(Icons.Filled.MusicNote, contentDescription = "Album Art Placeholder", modifier = Modifier.size(64.dp))
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    uiState.audioArtist?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
+                    uiState.audioAlbum?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom=4.dp)) }
+                    Text(
+                        text = "${formatDurationMillis( (if (isUserScrubbing) userSeekPositionMillis else currentPlaybackTimeMillis).coerceAtMost(uiState.audioDurationMillis ?: 0L) )} / ${formatDurationMillis(uiState.audioDurationMillis ?: 0L)}",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+                FilledTonalIconButton(
+                    onClick = onPlayPause,
+                    enabled = mediaPlayer != null && !isMediaPlayerPreparing,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (isPlaying) "Pause" else "Play")
+                }
+            }
+            if (isMediaPlayerPreparing) Text("Player preparing...", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top=0.dp, start=16.dp, end=16.dp, bottom=8.dp))
+            audioPreviewError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top=0.dp, start=16.dp, end=16.dp, bottom=8.dp)) }
+
+            val totalDuration = uiState.audioDurationMillis ?: 0L
+            val progress = remember(isUserScrubbing, userSeekPositionMillis, currentPlaybackTimeMillis, totalDuration) {
+                val currentPos = if (isUserScrubbing) userSeekPositionMillis else currentPlaybackTimeMillis
+                if (totalDuration > 0L) (currentPos.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f) else 0f
+            }
+
+            if (mediaPlayer != null || isMediaPlayerPreparing) {
+                Box(
+                    contentAlignment = Alignment.BottomCenter,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(24.dp)
+                        .onSizeChanged { onSeekBarWidthChanged(it.width) }
+                        .pointerInput(mediaPlayer, totalDuration, progressBarWidthPx) {
+                            if (mediaPlayer == null || totalDuration <= 0L || progressBarWidthPx <= 0) return@pointerInput
+                            detectHorizontalDragGestures(
+                                onDragStart = { offset ->
+                                    onDragStart(
+                                        offset,
+                                        totalDuration,
+                                        progressBarWidthPx
+                                    )
+                                },
+                                onHorizontalDrag = { change, _ ->
+                                    onDrag(
+                                        change,
+                                        totalDuration,
+                                        progressBarWidthPx
+                                    )
+                                },
+                                onDragEnd = onDragEnd,
+                                onDragCancel = onDragCancel
+                            )
+                        }
+                ) {
+                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth()) 
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun InlineImagePreview(
+    uiState: UploadUiState,
+    onFullScreenClick: () -> Unit
+) {
+    if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("image/") == true) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .padding(vertical = 8.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                val imageRequest = ImageRequest.Builder(LocalContext.current)
+                    .data(uiState.selectedFileUri)
+                    .crossfade(true)
+                    .listener(onError = { _, result ->
+                        Log.e(TAG_COIL, "Error loading image: ${uiState.selectedFileUri}", result.throwable)
+                    })
+                    .build()
+                var imageState by remember { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Loading(null)) }
+
+                AsyncImage(
+                    model = imageRequest,
+                    contentDescription = "Selected image preview",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    onState = { state -> imageState = state }
+                )
+
+                when (imageState) {
+                    is AsyncImagePainter.State.Loading -> CircularProgressIndicator(modifier = Modifier.size(48.dp))
+                    is AsyncImagePainter.State.Error -> Icon(Icons.Filled.BrokenImage, contentDescription = "Error loading image", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
+                    is AsyncImagePainter.State.Success -> {
+                        ClickablePreviewOverlay {
+                            onFullScreenClick()
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun InlineTextPreview(
+    textContent: String?
+) {
+    textContent?.takeIf { it.isNotBlank() }?.let {
+        Text("Content Preview (4KB Max):", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top=8.dp, bottom=4.dp))
+        OutlinedTextField(
+            value = it,
+            onValueChange = {},
+            readOnly = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 100.dp, max = 200.dp)
+                .padding(vertical = 8.dp),
+            textStyle = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+
+@Composable
+fun InlineVideoPreview(
+    videoThumbnail: ByteArray?,
+    selectedFileUri: Uri?,
+    selectedFileMimeType: String?,
+    onFullScreenClick: () -> Unit
+) {
+    if (selectedFileUri != null && selectedFileMimeType?.startsWith("video/") == true) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .padding(vertical = 8.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                videoThumbnail?.let {
+                    val bitmap = remember(it) { BitmapFactory.decodeByteArray(it, 0, it.size) }
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Video thumbnail preview",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    ClickablePreviewOverlay {
+                        onFullScreenClick()
+                    }
+                } ?: Icon(
+                    Icons.Filled.Videocam,
+                    contentDescription = "Video thumbnail placeholder",
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
