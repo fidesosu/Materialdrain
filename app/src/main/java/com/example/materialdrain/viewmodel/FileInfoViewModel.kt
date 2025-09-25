@@ -12,6 +12,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.materialdrain.network.ApiResponse
 import com.example.materialdrain.network.FileInfoResponse
 import com.example.materialdrain.network.PixeldrainApiService
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -110,13 +112,46 @@ class FileInfoViewModel(
     private val _uiState = MutableStateFlow(FileInfoUiState())
     val uiState: StateFlow<FileInfoUiState> = _uiState.asStateFlow()
 
+    private val _displayedFiles = MutableStateFlow<List<FileInfoResponse>>(emptyList())
+    val displayedFiles: StateFlow<List<FileInfoResponse>> = _displayedFiles.asStateFlow()
+
+
     private var apiKey: String = ""
     // Removed downloadJobs map
 
     init {
         Log.d(TAG, "ViewModel init: Calling loadApiKey()")
         loadApiKey()
+
+        // 👇 New: start recomputing displayedFiles whenever relevant state changes
+        viewModelScope.launch {
+            combine(
+                uiState.map { it.userFilesList },
+                uiState.map { it.sortField },
+                uiState.map { it.sortAscending },
+                uiState.map { it.filterQuery }
+            ) { files, sortField, sortAscending, filterQuery ->
+                withContext(Dispatchers.Default) {
+                    files
+                        .filter { it.name.contains(filterQuery, ignoreCase = true) }
+                        .sortedWith(
+                            compareBy<FileInfoResponse> {
+                                when (sortField) {
+                                    SortableField.NAME -> it.name.lowercase()
+                                    SortableField.SIZE -> it.size
+                                    SortableField.UPLOAD_DATE -> it.dateUpload
+                                }
+                            }.let { comparator ->
+                                if (sortAscending) comparator else comparator.reversed()
+                            }
+                        )
+                }
+            }.collect { sortedAndFiltered ->
+                _displayedFiles.value = sortedAndFiltered
+            }
+        }
     }
+
 
     fun loadApiKey() {
         val sharedPrefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

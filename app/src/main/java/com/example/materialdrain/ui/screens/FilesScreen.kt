@@ -2,6 +2,7 @@ package com.example.materialdrain.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
@@ -52,7 +53,6 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,12 +64,14 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext // Added import
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest // Added import
 import com.example.materialdrain.network.FileInfoResponse
 import com.example.materialdrain.ui.formatApiDateTimeString
 import com.example.materialdrain.ui.formatSize
@@ -78,7 +80,6 @@ import com.example.materialdrain.viewmodel.DownloadStatus
 import com.example.materialdrain.viewmodel.FileInfoUiState
 import com.example.materialdrain.viewmodel.FileInfoViewModel
 import com.example.materialdrain.viewmodel.SortableField
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,29 +152,7 @@ fun FilesScreenContent(
     val pullRefreshState = rememberPullToRefreshState()
     var isInitialUserFilesLoad by remember { mutableStateOf(true) }
 
-    val displayedFiles by remember(uiState.userFilesList, uiState.sortField, uiState.sortAscending, uiState.filterQuery) {
-        derivedStateOf {
-            val filteredList = if (uiState.filterQuery.isBlank()) {
-                uiState.userFilesList
-            } else {
-                uiState.userFilesList.filter {
-                    it.name.contains(uiState.filterQuery, ignoreCase = true)
-                }
-            }
-
-            val comparator = when (uiState.sortField) {
-                SortableField.NAME -> compareBy<FileInfoResponse> { it.name.lowercase(Locale.getDefault()) }
-                SortableField.SIZE -> compareBy { it.size }
-                SortableField.UPLOAD_DATE -> compareBy { it.dateUpload }
-            }
-
-            if (uiState.sortAscending) {
-                filteredList.sortedWith(comparator)
-            } else {
-                filteredList.sortedWith(comparator.reversed())
-            }
-        }
-    }
+    val displayedFiles by fileInfoViewModel.displayedFiles.collectAsState()
 
     LaunchedEffect(uiState.showFilterInput) {
         if (uiState.showFilterInput) {
@@ -389,13 +368,18 @@ fun UserFileListItemCard(
             },
         shape = RoundedCornerShape(8.dp)
     ) {
-        Column(modifier = Modifier.animateContentSize()) {
+        Column(modifier = Modifier.animateContentSize(animationSpec = tween(150))) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
             ) {
+                val context = LocalContext.current
                 AsyncImage(
-                    model = thumbnailUrl,
+                    model = ImageRequest.Builder(context)
+                        .data(thumbnailUrl)
+                        .size(80, 80) // Target 80x80 pixels for decoding
+                        .crossfade(true)
+                        .build(),
                     contentDescription = "${fileInfo.name} thumbnail",
                     modifier = Modifier
                         .size(80.dp)
