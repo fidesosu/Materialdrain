@@ -5,12 +5,10 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.clickable // Still used
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,23 +17,19 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ImageNotSupported
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -58,27 +52,23 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.ContentScale // Added import
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import coil.compose.AsyncImage
-import coil.compose.AsyncImagePainter
-import coil.request.ImageRequest
 import com.example.materialdrain.network.FileInfoResponse
 import com.example.materialdrain.ui.formatApiDateTimeString
 import com.example.materialdrain.ui.formatSize
-import com.example.materialdrain.ui.shared.* // Added import for shared composables
+import com.example.materialdrain.ui.shared.FullScreenMediaPreviewDialog
+import com.example.materialdrain.ui.shared.InlineImagePreview
+import com.example.materialdrain.ui.shared.InlineVideoPreview
 import com.example.materialdrain.viewmodel.DownloadStatus
 import com.example.materialdrain.viewmodel.FileInfoViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
-// ClickablePreviewOverlay and VideoPlayerControls definitions are removed from here.
-// FullScreenMediaPreviewDialog definition was already moved and is now imported from ui.shared.
 
 @Composable
 fun EnterFileIdDialog(fileInfoViewModel: FileInfoViewModel) {
@@ -153,10 +143,10 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
     }
 
     if (fullScreenPreviewUri != null) {
-        FullScreenMediaPreviewDialog( // Now calls the shared composable
+        FullScreenMediaPreviewDialog(
             previewUri = fullScreenPreviewUri,
             previewMimeType = fullScreenPreviewMimeType,
-            thumbnailUrl = actualThumbnailUrl, // Pass the actualThumbnailUrl
+            thumbnailUrl = actualThumbnailUrl, // Fullscreen preview in FileInfoDialogs might still want the direct thumbnail URL
             onDismissRequest = {
                 fullScreenPreviewUri = null
                 fullScreenPreviewMimeType = null
@@ -167,72 +157,33 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
     val fileUrl = "https://pixeldrain.com/u/${fileInfo.id}"
     val rawFileApiUrl = "https://pixeldrain.com/api/file/${fileInfo.id}"
 
-    Column( 
-        modifier = Modifier.fillMaxSize().padding(16.dp) 
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp)
     ) {
         Column(
             modifier = Modifier
-                .weight(1f) 
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
             if (showPreviews) {
                 if (fileInfo.mimeType?.startsWith("image/") == true) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(16f / 9f)
-                            .padding(vertical = 8.dp)
-                            .clip(RoundedCornerShape(12.dp)), 
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            var imageState by remember { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Loading(null)) }
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(rawFileApiUrl)
-                                    .crossfade(true)
-                                    .build(),
-                                contentDescription = "Image preview",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
-                                onState = { state -> imageState = state }
-                            )
-                            when (imageState) {
-                                is AsyncImagePainter.State.Loading -> CircularProgressIndicator(modifier = Modifier.size(48.dp))
-                                is AsyncImagePainter.State.Error -> Icon(Icons.Filled.BrokenImage, contentDescription = "Error loading image", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
-                                is AsyncImagePainter.State.Success -> {
-                                    ClickablePreviewOverlay { // Now calls the shared composable
-                                        fullScreenPreviewUri = rawFileApiUrl.toUri()
-                                        fullScreenPreviewMimeType = fileInfo.mimeType
-                                    }
-                                }
-                                else -> {}
-                            }
+                    InlineImagePreview(
+                        imageSource = rawFileApiUrl, // Pass the raw file API URL for the image
+                        contentDescription = "Image preview for ${fileInfo.name}",
+                        onFullScreenClick = {
+                            fullScreenPreviewUri = rawFileApiUrl.toUri()
+                            fullScreenPreviewMimeType = fileInfo.mimeType
                         }
-                    }
+                    )
                 } else if (fileInfo.mimeType?.startsWith("video/") == true) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(16f / 9f)
-                            .padding(vertical = 8.dp)
-                            .clip(RoundedCornerShape(12.dp)),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            AsyncImage(
-                                model = actualThumbnailUrl, 
-                                contentDescription = "Video thumbnail",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
-                                error = rememberVectorPainter(Icons.Filled.Videocam)
-                            )
-                            ClickablePreviewOverlay { // Now calls the shared composable
-                                fullScreenPreviewUri = rawFileApiUrl.toUri()
-                                fullScreenPreviewMimeType = fileInfo.mimeType
-                            }
+                    InlineVideoPreview(
+                        thumbnailSource = actualThumbnailUrl, // Pass the thumbnail URL for video
+                        contentDescription = "Video thumbnail for ${fileInfo.name}",
+                        onFullScreenClick = {
+                            fullScreenPreviewUri = rawFileApiUrl.toUri() // Fullscreen should use the raw video URL
+                            fullScreenPreviewMimeType = fileInfo.mimeType
                         }
-                    }
+                    )
                 } else if (uiState.isLoadingTextPreview) {
                     Box(modifier = Modifier.fillMaxWidth().height(100.dp).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
@@ -252,13 +203,14 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
                 } else if (uiState.textPreviewErrorMessage != null) {
                     Text(uiState.textPreviewErrorMessage ?: "Error loading text preview.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical=8.dp))
                 } else {
+                    // Fallback for non-image/video files that might have a thumbnail (e.g. documents, archives shown by API)
                     AsyncImage(
                         model = actualThumbnailUrl, 
-                        contentDescription = "File thumbnail",
+                        contentDescription = "File thumbnail for ${fileInfo.name}",
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 100.dp, max = 200.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            // .clip(RoundedCornerShape(12.dp)) // Already handled by Inline previews if they were used here
                             .align(Alignment.CenterHorizontally)
                             .padding(vertical = 8.dp),
                         contentScale = ContentScale.Fit,

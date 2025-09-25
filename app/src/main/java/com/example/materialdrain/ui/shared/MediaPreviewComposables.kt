@@ -19,7 +19,7 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Videocam // Added
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.rememberVectorPainter // Added import
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -58,7 +59,6 @@ import coil.request.ImageRequest
 import coil.target.Target
 import com.example.materialdrain.ui.formatDurationMillis
 import com.example.materialdrain.util.ExoPlayerCache
-import com.example.materialdrain.viewmodel.UploadUiState
 
 private const val TAG_COIL = "CoilImageLoaderShared"
 
@@ -197,7 +197,7 @@ fun FullScreenMediaPreviewDialog(
         ) {
             if (previewUri != null) {
                 Box(
-                    modifier = Modifier.clickable(enabled = false) {}
+                    modifier = Modifier.clickable(enabled = false) {} // Prevent dialog dismissal when clicking on the preview content
                 ) {
                     when {
                         previewMimeType?.startsWith("video/") == true -> {
@@ -240,7 +240,7 @@ fun FullScreenMediaPreviewDialog(
                                     .fillMaxSize()
                                     .padding(16.dp),
                                 contentScale = ContentScale.Fit,
-                                onError = { onDismissRequest() }
+                                onError = { onDismissRequest() } // Optionally dismiss on error
                             )
                         }
                         else -> {
@@ -257,7 +257,10 @@ fun FullScreenMediaPreviewDialog(
 
 @Composable
 fun AudioPlayerPreview(
-    uiState: UploadUiState,
+    albumArtSource: Any?, // Can be ByteArray, Uri, String (URL)
+    artist: String?,
+    album: String?,
+    audioDurationMillis: Long?,
     mediaPlayer: MediaPlayer?,
     isPlaying: Boolean,
     currentPlaybackTimeMillis: Long,
@@ -271,29 +274,68 @@ fun AudioPlayerPreview(
     onDragStart: (offset: androidx.compose.ui.geometry.Offset, totalDuration: Long, progressBarWidthPx: Int) -> Unit,
     onDrag: (change: PointerInputChange, totalDuration: Long, progressBarWidthPx: Int) -> Unit,
     onDragEnd: () -> Unit,
-    onDragCancel: () -> Unit
+    onDragCancel: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Card(modifier = Modifier
-        .fillMaxWidth()
-        .padding(vertical = 8.dp)) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
         Column(modifier = Modifier.padding(bottom = 0.dp)) {
             Row(
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                uiState.audioAlbumArt?.let {
-                    val bitmap = remember(it) { try { BitmapFactory.decodeByteArray(it, 0, it.size) } catch (_: Exception) { null } }
-                    bitmap?.let {bmp -> Image(bitmap = bmp.asImageBitmap(), contentDescription = "Album Art", modifier = Modifier
+                // Album Art Display
+                Box(
+                    modifier = Modifier
                         .size(64.dp)
-                        .clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop) }
-                        ?: Icon(Icons.Filled.MusicNote, contentDescription = "Album Art Placeholder", modifier = Modifier.size(64.dp))
-                } ?: Icon(Icons.Filled.MusicNote, contentDescription = "Album Art Placeholder", modifier = Modifier.size(64.dp))
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant), // Placeholder background
+                    contentAlignment = Alignment.Center
+                ) {
+                    when (albumArtSource) {
+                        is ByteArray -> {
+                            val bitmap = remember(albumArtSource) {
+                                try { BitmapFactory.decodeByteArray(albumArtSource, 0, albumArtSource.size) } catch (e: Exception) { null }
+                            }
+                            if (bitmap != null) {
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = "Album Art",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(Icons.Filled.MusicNote, contentDescription = "Album Art Placeholder", modifier = Modifier.size(32.dp))
+                            }
+                        }
+                        is Uri, is String -> {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(albumArtSource)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = "Album Art",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                                error = rememberVectorPainter(Icons.Filled.MusicNote) // Corrected error placeholder
+                            )
+                        }
+                        else -> {
+                            Icon(Icons.Filled.MusicNote, contentDescription = "Album Art Placeholder", modifier = Modifier.size(32.dp))
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.width(16.dp))
+
                 Column(modifier = Modifier.weight(1f)) {
-                    uiState.audioArtist?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
-                    uiState.audioAlbum?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom=4.dp)) }
+                    artist?.let { Text(it, style = MaterialTheme.typography.titleSmall, maxLines = 1) }
+                    album?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, modifier = Modifier.padding(bottom = 4.dp)) }
                     Text(
-                        text = "${formatDurationMillis( (if (isUserScrubbing) userSeekPositionMillis else currentPlaybackTimeMillis).coerceAtMost(uiState.audioDurationMillis ?: 0L) )} / ${formatDurationMillis(uiState.audioDurationMillis ?: 0L)}",
+                        text = "${formatDurationMillis((if (isUserScrubbing) userSeekPositionMillis else currentPlaybackTimeMillis).coerceAtMost(audioDurationMillis ?: 0L))} / ${formatDurationMillis(audioDurationMillis ?: 0L)}",
                         style = MaterialTheme.typography.labelMedium
                     )
                 }
@@ -305,10 +347,10 @@ fun AudioPlayerPreview(
                     Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (isPlaying) "Pause" else "Play")
                 }
             }
-            if (isMediaPlayerPreparing) Text("Player preparing...", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top=0.dp, start=16.dp, end=16.dp, bottom=8.dp))
-            audioPreviewError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top=0.dp, start=16.dp, end=16.dp, bottom=8.dp)) }
+            if (isMediaPlayerPreparing) Text("Player preparing...", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 0.dp, start = 16.dp, end = 16.dp, bottom = 8.dp))
+            audioPreviewError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 0.dp, start = 16.dp, end = 16.dp, bottom = 8.dp)) }
 
-            val totalDuration = uiState.audioDurationMillis ?: 0L
+            val totalDuration = audioDurationMillis ?: 0L
             val progress = remember(isUserScrubbing, userSeekPositionMillis, currentPlaybackTimeMillis, totalDuration) {
                 val currentPos = if (isUserScrubbing) userSeekPositionMillis else currentPlaybackTimeMillis
                 if (totalDuration > 0L) (currentPos.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f) else 0f
@@ -343,7 +385,7 @@ fun AudioPlayerPreview(
                             )
                         }
                 ) {
-                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth()) 
+                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
                 }
             }
         }
@@ -352,48 +394,50 @@ fun AudioPlayerPreview(
 
 @Composable
 fun InlineImagePreview(
-    uiState: UploadUiState,
+    imageSource: Any?, // Can be Uri, String (URL), etc.
+    contentDescription: String,
+    modifier: Modifier = Modifier,
     onFullScreenClick: () -> Unit
 ) {
-    if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("image/") == true) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .padding(vertical = 8.dp),
-            shape = RoundedCornerShape(12.dp)
+    if (imageSource == null) return
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(16f / 9f)
+            .padding(vertical = 8.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                val imageRequest = ImageRequest.Builder(LocalContext.current)
-                    .data(uiState.selectedFileUri)
+            var imageState by remember { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Loading(null)) }
+            val context = LocalContext.current
+
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(imageSource)
                     .crossfade(true)
                     .listener(onError = { _, result ->
-                        Log.e(TAG_COIL, "Error loading image: ${uiState.selectedFileUri}", result.throwable)
+                        Log.e(TAG_COIL, "Error loading image: $imageSource", result.throwable)
                     })
-                    .build()
-                var imageState by remember { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Loading(null)) }
+                    .build(),
+                contentDescription = contentDescription,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                onState = { state -> imageState = state }
+            )
 
-                AsyncImage(
-                    model = imageRequest,
-                    contentDescription = "Selected image preview",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                    onState = { state -> imageState = state }
-                )
-
-                when (imageState) {
-                    is AsyncImagePainter.State.Loading -> CircularProgressIndicator(modifier = Modifier.size(48.dp))
-                    is AsyncImagePainter.State.Error -> Icon(Icons.Filled.BrokenImage, contentDescription = "Error loading image", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
-                    is AsyncImagePainter.State.Success -> {
-                        ClickablePreviewOverlay {
-                            onFullScreenClick()
-                        }
+            when (imageState) {
+                is AsyncImagePainter.State.Loading -> CircularProgressIndicator(modifier = Modifier.size(48.dp))
+                is AsyncImagePainter.State.Error -> Icon(Icons.Filled.BrokenImage, contentDescription = "Error loading image", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
+                is AsyncImagePainter.State.Success -> {
+                    ClickablePreviewOverlay {
+                        onFullScreenClick()
                     }
-                    else -> {}
                 }
+                else -> {} // Handle other states if necessary
             }
         }
     }
@@ -407,11 +451,11 @@ fun InlineTextPreview(
         Text("Content Preview (4KB Max):", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top=8.dp, bottom=4.dp))
         OutlinedTextField(
             value = it,
-            onValueChange = {},
+            onValueChange = { /* Read-only */ },
             readOnly = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 100.dp, max = 200.dp)
+                .heightIn(min = 100.dp, max = 200.dp) // Adjusted max height
                 .padding(vertical = 8.dp),
             textStyle = MaterialTheme.typography.bodySmall
         )
@@ -420,40 +464,71 @@ fun InlineTextPreview(
 
 @Composable
 fun InlineVideoPreview(
-    videoThumbnail: ByteArray?,
-    selectedFileUri: Uri?,
-    selectedFileMimeType: String?,
+    thumbnailSource: Any?, // Can be ByteArray, String (URL), Uri, etc.
+    contentDescription: String,
+    modifier: Modifier = Modifier,
     onFullScreenClick: () -> Unit
 ) {
-    if (selectedFileUri != null && selectedFileMimeType?.startsWith("video/") == true) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .padding(vertical = 8.dp),
-            shape = RoundedCornerShape(12.dp)
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(16f / 9f)
+            .padding(vertical = 8.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                videoThumbnail?.let {
-                    val bitmap = remember(it) { BitmapFactory.decodeByteArray(it, 0, it.size) }
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "Video thumbnail preview",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    ClickablePreviewOverlay {
-                        onFullScreenClick()
+            when (thumbnailSource) {
+                is ByteArray -> {
+                    val bitmap = remember(thumbnailSource) {
+                        try { BitmapFactory.decodeByteArray(thumbnailSource, 0, thumbnailSource.size) } catch (e: Exception) { Log.e(TAG_COIL, "Error decoding ByteArray to Bitmap", e); null }
                     }
-                } ?: Icon(
-                    Icons.Filled.Videocam,
-                    contentDescription = "Video thumbnail placeholder",
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = contentDescription,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        ClickablePreviewOverlay { onFullScreenClick() }
+                    } else {
+                        Icon(Icons.Filled.BrokenImage, contentDescription = "Error displaying video thumbnail", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+                is String, is Uri -> { // Handles URL Strings and Uris via Coil
+                    var imageState by remember { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Loading(null)) }
+                    val context = LocalContext.current
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(thumbnailSource)
+                            .crossfade(true)
+                            .listener(onError = { _, result ->
+                                Log.e(TAG_COIL, "Error loading video thumbnail: $thumbnailSource", result.throwable)
+                            })
+                            .build(),
+                        contentDescription = contentDescription,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        onState = { state -> imageState = state }
+                    )
+                    when (imageState) {
+                        is AsyncImagePainter.State.Loading -> CircularProgressIndicator(modifier = Modifier.size(48.dp))
+                        is AsyncImagePainter.State.Error -> Icon(Icons.Filled.Videocam, contentDescription = "Video thumbnail placeholder", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        is AsyncImagePainter.State.Success -> {
+                            ClickablePreviewOverlay { onFullScreenClick() }
+                        }
+                        else -> {}
+                    }
+                }
+                null -> { // Explicitly handle null case with a placeholder
+                    Icon(Icons.Filled.Videocam, contentDescription = "Video thumbnail unavailable", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                else -> { // Fallback for unexpected types
+                    Icon(Icons.Filled.BrokenImage, contentDescription = "Unsupported thumbnail type", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
+                    Log.w(TAG_COIL, "Unsupported thumbnailSource type: ${thumbnailSource::class.java.name}")
+                }
             }
         }
     }

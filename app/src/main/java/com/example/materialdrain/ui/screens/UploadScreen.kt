@@ -33,7 +33,7 @@ import kotlinx.coroutines.isActive
 import com.example.materialdrain.ui.shared.AudioPlayerPreview
 import com.example.materialdrain.ui.shared.InlineImagePreview
 import com.example.materialdrain.ui.shared.InlineTextPreview
-import com.example.materialdrain.ui.shared.InlineVideoPreview // Added
+import com.example.materialdrain.ui.shared.InlineVideoPreview
 
 private const val TAG_MEDIA_PLAYER = "MediaPlayerPreview"
 
@@ -63,7 +63,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel) {
         FullScreenMediaPreviewDialog(
             previewUri = fullScreenPreviewUri,
             previewMimeType = fullScreenPreviewMimeType,
-            thumbnailUrl = null, 
+            thumbnailUrl = null, // In UploadScreen, fullscreen video doesn't use a separate thumbnail for the player
             onDismissRequest = {
                 fullScreenPreviewUri = null
                 fullScreenPreviewMimeType = null
@@ -111,12 +111,12 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel) {
                     audioPreviewError = "Cannot play audio (error $what, $extra)."
                     Log.e(TAG_MEDIA_PLAYER, "MediaPlayer Error: what=$what, extra=$extra for URI: ${uiState.selectedFileUri}")
                     mp?.release()
-                    if (mediaPlayer == mp) { 
+                    if (mediaPlayer == mp) {
                         mediaPlayer = null
                     }
                     isMediaPlayerPreparing = false
-                    isPlaying = false 
-                    true 
+                    isPlaying = false
+                    true
                 }
                 localMediaPlayerInstance.setOnCompletionListener { mp ->
                     isPlaying = false
@@ -128,7 +128,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel) {
                 audioPreviewError = "Error setting up audio player: ${e.message}"
                 Log.e(TAG_MEDIA_PLAYER, "Error setting up audio player for URI: ${uiState.selectedFileUri}", e)
                 localMediaPlayerInstance.release()
-                mediaPlayer = null 
+                mediaPlayer = null
                 isMediaPlayerPreparing = false
                 isPlaying = false
             }
@@ -160,11 +160,11 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel) {
                     }
                 } catch (e: IllegalStateException) {
                     Log.w(TAG_MEDIA_PLAYER, "MediaPlayer access error during playback: ${e.message}")
-                    isPlaying = false 
+                    isPlaying = false
                     audioPreviewError = "Player error during update."
-                    break 
+                    break
                 }
-                awaitFrame() 
+                awaitFrame()
                 if (!isPlaying || mediaPlayer?.isPlaying == false || isUserScrubbing) {
                     break
                 }
@@ -234,19 +234,26 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel) {
                         }
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        InlineImagePreview(uiState = uiState) {
-                            fullScreenPreviewUri = uiState.selectedFileUri
-                            fullScreenPreviewMimeType = uiState.selectedFileMimeType
+                        if (uiState.selectedFileMimeType?.startsWith("image/") == true) {
+                            InlineImagePreview(
+                                imageSource = uiState.selectedFileUri,
+                                contentDescription = "Selected image preview",
+                                onFullScreenClick = {
+                                    fullScreenPreviewUri = uiState.selectedFileUri
+                                    fullScreenPreviewMimeType = uiState.selectedFileMimeType
+                                }
+                            )
                         }
 
-                        // Use the shared InlineVideoPreview Composable
-                        InlineVideoPreview(
-                            videoThumbnail = uiState.videoThumbnail,
-                            selectedFileUri = uiState.selectedFileUri,
-                            selectedFileMimeType = uiState.selectedFileMimeType
-                        ) {
-                            fullScreenPreviewUri = uiState.selectedFileUri
-                            fullScreenPreviewMimeType = uiState.selectedFileMimeType
+                        if (uiState.selectedFileMimeType?.startsWith("video/") == true) {
+                            InlineVideoPreview(
+                                thumbnailSource = uiState.videoThumbnail, // Upload screen uses fetched byte array for thumbnail
+                                contentDescription = "Selected video preview",
+                                onFullScreenClick = {
+                                    fullScreenPreviewUri = uiState.selectedFileUri
+                                    fullScreenPreviewMimeType = uiState.selectedFileMimeType
+                                }
+                            )
                         }
 
                         if (uiState.selectedFileUri != null && uiState.selectedFileMimeType == "application/pdf" && uiState.pdfPageCount != null) {
@@ -293,7 +300,10 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel) {
 
                         if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("audio/") == true) {
                             AudioPlayerPreview(
-                                uiState = uiState,
+                                albumArtSource = uiState.audioAlbumArt,
+                                artist = uiState.audioArtist,
+                                album = uiState.audioAlbum,
+                                audioDurationMillis = uiState.audioDurationMillis,
                                 mediaPlayer = mediaPlayer,
                                 isPlaying = isPlaying,
                                 currentPlaybackTimeMillis = currentPlaybackTimeMillis,
@@ -346,7 +356,7 @@ fun UploadScreenContent(uploadViewModel: UploadViewModel) {
                         }
 
                         InlineTextPreview(textContent = uiState.selectedFileTextContent)
-                        
+
                         if (uiState.errorMessage?.contains("preview", true) == true || uiState.errorMessage?.contains("metadata", true) == true) {
                             Text(uiState.errorMessage!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom=8.dp))
                         }
