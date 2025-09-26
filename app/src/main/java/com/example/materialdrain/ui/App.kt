@@ -4,14 +4,12 @@ import android.app.Application
 import android.content.Context // Added for SharedPreferences
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-// import androidx.compose.animation.BoundsTransform // Removed
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SizeTransform // Added import for SizeTransform
-// import androidx.compose.animation.animateContentSize // Already present implicitly via AnimatedContent
-// import androidx.compose.animation.core.FiniteAnimationSpec // Removed
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -24,34 +22,35 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.*
+// Import specific filled icons that are still used directly
+import androidx.compose.material.icons.filled.Description 
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-// import androidx.compose.ui.geometry.Rect // Removed
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-// import androidx.compose.ui.platform.LocalLayoutDirection // No longer needed here for finalPadding
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.materialdrain.R // Import R class
 import com.example.materialdrain.network.PixeldrainApiService
 import com.example.materialdrain.ui.screens.EnterFileIdDialog
 import com.example.materialdrain.ui.screens.FileInfoDetailsCard
 import com.example.materialdrain.ui.screens.FilesScreenContent
+import com.example.materialdrain.ui.screens.FilesystemScreen // Updated import
 import com.example.materialdrain.ui.screens.ListsScreenContent
 import com.example.materialdrain.ui.screens.SettingsScreenContent
 import com.example.materialdrain.ui.screens.UploadScreenContent
-import com.example.materialdrain.ui.shared.AppSnackbarHost // Added import
+import com.example.materialdrain.ui.shared.AppSnackbarHost
 import com.example.materialdrain.ui.theme.MaterialdrainTheme
 import com.example.materialdrain.viewmodel.FileInfoViewModel
+import com.example.materialdrain.viewmodel.FilesystemViewModel 
 import com.example.materialdrain.viewmodel.UploadViewModel
 import com.example.materialdrain.viewmodel.ViewModelFactory
 import kotlinx.coroutines.flow.collectLatest
@@ -66,12 +65,13 @@ private const val PREFS_NAME = "pixeldrain_prefs"
 private const val API_KEY_PREF = "api_key"
 
 // Define the screens in the app
-enum class Screen(val title: String, val icon: ImageVector) {
-    Upload("Upload", Icons.Filled.FileUpload),
-    Files("Files", Icons.Filled.Folder),
-    FileDetail("File Details", Icons.Filled.Description),
-    Lists("Lists", Icons.AutoMirrored.Filled.List),
-    Settings("Settings", Icons.Filled.Settings)
+enum class Screen(val title: String, @DrawableRes val iconResId: Int?) {
+    Upload("Upload", R.drawable.icon_upload),
+    Files("Files", R.drawable.icon_folder_outlined),
+    Filesystem("Filesystem", R.drawable.icon_hard_drive_outlined),
+    FileDetail("File Details", null), // Using null for now, direct usage for its icon
+    Lists("Lists", R.drawable.icon_list),
+    Settings("Settings", R.drawable.icon_settings_outlined)
 }
 
 // Helper function to format API date-time strings
@@ -106,23 +106,21 @@ fun MaterialDrainScreen() {
 
     val uploadViewModel: UploadViewModel = viewModel(factory = viewModelFactory)
     val fileInfoViewModel: FileInfoViewModel = viewModel(factory = viewModelFactory)
+    val filesystemViewModel: FilesystemViewModel = viewModel(factory = viewModelFactory) // Instantiate FilesystemViewModel
 
-    val snackbarHostState = remember { SnackbarHostState() } // This is the SnackbarHostState we need to pass
+    val snackbarHostState = remember { SnackbarHostState() }
     val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
     val uploadUiState by uploadViewModel.uiState.collectAsState()
+    // val filesystemUiState by filesystemViewModel.uiState.collectAsState() // Collect if needed directly here
 
     val filesScreenListState = rememberLazyListState()
 
-    // Hoisted state for API Key input
     var apiKeyInput by rememberSaveable { mutableStateOf("") }
-
-    // State for FAB height
     var fabHeightDp by remember { mutableStateOf(0.dp) }
     val localDensity = LocalDensity.current
 
-    // Load API key from SharedPreferences when the screen is first composed
     LaunchedEffect(Unit) {
-        Log.d("MaterialDrainScreen", "Initial composition. Loading API Key from SharedPreferences.")
+        Log.d("App", "Initial composition. Loading API Key from SharedPreferences.")
         val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         apiKeyInput = sharedPrefs.getString(API_KEY_PREF, "") ?: ""
     }
@@ -135,9 +133,10 @@ fun MaterialDrainScreen() {
     }
 
     LaunchedEffect(currentScreen) {
-        Log.d("MaterialDrainScreen", "currentScreen changed to: ${currentScreen.name}")
+        Log.d("App", "currentScreen changed to: ${currentScreen.name}")
         when (currentScreen) {
             Screen.Files -> { /* Scroll handling is managed by FilesScreenContent and its LazyListState */ }
+            Screen.Filesystem -> { /* Placeholder for Filesystem specific logic if needed. ViewModel handles its own loading. */ }
             Screen.FileDetail -> fileInfoViewModel.setFilterInputVisible(false)
             else -> {
                 if (currentScreen != Screen.FileDetail) fileInfoViewModel.clearFileInfoDisplay()
@@ -226,19 +225,19 @@ fun MaterialDrainScreen() {
         derivedStateOf {
             when (currentScreen) {
                 Screen.Upload -> FabDetails(
-                    icon = Icons.Filled.FileUpload,
+                    iconResId = R.drawable.icon_upload,
                     text = "Upload",
                     onClick = { if ((uploadUiState.selectedFileUri != null || uploadUiState.textToUpload.isNotBlank()) && !uploadUiState.isLoading) uploadViewModel.upload() },
                     isExtended = true,
                 )
                 Screen.Files -> FabDetails(
-                    icon = Icons.Filled.Add,
+                    iconResId = R.drawable.icon_add,
                     text = "Filter",
                     onClick = { fileInfoViewModel.toggleFilterInput() },
                     isExtended = true
                 )
                 Screen.Lists -> FabDetails(
-                    icon = Icons.Filled.Add,
+                    iconResId = R.drawable.icon_add,
                     text = "New List",
                     onClick = {
                         genericDialogTitle = "New List"
@@ -248,7 +247,7 @@ fun MaterialDrainScreen() {
                     isExtended = true
                 )
                 Screen.Settings -> FabDetails(
-                    icon = Icons.Filled.Save,
+                    iconResId = R.drawable.icon_settings_filled, // Using filled settings as a save icon
                     text = "Save Settings",
                     onClick = {
                         val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -258,6 +257,7 @@ fun MaterialDrainScreen() {
                         }
                         uploadViewModel.updateApiKey(apiKeyInput.trim())
                         fileInfoViewModel.loadApiKey()
+                        filesystemViewModel.updateApiKey() // Update FilesystemViewModel with new API key
                         genericDialogTitle = "Settings Saved"
                         genericDialogContent = "API Key saved successfully."
                         showGenericDialog = true
@@ -265,12 +265,13 @@ fun MaterialDrainScreen() {
                     isExtended = true
                 )
                 Screen.FileDetail -> null
+                Screen.Filesystem -> null 
             }
         }
     }
     val isFabVisible = fabState != null
 
-    SharedTransitionLayout { // Retained for AnimatedContent transitions
+    SharedTransitionLayout { 
         Scaffold(
             topBar = {
                 Column {
@@ -329,6 +330,13 @@ fun MaterialDrainScreen() {
                                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Files")
                                 }
                             }
+                        },
+                        actions = {
+                            if (currentScreen != Screen.FileDetail && currentScreen != Screen.Settings) {
+                                IconButton(onClick = { currentScreen = Screen.Settings }) {
+                                    Icon(painterResource(id = R.drawable.icon_settings_outlined), contentDescription = "Settings")
+                                }
+                            }
                         }
                     )
                     AnimatedVisibility(
@@ -336,13 +344,13 @@ fun MaterialDrainScreen() {
                         enter = fadeIn(animationSpec = tween(150)),
                         exit = fadeOut(animationSpec = tween(150))
                     ) {
-                        val progress = if (uploadUiState.uploadTotalSizeBytes != null && uploadUiState.uploadTotalSizeBytes!! > 0L) {
+                        val progressFloat = if (uploadUiState.uploadTotalSizeBytes != null && uploadUiState.uploadTotalSizeBytes!! > 0L) {
                             (uploadUiState.uploadedBytes.toFloat() / uploadUiState.uploadTotalSizeBytes!!).coerceIn(0f, 1f)
-                        } else {0f}
+                        } else {0f} // Default to 0f if total size is null or 0, or handle as indeterminate
                         if (uploadUiState.uploadTotalSizeBytes != null && uploadUiState.uploadTotalSizeBytes!! > 0L) {
-                            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                            LinearProgressIndicator(progress = progressFloat, modifier = Modifier.fillMaxWidth())
                         } else {
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) // Indeterminate
                         }
                     }
                 }
@@ -356,7 +364,6 @@ fun MaterialDrainScreen() {
                     }
                 }
             },
-            // floatingActionButtonPosition = FabPosition.Center, // Defaults to End
             floatingActionButton = {
                 fabState?.let { details ->
                     ExtendedFloatingActionButton(
@@ -364,14 +371,14 @@ fun MaterialDrainScreen() {
                         expanded = details.isExtended,
                         icon = {
                             AnimatedContent(
-                                targetState = details.icon,
-                                contentKey = { it.name },
+                                targetState = details.iconResId,
+                                // contentKey = { it.name }, // contentKey might not be applicable directly for @DrawableRes Int
                                 transitionSpec = {
                                     fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(200))
                                 },
                                 label = "fabIconAnimation"
-                            ) { targetIcon ->
-                                Icon(targetIcon, contentDescription = details.text ?: targetIcon.name)
+                            ) { targetIconResId ->
+                                Icon(painterResource(id = targetIconResId), contentDescription = details.text ?: "FAB icon")
                             }
                         },
                         text = {
@@ -391,7 +398,6 @@ fun MaterialDrainScreen() {
                             .onSizeChanged {
                                 fabHeightDp = with(localDensity) { it.height.toDp() }
                             }
-                            // Removed .sharedElementWithCallerManagedVisibility()
                             .then(if (details.yOffset != 0.dp) Modifier.offset(y = details.yOffset) else Modifier)
                     )
                 }
@@ -400,10 +406,9 @@ fun MaterialDrainScreen() {
                 AppSnackbarHost(
                     hostState = snackbarHostState,
                     modifier = Modifier.zIndex(1f)
-                    // onDismiss can be added here if MaterialDrainScreen needs to react to swipe dismissals
                 )
             }
-        ) { paddingValues -> // These are the Scaffold's padding values
+        ) { paddingValues -> 
             CompositionLocalProvider(LocalOverscrollFactory provides null) {
                 AnimatedContent(
                     targetState = currentScreen,
@@ -423,7 +428,7 @@ fun MaterialDrainScreen() {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(paddingValues) // Apply Scaffold's padding directly
+                            .padding(paddingValues) 
                     ) {
                         when (targetScreen) {
                             Screen.Upload -> UploadScreenContent(
@@ -438,13 +443,18 @@ fun MaterialDrainScreen() {
                                 fabHeight = fabHeightDp,
                                 isFabVisible = isFabVisible
                             )
+                            Screen.Filesystem -> FilesystemScreen(
+                                filesystemViewModel = filesystemViewModel, // Pass the ViewModel
+                                fabHeight = fabHeightDp,
+                                isFabVisible = isFabVisible
+                            )
                             Screen.FileDetail -> {
                                 fileInfoUiState.fileInfo?.let { info ->
                                     FileInfoDetailsCard(
                                         fileInfo = info,
                                         fileInfoViewModel = fileInfoViewModel,
                                         context = LocalContext.current,
-                                        snackbarHostState = snackbarHostState // Pass the snackbarHostState here
+                                        snackbarHostState = snackbarHostState
                                     )
                                 } ?: run {
                                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -495,6 +505,7 @@ fun MaterialDrainScreen() {
                     if (genericDialogTitle.contains("API Key Required")) {
                         fileInfoViewModel.clearUserFilesError()
                         fileInfoViewModel.clearApiKeyMissingError()
+                        // Consider clearing filesystemViewModel error too if relevant
                     }
                 },
                 title = { Text(genericDialogTitle) },
@@ -507,6 +518,7 @@ fun MaterialDrainScreen() {
                         if (genericDialogTitle.contains("API Key Required")) {
                             fileInfoViewModel.clearUserFilesError()
                             fileInfoViewModel.clearApiKeyMissingError()
+                            // Consider clearing filesystemViewModel error too if relevant
                             if (genericDialogContent.contains("Settings")) {
                                 if (currentScreen != Screen.Settings) currentScreen = Screen.Settings
                             }
@@ -540,23 +552,26 @@ fun MaterialDrainScreen() {
 }
 
 data class FabDetails(
-    val icon: ImageVector,
+    @DrawableRes val iconResId: Int,
     val text: String?,
     val onClick: () -> Unit,
     val isExtended: Boolean,
-    val yOffset: androidx.compose.ui.unit.Dp = 0.dp // Default no offset
+    val yOffset: androidx.compose.ui.unit.Dp = 0.dp 
 )
 
 @Composable
 fun BottomNavigationBar(currentScreen: Screen, onScreenSelected: (Screen) -> Unit) {
+    val navBarOrder = listOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem)
     NavigationBar {
-        Screen.entries.filter { it != Screen.FileDetail }.forEach { screen ->
-            NavigationBarItem(
-                icon = { Icon(screen.icon, contentDescription = screen.title) },
-                label = { Text(screen.title) },
-                selected = currentScreen == screen,
-                onClick = { onScreenSelected(screen) }
-            )
+        navBarOrder.forEach { screen ->
+            screen.iconResId?.let { // Ensure iconResId is not null before using
+                NavigationBarItem(
+                    icon = { Icon(painterResource(id = it), contentDescription = screen.title) },
+                    label = { Text(screen.title) },
+                    selected = currentScreen == screen,
+                    onClick = { onScreenSelected(screen) }
+                )
+            }
         }
     }
 }
