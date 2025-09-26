@@ -24,7 +24,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
@@ -41,8 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight // Added import for FontWeight
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
@@ -53,9 +51,7 @@ import com.example.materialdrain.ui.formatSize
 import com.example.materialdrain.ui.shared.FullScreenMediaPreviewDialog
 import com.example.materialdrain.ui.shared.InlineImagePreview
 import com.example.materialdrain.ui.shared.InlineVideoPreview
-import com.example.materialdrain.viewmodel.DownloadStatus
 import com.example.materialdrain.viewmodel.FileInfoViewModel
-import kotlinx.coroutines.delay
 
 @Composable
 fun EnterFileIdDialog(fileInfoViewModel: FileInfoViewModel) {
@@ -216,27 +212,6 @@ fun FileInfoDetailsCard(
         fileInfo.hashSha256?.let { InfoRow("SHA256", it, true) }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-        downloadState?.let {
-            Spacer(Modifier.height(8.dp))
-            when (it.status) {
-                DownloadStatus.DOWNLOADING -> {
-                    LinearProgressIndicator(progress = { it.progressFraction }, modifier = Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(4.dp))
-                    Text("${formatSize(it.downloadedBytes)} / ${it.totalBytes?.let { tb -> formatSize(tb) } ?: "Unknown"}", style = MaterialTheme.typography.bodySmall)
-                }
-                DownloadStatus.COMPLETED -> {
-                    TextButton(onClick = { fileInfoViewModel.clearDownloadState(fileInfo.id) }) { Text("Clear Download Status") }
-                }
-                DownloadStatus.FAILED -> {
-                    TextButton(onClick = { fileInfoViewModel.clearDownloadState(fileInfo.id) }) { Text("Clear Download Status") }
-                }
-                DownloadStatus.PENDING -> {
-                    Text("Download is pending...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-        }
 
         // The "Admin Actions" section with the Delete button has been removed as it's now in the TopAppBar menu.
         // The Spacer that was previously used for FAB height is no longer necessary here, 

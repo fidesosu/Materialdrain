@@ -59,6 +59,7 @@ import com.example.materialdrain.ui.screens.SettingsScreenContent
 import com.example.materialdrain.ui.screens.UploadScreenContent
 import com.example.materialdrain.ui.shared.AppSnackbarHost
 import com.example.materialdrain.ui.theme.MaterialdrainTheme
+import com.example.materialdrain.viewmodel.DownloadStatus
 import com.example.materialdrain.viewmodel.FileInfoViewModel
 import com.example.materialdrain.viewmodel.FilesystemViewModel 
 import com.example.materialdrain.viewmodel.UploadViewModel
@@ -317,17 +318,28 @@ fun MaterialDrainScreen() {
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = currentTitle,
-                                        modifier = if (currentScreen == Screen.FileDetail) {
-                                            Modifier.weight(1f).horizontalScroll(rememberScrollState())
-                                        } else {
-                                            Modifier.weight(1f)
-                                        },
-                                        maxLines = 1,
-                                        // overflow property removed for FileDetail to allow scrolling
-                                        overflow = if (currentScreen == Screen.FileDetail) TextOverflow.Clip else TextOverflow.Ellipsis 
-                                    )
+                                    AnimatedVisibility(
+                                        visible = currentScreen != Screen.FileDetail || 
+                                                  fileInfoUiState.fileInfo?.id?.let { fileId ->
+                                                      fileInfoUiState.activeDownloads[fileId]?.let {
+                                                          it.status != DownloadStatus.DOWNLOADING && it.status != DownloadStatus.PENDING
+                                                      } ?: true
+                                                  } ?: true,
+                                        enter = fadeIn(animationSpec = tween(150)),
+                                        exit = fadeOut(animationSpec = tween(150))
+                                    ) {
+                                        Text(
+                                            text = currentTitle,
+                                            modifier = if (currentScreen == Screen.FileDetail) {
+                                                Modifier.weight(1f, fill = false).horizontalScroll(rememberScrollState())
+                                            } else {
+                                                Modifier.weight(1f)
+                                            },
+                                            maxLines = 1,
+                                            overflow = if (currentScreen == Screen.FileDetail) TextOverflow.Clip else TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    // Upload progress text in title Row (for UploadScreen)
                                     AnimatedVisibility(
                                         visible = currentScreen == Screen.Upload && uploadUiState.isLoading,
                                         enter = fadeIn(animationSpec = tween(300)),
@@ -342,7 +354,7 @@ fun MaterialDrainScreen() {
                                         Text(
                                             text = progressText,
                                             style = MaterialTheme.typography.bodySmall,
-                                            modifier = Modifier.padding(start = 8.dp)
+                                            modifier = Modifier.padding(start = 8.dp).weight(1f, fill = true) // Allow shrinking if title is long
                                         )
                                     }
                                 }
@@ -360,6 +372,24 @@ fun MaterialDrainScreen() {
                         },
                         actions = {
                             if (currentScreen == Screen.FileDetail) {
+                                val downloadState = fileInfoUiState.fileInfo?.id?.let { fileInfoUiState.activeDownloads[it] }
+                                AnimatedVisibility(
+                                    visible = downloadState?.status == DownloadStatus.DOWNLOADING,
+                                    enter = fadeIn(animationSpec = tween(150)),
+                                    exit = fadeOut(animationSpec = tween(150))
+                                ) {
+                                    if (downloadState != null) {
+                                        val downloaded = formatSize(downloadState.downloadedBytes)
+                                        val total = downloadState.totalBytes?.let { tb -> formatSize(tb) }
+                                        val progressText = if (total != null) "$downloaded / $total" else downloaded
+                                        Text(
+                                            text = progressText,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.align(Alignment.CenterVertically).padding(end = 8.dp) 
+                                        )
+                                    }
+                                }
+
                                 fileInfoUiState.fileInfo?.let { currentFile ->
                                     val fileUrl = "https://pixeldrain.com/u/${currentFile.id}"
                                     IconButton(onClick = { showFileDetailMenu = true }) {
@@ -428,11 +458,31 @@ fun MaterialDrainScreen() {
                     ) {
                         val progressFloat = if (uploadUiState.uploadTotalSizeBytes != null && uploadUiState.uploadTotalSizeBytes!! > 0L) {
                             (uploadUiState.uploadedBytes.toFloat() / uploadUiState.uploadTotalSizeBytes!!).coerceIn(0f, 1f)
-                        } else {0f} // Default to 0f if total size is null or 0, or handle as indeterminate
+                        } else {0f} 
                         if (uploadUiState.uploadTotalSizeBytes != null && uploadUiState.uploadTotalSizeBytes!! > 0L) {
-                            LinearProgressIndicator(progress = progressFloat, modifier = Modifier.fillMaxWidth())
+                            LinearProgressIndicator(progress = { progressFloat }, modifier = Modifier.fillMaxWidth())
                         } else {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) // Indeterminate
+                        }
+                    }
+                    // Added LinearProgressIndicator for FileDetailScreen download progress
+                    AnimatedVisibility(
+                        visible = currentScreen == Screen.FileDetail && 
+                                  fileInfoUiState.fileInfo?.id?.let { fileId -> 
+                                      fileInfoUiState.activeDownloads[fileId]?.let {
+                                          it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.PENDING
+                                      } ?: false
+                                  } == true,
+                        enter = fadeIn(animationSpec = tween(150)),
+                        exit = fadeOut(animationSpec = tween(150))
+                    ) {
+                        val downloadState = fileInfoUiState.fileInfo?.id?.let { fileInfoUiState.activeDownloads[it] }
+                        if (downloadState != null && (downloadState.status == DownloadStatus.DOWNLOADING || downloadState.status == DownloadStatus.PENDING)) {
+                            if (downloadState.totalBytes != null && downloadState.totalBytes > 0L && downloadState.status == DownloadStatus.DOWNLOADING) {
+                                LinearProgressIndicator(progress = { downloadState.progressFraction }, modifier = Modifier.fillMaxWidth())
+                            } else {
+                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) // Indeterminate
+                            }
                         }
                     }
                 }
@@ -454,7 +504,6 @@ fun MaterialDrainScreen() {
                         icon = {
                             AnimatedContent(
                                 targetState = details.iconResId,
-                                // contentKey = { it.name }, // contentKey might not be applicable directly for @DrawableRes Int
                                 transitionSpec = {
                                     fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(200))
                                 },
