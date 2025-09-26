@@ -16,13 +16,11 @@ class ViewModelFactory(
             return UploadViewModel(application, pixeldrainApiService) as T
         }
         if (modelClass.isAssignableFrom(FileInfoViewModel::class.java)) {
-            // Pass application to FileInfoViewModel
             return FileInfoViewModel(application, pixeldrainApiService) as T
         }
-        // Add more ViewModels here as needed
-        // if (modelClass.isAssignableFrom(AnotherViewModel::class.java)) {
-        //     return AnotherViewModel(pixeldrainApiService) as T // Example
-        // }
+        if (modelClass.isAssignableFrom(FilesystemViewModel::class.java)) {
+            return FilesystemViewModel(application, pixeldrainApiService) as T
+        }
         throw IllegalArgumentException("Unknown ViewModel class: " + modelClass.name)
     }
 }
