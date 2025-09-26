@@ -119,6 +119,14 @@ fun MaterialDrainScreen() {
     var fabHeightDp by remember { mutableStateOf(0.dp) }
     val localDensity = LocalDensity.current
 
+    // Define the order of screens in the bottom navigation bar
+    val navBarOrder = listOf(
+        Screen.Upload,
+        Screen.Files,
+        Screen.Lists,
+        Screen.Filesystem
+    )
+
     LaunchedEffect(Unit) {
         Log.d("App", "Initial composition. Loading API Key from SharedPreferences.")
         val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -357,7 +365,7 @@ fun MaterialDrainScreen() {
             },
             bottomBar = {
                 AnimatedVisibility(visible = currentScreen != Screen.FileDetail) {
-                    BottomNavigationBar(currentScreen) { selectedScreen ->
+                    BottomNavigationBar(currentScreen, navBarOrder) { selectedScreen -> // Pass navBarOrder
                         if (currentScreen != selectedScreen) {
                             currentScreen = selectedScreen
                         }
@@ -413,12 +421,28 @@ fun MaterialDrainScreen() {
                 AnimatedContent(
                     targetState = currentScreen,
                     transitionSpec = {
-                        if (targetState.ordinal > initialState.ordinal) {
-                            (slideInVertically { height -> height } + fadeIn())
-                                .togetherWith(slideOutVertically { height -> -height } + fadeOut())
+                        val initialIndex = navBarOrder.indexOf(initialState)
+                        val targetIndex = navBarOrder.indexOf(targetState)
+
+                        if (initialIndex != -1 && targetIndex != -1) {
+                            // Both screens are in the main navigation bar
+                            if (targetIndex > initialIndex) {
+                                (slideInVertically { height -> height } + fadeIn())
+                                    .togetherWith(slideOutVertically { height -> -height } + fadeOut())
+                            } else {
+                                (slideInVertically { height -> -height } + fadeIn())
+                                    .togetherWith(slideOutVertically { height -> height } + fadeOut())
+                            }
                         } else {
-                            (slideInVertically { height -> -height } + fadeIn())
-                                .togetherWith(slideOutVertically { height -> height } + fadeOut())
+                            // Default transition for screens not in navBarOrder (e.g., FileDetail, Settings)
+                            // Or if one of them is not in navBarOrder (should ideally not happen for main nav)
+                            if (targetState.ordinal > initialState.ordinal) {
+                                (slideInVertically { height -> height } + fadeIn())
+                                    .togetherWith(slideOutVertically { height -> -height } + fadeOut())
+                            } else {
+                                (slideInVertically { height -> -height } + fadeIn())
+                                    .togetherWith(slideOutVertically { height -> height } + fadeOut())
+                            }
                         }.using(
                             SizeTransform(clip = false)
                         )
@@ -561,8 +585,8 @@ data class FabDetails(
 )
 
 @Composable
-fun BottomNavigationBar(currentScreen: Screen, onScreenSelected: (Screen) -> Unit) {
-    val navBarOrder = listOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem)
+fun BottomNavigationBar(currentScreen: Screen, navBarOrder: List<Screen>, onScreenSelected: (Screen) -> Unit) {
+    // val navBarOrder = listOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem) // Moved up
     NavigationBar {
         navBarOrder.forEach { screen ->
             screen.iconResId?.let { // Ensure iconResId is not null before using
