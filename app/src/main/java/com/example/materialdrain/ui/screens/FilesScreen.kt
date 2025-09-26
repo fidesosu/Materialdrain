@@ -69,6 +69,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest // Added import
@@ -144,7 +145,9 @@ fun SortControls(uiState: FileInfoUiState, fileInfoViewModel: FileInfoViewModel)
 fun FilesScreenContent(
     fileInfoViewModel: FileInfoViewModel,
     onFileSelected: () -> Unit,
-    listState: LazyListState // Accept LazyListState as a parameter
+    listState: LazyListState, // Accept LazyListState as a parameter
+    fabHeight: Dp,
+    isFabVisible: Boolean
 ) {
     val uiState by fileInfoViewModel.uiState.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -301,7 +304,10 @@ fun FilesScreenContent(
                 LazyColumn(
                     state = listState, // Use the passed-in listState
                     modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(vertical = 8.dp)
+                    contentPadding = PaddingValues(
+                        top = 8.dp, 
+                        bottom = if (isFabVisible) fabHeight + 16.dp else 8.dp
+                    )
                 ) {
                     items(
                         items = displayedFiles,

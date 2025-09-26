@@ -20,35 +20,40 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun ListsScreenContent(onShowDialog: (String, String) -> Unit) {
+fun ListsScreenContent(
+    onShowDialog: (String, String) -> Unit,
+    fabHeight: Dp,
+    isFabVisible: Boolean
+) {
     var listId by remember { mutableStateOf("") }
-    var newListFileIds by remember { mutableStateOf("") }
+    // newListFileIds and related Button removed as FAB handles new list creation concept
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(horizontal = 16.dp) // Horizontal padding applied once
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(16.dp)) // Initial top spacer
 
-        OutlinedTextField(value = newListFileIds, onValueChange = { newListFileIds = it }, label = { Text("Enter File IDs for new list (comma-separated)") }, modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(onClick = { onShowDialog("Create List", "Creating new list with files: $newListFileIds (Not Implemented)") }, modifier = Modifier.fillMaxWidth(), enabled = newListFileIds.isNotBlank()) {
-            Text("Create New List")
-        }
-        Spacer(modifier = Modifier.height(24.dp))
         OutlinedTextField(value = listId, onValueChange = { listId = it }, label = { Text("Enter List ID to View") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(8.dp))
         Button(onClick = { onShowDialog("View List", "Fetching details for List ID: $listId (Not Implemented)") }, modifier = Modifier.fillMaxWidth(), enabled = listId.isNotBlank()) {
             Text("View List Details")
         }
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.weight(1f)) // Pushes content below to the bottom
         Text("List functionality is not yet implemented.", style = MaterialTheme.typography.bodySmall)
-        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Add Spacer at the end of the scrollable content if FAB is visible
+        if (isFabVisible) {
+            Spacer(Modifier.height(fabHeight + 16.dp)) // fabHeight + existing 16dp bottom margin
+        } else {
+            Spacer(modifier = Modifier.height(16.dp)) // Default bottom spacer when FAB is not visible
+        }
     }
 }
