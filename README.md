@@ -1,3 +1,9 @@
+# Important
+I apologize if you try to build and run the app. Currently the github repo probably doesn't have all the necessary files needed to build it from source. I'll try to get them all in near future. 
+
+In the mean time please use the built apps in the Releases page.
+
+---
 # Materialdrain
 
 Materialdrain is a modern Android client for Pixeldrain, built with Jetpack Compose and Material 3. It offers a native interface for uploading, managing, and viewing your Pixeldrain files.
