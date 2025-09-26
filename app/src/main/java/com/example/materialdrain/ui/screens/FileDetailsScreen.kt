@@ -1,4 +1,4 @@
-package com.example.materialdrain.ui.dialogs
+package com.example.materialdrain.ui.screens
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -60,7 +60,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import coil.compose.AsyncImage
@@ -129,6 +128,7 @@ fun EnterFileIdDialog(fileInfoViewModel: FileInfoViewModel) {
 }
 
 @Composable
+@androidx.media3.common.util.UnstableApi
 fun FileInfoDetailsCard(
     fileInfo: FileInfoResponse,
     fileInfoViewModel: FileInfoViewModel,
@@ -255,11 +255,11 @@ fun FileInfoDetailsCard(
                         Text("${formatSize(it.downloadedBytes)} / ${it.totalBytes?.let { tb -> formatSize(tb) } ?: "Unknown"}", style = MaterialTheme.typography.bodySmall)
                     }
                     DownloadStatus.COMPLETED -> {
-                        // SnackBar for this will be shown by MaterialDrainScreen using the passed snackbarHostState
+                        // SnackBar for this will be shown by App.kt using the passed snackbarHostState
                         TextButton(onClick = { fileInfoViewModel.clearDownloadState(fileInfo.id) }) { Text("Clear Status") }
                     }
                     DownloadStatus.FAILED -> {
-                        // SnackBar for this will be shown by MaterialDrainScreen
+                        // SnackBar for this will be shown by App.kt
                         TextButton(onClick = { fileInfoViewModel.clearDownloadState(fileInfo.id) }) { Text("Clear Status") }
                     }
                     DownloadStatus.PENDING -> {
@@ -319,7 +319,7 @@ fun FileInfoDetailsCard(
                     SmallFloatingActionButton(
                         onClick = {
                             fileInfoViewModel.initiateDownloadFile(fileInfo)
-                            // The actual Snackbar for download start/status will be shown by MaterialDrainScreen
+                            // The actual Snackbar for download start/status will be shown by App.kt
                             // using its own snackbarHostState which gets updates from the ViewModel.
                             // We can show a local one here if desired, but it might be redundant.
                             coroutineScope.launch { snackbarHostState.showSnackbar("Download initiated for ${fileInfo.name}") }
@@ -342,7 +342,7 @@ fun FileInfoDetailsCard(
                 )
             }
         }
-        // Removed local SnackbarHost, MaterialDrainScreen's AppSnackbarHost will be used.
+        // Removed local SnackbarHost, App.kt's AppSnackbarHost will be used.
     }
 }
 

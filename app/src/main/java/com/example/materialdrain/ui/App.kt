@@ -39,13 +39,12 @@ import androidx.compose.ui.platform.LocalDensity
 // import androidx.compose.ui.platform.LocalLayoutDirection // No longer needed here for finalPadding
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.materialdrain.network.PixeldrainApiService
-import com.example.materialdrain.ui.dialogs.EnterFileIdDialog
-import com.example.materialdrain.ui.dialogs.FileInfoDetailsCard
+import com.example.materialdrain.ui.screens.EnterFileIdDialog
+import com.example.materialdrain.ui.screens.FileInfoDetailsCard
 import com.example.materialdrain.ui.screens.FilesScreenContent
 import com.example.materialdrain.ui.screens.ListsScreenContent
 import com.example.materialdrain.ui.screens.SettingsScreenContent
