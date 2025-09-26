@@ -25,7 +25,8 @@ data class FilesystemUiState(
     val pathSegments: List<PathSegment> = listOf(PathSegment(FILESYSTEM_ROOT_PATH, FILESYSTEM_ROOT_PATH)), // Name and full path for breadcrumbs
     val children: List<FilesystemEntry> = emptyList(),
     val errorMessage: String? = null,
-    val apiKeyMissingError: Boolean = false
+    val apiKeyMissingError: Boolean = false,
+    val apiKey: String = "" // Exposed API Key
 )
 
 data class PathSegment(
@@ -41,7 +42,7 @@ class FilesystemViewModel(
     private val _uiState = MutableStateFlow(FilesystemUiState())
     val uiState: StateFlow<FilesystemUiState> = _uiState.asStateFlow()
 
-    private var apiKey: String = ""
+    private var internalApiKey: String = ""
 
     init {
         Log.d(TAG_FS_VM, "ViewModel init. Loading API Key and initial path.")
@@ -50,52 +51,67 @@ class FilesystemViewModel(
 
     private fun loadApiKeyAndFetchCurrentPath() {
         val sharedPrefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        apiKey = sharedPrefs.getString(API_KEY_PREF, "") ?: ""
-        Log.d(TAG_FS_VM, "API Key loaded: '${if (apiKey.isNotBlank()) "PRESENT" else "MISSING"}'")
+        internalApiKey = sharedPrefs.getString(API_KEY_PREF, "") ?: ""
+        Log.d(TAG_FS_VM, "API Key loaded: '${if (internalApiKey.isNotBlank()) "PRESENT" else "MISSING"}'")
 
-        if (apiKey.isBlank()) {
+        if (internalApiKey.isBlank()) {
             _uiState.update {
                 it.copy(
+                    apiKey = "",
                     apiKeyMissingError = true,
                     errorMessage = "API Key is missing. Please set it in Settings to browse the filesystem.",
                     isLoading = false
                 )
             }
         } else {
-            // If API key is present, clear potential missing key error and load the current path
-            _uiState.update { it.copy(apiKeyMissingError = false, errorMessage = null) }
-            fetchPathContent(uiState.value.currentPath) // Load initial path
+            _uiState.update {
+                it.copy(
+                    apiKey = internalApiKey,
+                    apiKeyMissingError = false,
+                    errorMessage = null
+                )
+            }
+            fetchPathContent(uiState.value.currentPath)
         }
     }
-    
+
     fun refreshCurrentPath() {
-        if (apiKey.isBlank()) {
+        if (internalApiKey.isBlank()) {
             _uiState.update {
                 it.copy(
                     apiKeyMissingError = true,
                     errorMessage = "API Key is missing. Please set it in Settings to browse the filesystem.",
                     isLoading = false,
-                    children = emptyList() // Clear children on refresh if API key is missing
+                    children = emptyList()
                 )
             }
             return
         }
-        _uiState.update { it.copy(apiKeyMissingError = false, errorMessage = null) } // Clear previous errors
+        _uiState.update { it.copy(apiKey = internalApiKey, apiKeyMissingError = false, errorMessage = null) }
         fetchPathContent(uiState.value.currentPath)
     }
 
     fun updateApiKey() {
-        val oldApiKey = apiKey
+        val oldApiKey = internalApiKey
         val sharedPrefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        apiKey = sharedPrefs.getString(API_KEY_PREF, "") ?: ""
-        Log.d(TAG_FS_VM, "API Key updated via settings. New Key: '${if (apiKey.isNotBlank()) "PRESENT" else "MISSING"}'")
-        if (apiKey.isNotBlank() && oldApiKey.isBlank()) {
-            // API key was just added, clear errors and load content
-            _uiState.update { it.copy(apiKeyMissingError = false, errorMessage = null) }
-            fetchPathContent(uiState.value.currentPath)
-        } else if (apiKey.isBlank()) {
+        internalApiKey = sharedPrefs.getString(API_KEY_PREF, "") ?: ""
+        Log.d(TAG_FS_VM, "API Key updated via settings. New Key: '${if (internalApiKey.isNotBlank()) "PRESENT" else "MISSING"}'")
+
+        if (internalApiKey.isNotBlank()) {
             _uiState.update {
                 it.copy(
+                    apiKey = internalApiKey,
+                    apiKeyMissingError = false,
+                    errorMessage = if (oldApiKey.isBlank()) null else it.errorMessage
+                )
+            }
+            if (oldApiKey.isBlank()) {
+                fetchPathContent(uiState.value.currentPath)
+            }
+        } else { 
+            _uiState.update {
+                it.copy(
+                    apiKey = "",
                     apiKeyMissingError = true,
                     errorMessage = "API Key is missing. Please set it in Settings.",
                     isLoading = false,
@@ -116,7 +132,6 @@ class FilesystemViewModel(
             currentBuiltPath = if (index == 0 && segmentName == FILESYSTEM_ROOT_PATH) {
                 FILESYSTEM_ROOT_PATH
             } else if (index == 0) {
-                 // Should not happen if root is always "me"
                 segmentName
             } else {
                 "$currentBuiltPath/$segmentName"
@@ -124,20 +139,19 @@ class FilesystemViewModel(
             pathObjects.add(PathSegment(segmentName, currentBuiltPath))
         }
         if (pathObjects.firstOrNull()?.name != FILESYSTEM_ROOT_PATH && segments.isNotEmpty() && segments.first() == FILESYSTEM_ROOT_PATH) {
-            // This ensures "me" is always the first segment if the path starts with "me/"
-            // It's mostly handled by the initial construction logic.
+            // This logic path seems to be intended to handle if "me" is not the first segment but path starts with "me"
+            // however, the path construction ensures "me" is correctly handled if it's the first actual segment name.
         } else if (pathObjects.isEmpty() && fullPath == FILESYSTEM_ROOT_PATH) {
              return listOf(PathSegment(FILESYSTEM_ROOT_PATH, FILESYSTEM_ROOT_PATH))
         } else if (pathObjects.isEmpty() && fullPath.isNotEmpty()) {
-            // Path like "somefolder" without "me" prefix (should not happen with current API structure)
             return listOf(PathSegment(fullPath, fullPath))
         }
         return pathObjects
     }
 
-
     fun fetchPathContent(path: String) {
-        if (apiKey.isBlank()) {
+        val currentApiKey = uiState.value.apiKey
+        if (currentApiKey.isBlank()) {
             Log.w(TAG_FS_VM, "fetchPathContent called with blank API key for path: $path")
             _uiState.update {
                 it.copy(
@@ -150,15 +164,15 @@ class FilesystemViewModel(
             return
         }
 
-        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        _uiState.update { it.copy(isLoading = true, errorMessage = null, apiKeyMissingError = false) }
         viewModelScope.launch {
             Log.d(TAG_FS_VM, "Fetching content for path: $path with API key.")
-            when (val response = pixeldrainApiService.getFilesystemPath(apiKey, path)) {
+            when (val response = pixeldrainApiService.getFilesystemPath(currentApiKey, path)) {
                 is ApiResponse.Success -> {
                     val sortedChildren = response.data.children.sortedWith(
-                        compareBy<FilesystemEntry> { it.type != "dir" } // Folders first
-                        .thenByDescending { it.modified } // Then by modification date (newest first)
-                        .thenBy { it.name.lowercase() } // Then by name
+                        compareBy<FilesystemEntry> { it.type != "dir" }
+                        .thenByDescending { it.modified }
+                        .thenBy { it.name.lowercase() }
                     )
                     _uiState.update {
                         it.copy(
@@ -176,10 +190,7 @@ class FilesystemViewModel(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = response.errorDetails.message ?: response.errorDetails.value ?: "Unknown error fetching filesystem.",
-                            // Optionally, reset children or currentPath on error, or keep current state
-                            // children = emptyList(), 
-                            // currentPath = if (path != FILESYSTEM_ROOT_PATH) it.currentPath else FILESYSTEM_ROOT_PATH 
+                            errorMessage = response.errorDetails.message ?: response.errorDetails.value ?: "Unknown error fetching filesystem."
                         )
                     }
                 }
@@ -189,10 +200,8 @@ class FilesystemViewModel(
 
     fun navigateToChild(childEntry: FilesystemEntry) {
         if (childEntry.type == "dir") {
-            // The child's 'path' field from the API is the full path to that child
             fetchPathContent(childEntry.path)
         } else {
-            // Handle file click - e.g., show info, download. For now, just log.
             Log.i(TAG_FS_VM, "File clicked: ${childEntry.name} at path ${childEntry.path}. ID: ${childEntry.id}")
             _uiState.update { it.copy(errorMessage = "Clicked on file: ${childEntry.name}. File interaction not yet implemented.") }
         }
@@ -200,5 +209,40 @@ class FilesystemViewModel(
 
     fun navigateToPathSegment(segment: PathSegment) {
         fetchPathContent(segment.fullPath)
+    }
+
+    fun navigateToParentPath(): Boolean {
+        val currentPath = uiState.value.currentPath
+        if (currentPath == FILESYSTEM_ROOT_PATH || currentPath.isBlank()) {
+            Log.d(TAG_FS_VM, "Already at root or path is blank. Cannot navigate to parent.")
+            return false // Already at root or invalid path
+        }
+
+        val parentPath = currentPath.substringBeforeLast('/', missingDelimiterValue = "").ifEmpty {
+            // If substringBeforeLast returns empty (e.g., path was "me/somefile" and became "me"),
+            // or if the path was just "somefile" (shouldn't happen with "me" prefix)
+            // we check if the result is FILESYSTEM_ROOT_PATH directly or if we need to assign it.
+            if (currentPath.contains('/')) FILESYSTEM_ROOT_PATH else "" // Go to root if there was a slash, else invalid
+        }
+
+        // Special case: if parentPath becomes empty AND currentPath was like "me/file", parent should be "me"
+        if (parentPath.isEmpty() && currentPath.startsWith("$FILESYSTEM_ROOT_PATH/") && currentPath != FILESYSTEM_ROOT_PATH) {
+             Log.d(TAG_FS_VM, "Calculated parent path for '$currentPath' is empty, but it's a child of root. Setting parent to root: $FILESYSTEM_ROOT_PATH")
+             fetchPathContent(FILESYSTEM_ROOT_PATH)
+             return true
+        } else if (parentPath.isNotEmpty()) {
+            Log.d(TAG_FS_VM, "Navigating from '$currentPath' to parent path: '$parentPath'")
+            fetchPathContent(parentPath)
+            return true
+        } else {
+            // This case might be hit if currentPath was something like "justafile" without "me/" prefix,
+            // which shouldn't occur with the current API design. Or if at root and somehow logic fell through.
+            Log.w(TAG_FS_VM, "Could not determine parent path for '$currentPath'. Staying at current path or considering it root.")
+            // If we are at root according to primary check, this ensures we still return false.
+            if (currentPath == FILESYSTEM_ROOT_PATH) return false
+            // If path is not root but parentPath calculation failed to produce a valid parent, 
+            // it might be an unhandled edge case or an invalid path state. Treating as cannot go further up.
+            return false
+        }
     }
 }

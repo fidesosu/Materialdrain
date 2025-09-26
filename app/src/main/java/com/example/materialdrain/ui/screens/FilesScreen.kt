@@ -1,5 +1,7 @@
 package com.example.materialdrain.ui.screens
 
+import android.app.Activity
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
@@ -64,7 +66,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext // Added import
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -72,7 +74,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import coil.request.ImageRequest // Added import
+import coil.request.ImageRequest
 import com.example.materialdrain.network.FileInfoResponse
 import com.example.materialdrain.ui.formatApiDateTimeString
 import com.example.materialdrain.ui.formatSize
@@ -154,8 +156,23 @@ fun FilesScreenContent(
     val filterFocusRequester = remember { FocusRequester() }
     val pullRefreshState = rememberPullToRefreshState()
     var isInitialUserFilesLoad by remember { mutableStateOf(true) }
+    val context = LocalContext.current
 
     val displayedFiles by fileInfoViewModel.displayedFiles.collectAsState()
+
+    BackHandler(enabled = true) {
+        // If filter is active, clear it. Otherwise, finish activity.
+        if (uiState.showFilterInput && uiState.filterQuery.isNotEmpty()) {
+            fileInfoViewModel.onFilterQueryChanged("")
+            fileInfoViewModel.setFilterInputVisible(false)
+            keyboardController?.hide()
+        } else if (uiState.showFilterInput) {
+            fileInfoViewModel.setFilterInputVisible(false)
+            keyboardController?.hide()
+        } else {
+            (context as? Activity)?.finish()
+        }
+    }
 
     LaunchedEffect(uiState.showFilterInput) {
         if (uiState.showFilterInput) {
@@ -166,14 +183,11 @@ fun FilesScreenContent(
 
     LaunchedEffect(uiState.shouldPreserveScrollPosition) {
         if (uiState.shouldPreserveScrollPosition) {
-            // If preserving scroll, reset the flag and do nothing else with scroll.
-            // This ensures subsequent sort/refresh actions will scroll to top unless this flag is set again.
             fileInfoViewModel.setPreserveScrollPosition(false)
         }
     }
 
     LaunchedEffect(uiState.sortField, uiState.sortAscending) {
-        // Only scroll if not currently preserving scroll from a back navigation
         if (!uiState.shouldPreserveScrollPosition) {
             if (displayedFiles.isNotEmpty() && listState.firstVisibleItemIndex != 0) {
                 listState.scrollToItem(0)
@@ -183,11 +197,10 @@ fun FilesScreenContent(
 
     LaunchedEffect(uiState.userFilesList) {
         if (isInitialUserFilesLoad) {
-            if (uiState.userFilesList.isNotEmpty()) { // Mark initial load as done only when data actually arrives
+            if (uiState.userFilesList.isNotEmpty()) {
                 isInitialUserFilesLoad = false
             }
         } else {
-            // This is a refresh (not the initial load)
             if (!uiState.shouldPreserveScrollPosition) {
                 if (displayedFiles.isNotEmpty() && listState.firstVisibleItemIndex != 0) {
                     listState.scrollToItem(0)
@@ -302,7 +315,7 @@ fun FilesScreenContent(
             if (displayedFiles.isNotEmpty()) {
                 SortControls(uiState = uiState, fileInfoViewModel = fileInfoViewModel)
                 LazyColumn(
-                    state = listState, // Use the passed-in listState
+                    state = listState, 
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(
                         top = 8.dp, 
@@ -383,7 +396,7 @@ fun UserFileListItemCard(
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data(thumbnailUrl)
-                        .size(80, 80) // Target 80x80 pixels for decoding
+                        .size(80, 80) 
                         .crossfade(true)
                         .build(),
                     contentDescription = "${fileInfo.name} thumbnail",
@@ -535,16 +548,15 @@ fun UserFileListItemCard(
                 HorizontalDivider(
                     thickness = 1.0.dp,
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.padding(top = 4.dp) // Add some padding above the divider
+                    modifier = Modifier.padding(top = 4.dp) 
                 )
             }
 
-            // Progress Indicator and Status Message Section
             if (showLpiSection) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp) // Padding for the whole LPI section
+                        .padding(horizontal = 8.dp, vertical = 4.dp) 
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -563,7 +575,7 @@ fun UserFileListItemCard(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                        } else if (downloadState.status == DownloadStatus.DOWNLOADING) { // Show percentage if total bytes unknown during download
+                        } else if (downloadState.status == DownloadStatus.DOWNLOADING) { 
                              Text(
                                 text = "${(downloadState.progressFraction * 100).toInt()}%",
                                 style = MaterialTheme.typography.labelSmall,
@@ -571,9 +583,9 @@ fun UserFileListItemCard(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(2.dp)) // Small space between text and LPI
+                    Spacer(modifier = Modifier.height(2.dp)) 
                     LinearProgressIndicator(
-                        progress = { downloadState.progressFraction }, // showLpiSection ensures downloadState is not null
+                        progress = { downloadState.progressFraction }, 
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(4.dp)
@@ -584,29 +596,28 @@ fun UserFileListItemCard(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp), // More compact padding
+                            .padding(vertical = 4.dp), 
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Filled.DownloadDone,
-                            contentDescription = "Download completed", // Accessibility text
-                            tint = MaterialTheme.colorScheme.primary, // Consistent with menu item
-                            modifier = Modifier.size(24.dp) // Standard icon size
+                            contentDescription = "Download completed", 
+                            tint = MaterialTheme.colorScheme.primary, 
+                            modifier = Modifier.size(24.dp) 
                         )
                     }
                 } else if (downloadState.status == DownloadStatus.FAILED) {
-                    // Error message remains as text for clarity
                     Text(
                         text = downloadState.message,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 8.dp), // Original padding for error text
+                            .padding(horizontal = 8.dp, vertical = 8.dp), 
                         textAlign = TextAlign.Center
                     )
                 }
             }
-        } // End of Column (with animateContentSize)
-    } // End of Card
+        } 
+    } 
 }

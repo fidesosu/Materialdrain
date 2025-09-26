@@ -21,13 +21,15 @@ import io.ktor.client.request.prepareDelete
 import io.ktor.client.request.prepareGet
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
-import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.path
 import io.ktor.http.URLProtocol
+import io.ktor.http.path
+import io.ktor.http.encodedPath
+import io.ktor.http.takeFrom
+import io.ktor.http.Url
 import io.ktor.http.content.OutputStreamContent
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
@@ -120,11 +122,9 @@ data class FilesystemEntry(
     @SerialName("bandwidth_used") val bandwidthUsed: Long? = null,
     @SerialName("bandwidth_used_paid") val bandwidthUsedPaid: Long? = null,
     val downloads: Int? = null,
-    // date_upload will be `created` for filesystem entries. We can map if needed in ViewModel.
     @SerialName("date_last_view") val dateLastView: String? = null,
     @SerialName("mime_type") val mimeType: String? = null, // More specific than fileType for files
     @SerialName("thumbnail_href") val thumbnailHref: String? = null,
-    // hash_sha256 is redundant with sha256_sum, keeping one from the example
     @SerialName("can_edit") val canEdit: Boolean? = null,
     @SerialName("delete_after_date") val deleteAfterDate: String? = null,
     @SerialName("delete_after_downloads") val deleteAfterDownloads: Int? = null,
@@ -158,15 +158,14 @@ data class FilesystemListResponse(
     val children: List<FilesystemEntry>,
     val permissions: FilesystemPermissions,
     val context: FilesystemContext,
-    // For potential error message directly in this response type
-    val success: Boolean? = null, 
-    val value: String? = null, 
+    val success: Boolean? = null,
+    val value: String? = null,
     val message: String? = null
 )
 
-class PixeldrainApiService(private val appContext: Context? = null) {
+class PixeldrainApiService {
 
-    private val STREAM_BUFFER_SIZE = 1024 * 1024
+    private val streamBufferSize = 1024 * 1024
 
     private val client = HttpClient(OkHttp) {
         engine {
@@ -184,12 +183,12 @@ class PixeldrainApiService(private val appContext: Context? = null) {
                 ignoreUnknownKeys = true
             }
             json(jsonFormatter, contentType = ContentType.Application.Json)
-            json(jsonFormatter, contentType = ContentType.Text.Plain) // Allow plain text for some error responses
+            json(jsonFormatter, contentType = ContentType.Text.Plain)
         }
         install(HttpTimeout) {
             requestTimeoutMillis = HttpTimeout.INFINITE_TIMEOUT_MS
             connectTimeoutMillis = 30000L
-            socketTimeoutMillis = 900000L // 15 minutes for socket timeout
+            socketTimeoutMillis = 900000L
         }
         install(Logging) {
             logger = object : Logger {
@@ -204,7 +203,6 @@ class PixeldrainApiService(private val appContext: Context? = null) {
             retryOnExceptionIf { _, cause ->
                 cause is IOException && cause !is java.net.SocketTimeoutException
             }
-            // exponentialDelay() // Consider adding delay if needed
         }
     }
 
@@ -213,14 +211,14 @@ class PixeldrainApiService(private val appContext: Context? = null) {
         fileName: String,
         fileBytes: ByteArray,
         onProgress: (bytesSent: Long, totalBytes: Long?) -> Unit
-    ): FileUploadResponse { // Return FileUploadResponse for consistency
+    ): FileUploadResponse {
         val basicAuth = "Basic " + Base64.encodeToString(":$apiKey".toByteArray(), Base64.NO_WRAP)
         return try {
             val response: HttpResponse = client.put {
                 url {
                     protocol = URLProtocol.HTTPS
                     host = "pixeldrain.com"
-                    path("api/file", fileName)
+                    path("api/file", fileName) // Ktor handles encoding for path segments
                 }
                 headers {
                     append(HttpHeaders.Authorization, basicAuth)
@@ -236,7 +234,7 @@ class PixeldrainApiService(private val appContext: Context? = null) {
                 val successBody = response.body<FileUploadPutSuccessResponse>()
                 FileUploadResponse(success = true, id = successBody.id)
             } else {
-                response.body<FileUploadResponse>() // Assume errors conform to FileUploadResponse
+                response.body<FileUploadResponse>()
             }
         } catch (e: Exception) {
             Log.e("PIXEL_API_SERVICE", "Exception during PUT text/byte array upload: ${e.message}", e)
@@ -250,7 +248,7 @@ class PixeldrainApiService(private val appContext: Context? = null) {
         fileUri: Uri,
         context: Context,
         onProgress: (bytesSent: Long, totalBytes: Long?) -> Unit
-    ): FileUploadResponse { // Return FileUploadResponse for consistency
+    ): FileUploadResponse {
         val contentResolver = context.contentResolver
         val basicAuth = "Basic " + Base64.encodeToString(":$apiKey".toByteArray(), Base64.NO_WRAP)
         val mimeType = contentResolver.getType(fileUri) ?: ContentType.Application.OctetStream.toString()
@@ -273,21 +271,20 @@ class PixeldrainApiService(private val appContext: Context? = null) {
                 url {
                     protocol = URLProtocol.HTTPS
                     host = "pixeldrain.com"
-                    path("api/file", fileName)
+                    path("api/file", fileName) // Ktor handles encoding for path segments
                 }
                 headers {
                     append(HttpHeaders.Authorization, basicAuth)
                     fileSize?.let {
                         append(HttpHeaders.ContentLength, it.toString())
                     }
-                    // append(HttpHeaders.ContentType, mimeType) // Ktor sets this from OutputStreamContent
                 }
                 setBody(
                     OutputStreamContent(
                         body = {
                             contentResolver.openInputStream(fileUri)?.use { rawInputStream ->
                                 BufferedInputStream(rawInputStream).use { bufferedInputStream ->
-                                    bufferedInputStream.copyTo(this, bufferSize = STREAM_BUFFER_SIZE)
+                                    bufferedInputStream.copyTo(this, bufferSize = streamBufferSize)
                                 }
                             } ?: throw IOException("Failed to open input stream for URI after initial check.")
                         },
@@ -295,8 +292,8 @@ class PixeldrainApiService(private val appContext: Context? = null) {
                         contentLength = fileSize
                     )
                 )
-                onUpload { bytesSentTotal, contentLength ->
-                    onProgress(bytesSentTotal, contentLength ?: fileSize)
+                onUpload { bytesSentTotal, contentLength -> // contentLength here is non-nullable Long
+                    onProgress(bytesSentTotal, contentLength) // Pass directly to onProgress which expects Long?
                 }
             }
             if (response.status == HttpStatusCode.Created) {
@@ -332,20 +329,23 @@ class PixeldrainApiService(private val appContext: Context? = null) {
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_file_info", message = errorMsg))
         }
     }
-    
+
     suspend fun getFilesystemPath(apiKey: String, fsPath: String): ApiResponse<FilesystemListResponse> {
         if (apiKey.isBlank()) {
             return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "API Key is required to browse filesystem."))
         }
         val basicAuth = "Basic " + Base64.encodeToString(":$apiKey".toByteArray(), Base64.NO_WRAP)
-        val actualPath = fsPath.ifBlank { "me" } // Default to "me" if blank
-    
-        // Construct the full URL string
-        val urlString = "https://pixeldrain.com/api/filesystem/$actualPath?stats=true"
+        val actualPath = fsPath.ifBlank { "me" }
 
         return try {
             client.prepareGet {
-                url(urlString) // Use the fully constructed URL string here
+                url {
+                    protocol = URLProtocol.HTTPS
+                    host = "pixeldrain.com"
+                    val pathSegments = listOf("api", "filesystem") + actualPath.split('/').filter { it.isNotEmpty() }
+                    path(*pathSegments.toTypedArray()) // Correctly spread the list into varargs for path()
+                    parameters.append("stats", "true")
+                }
                 headers {
                     append(HttpHeaders.Authorization, basicAuth)
                 }
@@ -355,7 +355,7 @@ class PixeldrainApiService(private val appContext: Context? = null) {
                     ApiResponse.Success(filesystemData)
                 } else {
                     try {
-                        val errorBody = response.body<FilesystemListResponse>() 
+                        val errorBody = response.body<FilesystemListResponse>()
                          ApiResponse.Error(FileUploadResponse(success = errorBody.success ?: false, value = errorBody.value, message = errorBody.message ?: "Filesystem API error"))
                     } catch (_: Exception) {
                         try {
@@ -388,13 +388,12 @@ class PixeldrainApiService(private val appContext: Context? = null) {
                     host = "pixeldrain.com"
                     path("api/file", fileId)
                 }
-                // No onDownload here for manual streaming
             }.execute { httpResponse: HttpResponse ->
                 if (httpResponse.status == HttpStatusCode.OK) {
-                    val inputStream: InputStream = httpResponse.body() // Get as stream
+                    val inputStream: InputStream = httpResponse.body()
                     val totalBytesFromServer = httpResponse.headers[HttpHeaders.ContentLength]?.toLongOrNull()
                     var totalBytesCopied = 0L
-                    val buffer = ByteArray(STREAM_BUFFER_SIZE) // Use defined buffer size
+                    val buffer = ByteArray(streamBufferSize)
                     var bytesRead: Int
                     try {
                         inputStream.use { netStream ->
@@ -404,7 +403,7 @@ class PixeldrainApiService(private val appContext: Context? = null) {
                                 onProgress(totalBytesCopied, totalBytesFromServer)
                             }
                         }
-                        outputStream.flush() // Ensure all data is written
+                        outputStream.flush()
                         ApiResponse.Success(totalBytesCopied)
                     } catch (e: IOException) {
                         Log.e("PIXEL_API_SERVICE", "IOException during stream copy: ${e.message}", e)
@@ -414,8 +413,8 @@ class PixeldrainApiService(private val appContext: Context? = null) {
                     try {
                         val errorBody = httpResponse.body<FileUploadResponse>()
                         ApiResponse.Error(errorBody)
-                    } catch (e: Exception) {
-                        Log.e("PIXEL_API_SERVICE", "Failed to parse error body for download: ${e.message}")
+                    } catch (_: Exception) {
+                        Log.e("PIXEL_API_SERVICE", "Failed to parse error body for download")
                         ApiResponse.Error(FileUploadResponse(success = false, value = "download_failed_status_${httpResponse.status.value}", message = "Download failed: ${httpResponse.status.description}. Error body parsing failed."))
                     }
                 }
@@ -424,164 +423,6 @@ class PixeldrainApiService(private val appContext: Context? = null) {
             Log.e("PIXEL_API_SERVICE", "Exception during GET file download to stream: ${e.message}", e)
             val errorMsg = e.message ?: "Network request failed or failed to parse response"
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_file_download_stream", message = errorMsg))
-        }
-    }
-    
-    suspend fun downloadFileBytes(
-        fileId: String,
-        onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit
-    ): ApiResponse<ByteArray> {
-        if (fileId.isBlank()) {
-            return ApiResponse.Error(FileUploadResponse(success = false, value = "file_id_missing", message = "File ID is required to download a file."))
-        }
-        return try {
-            client.prepareGet {
-                url {
-                    protocol = URLProtocol.HTTPS
-                    host = "pixeldrain.com"
-                    path("api/file", fileId)
-                }
-                onDownload { bytesSentTotal, contentLength -> onProgress(bytesSentTotal, contentLength) }
-            }.execute { response: HttpResponse ->
-                if (response.status == HttpStatusCode.OK) {
-                    val bytes = response.body<ByteArray>()
-                    ApiResponse.Success(bytes)
-                } else {
-                    try {
-                        ApiResponse.Error(response.body<FileUploadResponse>())
-                    } catch (e: Exception) {
-                        // Fallback if error body is not FileUploadResponse format
-                        ApiResponse.Error(FileUploadResponse(success = false, value = "download_failed_status_${response.status.value}", message = "Download failed: ${response.status.description}"))
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("PIXEL_API_SERVICE", "Exception during GET file download: ${e.message}", e)
-            val errorMsg = e.message ?: "Network request failed or failed to parse response"
-            ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_file_download", message = errorMsg))
-        }
-    }
-
-    suspend fun downloadFileWithRanges(
-        fileId: String,
-        outputFile: File,
-        partCount: Int = 4, 
-        onProgress: (bytesDownloaded: Long, totalBytes: Long?) -> Unit
-    ): ApiResponse<Long> {
-        if (fileId.isBlank()) {
-            return ApiResponse.Error(FileUploadResponse(success = false, value = "file_id_missing", message = "File ID is required to download a file."))
-        }
-
-        val headResponse = try {
-            client.prepareGet {
-                url {
-                    protocol = URLProtocol.HTTPS
-                    host = "pixeldrain.com"
-                    path("api/file", fileId) 
-                }
-            }.execute { it } 
-        } catch (e: Exception) {
-            Log.e("PIXEL_API_SERVICE", "Failed to probe file headers: ${e.message}", e)
-            return ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_probe", message = e.message ?: "Failed to probe file"))
-        }
-
-        if (headResponse.status != HttpStatusCode.OK) {
-            return try {
-                ApiResponse.Error(headResponse.body())
-            } catch (e: Exception) {
-                ApiResponse.Error(FileUploadResponse(success = false, value = "probe_failed_status_${headResponse.status.value}", message = headResponse.status.description))
-            }
-        }
-
-        val totalSize = headResponse.headers[HttpHeaders.ContentLength]?.toLongOrNull()
-        val acceptRanges = headResponse.headers["Accept-Ranges"]?.lowercase() ?: ""
-
-        if (totalSize == null || !acceptRanges.contains("bytes")) {
-            Log.i("PIXEL_API_SERVICE", "Range unsupported or size unknown fall back to single-stream download.")
-            try {
-                FileOutputStream(outputFile).use { fos -> 
-                    return downloadFileToOutputStream(fileId, fos, onProgress)
-                }
-            } catch (e: Exception) {
-                Log.e("PIXEL_API_SERVICE", "Fallback download failed: ${e.message}", e)
-                return ApiResponse.Error(FileUploadResponse(success = false, value = "fallback_download_failed", message = e.message ?: "Fallback failed"))
-            }
-        }
-
-        val partSize = totalSize / partCount
-        val ranges = (0 until partCount).map {
-            val start = it * partSize
-            val end = if (it == partCount - 1) totalSize - 1 else (start + partSize - 1)
-            start to end
-        }
-
-        val tempFiles = List(partCount) { idx -> 
-            File.createTempFile("\${outputFile.nameWithoutExtension}.part$idx", ".tmp", outputFile.parentFile)
-        }
-        
-        var totalDownloadedSoFar = 0L
-        val progressLock = Any()
-
-        return try {
-            coroutineScope {
-                val deferreds = ranges.mapIndexed { idx, (start, end) ->
-                    async(Dispatchers.IO) {
-                        client.prepareGet {
-                            url {
-                                protocol = URLProtocol.HTTPS
-                                host = "pixeldrain.com"
-                                path("api/file", fileId)
-                            }
-                            headers {
-                                append("Range", "bytes=$start-$end")
-                                append(HttpHeaders.UserAgent, "Mozilla/5.0 (Android) Ktor/OkHttp MaterialDrainApp")
-                            }
-                        }.execute { resp ->
-                            if (resp.status == HttpStatusCode.PartialContent || resp.status == HttpStatusCode.OK /* Some servers might send OK for single part */) {
-                                tempFiles[idx].outputStream().use { fos ->
-                                    resp.body<InputStream>().use { input ->
-                                        val buffer = ByteArray(STREAM_BUFFER_SIZE)
-                                        var read: Int
-                                        var localPartDownloaded = 0L
-                                        while (input.read(buffer).also { read = it } != -1) {
-                                            fos.write(buffer, 0, read)
-                                            localPartDownloaded += read
-                                            synchronized(progressLock) {
-                                                totalDownloadedSoFar += read
-                                                onProgress(totalDownloadedSoFar, totalSize)
-                                            }
-                                        }
-                                    }
-                                }
-                                true // Part download success
-                            } else {
-                                Log.e("PIXEL_API_SERVICE", "Range download failed for part $idx: status ${resp.status.value}")
-                                false // Part download failed
-                            }
-                        }
-                    }
-                }
-                val results = deferreds.awaitAll()
-                if (!results.all { it }) {
-                    throw IOException("One or more part downloads failed. Check logs for details.")
-                }
-            }
-
-            withContext(Dispatchers.IO) {
-                FileOutputStream(outputFile, false).use { finalOut -> // Overwrite if exists
-                    tempFiles.forEach { partFile ->
-                        partFile.inputStream().use { partIn ->
-                            partIn.copyTo(finalOut, bufferSize = STREAM_BUFFER_SIZE)
-                        }
-                        try { partFile.delete() } catch (e: Exception) { Log.w("PIXEL_API_SERVICE", "Failed to delete temp part: ${partFile.name}", e) }
-                    }
-                }
-            }
-            ApiResponse.Success(totalSize)
-        } catch (e: Exception) {
-            Log.e("PIXEL_API_SERVICE", "Parallel range download failed: ${e.message}", e)
-            tempFiles.forEach { try { if (it.exists()) it.delete() } catch (ignored: Exception) {} }
-            ApiResponse.Error(FileUploadResponse(success = false, value = "parallel_download_failed", message = e.message ?: "Parallel download failed"))
         }
     }
 
@@ -596,7 +437,6 @@ class PixeldrainApiService(private val appContext: Context? = null) {
                     host = "pixeldrain.com"
                     path("api/file", fileId)
                 }
-                // Consider adding Accept: text/plain if server respects it, though /api/file/{id} is usually direct download
             }.execute { response: HttpResponse ->
                 if (response.status == HttpStatusCode.OK) {
                     val textContent = response.body<String>()
@@ -604,7 +444,7 @@ class PixeldrainApiService(private val appContext: Context? = null) {
                 } else {
                     try {
                         ApiResponse.Error(response.body<FileUploadResponse>())
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         ApiResponse.Error(FileUploadResponse(success = false, value = "get_content_failed_status_${response.status.value}", message = "Failed to get content: ${response.status.description}"))
                     }
                 }
@@ -614,13 +454,6 @@ class PixeldrainApiService(private val appContext: Context? = null) {
             val errorMsg = e.message ?: "Network request failed or failed to parse response"
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_get_content", message = errorMsg))
         }
-    }
-
-    suspend fun downloadFileToOutputStreamSimple(
-        fileId: String,
-        outputStream: java.io.OutputStream
-    ): ApiResponse<Long> {
-        return downloadFileToOutputStream(fileId, outputStream) { _, _ -> /* No-op progress */ }
     }
 
     suspend fun getUserFiles(apiKey: String): ApiResponse<UserFilesListResponse> {
@@ -671,10 +504,9 @@ class PixeldrainApiService(private val appContext: Context? = null) {
                     append(HttpHeaders.Authorization, basicAuth)
                 }
             }.execute { response: HttpResponse ->
-                // Pixeldrain delete API returns 200 OK with a body indicating success/failure
-                val responseBody = response.body<FileUploadResponse>() 
+                val responseBody = response.body<FileUploadResponse>()
                 if (responseBody.success) {
-                    ApiResponse.Success(responseBody) 
+                    ApiResponse.Success(responseBody)
                 } else {
                     ApiResponse.Error(responseBody)
                 }

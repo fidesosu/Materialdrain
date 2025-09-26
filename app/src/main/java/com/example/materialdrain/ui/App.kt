@@ -488,7 +488,8 @@ fun MaterialDrainScreen() {
                                     showGenericDialog = true
                                 },
                                 fabHeight = fabHeightDp,
-                                isFabVisible = isFabVisible
+                                isFabVisible = isFabVisible,
+                                onNavigateBack = { currentScreen = Screen.Files } // Added onNavigateBack
                             )
                         }
                     }

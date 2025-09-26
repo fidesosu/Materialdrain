@@ -1,5 +1,6 @@
 package com.example.materialdrain.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -20,10 +21,15 @@ import androidx.compose.ui.unit.dp
 fun SettingsScreenContent(
     apiKeyInput: String,
     onApiKeyInputChange: (String) -> Unit,
-    onShowDialog: (String, String) -> Unit,
+    onShowDialog: (String, String) -> Unit, // This param seems unused based on previous context, but keeping it as it was there
     fabHeight: Dp,
-    isFabVisible: Boolean
+    isFabVisible: Boolean,
+    onNavigateBack: () -> Unit // Added for back navigation
 ) {
+    BackHandler(enabled = true) {
+        onNavigateBack()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()

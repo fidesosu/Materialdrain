@@ -1,5 +1,8 @@
 package com.example.materialdrain.ui.screens
 
+import android.app.Activity
+import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -10,8 +13,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.filled.Folder // Generic folder icon
-import androidx.compose.material.icons.filled.InsertDriveFile // Generic file icon
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile // Changed import
+import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -22,16 +26,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.materialdrain.network.FilesystemEntry
 import com.example.materialdrain.ui.formatApiDateTimeString
 import com.example.materialdrain.ui.formatSize
 import com.example.materialdrain.viewmodel.FilesystemViewModel
 import com.example.materialdrain.viewmodel.PathSegment
+import io.ktor.http.encodeURLPathPart
+
+private const val TAG_FILESYSTEM_SCREEN = "FilesystemScreen"
 
 @Composable
 fun PathBreadcrumb(
@@ -41,7 +53,6 @@ fun PathBreadcrumb(
 ) {
     val scrollState = rememberScrollState()
 
-    // Auto-scroll to the end when pathSegments change or the content width changes
     LaunchedEffect(pathSegments, scrollState.maxValue) {
         if (pathSegments.isNotEmpty()) {
             scrollState.animateScrollTo(scrollState.maxValue)
@@ -50,7 +61,7 @@ fun PathBreadcrumb(
 
     if (pathSegments.isEmpty()) {
         Text(
-            text = "Storage", // Default root name for an empty path
+            text = "Storage",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
             modifier = modifier
@@ -77,14 +88,14 @@ fun PathBreadcrumb(
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
                     .clickable { onPathSegmentClick(segment) }
-                    .padding(horizontal = 4.dp, vertical = 2.dp) // Adjusted padding for better touch targets in a row
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
             )
             if (index < pathSegments.lastIndex) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
                     contentDescription = "Path separator",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp) // Ensure icon aligns well
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
@@ -100,6 +111,15 @@ fun FilesystemScreen(
 ) {
     val uiState by filesystemViewModel.uiState.collectAsState()
     val pullRefreshState = rememberPullToRefreshState()
+    val context = LocalContext.current
+
+    BackHandler(enabled = true) {
+        val navigatedUp = filesystemViewModel.navigateToParentPath()
+        if (!navigatedUp) {
+            // If already at root, finish the activity to exit
+            (context as? Activity)?.finish()
+        }
+    }
 
     PullToRefreshBox(
         isRefreshing = uiState.isLoading,
@@ -155,9 +175,13 @@ fun FilesystemScreen(
                     contentPadding = PaddingValues(bottom = if (isFabVisible) fabHeight + 16.dp else 16.dp)
                 ) {
                     items(uiState.children, key = { it.path }) { entry ->
-                        FilesystemEntryItem(entry = entry, onClick = {
-                            filesystemViewModel.navigateToChild(entry)
-                        })
+                        FilesystemEntryItem(
+                            entry = entry,
+                            apiKey = uiState.apiKey, // Pass the API key from the ViewModel
+                            onClick = {
+                                filesystemViewModel.navigateToChild(entry)
+                            }
+                        )
                         HorizontalDivider()
                     }
                 }
@@ -169,6 +193,7 @@ fun FilesystemScreen(
 @Composable
 fun FilesystemEntryItem(
     entry: FilesystemEntry,
+    apiKey: String, // Accept API key as a parameter
     onClick: () -> Unit
 ) {
     ListItem(
@@ -185,11 +210,81 @@ fun FilesystemEntryItem(
             Text(details.joinToString(" • "), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
         },
         leadingContent = {
-            Icon(
-                imageVector = if (entry.type == "dir") Icons.Filled.Folder else Icons.Filled.InsertDriveFile,
-                contentDescription = if (entry.type == "dir") "Folder" else "File",
-                modifier = Modifier.size(40.dp)
-            )
+            val imageModifier = Modifier
+                .size(48.dp) // Adjusted size to match thumbnail request
+                .clip(RoundedCornerShape(4.dp))
+
+            if (entry.type == "file") {
+                val context = LocalContext.current
+                val finalThumbnailUrl: String
+                var isFilesystemApiThumbnailUrl = false
+
+                if (!entry.thumbnailHref.isNullOrBlank()) {
+                    finalThumbnailUrl = "https://pixeldrain.com${entry.thumbnailHref.trim()}"
+                    Log.d(TAG_FILESYSTEM_SCREEN, "Using thumbnailHref for ${entry.name}: $finalThumbnailUrl")
+                    if (finalThumbnailUrl.startsWith("https://pixeldrain.com/api/filesystem/") && finalThumbnailUrl.contains("?thumbnail")) {
+                        isFilesystemApiThumbnailUrl = true
+                        Log.d(TAG_FILESYSTEM_SCREEN, "thumbnailHref is a filesystem API thumbnail URL: $finalThumbnailUrl")
+                    }
+                } else {
+                    val cleanedPath = entry.path.removePrefix("/").split('/').filter { it.isNotEmpty() }
+                    val encodedPathSegments = cleanedPath.joinToString("/") { it.encodeURLPathPart() }
+
+                    if (encodedPathSegments.isNotEmpty()) {
+                        finalThumbnailUrl = "https://pixeldrain.com/api/filesystem/${encodedPathSegments}?thumbnail&width=48&height=48"
+                        isFilesystemApiThumbnailUrl = true 
+                        Log.d(TAG_FILESYSTEM_SCREEN, "Using constructed filesystem path for ${entry.name}: $finalThumbnailUrl (Original entry.path: '${entry.path}')")
+                    } else {
+                        Log.w(TAG_FILESYSTEM_SCREEN, "Could not construct thumbnail URL for ${entry.name} from problematic path: '${entry.path}'")
+                        finalThumbnailUrl = "invalid_path_for_thumbnail"
+                    }
+                }
+
+                if (finalThumbnailUrl != "invalid_path_for_thumbnail") {
+                    val requestBuilder = ImageRequest.Builder(context)
+                        .data(finalThumbnailUrl)
+                        .crossfade(true)
+                        .listener(
+                            onStart = { request ->
+                                Log.d(TAG_FILESYSTEM_SCREEN, "Coil request started for: ${request.data}")
+                            },
+                            onSuccess = { request, result ->
+                                Log.d(TAG_FILESYSTEM_SCREEN, "Coil request SUCCESS for: ${request.data} - from datasource: ${result.dataSource}")
+                            },
+                            onError = { request, result ->
+                                Log.e(TAG_FILESYSTEM_SCREEN, "Coil request ERROR for: ${request.data} - ${result.throwable.localizedMessage}", result.throwable)
+                            }
+                        )
+
+                    if (isFilesystemApiThumbnailUrl && apiKey.isNotBlank()) {
+                        requestBuilder.addHeader("Cookie", "pd_auth_key=$apiKey")
+                        Log.d(TAG_FILESYSTEM_SCREEN, "Added Cookie header for: $finalThumbnailUrl (pd_auth_key=...)")
+                    } else if (isFilesystemApiThumbnailUrl && apiKey.isBlank()) {
+                        Log.w(TAG_FILESYSTEM_SCREEN, "API Key is blank. Filesystem API thumbnail might fail for: $finalThumbnailUrl")
+                    }
+
+                    AsyncImage(
+                        model = requestBuilder.build(),
+                        contentDescription = "${entry.name} thumbnail",
+                        modifier = imageModifier,
+                        contentScale = ContentScale.Crop,
+                        placeholder = rememberVectorPainter(Icons.AutoMirrored.Filled.InsertDriveFile), // Changed Icon
+                        error = rememberVectorPainter(Icons.Filled.BrokenImage)
+                    )
+                } else {
+                     Icon(
+                        painter = rememberVectorPainter(Icons.Filled.BrokenImage),
+                        contentDescription = "${entry.name} thumbnail error (invalid path)",
+                        modifier = imageModifier
+                    )
+                }
+            } else { // entry.type == "dir"
+                Icon(
+                    imageVector = Icons.Filled.Folder,
+                    contentDescription = "Folder",
+                    modifier = imageModifier 
+                )
+            }
         },
         modifier = Modifier.clickable(onClick = onClick)
     )
