@@ -308,13 +308,19 @@ class PixeldrainApiService {
         }
     }
 
-    suspend fun getFileInfo(fileId: String): ApiResponse<FileInfoResponse> {
+    suspend fun getFileInfo(fileId: String, apiKey: String?): ApiResponse<FileInfoResponse> {
         return try {
             client.prepareGet {
                 url {
                     protocol = URLProtocol.HTTPS
                     host = "pixeldrain.com"
                     path("api/file", fileId, "info")
+                }
+                if (!apiKey.isNullOrBlank()) {
+                    val basicAuth = "Basic " + Base64.encodeToString(":$apiKey".toByteArray(), Base64.NO_WRAP)
+                    headers {
+                        append(HttpHeaders.Authorization, basicAuth)
+                    }
                 }
             }.execute { response: HttpResponse ->
                 if (response.status == HttpStatusCode.OK) {

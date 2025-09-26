@@ -1,7 +1,10 @@
 package com.example.materialdrain.ui
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context // Added for SharedPreferences
+import android.content.Intent
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
@@ -18,12 +21,19 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollFactory
+import androidx.compose.foundation.horizontalScroll // Added for horizontal scroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState // Added for scroll state
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 // Import specific filled icons that are still used directly
 import androidx.compose.material.icons.filled.Description 
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -54,6 +64,7 @@ import com.example.materialdrain.viewmodel.FilesystemViewModel
 import com.example.materialdrain.viewmodel.UploadViewModel
 import com.example.materialdrain.viewmodel.ViewModelFactory
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -111,7 +122,9 @@ fun MaterialDrainScreen() {
     val snackbarHostState = remember { SnackbarHostState() }
     val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
     val uploadUiState by uploadViewModel.uiState.collectAsState()
-    // val filesystemUiState by filesystemViewModel.uiState.collectAsState() // Collect if needed directly here
+    val coroutineScope = rememberCoroutineScope()
+    val localClipboardManager = LocalContext.current.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
 
     val filesScreenListState = rememberLazyListState()
 
@@ -126,6 +139,7 @@ fun MaterialDrainScreen() {
         Screen.Lists,
         Screen.Filesystem
     )
+    var showFileDetailMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         Log.d("App", "Initial composition. Loading API Key from SharedPreferences.")
@@ -305,9 +319,14 @@ fun MaterialDrainScreen() {
                                 ) {
                                     Text(
                                         text = currentTitle,
-                                        modifier = Modifier.weight(1f),
+                                        modifier = if (currentScreen == Screen.FileDetail) {
+                                            Modifier.weight(1f).horizontalScroll(rememberScrollState())
+                                        } else {
+                                            Modifier.weight(1f)
+                                        },
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        // overflow property removed for FileDetail to allow scrolling
+                                        overflow = if (currentScreen == Screen.FileDetail) TextOverflow.Clip else TextOverflow.Ellipsis 
                                     )
                                     AnimatedVisibility(
                                         visible = currentScreen == Screen.Upload && uploadUiState.isLoading,
@@ -340,7 +359,62 @@ fun MaterialDrainScreen() {
                             }
                         },
                         actions = {
-                            if (currentScreen != Screen.FileDetail && currentScreen != Screen.Settings) {
+                            if (currentScreen == Screen.FileDetail) {
+                                fileInfoUiState.fileInfo?.let { currentFile ->
+                                    val fileUrl = "https://pixeldrain.com/u/${currentFile.id}"
+                                    IconButton(onClick = { showFileDetailMenu = true }) {
+                                        Icon(Icons.Filled.MoreVert, contentDescription = "More options")
+                                    }
+                                    DropdownMenu(
+                                        expanded = showFileDetailMenu,
+                                        onDismissRequest = { showFileDetailMenu = false }
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("Download") },
+                                            onClick = {
+                                                fileInfoViewModel.initiateDownloadFile(currentFile)
+                                                coroutineScope.launch { snackbarHostState.showSnackbar("Download initiated for ${currentFile.name}") }
+                                                showFileDetailMenu = false
+                                            },
+                                            leadingIcon = { Icon(Icons.Filled.Download, contentDescription = "Download", modifier = Modifier.size(28.dp))}
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Share Link") },
+                                            onClick = {
+                                                val sendIntent: Intent = Intent().apply {
+                                                    action = Intent.ACTION_SEND
+                                                    putExtra(Intent.EXTRA_TEXT, fileUrl)
+                                                    type = "text/plain"
+                                                }
+                                                context.startActivity(Intent.createChooser(sendIntent, null))
+                                                showFileDetailMenu = false
+                                            },
+                                            leadingIcon = { Icon(Icons.Filled.Share, contentDescription = "Share Link", modifier = Modifier.size(28.dp))}
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Copy Link") },
+                                            onClick = {
+                                                val clip = ClipData.newPlainText("Pixeldrain URL", fileUrl)
+                                                localClipboardManager.setPrimaryClip(clip)
+                                                coroutineScope.launch { snackbarHostState.showSnackbar("Link copied to clipboard!") }
+                                                showFileDetailMenu = false
+                                            },
+                                            leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = "Copy Link", modifier = Modifier.size(28.dp))}
+                                        )
+                                        if (currentFile.canEdit == true) {
+                                            HorizontalDivider()
+                                            DropdownMenuItem(
+                                                text = { Text("Delete File", color = MaterialTheme.colorScheme.error) },
+                                                onClick = {
+                                                    fileInfoViewModel.initiateDeleteFile(currentFile.id)
+                                                    showFileDetailMenu = false
+                                                },
+                                                leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = "Delete File", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(28.dp))}
+                                            )
+                                        }
+                                    }
+                                }
+                            } else if (currentScreen != Screen.Settings) { // Show settings icon for other screens not FileDetail or Settings itself
                                 IconButton(onClick = { currentScreen = Screen.Settings }) {
                                     Icon(painterResource(id = R.drawable.icon_settings_outlined), contentDescription = "Settings")
                                 }

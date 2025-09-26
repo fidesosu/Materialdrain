@@ -275,12 +275,14 @@ class FileInfoViewModel(
         _uiState.update { it.copy(isLoadingFileInfo = true, fileInfo = null, fileInfoErrorMessage = null) }
         clearTextPreviewStates()
         viewModelScope.launch {
-            when (val response = pixeldrainApiService.getFileInfo(fileId)) {
+            // Pass the API key to the service method
+            when (val response = pixeldrainApiService.getFileInfo(fileId, apiKey)) {
                 is ApiResponse.Success -> {
                     _uiState.update {
                         it.copy(isLoadingFileInfo = false, fileInfo = response.data, fileIdInput = fileId)
                     }
-                    fetchTextFilePreviewContent(response.data)
+                    // Only fetch text preview if the main file info call was successful
+                    fetchTextFilePreviewContent(response.data) 
                 }
                 is ApiResponse.Error -> {
                     _uiState.update {
