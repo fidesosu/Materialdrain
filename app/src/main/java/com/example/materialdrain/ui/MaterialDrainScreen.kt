@@ -50,6 +50,7 @@ import com.example.materialdrain.ui.screens.FilesScreenContent
 import com.example.materialdrain.ui.screens.ListsScreenContent
 import com.example.materialdrain.ui.screens.SettingsScreenContent
 import com.example.materialdrain.ui.screens.UploadScreenContent
+import com.example.materialdrain.ui.shared.AppSnackbarHost // Added import
 import com.example.materialdrain.ui.theme.MaterialdrainTheme
 import com.example.materialdrain.viewmodel.FileInfoViewModel
 import com.example.materialdrain.viewmodel.UploadViewModel
@@ -107,7 +108,7 @@ fun MaterialDrainScreen() {
     val uploadViewModel: UploadViewModel = viewModel(factory = viewModelFactory)
     val fileInfoViewModel: FileInfoViewModel = viewModel(factory = viewModelFactory)
 
-    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarHostState = remember { SnackbarHostState() } // This is the SnackbarHostState we need to pass
     val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
     val uploadUiState by uploadViewModel.uiState.collectAsState()
 
@@ -397,18 +398,11 @@ fun MaterialDrainScreen() {
                 }
             },
             snackbarHost = {
-                SnackbarHost(
+                AppSnackbarHost(
                     hostState = snackbarHostState,
-                    modifier = Modifier
-                        .zIndex(1f)
-                ) { data ->
-                    Snackbar(
-                        snackbarData = data,
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        actionColor = MaterialTheme.colorScheme.primary
-                    )
-                }
+                    modifier = Modifier.zIndex(1f)
+                    // onDismiss can be added here if MaterialDrainScreen needs to react to swipe dismissals
+                )
             }
         ) { paddingValues -> // These are the Scaffold's padding values
             CompositionLocalProvider(LocalOverscrollFactory provides null) {
@@ -450,7 +444,8 @@ fun MaterialDrainScreen() {
                                     FileInfoDetailsCard(
                                         fileInfo = info,
                                         fileInfoViewModel = fileInfoViewModel,
-                                        context = LocalContext.current
+                                        context = LocalContext.current,
+                                        snackbarHostState = snackbarHostState // Pass the snackbarHostState here
                                     )
                                 } ?: run {
                                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

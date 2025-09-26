@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,23 +23,24 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ImageNotSupported
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,9 +55,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.layout.ContentScale // Added import
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import coil.compose.AsyncImage
@@ -124,21 +129,31 @@ fun EnterFileIdDialog(fileInfoViewModel: FileInfoViewModel) {
 }
 
 @Composable
-fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoViewModel, context: Context) {
+fun FileInfoDetailsCard(
+    fileInfo: FileInfoResponse,
+    fileInfoViewModel: FileInfoViewModel,
+    context: Context,
+    snackbarHostState: SnackbarHostState // Added parameter
+) {
     val uiState by fileInfoViewModel.uiState.collectAsState()
     val localClipboardManager = LocalContext.current.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    val snackbarHostState = remember { SnackbarHostState() }
+    // Removed local snackbarHostState, will use the one passed as parameter
     val coroutineScope = rememberCoroutineScope()
 
     var fullScreenPreviewUri by remember { mutableStateOf<Uri?>(null) }
     var fullScreenPreviewMimeType by remember { mutableStateOf<String?>(null) }
     var showPreviews by remember { mutableStateOf(false) }
 
+    // FAB Menu states
+    var isFabMenuExpanded by remember { mutableStateOf(false) }
+    var detailsFabHeightDp by remember { mutableStateOf(0.dp) }
+    val localDensity = LocalDensity.current
+
     val actualThumbnailUrl = "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail"
     val downloadState = uiState.activeDownloads[fileInfo.id]
 
     LaunchedEffect(fileInfo.id) {
-        delay(100) 
+        delay(100)
         showPreviews = true
     }
 
@@ -146,7 +161,7 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
         FullScreenMediaPreviewDialog(
             previewUri = fullScreenPreviewUri,
             previewMimeType = fullScreenPreviewMimeType,
-            thumbnailUrl = actualThumbnailUrl, // Fullscreen preview in FileInfoDialogs might still want the direct thumbnail URL
+            thumbnailUrl = actualThumbnailUrl,
             onDismissRequest = {
                 fullScreenPreviewUri = null
                 fullScreenPreviewMimeType = null
@@ -157,18 +172,17 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
     val fileUrl = "https://pixeldrain.com/u/${fileInfo.id}"
     val rawFileApiUrl = "https://pixeldrain.com/api/file/${fileInfo.id}"
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
-                .weight(1f)
+                .fillMaxSize()
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
             if (showPreviews) {
                 if (fileInfo.mimeType?.startsWith("image/") == true) {
                     InlineImagePreview(
-                        imageSource = rawFileApiUrl, // Pass the raw file API URL for the image
+                        imageSource = rawFileApiUrl,
                         contentDescription = "Image preview for ${fileInfo.name}",
                         onFullScreenClick = {
                             fullScreenPreviewUri = rawFileApiUrl.toUri()
@@ -177,10 +191,10 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
                     )
                 } else if (fileInfo.mimeType?.startsWith("video/") == true) {
                     InlineVideoPreview(
-                        thumbnailSource = actualThumbnailUrl, // Pass the thumbnail URL for video
+                        thumbnailSource = actualThumbnailUrl,
                         contentDescription = "Video thumbnail for ${fileInfo.name}",
                         onFullScreenClick = {
-                            fullScreenPreviewUri = rawFileApiUrl.toUri() // Fullscreen should use the raw video URL
+                            fullScreenPreviewUri = rawFileApiUrl.toUri()
                             fullScreenPreviewMimeType = fileInfo.mimeType
                         }
                     )
@@ -203,14 +217,12 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
                 } else if (uiState.textPreviewErrorMessage != null) {
                     Text(uiState.textPreviewErrorMessage ?: "Error loading text preview.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical=8.dp))
                 } else {
-                    // Fallback for non-image/video files that might have a thumbnail (e.g. documents, archives shown by API)
                     AsyncImage(
-                        model = actualThumbnailUrl, 
+                        model = actualThumbnailUrl,
                         contentDescription = "File thumbnail for ${fileInfo.name}",
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 100.dp, max = 200.dp)
-                            // .clip(RoundedCornerShape(12.dp)) // Already handled by Inline previews if they were used here
                             .align(Alignment.CenterHorizontally)
                             .padding(vertical = 8.dp),
                         contentScale = ContentScale.Fit,
@@ -218,9 +230,7 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
                     )
                 }
             } else {
-                Box(modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
-                    // Intentionally empty or light placeholder to prevent jank
-                }
+                Box(modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {}
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
@@ -236,125 +246,31 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-            Text("Actions", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 12.dp))
-
-            Button(
-                onClick = {
-                    val sendIntent: Intent = Intent().apply {
-                        action = Intent.ACTION_SEND
-                        putExtra(Intent.EXTRA_TEXT, fileUrl)
-                        type = "text/plain"
-                    }
-                    val shareIntent = Intent.createChooser(sendIntent, null)
-                    context.startActivity(shareIntent)
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Filled.Share, contentDescription = "Share Link")
-                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                Text("Share", maxLines = 1)
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            OutlinedButton(
-                onClick = {
-                    val clip = ClipData.newPlainText("Pixeldrain URL", fileUrl)
-                    localClipboardManager.setPrimaryClip(clip)
-                    coroutineScope.launch {
-                        snackbarHostState.showSnackbar("Link copied to clipboard!")
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Filled.ContentCopy, contentDescription = "Copy Link")
-                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                Text("Copy Link", maxLines = 1)
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            val downloadButtonEnabled = downloadState == null ||
-                    downloadState.status == DownloadStatus.PENDING ||
-                    downloadState.status == DownloadStatus.COMPLETED ||
-                    downloadState.status == DownloadStatus.FAILED
-
-            Button(
-                onClick = {
-                    if (downloadState == null || downloadState.status == DownloadStatus.FAILED || downloadState.status == DownloadStatus.COMPLETED) {
-                        fileInfoViewModel.initiateDownloadFile(fileInfo)
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Download started for ${fileInfo.name}")
-                        }
-                    } else if (downloadState.status == DownloadStatus.PENDING) {
-                         coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Download is already pending for ${fileInfo.name}")
-                        }
-                    }
-                },
-                enabled = downloadButtonEnabled,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Filled.Download, contentDescription = "Download")
-                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                Text(
-                    when (downloadState?.status) {
-                        DownloadStatus.DOWNLOADING -> "Downloading..."
-                        DownloadStatus.COMPLETED -> "Download Again"
-                        DownloadStatus.FAILED -> "Retry Download"
-                        DownloadStatus.PENDING -> "Download Pending..."
-                        else -> "Download File"
-                    }
-                )
-            }
-
-            downloadState?.let { state ->
+            downloadState?.let {
                 Spacer(Modifier.height(8.dp))
-                when (state.status) {
+                when (it.status) {
                     DownloadStatus.DOWNLOADING -> {
-                        LinearProgressIndicator(
-                            progress = { state.progressFraction },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        LinearProgressIndicator(progress = { it.progressFraction }, modifier = Modifier.fillMaxWidth())
                         Spacer(Modifier.height(4.dp))
-                        Text(
-                            "${formatSize(state.downloadedBytes)} / ${state.totalBytes?.let { formatSize(it) } ?: "Unknown"}",
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                        Text("${formatSize(it.downloadedBytes)} / ${it.totalBytes?.let { tb -> formatSize(tb) } ?: "Unknown"}", style = MaterialTheme.typography.bodySmall)
                     }
                     DownloadStatus.COMPLETED -> {
-                        Text(
-                            state.message ?: "Download completed successfully.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                         TextButton(onClick = { fileInfoViewModel.clearDownloadState(fileInfo.id) }) {
-                            Text("Clear Status")
-                        }
+                        // SnackBar for this will be shown by MaterialDrainScreen using the passed snackbarHostState
+                        TextButton(onClick = { fileInfoViewModel.clearDownloadState(fileInfo.id) }) { Text("Clear Status") }
                     }
                     DownloadStatus.FAILED -> {
-                        Text(
-                            state.message ?: "Download failed.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                         TextButton(onClick = { fileInfoViewModel.clearDownloadState(fileInfo.id) }) {
-                            Text("Clear Status")
-                        }
+                        // SnackBar for this will be shown by MaterialDrainScreen
+                        TextButton(onClick = { fileInfoViewModel.clearDownloadState(fileInfo.id) }) { Text("Clear Status") }
                     }
                     DownloadStatus.PENDING -> {
-                         Text(
-                            "Download is pending...",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text("Download is pending...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+                Spacer(Modifier.height(8.dp))
             }
 
-
             if (fileInfo.canEdit == true) {
-                Spacer(Modifier.height(8.dp))
+                Text("Admin Actions", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp, bottom = 8.dp))
                 Button(
                     onClick = { fileInfoViewModel.initiateDeleteFile(fileInfo.id) },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
@@ -362,26 +278,71 @@ fun FileInfoDetailsCard(fileInfo: FileInfoResponse, fileInfoViewModel: FileInfoV
                 ) {
                     Icon(Icons.Filled.Delete, contentDescription = "Delete")
                     Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                    Text("Delete File", maxLines = 1) 
+                    Text("Delete File", maxLines = 1)
                 }
             }
-            Spacer(Modifier.height(16.dp)) 
+            Spacer(modifier = Modifier.height(detailsFabHeightDp + 16.dp))
         }
 
-        Box( 
+        Column(
             modifier = Modifier
-                .fillMaxWidth() 
-                .padding(bottom = 8.dp), 
-            contentAlignment = Alignment.BottomCenter 
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 16.dp),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            SnackbarHost(hostState = snackbarHostState) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = MaterialTheme.colorScheme.inverseSurface,
-                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+            if (isFabMenuExpanded) {
+                SmallFloatingActionButton(
+                    onClick = {
+                        val sendIntent: Intent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_TEXT, fileUrl)
+                            type = "text/plain"
+                        }
+                        context.startActivity(Intent.createChooser(sendIntent, null))
+                        isFabMenuExpanded = false
+                    },
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                ) { Icon(Icons.Filled.Share, "Share File") }
+
+                SmallFloatingActionButton(
+                    onClick = {
+                        val clip = ClipData.newPlainText("Pixeldrain URL", fileUrl)
+                        localClipboardManager.setPrimaryClip(clip)
+                        coroutineScope.launch { snackbarHostState.showSnackbar("Link copied to clipboard!") }
+                        isFabMenuExpanded = false
+                    },
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                ) { Icon(Icons.Filled.ContentCopy, "Copy Link") }
+
+                if (downloadState?.status != DownloadStatus.DOWNLOADING && downloadState?.status != DownloadStatus.PENDING) {
+                    SmallFloatingActionButton(
+                        onClick = {
+                            fileInfoViewModel.initiateDownloadFile(fileInfo)
+                            // The actual Snackbar for download start/status will be shown by MaterialDrainScreen
+                            // using its own snackbarHostState which gets updates from the ViewModel.
+                            // We can show a local one here if desired, but it might be redundant.
+                            coroutineScope.launch { snackbarHostState.showSnackbar("Download initiated for ${fileInfo.name}") }
+                            isFabMenuExpanded = false
+                        },
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    ) { Icon(Icons.Filled.Download, "Download File") }
+                }
+            }
+
+            FloatingActionButton(
+                onClick = { isFabMenuExpanded = !isFabMenuExpanded },
+                modifier = Modifier.onSizeChanged {
+                    detailsFabHeightDp = with(localDensity) { it.height.toDp() }
+                }
+            ) {
+                Icon(
+                    imageVector = if (isFabMenuExpanded) Icons.Filled.Close else Icons.Filled.Menu,
+                    contentDescription = if (isFabMenuExpanded) "Close FAB Menu" else "Open FAB Menu"
                 )
             }
         }
+        // Removed local SnackbarHost, MaterialDrainScreen's AppSnackbarHost will be used.
     }
 }
 
