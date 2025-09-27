@@ -252,7 +252,7 @@ class UploadViewModel(
                         newVideoDurationMillis = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
                         var bitmap: Bitmap? = null
                         bitmap = retriever.getFrameAtTime(VIDEO_THUMBNAIL_TARGET_TIME_US, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                        if (bitmap == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        if (bitmap == null && true) {
                             bitmap = retriever.getPrimaryImage()
                         }
                         if (bitmap == null) {

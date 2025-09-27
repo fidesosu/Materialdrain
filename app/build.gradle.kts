@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.materialdrain"
-        minSdk = 32
+        minSdk = 33
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -59,33 +59,33 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.foundation) // This line is un-commented
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0") // Added ViewModel Compose
-    implementation("io.coil-kt:coil-compose:2.7.0") // Added Coil for image loading
-    implementation("io.coil-kt:coil-gif:2.7.0") // Added for GIF support with Coil
+    implementation(libs.androidx.lifecycle.viewmodel.compose) // Added ViewModel Compose
+    implementation(libs.coil.compose) // Added Coil for image loading
+    implementation(libs.coil.gif) // Added for GIF support with Coil
     implementation(libs.google.android.material) // Added Material Components for XML themes
 
     // Ktor Client Dependencies
-    implementation("io.ktor:ktor-client-core:2.3.11")
-    implementation("io.ktor:ktor-client-cio:2.3.11") // CIO engine for Android
-    implementation("io.ktor:ktor-client-content-negotiation:2.3.11")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.11")
-    implementation("io.ktor:ktor-client-auth:2.3.11")
-    implementation("io.ktor:ktor-client-logging:2.3.11") // Optional but good for debugging
-    implementation("io.ktor:ktor-client-okhttp:2.3.11")
-    implementation("io.ktor:ktor-client-content-negotiation:2.3.11")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.11")
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.ktor.client.auth)
+    implementation(libs.ktor.client.logging) // Optional but good for debugging
+    implementation(libs.ktor.client.okhttp)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
 
-    implementation("com.squareup.okhttp3:okhttp:5.1.0")
+    implementation(libs.okhttp)
 
     // implementation("org.chromium.net:cronet-embedded:119.6045.31")
     // implementation("com.google.android:cronet-transport-for-okhttp:5.1.0")
 
     // Kotlinx Serialization runtime (needed for Ktor's JSON serialization)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation(libs.kotlinx.serialization.json.v163)
 
     // Media3 (ExoPlayer)
-    implementation("androidx.media3:media3-exoplayer:1.8.0")
-    implementation("androidx.media3:media3-ui:1.8.0")
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -94,5 +94,5 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-    implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation(libs.androidx.core.splashscreen)
 }

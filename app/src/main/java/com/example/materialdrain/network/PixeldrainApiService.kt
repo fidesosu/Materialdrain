@@ -186,7 +186,7 @@ class PixeldrainApiService {
             json(jsonFormatter, contentType = ContentType.Text.Plain)
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = HttpTimeout.INFINITE_TIMEOUT_MS
+            requestTimeoutMillis = null
             connectTimeoutMillis = 30000L
             socketTimeoutMillis = 900000L
         }

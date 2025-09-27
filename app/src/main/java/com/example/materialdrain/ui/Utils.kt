@@ -1,6 +1,7 @@
 package com.example.materialdrain.ui
 
 import java.text.DecimalFormat
+import java.util.Locale // Added import for Locale
 import java.util.concurrent.TimeUnit
 
 // Helper function to format size in bytes to a human-readable string
@@ -14,7 +15,8 @@ fun formatSize(bytes: Long): String {
         size /= 1024
         unitIndex++
     }
-    return DecimalFormat("#,##0.#").format(size) + " " + units[unitIndex]
+    // For DecimalFormat, explicitly using Locale.US is a good practice too if numbers might vary
+    return DecimalFormat("#,##0.#", java.text.DecimalFormatSymbols(Locale.US)).format(size) + " " + units[unitIndex]
 }
 
 // Helper function to format duration in milliseconds to MM:SS or HH:MM:SS
@@ -24,8 +26,8 @@ fun formatDurationMillis(millis: Long): String {
     val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % TimeUnit.HOURS.toMinutes(1)
     val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) % TimeUnit.MINUTES.toSeconds(1)
     return if (hours > 0) {
-        String.format("%02d:%02d:%02d", hours, minutes, seconds)
+        String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
     } else {
-        String.format("%02d:%02d", minutes, seconds)
+        String.format(Locale.US, "%02d:%02d", minutes, seconds)
     }
 }
