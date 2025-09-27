@@ -1,7 +1,11 @@
 package com.example.materialdrain.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource // Added for clickable without ripple
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,11 +39,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -52,6 +58,7 @@ import com.example.materialdrain.ui.shared.FullScreenMediaPreviewDialog
 import com.example.materialdrain.ui.shared.InlineImagePreview
 import com.example.materialdrain.ui.shared.InlineVideoPreview
 import com.example.materialdrain.viewmodel.FileInfoViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun EnterFileIdDialog(fileInfoViewModel: FileInfoViewModel) {
@@ -115,13 +122,15 @@ fun FileInfoDetailsCard(
     snackbarHostState: SnackbarHostState // Retain for consistency, though App.kt manages most
 ) {
     val uiState by fileInfoViewModel.uiState.collectAsState()
+    val localContext = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val clipboardManager = localContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
     var fullScreenPreviewUri by remember { mutableStateOf<Uri?>(null) }
     var fullScreenPreviewMimeType by remember { mutableStateOf<String?>(null) }
     var showPreviews by remember { mutableStateOf(false) }
 
     val actualThumbnailUrl = "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail"
-    val downloadState = uiState.activeDownloads[fileInfo.id]
     val rawFileApiUrl = "https://pixeldrain.com/api/file/${fileInfo.id}"
 
     LaunchedEffect(fileInfo.id) {
@@ -202,52 +211,110 @@ fun FileInfoDetailsCard(
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
         Text("File Details", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-        InfoRow("ID", fileInfo.id, true)
+        InfoRow(
+            label = "ID",
+            value = fileInfo.id,
+            isValueSelectable = true,
+            onValueClick = {
+                val clip = ClipData.newPlainText("File ID", fileInfo.id)
+                clipboardManager.setPrimaryClip(clip)
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("ID copied to clipboard!")
+                }
+            }
+        )
         InfoRow("Size", formatSize(fileInfo.size))
-        fileInfo.mimeType?.let { InfoRow("Type", it) }
+        fileInfo.mimeType?.let {
+            InfoRow(
+                label = "Type",
+                value = it,
+                isValueSelectable = true,
+                onValueClick = {
+                    val clip = ClipData.newPlainText("Mime Type", it)
+                    clipboardManager.setPrimaryClip(clip)
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("Mime type copied to clipboard!")
+                    }
+                }
+            )
+        }
         InfoRow("Upload Date", formatApiDateTimeString(fileInfo.dateUpload))
         fileInfo.dateLastView?.let { InfoRow("Last View", formatApiDateTimeString(it)) }
         fileInfo.views?.let { InfoRow("Views", it.toString()) }
         fileInfo.downloads?.let { InfoRow("Downloads", it.toString()) }
-        fileInfo.hashSha256?.let { InfoRow("SHA256", it, true) }
+        fileInfo.hashSha256?.let {
+            InfoRow(
+                label = "SHA256",
+                value = it,
+                isValueSelectable = true,
+                onValueClick = {
+                    val clip = ClipData.newPlainText("SHA256 Hash", it)
+                    clipboardManager.setPrimaryClip(clip)
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("SHA256 hash copied to clipboard!")
+                    }
+                }
+            )
+        }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-        // The "Admin Actions" section with the Delete button has been removed as it's now in the TopAppBar menu.
-        // The Spacer that was previously used for FAB height is no longer necessary here, 
-        // or can be a simple fixed spacer if bottom padding is desired.
-        Spacer(modifier = Modifier.height(16.dp)) // General bottom spacing for scrollable content
+        Spacer(modifier = Modifier.height(16.dp))
     }
-    // The Box that contained the FAB menu has been removed.
 }
 
 
 @Composable
-fun InfoRow(label: String, value: String, isValueSelectable: Boolean = false) {
+fun InfoRow(
+    label: String,
+    value: String,
+    isValueSelectable: Boolean = false,
+    onValueClick: (() -> Unit)? = null
+) {
     Row(
-        modifier = Modifier.padding(vertical = 4.dp),
+        modifier = Modifier
+            .padding(vertical = 4.dp)
+            .fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "$label:", // Added colon
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), // Made bold
+            text = "$label:",
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
             modifier = Modifier
-                .defaultMinSize(minWidth = 90.dp)
+                .defaultMinSize(minWidth = 110.dp)
                 .padding(end = 8.dp)
         )
+        val valueModifier = Modifier
+            .weight(1f)
+            .then(
+                if (onValueClick != null) {
+                    Modifier.clickable(
+                        onClick = onValueClick,
+                        indication = null, // Disable ripple
+                        interactionSource = remember { MutableInteractionSource() } // Required for indication = null
+                    )
+                } else {
+                    Modifier
+                }
+            )
+
+        val valueColor = if (onValueClick != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+
         if (isValueSelectable) {
             SelectionContainer {
                 Text(
                     value,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f)
+                    color = valueColor,
+                    modifier = valueModifier
                 )
             }
         } else {
             Text(
                 value,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f)
+                color = valueColor, // Apply color here too for non-selectable but clickable items if any in future
+                modifier = valueModifier
             )
         }
     }
