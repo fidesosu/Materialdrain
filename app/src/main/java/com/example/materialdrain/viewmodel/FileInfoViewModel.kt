@@ -12,6 +12,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.materialdrain.network.ApiResponse
 import com.example.materialdrain.network.FileInfoResponse
 import com.example.materialdrain.network.PixeldrainApiService
+import com.example.materialdrain.network.FilesystemEntry // Added import
+import com.example.materialdrain.network.toFileInfoResponse // Added import
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
@@ -282,7 +284,7 @@ class FileInfoViewModel(
                         it.copy(isLoadingFileInfo = false, fileInfo = response.data, fileIdInput = fileId)
                     }
                     // Only fetch text preview if the main file info call was successful
-                    fetchTextFilePreviewContent(response.data) 
+                    fetchTextFilePreviewContent(response.data)
                 }
                 is ApiResponse.Error -> {
                     _uiState.update {
@@ -294,6 +296,31 @@ class FileInfoViewModel(
                     }
                 }
             }
+        }
+    }
+
+    // New function to set FileInfo from a FilesystemEntry
+    fun setFileInfoFromFilesystemEntry(entry: FilesystemEntry) {
+        val fileInfo = entry.toFileInfoResponse()
+        if (fileInfo != null) {
+            _uiState.update {
+                it.copy(
+                    isLoadingFileInfo = false, // Assuming conversion is quick
+                    fileInfo = fileInfo,
+                    fileIdInput = fileInfo.id, // Keep fileIdInput in sync
+                    fileInfoErrorMessage = null
+                )
+            }
+            fetchTextFilePreviewContent(fileInfo) // Attempt to load text preview if applicable
+        } else {
+            _uiState.update {
+                it.copy(
+                    isLoadingFileInfo = false,
+                    fileInfo = null,
+                    fileInfoErrorMessage = "Cannot display details. Item may be a folder or a file without a direct Pixeldrain ID."
+                )
+            }
+            clearTextPreviewStates() // Clear any previous preview
         }
     }
 

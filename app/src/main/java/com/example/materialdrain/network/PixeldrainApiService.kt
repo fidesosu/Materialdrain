@@ -19,13 +19,17 @@ import io.ktor.client.plugins.onUpload
 import io.ktor.client.request.headers
 import io.ktor.client.request.prepareDelete
 import io.ktor.client.request.prepareGet
+import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLProtocol
+import io.ktor.http.isSuccess
 import io.ktor.http.path
 import io.ktor.http.encodedPath
 import io.ktor.http.takeFrom
@@ -40,6 +44,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
 import okhttp3.Protocol
 import okhttp3.OkHttpClient
 import java.io.BufferedInputStream
@@ -115,9 +120,9 @@ data class FilesystemEntry(
     @SerialName("file_size") val fileSize: Long, // Will be 0 for dirs
     @SerialName("file_type") val fileType: String, // Mime type for files, empty for dirs
     @SerialName("sha256_sum") val sha256Sum: String, // SHA256 for files, empty for dirs
-    val id: String? = null, // Pixeldrain file ID if it\'s a direct file, null for dirs or "me" for root dir in path context
+    val id: String? = null, // Pixeldrain file ID if it's a direct file, null for dirs or "me" for root dir in path context
     @SerialName("logging_enabled_at") val loggingEnabledAt: String? = null,
-    // Fields from FileInfoResponse that might appear if \'?stats\' is used for a file child
+    // Fields from FileInfoResponse that might appear if '?stat' is used for a file child (corrected from stats)
     val views: Int? = null,
     @SerialName("bandwidth_used") val bandwidthUsed: Long? = null,
     @SerialName("bandwidth_used_paid") val bandwidthUsedPaid: Long? = null,
@@ -137,6 +142,43 @@ data class FilesystemEntry(
     @SerialName("allow_video_player") val allowVideoPlayer: Boolean? = null,
     @SerialName("download_speed_limit") val downloadSpeedLimit: Long? = null
 )
+
+// Extension function to convert FilesystemEntry to FileInfoResponse
+fun FilesystemEntry.toFileInfoResponse(): FileInfoResponse? {
+    // A Pixeldrain ID is essential for FileInfoResponse to be useful for previews/downloads.
+    // If the entry is a file and has an ID, and other necessary fields are present.
+    if (this.type == "file" && !this.id.isNullOrBlank()) {
+        return FileInfoResponse(
+            id = this.id, // Essential: Use the ID from FilesystemEntry if available (from ?stat=true)
+            name = this.name,
+            size = this.fileSize,
+            views = this.views,
+            bandwidthUsed = this.bandwidthUsed,
+            bandwidthUsedPaid = this.bandwidthUsedPaid,
+            downloads = this.downloads,
+            dateUpload = this.created, // Using 'created' from FilesystemEntry as 'dateUpload'
+            dateLastView = this.dateLastView,
+            mimeType = this.mimeType ?: this.fileType.ifBlank { null }, // Prioritize specific mimeType, fallback to fileType
+            thumbnailHref = this.thumbnailHref,
+            hashSha256 = this.sha256Sum.ifBlank { null }, // Use sha256Sum from FilesystemEntry
+            canEdit = this.canEdit,
+            deleteAfterDate = this.deleteAfterDate,
+            deleteAfterDownloads = this.deleteAfterDownloads,
+            availability = this.availability,
+            availabilityMessage = this.availabilityMessage,
+            abuseType = this.abuseType,
+            abuseReporterName = this.abuseReporterName,
+            canDownload = this.canDownload,
+            showAds = this.showAds,
+            allowVideoPlayer = this.allowVideoPlayer,
+            downloadSpeedLimit = this.downloadSpeedLimit
+        )
+    }
+    // If it's a directory, or a file without an ID (e.g. not a direct Pixeldrain file, or stats not loaded),
+    // it cannot be meaningfully converted to a FileInfoResponse for individual file operations/previews.
+    return null
+}
+
 
 @Serializable
 data class FilesystemPermissions(
@@ -183,7 +225,7 @@ class PixeldrainApiService {
                 ignoreUnknownKeys = true
             }
             json(jsonFormatter, contentType = ContentType.Application.Json)
-            json(jsonFormatter, contentType = ContentType.Text.Plain)
+            json(jsonFormatter, contentType = ContentType.Text.Plain) // Added for flexibility with text/plain responses
         }
         install(HttpTimeout) {
             requestTimeoutMillis = null
@@ -237,7 +279,7 @@ class PixeldrainApiService {
                 response.body<FileUploadResponse>()
             }
         } catch (e: Exception) {
-            Log.e("PIXEL_API_SERVICE", "Exception during PUT text/byte array upload: ${e.message}", e)
+            Log.e("PIXEL_API_SERVICE", "Exception during PUT text/byte array upload: ${'$'}{e.message}", e)
             FileUploadResponse(success = false, value = "network_exception_upload_bytearray", message = e.message ?: "Network request failed")
         }
     }
@@ -263,7 +305,7 @@ class PixeldrainApiService {
                 }
             }
         } catch (e: Exception) {
-            Log.w("PIXEL_API_SERVICE", "Could not determine file size for Content-Length: ${e.message}")
+            Log.w("PIXEL_API_SERVICE", "Could not determine file size for Content-Length: ${'$'}{e.message}")
         }
 
         return try {
@@ -303,7 +345,7 @@ class PixeldrainApiService {
                 response.body<FileUploadResponse>()
             }
         } catch (e: Exception) {
-            Log.e("PIXEL_API_SERVICE", "Exception during PUT URI upload (streaming): ${e.message}", e)
+            Log.e("PIXEL_API_SERVICE", "Exception during PUT URI upload (streaming): ${'$'}{e.message}", e)
             FileUploadResponse(success = false, value = "network_exception_upload_uri_stream", message = e.message ?: "Network request failed or stream error")
         }
     }
@@ -330,7 +372,7 @@ class PixeldrainApiService {
                 }
             }
         } catch (e: Exception) {
-            Log.e("PIXEL_API_SERVICE", "Exception for GET file info: ${e.message}", e)
+            Log.e("PIXEL_API_SERVICE", "Exception for GET file info: ${'$'}{e.message}", e)
             val errorMsg = e.message ?: "Network request failed or failed to parse error response"
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_file_info", message = errorMsg))
         }
@@ -349,8 +391,8 @@ class PixeldrainApiService {
                     protocol = URLProtocol.HTTPS
                     host = "pixeldrain.com"
                     val pathSegments = listOf("api", "filesystem") + actualPath.split('/').filter { it.isNotEmpty() }
-                    path(*pathSegments.toTypedArray()) // Correctly spread the list into varargs for path()
-                    parameters.append("stats", "true")
+                    path(*pathSegments.toTypedArray())
+                    parameters.append("stat", "") // Changed to append empty string for ?stat=
                 }
                 headers {
                     append(HttpHeaders.Authorization, basicAuth)
@@ -367,15 +409,77 @@ class PixeldrainApiService {
                         try {
                             ApiResponse.Error(response.body<FileUploadResponse>())
                         } catch (_: Exception) {
-                             ApiResponse.Error(FileUploadResponse(success = false, value = "filesystem_api_error_parsing_failed", message = "HTTP ${response.status.value}: Could not parse error response."))
+                             ApiResponse.Error(FileUploadResponse(success = false, value = "filesystem_api_error_parsing_failed", message = "HTTP ${'$'}{response.status.value}: Could not parse error response."))
                         }
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.e("PIXEL_API_SERVICE", "Exception for GET filesystem path '$actualPath': ${e.message}", e)
+            Log.e("PIXEL_API_SERVICE", "Exception for GET filesystem path '${'$'}actualPath': ${'$'}{e.message}", e)
             val errorMsg = e.message ?: "Network request failed or failed to parse error response"
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_filesystem_path", message = errorMsg))
+        }
+    }
+
+    suspend fun importFilesToFilesystem(
+        apiKey: String,
+        destinationPath: String, // e.g., "MyFolder" or "" for root of "me"
+        sourceFileIds: List<String>
+    ): ApiResponse<FileUploadResponse> {
+        if (apiKey.isBlank()) {
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "API Key is required for filesystem operations."))
+        }
+        if (sourceFileIds.isEmpty()) {
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "no_source_files", message = "No source file IDs provided for import."))
+        }
+
+        val basicAuth = "Basic " + Base64.encodeToString(":$apiKey".toByteArray(), Base64.NO_WRAP)
+        // Use Json.Default for encoding the list to JSON string
+        val filesJsonString = Json.encodeToString(sourceFileIds)
+
+        return try {
+            val response: HttpResponse = client.post {
+                url {
+                    protocol = URLProtocol.HTTPS
+                    host = "pixeldrain.com"
+                    val basePathSegments = listOf("api", "filesystem", "me")
+                    val dynamicPathSegments = destinationPath.split('/').filter { it.isNotEmpty() }
+                    path(*(basePathSegments + dynamicPathSegments).toTypedArray())
+                }
+                headers {
+                    append(HttpHeaders.Authorization, basicAuth)
+                    // Content-Type for multipart/form-data is set automatically by Ktor
+                }
+                setBody(MultiPartFormDataContent(
+                    parts = formData {
+                        append("action", "import")
+                        append("files", filesJsonString)
+                    }
+                ))
+            }
+
+            if (response.status == HttpStatusCode.NoContent) {
+                ApiResponse.Success(FileUploadResponse(success = true, message = "Files imported successfully (No Content)."))
+            } else if (response.status.isSuccess()) { // Handles other 2xx responses like OK
+                try {
+                    val successBody = response.body<FileUploadResponse>()
+                    ApiResponse.Success(successBody)
+                } catch (e: Exception) {
+                    Log.w("PIXEL_API_SERVICE", "Successful import (HTTP ${'$'}{response.status.value}), but response body parsing as FileUploadResponse failed: ${'$'}{e.message}")
+                    ApiResponse.Success(FileUploadResponse(success = true, message = "Import action reported success (HTTP ${'$'}{response.status.value}), but response format was unexpected."))
+                }
+            } else { // Error cases (4xx, 5xx)
+                try {
+                    val errorBody = response.body<FileUploadResponse>()
+                    ApiResponse.Error(errorBody)
+                } catch (e: Exception) {
+                    Log.e("PIXEL_API_SERVICE", "Import files failed (HTTP ${'$'}{response.status.value}). Error body parsing failed: ${'$'}{e.message}")
+                    ApiResponse.Error(FileUploadResponse(success = false, value = "import_failed_status_${'$'}{response.status.value}", message = "Import failed: ${'$'}{response.status.description}. Could not parse error details."))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PIXEL_API_SERVICE", "Exception during POST import files: ${'$'}{e.message}", e)
+            ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_import_files", message = e.message ?: "Network request failed during import"))
         }
     }
 
@@ -400,19 +504,19 @@ class PixeldrainApiService {
                     val totalBytesFromServer = httpResponse.headers[HttpHeaders.ContentLength]?.toLongOrNull()
                     var totalBytesCopied = 0L
                     val buffer = ByteArray(streamBufferSize)
-                    var bytesRead: Int
+                    var bytesReadCount: Int
                     try {
                         inputStream.use { netStream ->
-                            while (netStream.read(buffer).also { bytesRead = it } != -1) {
-                                outputStream.write(buffer, 0, bytesRead)
-                                totalBytesCopied += bytesRead
+                            while (netStream.read(buffer).also { bytesReadCount = it } != -1) {
+                                outputStream.write(buffer, 0, bytesReadCount)
+                                totalBytesCopied += bytesReadCount
                                 onProgress(totalBytesCopied, totalBytesFromServer)
                             }
                         }
                         outputStream.flush()
                         ApiResponse.Success(totalBytesCopied)
                     } catch (e: IOException) {
-                        Log.e("PIXEL_API_SERVICE", "IOException during stream copy: ${e.message}", e)
+                        Log.e("PIXEL_API_SERVICE", "IOException during stream copy: ${'$'}{e.message}", e)
                         ApiResponse.Error(FileUploadResponse(success = false, value = "download_stream_copy_error", message = e.message ?: "Error copying download stream"))
                     }
                 } else {
@@ -421,12 +525,12 @@ class PixeldrainApiService {
                         ApiResponse.Error(errorBody)
                     } catch (_: Exception) {
                         Log.e("PIXEL_API_SERVICE", "Failed to parse error body for download")
-                        ApiResponse.Error(FileUploadResponse(success = false, value = "download_failed_status_${httpResponse.status.value}", message = "Download failed: ${httpResponse.status.description}. Error body parsing failed."))
+                        ApiResponse.Error(FileUploadResponse(success = false, value = "download_failed_status_${'$'}{httpResponse.status.value}", message = "Download failed: ${'$'}{httpResponse.status.description}. Error body parsing failed."))
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.e("PIXEL_API_SERVICE", "Exception during GET file download to stream: ${e.message}", e)
+            Log.e("PIXEL_API_SERVICE", "Exception during GET file download to stream: ${'$'}{e.message}", e)
             val errorMsg = e.message ?: "Network request failed or failed to parse response"
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_file_download_stream", message = errorMsg))
         }
@@ -451,12 +555,12 @@ class PixeldrainApiService {
                     try {
                         ApiResponse.Error(response.body<FileUploadResponse>())
                     } catch (_: Exception) {
-                        ApiResponse.Error(FileUploadResponse(success = false, value = "get_content_failed_status_${response.status.value}", message = "Failed to get content: ${response.status.description}"))
+                        ApiResponse.Error(FileUploadResponse(success = false, value = "get_content_failed_status_${'$'}{response.status.value}", message = "Failed to get content: ${'$'}{response.status.description}"))
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.e("PIXEL_API_SERVICE", "Exception during GET file content as text: ${e.message}", e)
+            Log.e("PIXEL_API_SERVICE", "Exception during GET file content as text: ${'$'}{e.message}", e)
             val errorMsg = e.message ?: "Network request failed or failed to parse response"
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_get_content", message = errorMsg))
         }
@@ -485,7 +589,7 @@ class PixeldrainApiService {
                 }
             }
         } catch (e: Exception) {
-            Log.e("PIXEL_API_SERVICE", "Exception for GET user files: ${e.message}", e)
+            Log.e("PIXEL_API_SERVICE", "Exception for GET user files: ${'$'}{e.message}", e)
             val errorMsg = e.message ?: "Network request failed or failed to parse error response"
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_user_files", message = errorMsg))
         }
@@ -518,7 +622,7 @@ class PixeldrainApiService {
                 }
             }
         } catch (e: Exception) {
-            Log.e("PIXEL_API_SERVICE", "Exception during DELETE file: ${e.message}", e)
+            Log.e("PIXEL_API_SERVICE", "Exception during DELETE file: ${'$'}{e.message}", e)
             val errorMsg = e.message ?: "Network request failed or failed to parse error/success response"
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_delete_file", message = errorMsg))
         }
