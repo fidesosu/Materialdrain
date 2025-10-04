@@ -31,7 +31,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 // Import specific filled icons that are still used directly
-import androidx.compose.material.icons.filled.Description 
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -43,6 +43,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -61,7 +62,7 @@ import com.example.materialdrain.ui.shared.AppSnackbarHost
 import com.example.materialdrain.ui.theme.MaterialdrainTheme
 import com.example.materialdrain.viewmodel.DownloadStatus
 import com.example.materialdrain.viewmodel.FileInfoViewModel
-import com.example.materialdrain.viewmodel.FilesystemViewModel 
+import com.example.materialdrain.viewmodel.FilesystemViewModel
 import com.example.materialdrain.viewmodel.UploadViewModel
 import com.example.materialdrain.viewmodel.ViewModelFactory
 import kotlinx.coroutines.flow.collectLatest
@@ -106,6 +107,7 @@ internal fun formatApiDateTimeString(dateTimeString: String?): String {
 @Composable
 fun MaterialDrainScreen() {
     var currentScreen by rememberSaveable { mutableStateOf(Screen.Upload) }
+    var previousScreen by rememberSaveable { mutableStateOf(Screen.Files) }
 
     var showGenericDialog by remember { mutableStateOf(false) }
     var genericDialogContent by remember { mutableStateOf("") }
@@ -142,6 +144,13 @@ fun MaterialDrainScreen() {
     )
     var showFileDetailMenu by remember { mutableStateOf(false) }
 
+    val navigateTo = { screen: Screen ->
+        if (currentScreen != screen) {
+            previousScreen = currentScreen
+            currentScreen = screen
+        }
+    }
+
     LaunchedEffect(Unit) {
         Log.d("App", "Initial composition. Loading API Key from SharedPreferences.")
         val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -151,7 +160,7 @@ fun MaterialDrainScreen() {
     if (currentScreen == Screen.FileDetail) {
         BackHandler(enabled = true) {
             fileInfoViewModel.setPreserveScrollPosition(true)
-            currentScreen = Screen.Files
+            navigateTo(previousScreen)
         }
     }
 
@@ -208,7 +217,7 @@ fun MaterialDrainScreen() {
             fileInfoViewModel.clearDeleteMessages()
             if (currentScreen == Screen.FileDetail) {
                 fileInfoViewModel.setPreserveScrollPosition(true)
-                currentScreen = Screen.Files
+                navigateTo(previousScreen)
             }
         }
     }
@@ -288,13 +297,13 @@ fun MaterialDrainScreen() {
                     isExtended = true
                 )
                 Screen.FileDetail -> null
-                Screen.Filesystem -> null 
+                Screen.Filesystem -> null
             }
         }
     }
     val isFabVisible = fabState != null
 
-    SharedTransitionLayout { 
+    SharedTransitionLayout {
         Scaffold(
             topBar = {
                 Column {
@@ -319,7 +328,7 @@ fun MaterialDrainScreen() {
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     AnimatedVisibility(
-                                        visible = currentScreen != Screen.FileDetail || 
+                                        visible = currentScreen != Screen.FileDetail ||
                                                   fileInfoUiState.fileInfo?.id?.let { fileId ->
                                                       fileInfoUiState.activeDownloads[fileId]?.let {
                                                           it.status != DownloadStatus.DOWNLOADING && it.status != DownloadStatus.PENDING
@@ -331,7 +340,9 @@ fun MaterialDrainScreen() {
                                         Text(
                                             text = currentTitle,
                                             modifier = if (currentScreen == Screen.FileDetail) {
-                                                Modifier.weight(1f, fill = false).horizontalScroll(rememberScrollState())
+                                                Modifier
+                                                    .weight(1f, fill = false)
+                                                    .horizontalScroll(rememberScrollState())
                                             } else {
                                                 Modifier.weight(1f)
                                             },
@@ -354,7 +365,9 @@ fun MaterialDrainScreen() {
                                         Text(
                                             text = progressText,
                                             style = MaterialTheme.typography.bodySmall,
-                                            modifier = Modifier.padding(start = 8.dp).weight(1f, fill = true) // Allow shrinking if title is long
+                                            modifier = Modifier
+                                                .padding(start = 8.dp)
+                                                .weight(1f, fill = true) // Allow shrinking if title is long
                                         )
                                     }
                                 }
@@ -364,9 +377,9 @@ fun MaterialDrainScreen() {
                             if (currentScreen == Screen.FileDetail) {
                                 IconButton(onClick = {
                                     fileInfoViewModel.setPreserveScrollPosition(true)
-                                    currentScreen = Screen.Files
+                                    navigateTo(previousScreen)
                                 }) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Files")
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                                 }
                             }
                         },
@@ -385,7 +398,9 @@ fun MaterialDrainScreen() {
                                         Text(
                                             text = progressText,
                                             style = MaterialTheme.typography.bodySmall,
-                                            modifier = Modifier.align(Alignment.CenterVertically).padding(end = 8.dp) 
+                                            modifier = Modifier
+                                                .align(Alignment.CenterVertically)
+                                                .padding(end = 8.dp)
                                         )
                                     }
                                 }
@@ -445,7 +460,7 @@ fun MaterialDrainScreen() {
                                     }
                                 }
                             } else if (currentScreen != Screen.Settings) { // Show settings icon for other screens not FileDetail or Settings itself
-                                IconButton(onClick = { currentScreen = Screen.Settings }) {
+                                IconButton(onClick = { navigateTo(Screen.Settings) }) {
                                     Icon(painterResource(id = R.drawable.icon_settings_outlined), contentDescription = "Settings")
                                 }
                             }
@@ -458,7 +473,7 @@ fun MaterialDrainScreen() {
                     ) {
                         val progressFloat = if (uploadUiState.uploadTotalSizeBytes != null && uploadUiState.uploadTotalSizeBytes!! > 0L) {
                             (uploadUiState.uploadedBytes.toFloat() / uploadUiState.uploadTotalSizeBytes!!).coerceIn(0f, 1f)
-                        } else {0f} 
+                        } else {0f}
                         if (uploadUiState.uploadTotalSizeBytes != null && uploadUiState.uploadTotalSizeBytes!! > 0L) {
                             LinearProgressIndicator(progress = { progressFloat }, modifier = Modifier.fillMaxWidth())
                         } else {
@@ -467,8 +482,8 @@ fun MaterialDrainScreen() {
                     }
                     // Added LinearProgressIndicator for FileDetailScreen download progress
                     AnimatedVisibility(
-                        visible = currentScreen == Screen.FileDetail && 
-                                  fileInfoUiState.fileInfo?.id?.let { fileId -> 
+                        visible = currentScreen == Screen.FileDetail &&
+                                  fileInfoUiState.fileInfo?.id?.let { fileId ->
                                       fileInfoUiState.activeDownloads[fileId]?.let {
                                           it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.PENDING
                                       } ?: false
@@ -490,9 +505,7 @@ fun MaterialDrainScreen() {
             bottomBar = {
                 AnimatedVisibility(visible = currentScreen != Screen.FileDetail) {
                     BottomNavigationBar(currentScreen, navBarOrder) { selectedScreen -> // Pass navBarOrder
-                        if (currentScreen != selectedScreen) {
-                            currentScreen = selectedScreen
-                        }
+                        navigateTo(selectedScreen)
                     }
                 }
             },
@@ -539,7 +552,7 @@ fun MaterialDrainScreen() {
                     modifier = Modifier.zIndex(1f)
                 )
             }
-        ) { paddingValues -> 
+        ) { paddingValues ->
             CompositionLocalProvider(LocalOverscrollFactory provides null) {
                 AnimatedContent(
                     targetState = currentScreen,
@@ -575,7 +588,7 @@ fun MaterialDrainScreen() {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(paddingValues) 
+                            .padding(paddingValues)
                     ) {
                         when (targetScreen) {
                             Screen.Upload -> UploadScreenContent(
@@ -585,13 +598,15 @@ fun MaterialDrainScreen() {
                             )
                             Screen.Files -> FilesScreenContent(
                                 fileInfoViewModel = fileInfoViewModel,
-                                onFileSelected = { currentScreen = Screen.FileDetail },
+                                onFileSelected = { navigateTo(Screen.FileDetail) },
                                 listState = filesScreenListState,
                                 fabHeight = fabHeightDp,
                                 isFabVisible = isFabVisible
                             )
                             Screen.Filesystem -> FilesystemScreen(
-                                filesystemViewModel = filesystemViewModel, // Pass the ViewModel
+                                filesystemViewModel = filesystemViewModel,
+                                fileInfoViewModel = fileInfoViewModel,
+                                onFileSelected = { navigateTo(Screen.FileDetail) },
                                 fabHeight = fabHeightDp,
                                 isFabVisible = isFabVisible
                             )
@@ -608,11 +623,12 @@ fun MaterialDrainScreen() {
                                         if (fileInfoUiState.isLoadingFileInfo) {
                                             CircularProgressIndicator()
                                         } else {
-                                            Text("File details not available. Please go back and select a file.")
-                                            LaunchedEffect(Unit) {
-                                                fileInfoViewModel.setPreserveScrollPosition(true)
-                                                currentScreen = Screen.Files
-                                            }
+                                            val errorMessage = fileInfoUiState.fileInfoErrorMessage ?: "File details not available."
+                                            Text(
+                                                text = "$errorMessage Please go back and select a different file.",
+                                                modifier = Modifier.padding(16.dp),
+                                                textAlign = TextAlign.Center
+                                            )
                                         }
                                     }
                                 }
@@ -636,7 +652,7 @@ fun MaterialDrainScreen() {
                                 },
                                 fabHeight = fabHeightDp,
                                 isFabVisible = isFabVisible,
-                                onNavigateBack = { currentScreen = Screen.Files } // Added onNavigateBack
+                                onNavigateBack = { navigateTo(previousScreen) }
                             )
                         }
                     }
@@ -668,7 +684,7 @@ fun MaterialDrainScreen() {
                             fileInfoViewModel.clearApiKeyMissingError()
                             // Consider clearing filesystemViewModel error too if relevant
                             if (genericDialogContent.contains("Settings")) {
-                                if (currentScreen != Screen.Settings) currentScreen = Screen.Settings
+                                navigateTo(Screen.Settings)
                             }
                         }
                     }) { Text("OK") }
@@ -704,7 +720,7 @@ data class FabDetails(
     val text: String?,
     val onClick: () -> Unit,
     val isExtended: Boolean,
-    val yOffset: androidx.compose.ui.unit.Dp = 0.dp 
+    val yOffset: androidx.compose.ui.unit.Dp = 0.dp
 )
 
 @Composable

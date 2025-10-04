@@ -39,6 +39,7 @@ import coil.request.ImageRequest
 import com.example.materialdrain.network.FilesystemEntry
 import com.example.materialdrain.ui.formatApiDateTimeString
 import com.example.materialdrain.ui.formatSize
+import com.example.materialdrain.viewmodel.FileInfoViewModel
 import com.example.materialdrain.viewmodel.FilesystemViewModel
 import com.example.materialdrain.viewmodel.PathSegment
 import io.ktor.http.encodeURLPathPart
@@ -106,6 +107,8 @@ fun PathBreadcrumb(
 @Composable
 fun FilesystemScreen(
     filesystemViewModel: FilesystemViewModel,
+    fileInfoViewModel: FileInfoViewModel,
+    onFileSelected: () -> Unit,
     fabHeight: Dp,
     isFabVisible: Boolean
 ) {
@@ -179,7 +182,12 @@ fun FilesystemScreen(
                             entry = entry,
                             apiKey = uiState.apiKey, // Pass the API key from the ViewModel
                             onClick = {
-                                filesystemViewModel.navigateToChild(entry)
+                                if (entry.type == "file") {
+                                    fileInfoViewModel.setFileInfoFromFilesystemEntry(entry)
+                                    onFileSelected()
+                                } else {
+                                    filesystemViewModel.navigateToChild(entry)
+                                }
                             }
                         )
                         HorizontalDivider()

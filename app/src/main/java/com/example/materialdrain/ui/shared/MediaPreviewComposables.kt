@@ -62,6 +62,11 @@ import com.example.materialdrain.util.ExoPlayerCache
 
 private const val TAG_COIL = "CoilImageLoaderShared"
 
+// Helper function to decide if the auth header should be added
+private fun shouldAddAuthenticationHeader(url: String): Boolean {
+    return url.startsWith("https://pixeldrain.com/api/filesystem/")
+}
+
 @Composable
 fun ClickablePreviewOverlay(onClick: () -> Unit) {
     Box(
@@ -88,23 +93,27 @@ fun ClickablePreviewOverlay(onClick: () -> Unit) {
     }
 }
 
-@UnstableApi
+@OptIn(UnstableApi::class)
 @Composable
-fun VideoPlayerControls(videoUri: Uri, thumbnailUrl: String?, modifier: Modifier = Modifier) {
+fun VideoPlayerControls(videoUri: Uri, thumbnailUrl: String?, apiKey: String?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val playedColor = MaterialTheme.colorScheme.primary.toArgb()
     val scrubberColor = MaterialTheme.colorScheme.primary.toArgb()
     val bufferedColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f).toArgb()
     val unplayedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f).toArgb()
 
-    val exoPlayer = remember(videoUri) {
+    val exoPlayer = remember(videoUri, apiKey) {
         val mediaSourceFactory: MediaSource.Factory = if (videoUri.scheme == "content") {
             ProgressiveMediaSource.Factory(DefaultDataSource.Factory(context))
         } else {
             val simpleCache = ExoPlayerCache.getInstance(context)
+            val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            if (apiKey != null && shouldAddAuthenticationHeader(videoUri.toString())) {
+                httpDataSourceFactory.setDefaultRequestProperties(mapOf("Cookie" to "pd_auth_key=$apiKey"))
+            }
             val cacheDataSourceFactory = CacheDataSource.Factory()
                 .setCache(simpleCache)
-                .setUpstreamDataSourceFactory(DefaultHttpDataSource.Factory())
+                .setUpstreamDataSourceFactory(httpDataSourceFactory)
                 .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
             ProgressiveMediaSource.Factory(cacheDataSourceFactory)
         }
@@ -122,9 +131,9 @@ fun VideoPlayerControls(videoUri: Uri, thumbnailUrl: String?, modifier: Modifier
     var artworkDrawable by remember { mutableStateOf<Drawable?>(null) }
     val coilImageLoader = context.imageLoader
 
-    LaunchedEffect(thumbnailUrl, coilImageLoader) {
+    LaunchedEffect(thumbnailUrl, coilImageLoader, apiKey) {
         if (thumbnailUrl != null) {
-            val request = ImageRequest.Builder(context)
+            val requestBuilder = ImageRequest.Builder(context)
                 .data(thumbnailUrl)
                 .target(object : Target {
                     override fun onSuccess(result: Drawable) {
@@ -134,8 +143,12 @@ fun VideoPlayerControls(videoUri: Uri, thumbnailUrl: String?, modifier: Modifier
                         artworkDrawable = null
                     }
                 })
-                .build()
-            coilImageLoader.enqueue(request)
+
+            if (apiKey != null && shouldAddAuthenticationHeader(thumbnailUrl)) {
+                requestBuilder.addHeader("Cookie", "pd_auth_key=$apiKey")
+            }
+
+            coilImageLoader.enqueue(requestBuilder.build())
         } else {
             artworkDrawable = null
         }
@@ -176,12 +189,13 @@ fun VideoPlayerControls(videoUri: Uri, thumbnailUrl: String?, modifier: Modifier
     )
 }
 
-@UnstableApi
+@OptIn(UnstableApi::class)
 @Composable
 fun FullScreenMediaPreviewDialog(
     previewUri: Uri?,
     previewMimeType: String?,
     thumbnailUrl: String?,
+    apiKey: String?, // Added apiKey
     onDismissRequest: () -> Unit
 ) {
     Dialog(
@@ -204,6 +218,7 @@ fun FullScreenMediaPreviewDialog(
                             VideoPlayerControls(
                                 videoUri = previewUri,
                                 thumbnailUrl = thumbnailUrl,
+                                apiKey = apiKey, // Pass apiKey
                                 modifier = Modifier.fillMaxSize().padding(8.dp)
                             )
                         }
@@ -216,11 +231,16 @@ fun FullScreenMediaPreviewDialog(
                                     }
                                     .build()
                             }
+                            val requestBuilder = ImageRequest.Builder(context)
+                                .data(previewUri)
+                                .crossfade(true)
+
+                            if (apiKey != null && previewUri.toString().let { shouldAddAuthenticationHeader(it) }) {
+                                requestBuilder.addHeader("Cookie", "pd_auth_key=$apiKey")
+                            }
+
                             AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(previewUri)
-                                    .crossfade(true)
-                                    .build(),
+                                model = requestBuilder.build(),
                                 imageLoader = imageLoader,
                                 contentDescription = "Fullscreen GIF Preview",
                                 modifier = Modifier
@@ -230,11 +250,16 @@ fun FullScreenMediaPreviewDialog(
                             )
                         }
                         previewMimeType?.startsWith("image/") == true -> {
+                            val requestBuilder = ImageRequest.Builder(LocalContext.current)
+                                .data(previewUri)
+                                .crossfade(true)
+
+                            if (apiKey != null && previewUri.toString().let { shouldAddAuthenticationHeader(it) }) {
+                                requestBuilder.addHeader("Cookie", "pd_auth_key=$apiKey")
+                            }
+
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(previewUri)
-                                    .crossfade(true)
-                                    .build(),
+                                model = requestBuilder.build(),
                                 contentDescription = "Fullscreen Image Preview",
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -258,6 +283,7 @@ fun FullScreenMediaPreviewDialog(
 @Composable
 fun AudioPlayerPreview(
     albumArtSource: Any?, // Can be ByteArray, Uri, String (URL)
+    apiKey: String?, // Added apiKey
     artist: String?,
     album: String?,
     audioDurationMillis: Long?,
@@ -312,11 +338,16 @@ fun AudioPlayerPreview(
                             }
                         }
                         is Uri, is String -> {
+                            val requestBuilder = ImageRequest.Builder(LocalContext.current)
+                                .data(albumArtSource)
+                                .crossfade(true)
+
+                            if (apiKey != null && albumArtSource.toString().let { shouldAddAuthenticationHeader(it) }) {
+                                requestBuilder.addHeader("Cookie", "pd_auth_key=$apiKey")
+                            }
+
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(albumArtSource)
-                                    .crossfade(true)
-                                    .build(),
+                                model = requestBuilder.build(),
                                 contentDescription = "Album Art",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop,
@@ -396,6 +427,7 @@ fun AudioPlayerPreview(
 fun InlineImagePreview(
     imageSource: Any?, // Can be Uri, String (URL), etc.
     contentDescription: String,
+    apiKey: String?, // Added apiKey
     modifier: Modifier = Modifier,
     onFullScreenClick: () -> Unit
 ) {
@@ -415,14 +447,19 @@ fun InlineImagePreview(
             var imageState by remember { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Loading(null)) }
             val context = LocalContext.current
 
+            val requestBuilder = ImageRequest.Builder(context)
+                .data(imageSource)
+                .crossfade(true)
+                .listener(onError = { _, result ->
+                    Log.e(TAG_COIL, "Error loading image: $imageSource", result.throwable)
+                })
+
+            if (apiKey != null && imageSource.toString().let { shouldAddAuthenticationHeader(it) }) {
+                requestBuilder.addHeader("Cookie", "pd_auth_key=$apiKey")
+            }
+
             AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(imageSource)
-                    .crossfade(true)
-                    .listener(onError = { _, result ->
-                        Log.e(TAG_COIL, "Error loading image: $imageSource", result.throwable)
-                    })
-                    .build(),
+                model = requestBuilder.build(),
                 contentDescription = contentDescription,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
@@ -466,6 +503,7 @@ fun InlineTextPreview(
 fun InlineVideoPreview(
     thumbnailSource: Any?, // Can be ByteArray, String (URL), Uri, etc.
     contentDescription: String,
+    apiKey: String?, // Added apiKey
     modifier: Modifier = Modifier,
     onFullScreenClick: () -> Unit
 ) {
@@ -500,14 +538,20 @@ fun InlineVideoPreview(
                 is String, is Uri -> { // Handles URL Strings and Uris via Coil
                     var imageState by remember { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Loading(null)) }
                     val context = LocalContext.current
+
+                    val requestBuilder = ImageRequest.Builder(context)
+                        .data(thumbnailSource)
+                        .crossfade(true)
+                        .listener(onError = { _, result ->
+                            Log.e(TAG_COIL, "Error loading video thumbnail: $thumbnailSource", result.throwable)
+                        })
+
+                    if (apiKey != null && thumbnailSource.toString().let { shouldAddAuthenticationHeader(it) }) {
+                        requestBuilder.addHeader("Cookie", "pd_auth_key=$apiKey")
+                    }
+
                     AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(thumbnailSource)
-                            .crossfade(true)
-                            .listener(onError = { _, result ->
-                                Log.e(TAG_COIL, "Error loading video thumbnail: $thumbnailSource", result.throwable)
-                            })
-                            .build(),
+                        model = requestBuilder.build(),
                         contentDescription = contentDescription,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,

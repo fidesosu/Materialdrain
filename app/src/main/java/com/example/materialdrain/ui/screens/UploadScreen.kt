@@ -25,7 +25,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.media3.common.util.UnstableApi
 import com.example.materialdrain.ui.formatDurationMillis
 import com.example.materialdrain.ui.formatSize
 import com.example.materialdrain.ui.shared.*
@@ -70,6 +69,7 @@ fun UploadScreenContent(
             previewUri = fullScreenPreviewUri,
             previewMimeType = fullScreenPreviewMimeType,
             thumbnailUrl = null, // In UploadScreen, fullscreen video doesn't use a separate thumbnail for the player
+            apiKey = null,
             onDismissRequest = {
                 fullScreenPreviewUri = null
                 fullScreenPreviewMimeType = null
@@ -248,6 +248,7 @@ fun UploadScreenContent(
                             InlineImagePreview(
                                 imageSource = uiState.selectedFileUri,
                                 contentDescription = "Selected image preview",
+                                apiKey = null,
                                 onFullScreenClick = {
                                     fullScreenPreviewUri = uiState.selectedFileUri
                                     fullScreenPreviewMimeType = uiState.selectedFileMimeType
@@ -259,6 +260,7 @@ fun UploadScreenContent(
                             InlineVideoPreview(
                                 thumbnailSource = uiState.videoThumbnail, // Upload screen uses fetched byte array for thumbnail
                                 contentDescription = "Selected video preview",
+                                apiKey = null,
                                 onFullScreenClick = {
                                     fullScreenPreviewUri = uiState.selectedFileUri
                                     fullScreenPreviewMimeType = uiState.selectedFileMimeType
@@ -311,6 +313,7 @@ fun UploadScreenContent(
                         if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("audio/") == true) {
                             AudioPlayerPreview(
                                 albumArtSource = uiState.audioAlbumArt,
+                                apiKey = null,
                                 artist = uiState.audioArtist,
                                 album = uiState.audioAlbum,
                                 audioDurationMillis = uiState.audioDurationMillis,

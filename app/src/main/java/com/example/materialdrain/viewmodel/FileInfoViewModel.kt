@@ -87,6 +87,7 @@ data class FileInfoUiState(
     val fileIdToDelete: String? = null,
 
     val apiKeyMissingError: Boolean = false,
+    val apiKey: String = "", // Exposed API Key
 
     // Sorting state
     val sortField: SortableField = SortableField.UPLOAD_DATE,
@@ -158,6 +159,7 @@ class FileInfoViewModel(
     fun loadApiKey() {
         val sharedPrefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         apiKey = sharedPrefs.getString(API_KEY_PREF, "") ?: ""
+        _uiState.update { it.copy(apiKey = apiKey) }
         Log.d(TAG, "loadApiKey called. API Key loaded: '${if (apiKey.isNotBlank()) "PRESENT (not showing value)" else "MISSING"}'")
 
         if (apiKey.isBlank()) {

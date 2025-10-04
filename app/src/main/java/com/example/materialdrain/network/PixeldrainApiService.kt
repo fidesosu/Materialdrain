@@ -145,22 +145,20 @@ data class FilesystemEntry(
 
 // Extension function to convert FilesystemEntry to FileInfoResponse
 fun FilesystemEntry.toFileInfoResponse(): FileInfoResponse? {
-    // A Pixeldrain ID is essential for FileInfoResponse to be useful for previews/downloads.
-    // If the entry is a file and has an ID, and other necessary fields are present.
-    if (this.type == "file" && !this.id.isNullOrBlank()) {
+    if (this.type == "file") {
         return FileInfoResponse(
-            id = this.id, // Essential: Use the ID from FilesystemEntry if available (from ?stat=true)
+            id = this.id ?: this.path,
             name = this.name,
             size = this.fileSize,
             views = this.views,
             bandwidthUsed = this.bandwidthUsed,
             bandwidthUsedPaid = this.bandwidthUsedPaid,
             downloads = this.downloads,
-            dateUpload = this.created, // Using 'created' from FilesystemEntry as 'dateUpload'
+            dateUpload = this.created,
             dateLastView = this.dateLastView,
-            mimeType = this.mimeType ?: this.fileType.ifBlank { null }, // Prioritize specific mimeType, fallback to fileType
+            mimeType = this.mimeType ?: this.fileType.ifBlank { null },
             thumbnailHref = this.thumbnailHref,
-            hashSha256 = this.sha256Sum.ifBlank { null }, // Use sha256Sum from FilesystemEntry
+            hashSha256 = this.sha256Sum.ifBlank { null },
             canEdit = this.canEdit,
             deleteAfterDate = this.deleteAfterDate,
             deleteAfterDownloads = this.deleteAfterDownloads,
@@ -174,8 +172,6 @@ fun FilesystemEntry.toFileInfoResponse(): FileInfoResponse? {
             downloadSpeedLimit = this.downloadSpeedLimit
         )
     }
-    // If it's a directory, or a file without an ID (e.g. not a direct Pixeldrain file, or stats not loaded),
-    // it cannot be meaningfully converted to a FileInfoResponse for individual file operations/previews.
     return null
 }
 

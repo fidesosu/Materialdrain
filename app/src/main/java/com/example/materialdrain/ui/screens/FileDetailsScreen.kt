@@ -4,45 +4,24 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource // Added for clickable without ripple
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ImageNotSupported
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.PlayCircleOutline
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -51,14 +30,16 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.materialdrain.network.FileInfoResponse
 import com.example.materialdrain.ui.formatApiDateTimeString
 import com.example.materialdrain.ui.formatSize
 import com.example.materialdrain.ui.shared.FullScreenMediaPreviewDialog
-import com.example.materialdrain.ui.shared.InlineImagePreview
-import com.example.materialdrain.ui.shared.InlineVideoPreview
 import com.example.materialdrain.viewmodel.FileInfoViewModel
+import io.ktor.http.encodeURLPathPart
 import kotlinx.coroutines.launch
+
+private const val TAG_FILE_DETAILS_SCREEN = "FileDetailsScreen"
 
 @Composable
 fun EnterFileIdDialog(fileInfoViewModel: FileInfoViewModel) {
@@ -118,8 +99,8 @@ fun EnterFileIdDialog(fileInfoViewModel: FileInfoViewModel) {
 fun FileInfoDetailsCard(
     fileInfo: FileInfoResponse,
     fileInfoViewModel: FileInfoViewModel,
-    context: Context, // Retain for potential future use or specific local operations
-    snackbarHostState: SnackbarHostState // Retain for consistency, though App.kt manages most
+    context: Context,
+    snackbarHostState: SnackbarHostState
 ) {
     val uiState by fileInfoViewModel.uiState.collectAsState()
     val localContext = LocalContext.current
@@ -130,8 +111,22 @@ fun FileInfoDetailsCard(
     var fullScreenPreviewMimeType by remember { mutableStateOf<String?>(null) }
     var showPreviews by remember { mutableStateOf(false) }
 
-    val actualThumbnailUrl = "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail"
-    val rawFileApiUrl = "https://pixeldrain.com/api/file/${fileInfo.id}"
+    val isFilesystemFile = fileInfo.id.startsWith("/")
+
+    val (actualThumbnailUrl, rawFileApiUrl) = remember(fileInfo.id, isFilesystemFile) {
+        if (isFilesystemFile) {
+            val encodedPath = fileInfo.id.removePrefix("/").split('/').joinToString("/") { it.encodeURLPathPart() }
+            Pair(
+                "https://pixeldrain.com/api/filesystem/$encodedPath?thumbnail",
+                "https://pixeldrain.com/api/filesystem/$encodedPath"
+            )
+        } else {
+            Pair(
+                "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail",
+                "https://pixeldrain.com/api/file/${fileInfo.id}"
+            )
+        }
+    }
 
     LaunchedEffect(fileInfo.id) {
         showPreviews = true
@@ -142,6 +137,7 @@ fun FileInfoDetailsCard(
             previewUri = fullScreenPreviewUri,
             previewMimeType = fullScreenPreviewMimeType,
             thumbnailUrl = actualThumbnailUrl,
+            apiKey = uiState.apiKey,
             onDismissRequest = {
                 fullScreenPreviewUri = null
                 fullScreenPreviewMimeType = null
@@ -152,28 +148,77 @@ fun FileInfoDetailsCard(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp) // Added bottom padding
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp)
             .verticalScroll(rememberScrollState())
     ) {
         if (showPreviews) {
             if (fileInfo.mimeType?.startsWith("image/") == true) {
-                InlineImagePreview(
-                    imageSource = rawFileApiUrl,
-                    contentDescription = "Image preview for ${fileInfo.name}",
-                    onFullScreenClick = {
-                        fullScreenPreviewUri = rawFileApiUrl.toUri()
-                        fullScreenPreviewMimeType = fileInfo.mimeType
+                val imageRequestBuilder = remember(rawFileApiUrl, isFilesystemFile, uiState.apiKey) {
+                    val builder = ImageRequest.Builder(context).data(rawFileApiUrl).crossfade(true)
+                    if (isFilesystemFile && uiState.apiKey.isNotBlank()) {
+                        builder.addHeader("Cookie", "pd_auth_key=${uiState.apiKey}")
+                        Log.d(TAG_FILE_DETAILS_SCREEN, "Added Cookie header for filesystem image request.")
                     }
-                )
+                    builder.build()
+                }
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .padding(vertical = 8.dp)
+                        .clickable {
+                            fullScreenPreviewUri = rawFileApiUrl.toUri()
+                            fullScreenPreviewMimeType = fileInfo.mimeType
+                        },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    AsyncImage(
+                        model = imageRequestBuilder,
+                        contentDescription = "Image preview for ${fileInfo.name}",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        error = rememberVectorPainter(Icons.Filled.ImageNotSupported)
+                    )
+                }
             } else if (fileInfo.mimeType?.startsWith("video/") == true) {
-                InlineVideoPreview(
-                    thumbnailSource = actualThumbnailUrl,
-                    contentDescription = "Video thumbnail for ${fileInfo.name}",
-                    onFullScreenClick = {
-                        fullScreenPreviewUri = rawFileApiUrl.toUri()
-                        fullScreenPreviewMimeType = fileInfo.mimeType
+                val thumbnailRequestBuilder = remember(actualThumbnailUrl, isFilesystemFile, uiState.apiKey) {
+                    val builder = ImageRequest.Builder(context).data(actualThumbnailUrl).crossfade(true)
+                    if (isFilesystemFile && uiState.apiKey.isNotBlank()) {
+                        builder.addHeader("Cookie", "pd_auth_key=${uiState.apiKey}")
+                        Log.d(TAG_FILE_DETAILS_SCREEN, "Added Cookie header for filesystem video thumbnail request.")
                     }
-                )
+                    builder.build()
+                }
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .padding(vertical = 8.dp)
+                        .clickable {
+                            fullScreenPreviewUri = rawFileApiUrl.toUri()
+                            fullScreenPreviewMimeType = fileInfo.mimeType
+                        },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AsyncImage(
+                            model = thumbnailRequestBuilder,
+                            contentDescription = "Video thumbnail for ${fileInfo.name}",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                            error = rememberVectorPainter(Icons.Filled.ImageNotSupported)
+                        )
+                        Icon(
+                            imageVector = Icons.Filled.PlayCircleOutline,
+                            contentDescription = "Play Video",
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
             } else if (uiState.isLoadingTextPreview) {
                 Box(modifier = Modifier.fillMaxWidth().height(100.dp).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -193,17 +238,26 @@ fun FileInfoDetailsCard(
             } else if (uiState.textPreviewErrorMessage != null) {
                 Text(uiState.textPreviewErrorMessage ?: "Error loading text preview.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical=8.dp))
             } else {
-                AsyncImage(
-                    model = actualThumbnailUrl,
-                    contentDescription = "File thumbnail for ${fileInfo.name}",
+                val request = ImageRequest.Builder(localContext)
+                    .data(actualThumbnailUrl)
+                    .crossfade(true)
+                    .build()
+
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 100.dp, max = 200.dp)
-                        .align(Alignment.CenterHorizontally)
+                        .aspectRatio(16f / 9f)
                         .padding(vertical = 8.dp),
-                    contentScale = ContentScale.Fit,
-                    error = rememberVectorPainter(Icons.Filled.ImageNotSupported)
-                )
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    AsyncImage(
+                        model = request,
+                        contentDescription = "File thumbnail for ${fileInfo.name}",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        error = rememberVectorPainter(Icons.Filled.ImageNotSupported)
+                    )
+                }
             }
         } else {
             Box(modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {}
@@ -298,7 +352,7 @@ fun InfoRow(
                 }
             )
 
-        val valueColor = if (onValueClick != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+        val valueColor = if (onValueClick != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
 
         if (isValueSelectable) {
             SelectionContainer {
