@@ -63,6 +63,7 @@ import com.example.materialdrain.ui.theme.MaterialdrainTheme
 import com.example.materialdrain.viewmodel.DownloadStatus
 import com.example.materialdrain.viewmodel.FileInfoViewModel
 import com.example.materialdrain.viewmodel.FilesystemViewModel
+import com.example.materialdrain.viewmodel.ListViewModel
 import com.example.materialdrain.viewmodel.UploadViewModel
 import com.example.materialdrain.viewmodel.ViewModelFactory
 import kotlinx.coroutines.flow.collectLatest
@@ -120,7 +121,8 @@ fun MaterialDrainScreen() {
 
     val uploadViewModel: UploadViewModel = viewModel(factory = viewModelFactory)
     val fileInfoViewModel: FileInfoViewModel = viewModel(factory = viewModelFactory)
-    val filesystemViewModel: FilesystemViewModel = viewModel(factory = viewModelFactory) // Instantiate FilesystemViewModel
+    val filesystemViewModel: FilesystemViewModel = viewModel(factory = viewModelFactory)
+    val listViewModel: ListViewModel = viewModel(factory = viewModelFactory)
 
     val snackbarHostState = remember { SnackbarHostState() }
     val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
@@ -290,6 +292,7 @@ fun MaterialDrainScreen() {
                         uploadViewModel.updateApiKey(apiKeyInput.trim())
                         fileInfoViewModel.loadApiKey()
                         filesystemViewModel.updateApiKey() // Update FilesystemViewModel with new API key
+                        listViewModel.loadApiKey()
                         genericDialogTitle = "Settings Saved"
                         genericDialogContent = "API Key saved successfully."
                         showGenericDialog = true
@@ -634,11 +637,7 @@ fun MaterialDrainScreen() {
                                 }
                             }
                             Screen.Lists -> ListsScreenContent(
-                                onShowDialog = { title, content ->
-                                    genericDialogTitle = title
-                                    genericDialogContent = content
-                                    showGenericDialog = true
-                                },
+                                listViewModel = listViewModel,
                                 fabHeight = fabHeightDp,
                                 isFabVisible = isFabVisible
                             )

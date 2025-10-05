@@ -21,6 +21,9 @@ class ViewModelFactory(
         if (modelClass.isAssignableFrom(FilesystemViewModel::class.java)) {
             return FilesystemViewModel(application, pixeldrainApiService) as T
         }
+        if (modelClass.isAssignableFrom(ListViewModel::class.java)) {
+            return ListViewModel(application, pixeldrainApiService) as T
+        }
         throw IllegalArgumentException("Unknown ViewModel class: " + modelClass.name)
     }
 }

@@ -80,6 +80,21 @@ data class UserFilesListResponse(
 )
 
 @Serializable
+data class UserList(
+    val id: String,
+    val title: String,
+    @SerialName("date_created") val dateCreated: String,
+    @SerialName("file_count") val fileCount: Int,
+    val files: List<FileInfoResponse>? = null,
+    @SerialName("can_edit") val canEdit: Boolean
+)
+
+@Serializable
+data class UserListsResponse(
+    val lists: List<UserList>
+)
+
+@Serializable
 data class FileInfoResponse(
     val id: String,
     val name: String,
@@ -588,6 +603,35 @@ class PixeldrainApiService {
             Log.e("PIXEL_API_SERVICE", "Exception for GET user files: ${'$'}{e.message}", e)
             val errorMsg = e.message ?: "Network request failed or failed to parse error response"
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_user_files", message = errorMsg))
+        }
+    }
+
+    suspend fun getUserLists(apiKey: String): ApiResponse<UserListsResponse> {
+        if (apiKey.isBlank()) {
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "API Key is required to fetch user lists."))
+        }
+        val basicAuth = "Basic " + Base64.encodeToString(":$apiKey".toByteArray(), Base64.NO_WRAP)
+        return try {
+            client.prepareGet {
+                url {
+                    protocol = URLProtocol.HTTPS
+                    host = "pixeldrain.com"
+                    path("api/user/lists")
+                }
+                headers {
+                    append(HttpHeaders.Authorization, basicAuth)
+                }
+            }.execute { response: HttpResponse ->
+                if (response.status == HttpStatusCode.OK) {
+                    ApiResponse.Success(response.body<UserListsResponse>())
+                } else {
+                    ApiResponse.Error(response.body<FileUploadResponse>())
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PIXEL_API_SERVICE", "Exception for GET user lists: ${'$'}{e.message}", e)
+            val errorMsg = e.message ?: "Network request failed or failed to parse error response"
+            ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_user_lists", message = errorMsg))
         }
     }
 
