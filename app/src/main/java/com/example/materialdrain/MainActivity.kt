@@ -12,7 +12,7 @@ import com.example.materialdrain.ui.MaterialDrainScreen // Import the new screen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen() // Added this call
+        installSplashScreen() // Added this to make the splashscreen not white
         enableEdgeToEdge() // Call before super.onCreate or setContent
         super.onCreate(savedInstanceState)
         setContent {
