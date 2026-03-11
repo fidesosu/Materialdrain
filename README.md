@@ -1,12 +1,17 @@
-# Important
-I apologize if you try to build and run the app. Currently the github repo probably doesn't have all the necessary files needed to build it from source. I'll try to get them all in near future. 
-
-In the mean time please use the built apps in the Releases page.
-
----
 # Materialdrain
 
 Materialdrain is a modern Android client for Pixeldrain, built with Jetpack Compose and Material 3. It offers a native interface for uploading, managing, and viewing your Pixeldrain files.
+
+## Setup
+
+- Download and install a version from the github 'Releases'
+  page. [Link to Releases page](https://github.com/fidesosu/Materialdrain/releases)
+- Create a new API Key in Pixeldrain. [Link to Api Keys](https://pixeldrain.com/user/api_keys)
+- Add the newly created API key to the input field in the settings page of the app.
+
+> You can find the settings page by pressing the cog icon at the top right of the screen within the app
+
+After doing these steps, you should be able to see the files in the 'Files' tab of the app.
 
 ## Features
 
@@ -53,7 +58,7 @@ Materialdrain is a modern Android client for Pixeldrain, built with Jetpack Comp
 
 *   **Lists Screen Functionality:**
     *   View and manage Pixeldrain lists.
-    *   Create new lists and add files to them.
+    * Create new lists and add/remove files to/from them.
 *   **Filesystem View Enhancements:**
     *   Download files/folders directly from the filesystem view.
     *   Full preview capabilities for files within the filesystem view.
@@ -69,6 +74,10 @@ Materialdrain is a modern Android client for Pixeldrain, built with Jetpack Comp
 
 ## 🛠️ Development Status
 
-Every feature listed under "Available Now" or "In Development / Planned" in this README is intended for implementation and will almost definitely be implemented as long as pixeldrain remains a functional service. 
+Every feature listed under "Available Now" or "In Development / Planned" in this README is intended for implementation
+and will almost definitely be implemented as long as pixeldrain remains a functional service.
 
-The app also needs some optimizations concerning the download and upload speed (currently 8-10MB/s, it's usable, but it can definitely be increased.)
+PS. I will update the app whenever I am motivated, as I'm not in a hurry to finish this.
+
+The app also needs some optimizations concerning the download and upload speed (currently ~~8-10MB/s, it's usable~~ ~
+30MB/s, but it can definitely be increased.)
