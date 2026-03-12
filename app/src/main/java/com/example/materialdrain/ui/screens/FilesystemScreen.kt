@@ -43,6 +43,7 @@ import com.example.materialdrain.viewmodel.FileInfoViewModel
 import com.example.materialdrain.viewmodel.FilesystemViewModel
 import com.example.materialdrain.viewmodel.PathSegment
 import io.ktor.http.encodeURLPathPart
+import com.example.materialdrain.components.FileListItem
 
 private const val TAG_FILESYSTEM_SCREEN = "FilesystemScreen"
 
@@ -190,7 +191,8 @@ fun FilesystemScreen(
                                 }
                             }
                         )
-                        HorizontalDivider()
+                        HorizontalDivider(thickness = 0.5.dp, 
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     }
                 }
             }
@@ -201,99 +203,25 @@ fun FilesystemScreen(
 @Composable
 fun FilesystemEntryItem(
     entry: FilesystemEntry,
-    apiKey: String, // Accept API key as a parameter
+    apiKey: String,
     onClick: () -> Unit
 ) {
-    ListItem(
-        headlineContent = { Text(entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = {
-            val details = mutableListOf<String>()
-            if (entry.type == "dir") {
-                details.add("Folder")
-            } else {
-                details.add(formatSize(entry.fileSize))
-                entry.mimeType?.let { if(it.isNotBlank()) details.add(it) }
-            }
-            details.add("Modified: ${formatApiDateTimeString(entry.modified)}")
-            Text(details.joinToString(" • "), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
-        },
-        leadingContent = {
-            val imageModifier = Modifier
-                .size(48.dp) // Adjusted size to match thumbnail request
-                .clip(RoundedCornerShape(4.dp))
-
+    FileListItem(
+        name = entry.name,
+        type = entry.type,
+        fileSize = entry.fileSize,
+        modified = com.example.materialdrain.ui.formatApiDateTimeString(entry.modified),
+        mimeType = entry.mimeType,
+        thumbnailUrl = entry.thumbnailHref?.let { "https://pixeldrain.com${it}" } ?: run {
             if (entry.type == "file") {
-                val context = LocalContext.current
-                val finalThumbnailUrl: String
-                var isFilesystemApiThumbnailUrl = false
-
-                if (!entry.thumbnailHref.isNullOrBlank()) {
-                    finalThumbnailUrl = "https://pixeldrain.com${entry.thumbnailHref.trim()}"
-                    Log.d(TAG_FILESYSTEM_SCREEN, "Using thumbnailHref for ${entry.name}: $finalThumbnailUrl")
-                    if (finalThumbnailUrl.startsWith("https://pixeldrain.com/api/filesystem/") && finalThumbnailUrl.contains("?thumbnail")) {
-                        isFilesystemApiThumbnailUrl = true
-                        Log.d(TAG_FILESYSTEM_SCREEN, "thumbnailHref is a filesystem API thumbnail URL: $finalThumbnailUrl")
-                    }
-                } else {
-                    val cleanedPath = entry.path.removePrefix("/").split('/').filter { it.isNotEmpty() }
-                    val encodedPathSegments = cleanedPath.joinToString("/") { it.encodeURLPathPart() }
-
-                    if (encodedPathSegments.isNotEmpty()) {
-                        finalThumbnailUrl = "https://pixeldrain.com/api/filesystem/${encodedPathSegments}?thumbnail&width=48&height=48"
-                        isFilesystemApiThumbnailUrl = true 
-                        Log.d(TAG_FILESYSTEM_SCREEN, "Using constructed filesystem path for ${entry.name}: $finalThumbnailUrl (Original entry.path: '${entry.path}')")
-                    } else {
-                        Log.w(TAG_FILESYSTEM_SCREEN, "Could not construct thumbnail URL for ${entry.name} from problematic path: '${entry.path}'")
-                        finalThumbnailUrl = "invalid_path_for_thumbnail"
-                    }
-                }
-
-                if (finalThumbnailUrl != "invalid_path_for_thumbnail") {
-                    val requestBuilder = ImageRequest.Builder(context)
-                        .data(finalThumbnailUrl)
-                        .crossfade(true)
-                        .listener(
-                            onStart = { request ->
-                                Log.d(TAG_FILESYSTEM_SCREEN, "Coil request started for: ${request.data}")
-                            },
-                            onSuccess = { request, result ->
-                                Log.d(TAG_FILESYSTEM_SCREEN, "Coil request SUCCESS for: ${request.data} - from datasource: ${result.dataSource}")
-                            },
-                            onError = { request, result ->
-                                Log.e(TAG_FILESYSTEM_SCREEN, "Coil request ERROR for: ${request.data} - ${result.throwable.localizedMessage}", result.throwable)
-                            }
-                        )
-
-                    if (isFilesystemApiThumbnailUrl && apiKey.isNotBlank()) {
-                        requestBuilder.addHeader("Cookie", "pd_auth_key=$apiKey")
-                        Log.d(TAG_FILESYSTEM_SCREEN, "Added Cookie header for: $finalThumbnailUrl (pd_auth_key=...)")
-                    } else if (isFilesystemApiThumbnailUrl && apiKey.isBlank()) {
-                        Log.w(TAG_FILESYSTEM_SCREEN, "API Key is blank. Filesystem API thumbnail might fail for: $finalThumbnailUrl")
-                    }
-
-                    AsyncImage(
-                        model = requestBuilder.build(),
-                        contentDescription = "${entry.name} thumbnail",
-                        modifier = imageModifier,
-                        contentScale = ContentScale.Crop,
-                        placeholder = rememberVectorPainter(Icons.AutoMirrored.Filled.InsertDriveFile), // Changed Icon
-                        error = rememberVectorPainter(Icons.Filled.BrokenImage)
-                    )
-                } else {
-                     Icon(
-                        painter = rememberVectorPainter(Icons.Filled.BrokenImage),
-                        contentDescription = "${entry.name} thumbnail error (invalid path)",
-                        modifier = imageModifier
-                    )
-                }
-            } else { // entry.type == "dir"
-                Icon(
-                    imageVector = Icons.Filled.Folder,
-                    contentDescription = "Folder",
-                    modifier = imageModifier 
-                )
-            }
+                val cleanedPath = entry.path.removePrefix("/").split('/').filter { it.isNotEmpty() }
+                val encodedPathSegments = cleanedPath.joinToString("/") { it.encodeURLPathPart() }
+                if (encodedPathSegments.isNotEmpty()) {
+                    "https://pixeldrain.com/api/filesystem/${encodedPathSegments}?thumbnail&width=48&height=48"
+                } else null
+            } else null
         },
-        modifier = Modifier.clickable(onClick = onClick)
+        apiKey = apiKey,
+        onClick = onClick
     )
 }
