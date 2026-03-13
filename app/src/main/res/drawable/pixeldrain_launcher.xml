@@ -9,8 +9,9 @@
         android:scaleY="0.8"
         android:pivotX="150"
         android:pivotY="150"
-        android:translateX="8"
-        android:translateY="8">
+        android:translateX="6"
+        android:translateY="8"
+    >
         
         <path
             android:fillColor="#ffffff"
