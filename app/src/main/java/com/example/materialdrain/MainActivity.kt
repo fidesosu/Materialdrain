@@ -8,16 +8,16 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen // 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.materialdrain.ui.theme.MaterialdrainTheme
-import com.example.materialdrain.ui.MaterialDrainScreen // Import the new screen
+import com.example.materialdrain.ui.MaterialdrainScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen() // Added this to make the splashscreen not white
-        enableEdgeToEdge() // Call before super.onCreate or setContent
+        installSplashScreen()
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
             MaterialdrainTheme {
-                MaterialDrainScreen() // Use the new screen
+                MaterialdrainScreen()
             }
         }
     }
@@ -27,6 +27,6 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun DefaultPreview() {
     MaterialdrainTheme {
-        MaterialDrainScreen() // Preview the new screen
+        MaterialdrainScreen()
     }
 }

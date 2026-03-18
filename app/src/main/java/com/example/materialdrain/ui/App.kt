@@ -3,7 +3,7 @@ package com.example.materialdrain.ui
 import android.app.Application
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context // Added for SharedPreferences
+import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.activity.compose.BackHandler
@@ -12,25 +12,24 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.SizeTransform // Added import for SizeTransform
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith // Added import for togetherWith
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalOverscrollFactory
-import androidx.compose.foundation.horizontalScroll // Added for horizontal scroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState // Added for scroll state
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
-// Import specific filled icons that are still used directly
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
@@ -49,12 +48,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.materialdrain.R // Import R class
+import com.example.materialdrain.R
 import com.example.materialdrain.network.PixeldrainApiService
 import com.example.materialdrain.ui.screens.EnterFileIdDialog
 import com.example.materialdrain.ui.screens.FileInfoDetailsCard
 import com.example.materialdrain.ui.screens.FilesScreenContent
-import com.example.materialdrain.ui.screens.FilesystemScreen // Updated import
+import com.example.materialdrain.ui.screens.FilesystemScreen
 import com.example.materialdrain.ui.screens.ListsScreenContent
 import com.example.materialdrain.ui.screens.SettingsScreenContent
 import com.example.materialdrain.ui.screens.UploadScreenContent
@@ -106,7 +105,7 @@ internal fun formatApiDateTimeString(dateTimeString: String?): String {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
-fun MaterialDrainScreen() {
+fun MaterialdrainScreen() {
     var currentScreen by rememberSaveable { mutableStateOf(Screen.Upload) }
     var previousScreen by rememberSaveable { mutableStateOf(Screen.Files) }
 
@@ -741,8 +740,8 @@ fun BottomNavigationBar(currentScreen: Screen, navBarOrder: List<Screen>, onScre
 
 @Preview(showBackground = true)
 @Composable
-fun DefaultPreviewMaterialDrainScreen() {
+fun DefaultPreviewMaterialdrainScreen() {
     MaterialdrainTheme {
-        MaterialDrainScreen()
+        MaterialdrainScreen()
     }
 }
