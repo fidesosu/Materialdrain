@@ -154,11 +154,15 @@ fun FileInfoDetailsCard(
         if (showPreviews) {
             if (fileInfo.mimeType?.startsWith("image/") == true) {
                 val imageRequestBuilder = remember(rawFileApiUrl, isFilesystemFile, uiState.apiKey) {
-                    val builder = ImageRequest.Builder(context).data(rawFileApiUrl).crossfade(true)
+                    val builder = ImageRequest.Builder(context)
+                        .data(rawFileApiUrl)
+                        .crossfade(true)
+
                     if (isFilesystemFile && uiState.apiKey.isNotBlank()) {
                         builder.addHeader("Cookie", "pd_auth_key=${uiState.apiKey}")
                         Log.d(TAG_FILE_DETAILS_SCREEN, "Added Cookie header for filesystem image request.")
                     }
+                    
                     builder.build()
                 }
                 Card(
@@ -224,15 +228,15 @@ fun FileInfoDetailsCard(
                     CircularProgressIndicator()
                 }
             } else if (uiState.textPreviewContent != null) {
-                Text("Preview:", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
                 OutlinedTextField(
                     value = uiState.textPreviewContent ?: "",
                     onValueChange = {},
                     readOnly = true,
+                    label = { Text("Preview") },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 100.dp, max = 200.dp)
-                        .padding(vertical = 8.dp),
+                        .heightIn(min = 25.dp, max = 250.dp)
+                        .padding(vertical = 0.dp),
                     textStyle = MaterialTheme.typography.bodySmall
                 )
             } else if (uiState.textPreviewErrorMessage != null) {
