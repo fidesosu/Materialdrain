@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -276,6 +277,21 @@ fun FullScreenMediaPreviewDialog(
                 }
             } else {
                 Text("Preview unavailable.", color = Color.White)
+            }
+
+            // The Fixed Back Button (Top Left)
+            IconButton(
+                onClick = onDismissRequest,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp) // Offset from the screen edge
+                    .background(Color.Black.copy(alpha = 0.4f), CircleShape) // Makes it visible over light images
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White
+                )
             }
         }
     }

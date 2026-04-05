@@ -244,8 +244,15 @@ fun FileInfoDetailsCard(
                     textStyle = MaterialTheme.typography.bodySmall
                 )
             } else if (uiState.textPreviewErrorMessage != null) {
-                Text(uiState.textPreviewErrorMessage ?: "Error loading text preview.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical=8.dp))
-            } else {
+                Text(
+                    uiState.textPreviewErrorMessage ?: "Error loading text preview.", 
+                    color = MaterialTheme.colorScheme.error, 
+                    style = MaterialTheme.typography.bodySmall, 
+                    modifier = Modifier.padding(vertical=8.dp)
+                )
+            } 
+            
+            else {
                 val request = ImageRequest.Builder(localContext)
                     .data(actualThumbnailUrl)
                     .crossfade(true)
