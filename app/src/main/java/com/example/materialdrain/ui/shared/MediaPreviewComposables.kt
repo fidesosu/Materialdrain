@@ -29,7 +29,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.vector.rememberVectorPainter // Added import
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -93,7 +94,6 @@ fun ClickablePreviewOverlay(onClick: () -> Unit) {
     }
 }
 
-@OptIn(UnstableApi::class)
 @Composable
 fun VideoPlayerControls(videoUri: Uri, thumbnailUrl: String?, apiKey: String?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -189,7 +189,6 @@ fun VideoPlayerControls(videoUri: Uri, thumbnailUrl: String?, apiKey: String?, m
     )
 }
 
-@OptIn(UnstableApi::class)
 @Composable
 fun FullScreenMediaPreviewDialog(
     previewUri: Uri?,
@@ -246,7 +245,8 @@ fun FullScreenMediaPreviewDialog(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .padding(16.dp),
-                                contentScale = ContentScale.Fit
+                                contentScale = ContentScale.Fit,
+                                filterQuality = FilterQuality.None, // Disable filtering for pixel art GIFs to prevent blurring
                             )
                         }
                         previewMimeType?.startsWith("image/") == true -> {
@@ -265,6 +265,7 @@ fun FullScreenMediaPreviewDialog(
                                     .fillMaxSize()
                                     .padding(16.dp),
                                 contentScale = ContentScale.Fit,
+                                filterQuality = FilterQuality.None, // Disable filtering to prevent blurring when scaling images
                                 onError = { onDismissRequest() } // Optionally dismiss on error
                             )
                         }

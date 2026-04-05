@@ -182,7 +182,7 @@ fun UploadScreenContent(
         modifier = Modifier
             .fillMaxSize() // This Column will extend edge-to-edge
     ) {
-        TabRow(selectedTabIndex = selectedTabIndex) {
+        PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
             tabTitles.forEachIndexed { index, title ->
                 Tab(
                     selected = selectedTabIndex == index,

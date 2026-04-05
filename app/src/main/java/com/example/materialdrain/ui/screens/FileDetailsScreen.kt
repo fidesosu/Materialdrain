@@ -23,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -180,6 +182,8 @@ fun FileInfoDetailsCard(
                         model = imageRequestBuilder,
                         contentDescription = "Image preview for ${fileInfo.name}",
                         modifier = Modifier.fillMaxSize(),
+                        // This disables smooth filtering (nearest neighbor scaling), which removes the blur when scaling images.
+                        filterQuality = FilterQuality.None,
                         contentScale = ContentScale.Crop,
                         error = rememberVectorPainter(Icons.Filled.ImageNotSupported)
                     )
