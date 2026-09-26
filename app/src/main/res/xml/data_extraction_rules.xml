@@ -5,15 +5,10 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- The login session key is encrypted with a Keystore key which is not part of a backup -->
+        <exclude domain="sharedpref" path="pixeldrain_secure_prefs.xml" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="sharedpref" path="pixeldrain_secure_prefs.xml" />
     </device-transfer>
-    -->
 </data-extraction-rules>

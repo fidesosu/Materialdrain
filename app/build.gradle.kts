@@ -1,20 +1,20 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
 
 android {
-    namespace = "com.example.materialdrain"
-    compileSdk = 36
+    namespace = "tools.senko.materialdrain"
+    compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.example.materialdrain"
-        minSdk = 26
+        applicationId = "tools.senko.materialdrain"
+        minSdk = 29
+        //noinspection OldTargetApi
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -61,7 +61,8 @@ dependencies {
     implementation(libs.androidx.compose.foundation) // This line is un-commented
     implementation(libs.androidx.lifecycle.viewmodel.compose) // Added ViewModel Compose
     implementation(libs.coil.compose) // Added Coil for image loading
-    implementation(libs.coil.gif) // Added for GIF support with Coil
+    implementation(libs.coil.gif)
+    implementation(libs.core.ktx) // Added for GIF support with Coil
     implementation(libs.google.android.material) // Added Material Components for XML themes
 
     // Ktor Client Dependencies
@@ -84,11 +85,11 @@ dependencies {
     // Media3 (ExoPlayer)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
+    implementation(libs.androidx.media3.datasource.okhttp) // Streams media over the same OkHttp client as the API
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

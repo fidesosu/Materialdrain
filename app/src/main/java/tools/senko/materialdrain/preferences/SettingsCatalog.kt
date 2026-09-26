@@ -1,0 +1,142 @@
+package tools.senko.materialdrain.preferences
+
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Accessibility
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.runtime.collectAsState
+import tools.senko.materialdrain.settings.SEARCH_INDEX_FILE_NAME
+import tools.senko.materialdrain.transfer.CHANNEL_TRANSFER_COMPLETE
+import tools.senko.materialdrain.transfer.CHANNEL_TRANSFER_FAILED
+import tools.senko.materialdrain.transfer.CHANNEL_TRANSFER_PROGRESS
+
+/**
+ * Everything the settings screen shows. It is the one place to edit: to add a setting, add an item to the
+ * `items` of a category; to add a category, add a [SettingsCategory] to this list (in the order in which they
+ * should appear). Nothing else needs to change.
+ */
+val SettingsCatalog: List<SettingsCategory> = listOf(
+
+    SettingsCategory(
+        id = ACCOUNT_CATEGORY_ID,
+        title = "Account",
+        summary = "Login and API key",
+        icon = Icons.Filled.AccountCircle,
+        hasSaveButton = true, // the API key is saved with the button
+        items = listOf(
+            SettingsItem.Header("Account login"),
+            SettingsItem.Custom { LoginSection() },
+            SettingsItem.Header("API key"),
+            SettingsItem.Custom { ApiKeySection() }
+        )
+    ),
+
+    SettingsCategory(
+        id = "filesystem",
+        title = "Filesystem",
+        summary = "What is shown in your filesystem",
+        icon = Icons.Filled.Folder,
+        items = listOf(
+            SettingsItem.Toggle(
+                title = "Hide $SEARCH_INDEX_FILE_NAME",
+                summary = "Pixeldrain uses this file itself to store the paths of your files and re-creates it when it is " +
+                    "removed. Hiding it keeps you from deleting it by accident.",
+                isChecked = { appSettings.hideSearchIndex.collectAsState().value },
+                onCheckedChange = { appSettings.setHideSearchIndex(it) }
+            )
+        )
+    ),
+
+    SettingsCategory(
+        id = "notifications",
+        title = "Notifications",
+        summary = "Progress of uploads and downloads",
+        icon = Icons.Filled.Notifications,
+        items = listOf(
+            SettingsItem.Note(
+                "Uploads and downloads keep running while the app is in the background and show their progress in a " +
+                    "notification. Each kind of notification has its own settings in Android, where you can change its " +
+                    "importance, sound, vibration and lock screen visibility."
+            ),
+            SettingsItem.Action(
+                title = "Notification settings",
+                summary = "All notifications of this app",
+                onClick = { context -> openNotificationSettings(context, null) }
+            ),
+            SettingsItem.Header("Kinds of notifications"),
+            SettingsItem.Action(
+                title = "Transfer progress",
+                summary = "Shown while something is uploading or downloading",
+                onClick = { context -> openNotificationSettings(context, CHANNEL_TRANSFER_PROGRESS) }
+            ),
+            SettingsItem.Action(
+                title = "Completed transfers",
+                summary = "Shown when a transfer finished in the background",
+                onClick = { context -> openNotificationSettings(context, CHANNEL_TRANSFER_COMPLETE) }
+            ),
+            SettingsItem.Action(
+                title = "Failed transfers",
+                summary = "Shown when a transfer failed in the background",
+                onClick = { context -> openNotificationSettings(context, CHANNEL_TRANSFER_FAILED) }
+            )
+        )
+    ),
+
+    SettingsCategory(
+        id = "previews",
+        title = "Previews",
+        summary = "Images and videos",
+        icon = Icons.Filled.Image,
+        items = listOf(
+            SettingsItem.Toggle(
+                title = "Blurred backdrop",
+                summary = "Shows the thumbnail of a file, blurred, behind its preview: it fills the space around a " +
+                    "fullscreen image and is there while a preview is loading.",
+                isChecked = { appSettings.blurredBackdrop.collectAsState().value },
+                onCheckedChange = { appSettings.setBlurredBackdrop(it) }
+            )
+        )
+    ),
+
+    SettingsCategory(
+        id = "accessibility",
+        title = "Accessibility",
+        summary = "Animations",
+        icon = Icons.Filled.Accessibility,
+        items = listOf(
+            SettingsItem.Toggle(
+                title = "Reduce animations",
+                summary = "Leaves out sliding, scaling, spinning and rolling text, and scrolls without animation. " +
+                    "Screens then only fade.",
+                isChecked = { appSettings.reduceAnimations.collectAsState().value },
+                onCheckedChange = { appSettings.setReduceAnimations(it) }
+            ),
+            SettingsItem.Note("Animations are also reduced when they are turned off in the Android settings.")
+        )
+    )
+)
+
+const val ACCOUNT_CATEGORY_ID = "account"
+
+fun settingsCategory(id: String?): SettingsCategory? = SettingsCatalog.firstOrNull { it.id == id }
+
+/** Opens the Android notification settings of the app, or of a single notification channel. */
+private fun openNotificationSettings(context: Context, channelId: String?) {
+    val intent = if (channelId == null) {
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+    } else {
+        Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
+    }
+    intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        context.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        // No settings screen available on this device
+    }
+}
