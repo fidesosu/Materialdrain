@@ -1,4 +1,4 @@
-package com.example.materialdrain
+package tools.senko.materialdrain
 
 import org.junit.Test
 
