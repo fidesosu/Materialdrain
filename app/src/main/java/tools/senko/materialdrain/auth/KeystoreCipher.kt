@@ -19,7 +19,7 @@ private const val GCM_TAG_BITS = 128
 class KeystoreCipher(private val alias: String = "materialdrain_session_key") {
 
     private fun getOrCreateKey(): SecretKey {
-        val keyStore = KeyStore.getInstance(_root_ide_package_.tools.senko.materialdrain.auth.ANDROID_KEYSTORE).apply { load(null) }
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
         (keyStore.getKey(alias, null) as? SecretKey)?.let { return it }
 
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
