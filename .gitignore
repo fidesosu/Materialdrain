@@ -3,10 +3,11 @@
 local.properties
 .idea/
 .DS_Store
-/build/
-/release/
-/captures/
+build/
+release/
+captures/
 .externalNativeBuild
 .cxx
 *.jks
 *.keystore
+test/
