@@ -115,7 +115,6 @@ import tools.senko.materialdrain.upload.UploadViewModel
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun MaterialdrainScreen() {
-    var currentScreen by rememberSaveable { mutableStateOf(Screen.Upload) }
     var previousScreen by rememberSaveable { mutableStateOf(Screen.Files) }
 
     var showGenericDialog by remember { mutableStateOf(false) }
@@ -125,6 +124,8 @@ fun MaterialdrainScreen() {
     val application = LocalContext.current.applicationContext as Application
     val context = LocalContext.current
     val appContainer = remember { AppContainer.get(application) }
+    // The app opens on the screen it was last on
+    var currentScreen by rememberSaveable { mutableStateOf(appContainer.appSettings.lastScreen) }
     val sessionManager = appContainer.sessionManager
     val viewModelFactory = remember { ViewModelFactory(application, appContainer) }
 
@@ -241,6 +242,12 @@ fun MaterialdrainScreen() {
             previousScreen = currentScreen
             currentScreen = screen
         }
+    }
+    // Remembered so the app opens where it was closed
+    LaunchedEffect(currentScreen) { appContainer.appSettings.lastScreen = currentScreen }
+    // The details page reopens the file it showed; when that file can't be found, the Files screen is shown instead
+    LaunchedEffect(Unit) {
+        if (currentScreen == Screen.FileDetail && !fileInfoViewModel.restoreOpenedFile()) navigateTo(Screen.Files)
     }
 
     // Files shared from another app go to the upload screen, which queues them like picked files

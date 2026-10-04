@@ -8,9 +8,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import androidx.core.content.edit
+import tools.senko.materialdrain.Screen
 import tools.senko.materialdrain.files.SortableField
 import tools.senko.materialdrain.navmenu.NavFabPosition
 import tools.senko.materialdrain.navmenu.NavMenuPreview
+import tools.senko.materialdrain.provider.api.FileList
 import tools.senko.materialdrain.provider.api.StorageNode
 
 private const val PREFS_NAME = "pixeldrain_prefs"
@@ -24,6 +26,16 @@ private const val NAV_FAB_POSITION_PREF = "nav_fab_position"
 private const val FILES_SORT_FIELD_PREF = "files_sort_field"
 private const val FILES_SORT_ASCENDING_PREF = "files_sort_ascending"
 private const val TEXT_WRAP_PREF = "text_wrap"
+private const val LAST_SCREEN_PREF = "last_screen"
+private const val FILESYSTEM_PATH_PREFIX = "filesystem_path_"
+private const val OPENED_LIST_ID_PREF = "opened_list_id"
+private const val OPENED_LIST_TITLE_PREF = "opened_list_title"
+private const val OPENED_LIST_COUNT_PREF = "opened_list_count"
+private const val OPENED_LIST_CAN_EDIT_PREF = "opened_list_can_edit"
+private const val OPENED_LIST_HOST_PREF = "opened_list_host"
+private const val OPENED_FILE_ID_PREF = "opened_file_id"
+private const val OPENED_FILE_PATH_PREF = "opened_file_path"
+private const val OPENED_FILE_HOST_PREF = "opened_file_host"
 private const val BIOMETRIC_LOCK_PREF = "biometric_lock"
 
 /** Pixeldrain keeps the paths of the files of a filesystem in this file, it is re-created when removed. */
@@ -34,6 +46,12 @@ const val SEARCH_INDEX_DELETE_WARNING =
         "Almost nobody has a reason to delete it, and Pixeldrain will re-create it after a while anyway."
 
 fun StorageNode.isSearchIndex(): Boolean = !isDirectory && name == SEARCH_INDEX_FILE_NAME
+
+/** The list open on the Lists screen when the app was closed, with the host it belongs to. */
+data class SavedOpenedList(val hostId: String, val list: FileList)
+
+/** The file open in the details when the app was closed, with the host it belongs to. Only files with an id are kept. */
+data class SavedOpenedFile(val hostId: String, val id: String, val path: String)
 
 class AppSettings(context: Context) {
 
@@ -134,6 +152,61 @@ class AppSettings(context: Context) {
         prefs.edit { putBoolean(TEXT_WRAP_PREF, wrap) }
         _textWrap.value = wrap
     }
+
+    /** The folder last open on the Filesystem screen of [hostId], null when none is saved. */
+    fun filesystemPath(hostId: String): String? = prefs.getString(FILESYSTEM_PATH_PREFIX + hostId, null)
+
+    fun setFilesystemPath(hostId: String, path: String) = prefs.edit { putString(FILESYSTEM_PATH_PREFIX + hostId, path) }
+
+    /** The list open on the Lists screen, kept across restarts. Set to null when the list is closed. */
+    var openedList: SavedOpenedList?
+        get() {
+            val id = prefs.getString(OPENED_LIST_ID_PREF, null) ?: return null
+            val host = prefs.getString(OPENED_LIST_HOST_PREF, null) ?: return null
+            val list = FileList(
+                id = id,
+                title = prefs.getString(OPENED_LIST_TITLE_PREF, null).orEmpty(),
+                fileCount = prefs.getInt(OPENED_LIST_COUNT_PREF, 0),
+                canEdit = prefs.getBoolean(OPENED_LIST_CAN_EDIT_PREF, false)
+            )
+            return SavedOpenedList(host, list)
+        }
+        set(value) = prefs.edit {
+            if (value == null) {
+                remove(OPENED_LIST_ID_PREF)
+                remove(OPENED_LIST_HOST_PREF)
+            } else {
+                putString(OPENED_LIST_ID_PREF, value.list.id)
+                putString(OPENED_LIST_HOST_PREF, value.hostId)
+                putString(OPENED_LIST_TITLE_PREF, value.list.title)
+                putInt(OPENED_LIST_COUNT_PREF, value.list.fileCount)
+                putBoolean(OPENED_LIST_CAN_EDIT_PREF, value.list.canEdit)
+            }
+        }
+
+    /** The file open in the details, kept across restarts. Set to null when the details are closed. */
+    var openedFile: SavedOpenedFile?
+        get() {
+            val id = prefs.getString(OPENED_FILE_ID_PREF, null) ?: return null
+            val host = prefs.getString(OPENED_FILE_HOST_PREF, null) ?: return null
+            return SavedOpenedFile(host, id, prefs.getString(OPENED_FILE_PATH_PREF, null).orEmpty())
+        }
+        set(value) = prefs.edit {
+            if (value == null) {
+                remove(OPENED_FILE_ID_PREF)
+                remove(OPENED_FILE_HOST_PREF)
+                remove(OPENED_FILE_PATH_PREF)
+            } else {
+                putString(OPENED_FILE_ID_PREF, value.id)
+                putString(OPENED_FILE_HOST_PREF, value.hostId)
+                putString(OPENED_FILE_PATH_PREF, value.path)
+            }
+        }
+
+    /** The screen the app was last on, so it opens there again. Kept across restarts. */
+    var lastScreen: Screen
+        get() = enumPref(LAST_SCREEN_PREF, Screen.Upload)
+        set(value) = prefs.edit { putString(LAST_SCREEN_PREF, value.name) }
 
     private inline fun <reified T : Enum<T>> enumPref(key: String, default: T): T =
         prefs.getString(key, null)?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: default

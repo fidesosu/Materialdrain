@@ -31,6 +31,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
 import tools.senko.materialdrain.auth.SessionManager
 import tools.senko.materialdrain.settings.AppSettings
+import tools.senko.materialdrain.settings.SavedOpenedFile
 import tools.senko.materialdrain.provider.ProviderConfigStore
 import tools.senko.materialdrain.provider.ProviderRegistry
 import tools.senko.materialdrain.provider.api.ApiResponse
@@ -363,6 +364,14 @@ class FileInfoViewModel(
         }
     }
 
+    /** Shows the file that was open when the app was closed. False when there is none, or it belongs to another host. */
+    fun restoreOpenedFile(): Boolean {
+        val saved = appSettings.openedFile ?: return false
+        if (saved.hostId != configStore.activeProviderId.value) return false
+        fetchFileInfo(saved.id)
+        return true
+    }
+
     fun fetchFileInfo(fileId: String) {
         if (fileId.isBlank()) {
             _uiState.update { it.copy(fileInfoErrorMessage = "Please enter or select a File ID.", isLoadingFileInfo = false) }
@@ -379,6 +388,7 @@ class FileInfoViewModel(
             when (val response = store.fileInfo(StorageRef(id = fileId))) {
                 is ApiResponse.Success -> {
                     _uiState.update { it.copy(isLoadingFileInfo = false, fileInfo = response.data) }
+                    appSettings.openedFile = SavedOpenedFile(configStore.activeProviderId.value, fileId, "")
                     // Only fetch text preview if the main file info call was successful
                     fetchTextFilePreviewContent(response.data)
                 }
@@ -451,6 +461,7 @@ class FileInfoViewModel(
                 fileInfoErrorMessage = null
             )
         }
+        node.ref.id?.let { appSettings.openedFile = SavedOpenedFile(configStore.activeProviderId.value, it, node.ref.path) }
         fetchTextFilePreviewContent(node)
         // An archive shows what's inside it, in the details
         _uiState.update { it.copy(archive = null) }
@@ -458,6 +469,7 @@ class FileInfoViewModel(
     }
 
     fun clearFileInfoDisplay() {
+        appSettings.openedFile = null
         _uiState.update { it.copy(fileInfo = null, isLoadingFileInfo = false, archive = null) }
         clearTextPreviewStates()
     }

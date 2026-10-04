@@ -27,7 +27,7 @@ class ViewModelFactory(
             return FilesystemViewModel(application, container.providerRegistry, container.providerConfigStore, container.sessionManager, container.transferRegistry, container.appSettings) as T
         }
         if (modelClass.isAssignableFrom(ListViewModel::class.java)) {
-            return ListViewModel(container.providerRegistry, container.providerConfigStore, container.sessionManager) as T
+            return ListViewModel(container.providerRegistry, container.providerConfigStore, container.sessionManager, container.appSettings) as T
         }
         if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
             return AuthViewModel(container.userApi, container.sessionManager) as T

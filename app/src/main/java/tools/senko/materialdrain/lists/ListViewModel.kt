@@ -17,6 +17,8 @@ import tools.senko.materialdrain.provider.api.FileList
 import tools.senko.materialdrain.provider.api.ProviderLog
 import tools.senko.materialdrain.provider.api.ProviderKind
 import tools.senko.materialdrain.provider.api.StorageNode
+import tools.senko.materialdrain.settings.AppSettings
+import tools.senko.materialdrain.settings.SavedOpenedList
 
 data class ListsUiState(
     val isLoading: Boolean = false,
@@ -35,7 +37,8 @@ data class ListsUiState(
 class ListViewModel(
     private val registry: ProviderRegistry,
     private val configStore: ProviderConfigStore,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val appSettings: AppSettings
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ListsUiState())
@@ -43,13 +46,23 @@ class ListViewModel(
 
     init {
         loadApiKey()
+        restoreOpenedList()
         viewModelScope.launch {
             configStore.changes.drop(1).collect {
                 ProviderLog.i("Lists", "active host changed, reloading the lists")
+                appSettings.openedList = null
                 _uiState.update { it.copy(lists = emptyList(), openedList = null, listFiles = emptyList(), errorMessage = null) }
                 loadApiKey()
             }
         }
+    }
+
+    /** Reopens the list that was open when the app was closed, if it belongs to the active host. */
+    private fun restoreOpenedList() {
+        val saved = appSettings.openedList ?: return
+        if (saved.hostId != configStore.activeProviderId.value) return
+        _uiState.update { it.copy(openedList = saved.list) }
+        fetchOpenedListFiles()
     }
 
     private fun lists() = registry.resolve(configStore.activeProviderId.value).lists
@@ -97,6 +110,7 @@ class ListViewModel(
     }
 
     fun openList(list: FileList) {
+        appSettings.openedList = SavedOpenedList(configStore.activeProviderId.value, list)
         _uiState.update { it.copy(openedList = list, listFiles = emptyList(), listFilesErrorMessage = null) }
         fetchOpenedListFiles()
     }
@@ -104,6 +118,7 @@ class ListViewModel(
     fun refreshOpenedList() = fetchOpenedListFiles()
 
     fun closeList() {
+        appSettings.openedList = null
         _uiState.update { it.copy(openedList = null, listFiles = emptyList(), isLoadingListFiles = false, listFilesErrorMessage = null) }
     }
 

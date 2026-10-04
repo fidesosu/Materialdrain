@@ -144,7 +144,9 @@ class FilesystemViewModel(
         if (provider.browse == null) {
             _uiState.update { it.copy(isLoading = false, errorMessage = "This host can't browse files.") }
         } else if (provider.kind != ProviderKind.PIXELDRAIN || sessionManager.currentApiKey().isNotBlank()) {
-            fetchPathContent(rootPath(provider))
+            // The folder last open on this host, or its root when there is none (or it can't be listed any more)
+            val saved = appSettings.filesystemPath(configStore.activeProviderId.value)
+            fetchPathContent(saved ?: rootPath(provider), fallbackToRoot = saved != null)
         }
     }
 
@@ -173,7 +175,7 @@ class FilesystemViewModel(
         }
     }
 
-    fun fetchPathContent(path: String) {
+    fun fetchPathContent(path: String, fallbackToRoot: Boolean = false) {
         val provider = activeProvider()
         val browse = provider.browse ?: run {
             _uiState.update { it.copy(isLoading = false, errorMessage = "This host can't browse files.") }
@@ -189,6 +191,7 @@ class FilesystemViewModel(
                         compareBy<StorageNode> { !it.isDirectory }
                             .thenBy { it.name.lowercase() }
                     )
+                    appSettings.setFilesystemPath(configStore.activeProviderId.value, normalized)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -204,6 +207,10 @@ class FilesystemViewModel(
                 }
                 is ApiResponse.Error -> {
                     ProviderLog.e("Filesystem", "listing '$normalized' failed (${response.error.code}): ${response.error.message}")
+                    if (fallbackToRoot) {
+                        fetchPathContent(rootPath(provider))
+                        return@launch
+                    }
                     _uiState.update { it.copy(isLoading = false, errorMessage = response.error.forDisplay()) }
                 }
             }
