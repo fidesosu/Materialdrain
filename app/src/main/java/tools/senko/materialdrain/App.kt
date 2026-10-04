@@ -52,8 +52,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.offset
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -96,6 +98,7 @@ import tools.senko.materialdrain.settings.SEARCH_INDEX_FILE_NAME
 import tools.senko.materialdrain.settings.isSearchIndex
 import tools.senko.materialdrain.files.key
 import tools.senko.materialdrain.ui.LocalBlurredBackdrop
+import tools.senko.materialdrain.ui.LocalTextWrap
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.LocalVideoLoop
 import tools.senko.materialdrain.ui.VideoLoopSetting
@@ -156,6 +159,7 @@ fun MaterialdrainScreen() {
     val reduceAnimationsSetting by appContainer.appSettings.reduceAnimations.collectAsState()
     val reduceMotion = reduceAnimationsSetting || appContainer.appSettings.systemAnimationsDisabled()
     val blurredBackdrop by appContainer.appSettings.blurredBackdrop.collectAsState()
+    val textWrap by appContainer.appSettings.textWrap.collectAsState()
     val loopVideos by appContainer.appSettings.loopVideos.collectAsState()
     val navPrototype by appContainer.appSettings.navPrototype.collectAsState()
     val navMenuPreview by appContainer.appSettings.navMenuPreview.collectAsState()
@@ -403,7 +407,7 @@ fun MaterialdrainScreen() {
         derivedStateOf {
             // The navigation prototype takes the FAB's place (and its bottom padding), see NavFabMenu
             // The navigation prototype has its own button in the corner; the upload screen keeps its upload button
-            if (navPrototype && currentScreen != Screen.Upload) null else when (currentScreen) {
+            if (navPrototype) null else when (currentScreen) {
                 // Nothing to upload yet (or already uploading): the upload screen offers its own actions instead
                 Screen.Upload -> if (uploadUiState.hasUploadable && !uploadUiState.isLoading) FabDetails(
                     screen = Screen.Upload,
@@ -480,6 +484,7 @@ fun MaterialdrainScreen() {
     CompositionLocalProvider(
         LocalReduceMotion provides reduceMotion,
         LocalBlurredBackdrop provides blurredBackdrop,
+        LocalTextWrap provides textWrap,
         LocalVideoLoop provides videoLoop
     ) {
     SharedTransitionLayout {
@@ -710,6 +715,8 @@ fun MaterialdrainScreen() {
                 AnimatedVisibility(
                     // The FAB navigation prototype (Developer settings) replaces the bar while it's on
                     visible = !navPrototype && currentScreen != Screen.FileDetail,
+                    // Above the upload button, so the button slides down behind the bar
+                    modifier = Modifier.zIndex(2f),
                     enter = if (reduceMotion) fadeIn(tween(100)) else fadeIn() + expandVertically(),
                     exit = if (reduceMotion) fadeOut(tween(100)) else fadeOut() + shrinkVertically()
                 ) {
@@ -724,6 +731,13 @@ fun MaterialdrainScreen() {
                 // Keep the last button around so it can animate out instead of vanishing
                 var lastFab by remember { mutableStateOf<FabDetails?>(null) }
                 LaunchedEffect(fabState) { if (fabState != null) lastFab = fabState }
+
+                // 0 = shown, 1 = gone. Animated by its own state, so leaving slides it down instead of removing it at once
+                val fabHidden by animateFloatAsState(
+                    targetValue = if (fabState != null) 0f else 1f,
+                    animationSpec = tween(if (reduceMotion) 100 else 320, easing = FastOutSlowInEasing),
+                    label = "fabHidden"
+                )
 
                 // The icon makes a full turn whenever the trigger of the button counts up
                 val iconRotation = remember { Animatable(0f) }
@@ -740,12 +754,11 @@ fun MaterialdrainScreen() {
                     }
                 }
 
-                AnimatedVisibility(
-                    visible = fabState != null,
-                    enter = if (reduceMotion) fadeIn(tween(100)) else slideInVertically(animationSpec = tween(420, easing = FastOutSlowInEasing)) { it + entryOffsetPx.roundToInt() } + fadeIn(animationSpec = tween(200)),
-                    exit = if (reduceMotion) fadeOut(tween(100)) else slideOutVertically(animationSpec = tween(320, easing = FastOutSlowInEasing)) { it + entryOffsetPx.roundToInt() } + fadeOut(animationSpec = tween(200))
-                ) {
-                (fabState ?: lastFab)?.let { details ->
+                Box(modifier = Modifier.graphicsLayer {
+                    translationY = fabHidden * entryOffsetPx
+                    alpha = 1f - fabHidden
+                }) {
+                if (fabHidden < 1f) (fabState ?: lastFab)?.let { details ->
                     ExtendedFloatingActionButton(
                         onClick = details.onClick,
                         expanded = details.isExtended,
@@ -858,7 +871,8 @@ fun MaterialdrainScreen() {
                         Screen.Upload -> UploadScreenContent(
                             uploadViewModel = uploadViewModel,
                             fabHeight = fabHeightDp,
-                            isFabVisible = isFabVisible
+                            isFabVisible = isFabVisible,
+                            inlineUploadButton = navPrototype
                         )
                         Screen.Files, Screen.Lists, Screen.Filesystem -> BrowserScreen(
                             mode = when (targetScreen) {
@@ -919,7 +933,8 @@ fun MaterialdrainScreen() {
                 }
             }
         }
-        if (showNavFab) {
+        // Kept while the navigation prototype is on: it slides out of the screen when hidden (see NavFabMenu)
+        if (navPrototype) {
             NavFabMenu(
                 menu = navMenuPreview.menu(),
                 currentScreen = currentScreen,
@@ -927,7 +942,8 @@ fun MaterialdrainScreen() {
                 onPositionChange = appContainer.appSettings::setNavFabPosition,
                 onNavigate = navigateTo,
                 onFabHeightChanged = { fabHeightDp = it },
-                lift = navLift
+                lift = navLift,
+                visible = showNavFab
             )
         }
         }

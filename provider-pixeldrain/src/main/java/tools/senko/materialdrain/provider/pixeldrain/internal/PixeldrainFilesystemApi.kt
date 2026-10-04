@@ -7,6 +7,7 @@ import io.ktor.client.call.body
 import io.ktor.client.request.headers
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
+import java.io.IOException
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -23,6 +24,18 @@ private const val TAG_FS_API = "PIXEL_API_SERVICE"
 interface PixeldrainFilesystemApi {
 
     suspend fun getFilesystemPath(apiKey: String, fsPath: String): ApiResponse<FilesystemListResponse>
+
+    /** The raw answer of ?zip_info for the archive at [fsPath]. Errors come back in the answer too, see ZipInfo. */
+    suspend fun getZipInfo(apiKey: String, fsPath: String): ApiResponse<String>
+
+    /** One file inside the archive at [fsPath]; [entryPath] is as ?zip_file takes it, with its leading slash. */
+    suspend fun downloadZipEntry(
+        apiKey: String,
+        fsPath: String,
+        entryPath: String,
+        outputStream: OutputStream,
+        onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit
+    ): ApiResponse<Long>
 
     suspend fun downloadFile(
         apiKey: String,
@@ -60,6 +73,39 @@ class PixeldrainFilesystemApiImpl(private val http: PixeldrainHttpClient) : Pixe
 
     private fun apiKeyMissing(message: String) =
         ApiResponse.Error<FileUploadResponse>(FileUploadResponse(success = false, value = "api_key_missing", message = message))
+
+    override suspend fun getZipInfo(apiKey: String, fsPath: String): ApiResponse<String> {
+        val request = Request.Builder()
+            .url(http.filesystemUrl(fsPath).addQueryParameter("zip_info", "").build())
+            .header(HttpHeaders.AcceptEncoding, "identity")
+            .apply { if (apiKey.isNotBlank()) header(HttpHeaders.Authorization, http.basicAuth(apiKey)) }
+            .get()
+            .build()
+        return try {
+            http.okHttpClient.newCall(request).execute().use { response ->
+                // Read whatever the status: a file which can't be read says why in the body
+                ApiResponse.Success(response.body?.string().orEmpty())
+            }
+        } catch (e: IOException) {
+            ApiResponse.Error(FileUploadResponse(success = false, value = "network_error", message = e.message ?: "The archive couldn't be read."))
+        }
+    }
+
+    override suspend fun downloadZipEntry(
+        apiKey: String,
+        fsPath: String,
+        entryPath: String,
+        outputStream: OutputStream,
+        onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit
+    ): ApiResponse<Long> {
+        val request = Request.Builder()
+            .url(http.filesystemUrl(fsPath).addQueryParameter("zip_file", entryPath).build())
+            .header(HttpHeaders.AcceptEncoding, "identity")
+            .apply { if (apiKey.isNotBlank()) header(HttpHeaders.Authorization, http.basicAuth(apiKey)) }
+            .get()
+            .build()
+        return http.downloadToStream(request, outputStream, onProgress)
+    }
 
     override suspend fun getFilesystemPath(apiKey: String, fsPath: String): ApiResponse<FilesystemListResponse> {
         if (apiKey.isBlank()) {

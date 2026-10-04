@@ -44,6 +44,16 @@
       "method": "GET",
       "path": "/file/{ids}"
     },
+    "archive_info": {
+      "method": "GET",
+      "path": "/filesystem/{path}",
+      "query": { "zip_info": "" }
+    },
+    "archive_file": {
+      "method": "GET",
+      "path": "/filesystem/{path}",
+      "query": { "zip_file": "{entry}" }
+    },
     "delete": {
       "method": "DELETE",
       "path": "/file/{id}",
@@ -219,7 +229,7 @@
   },
   "meta": {
     "id": "tools.senko.materialdrain.examples.pixeldrain",
-    "version": 4,
+    "version": 5,
     "author": "Materialdrain"
   }
 }

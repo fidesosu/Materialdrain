@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.ui.LocalReduceMotion
+import androidx.compose.foundation.layout.Box
+import tools.senko.materialdrain.ui.components.DotScrollbar
 
 /**
  * The settings: a list of categories, each of which opens a page with its settings. What the categories and
@@ -89,16 +91,20 @@ fun SettingsScreenContent(
 /** The list of categories: the standard Material list, an icon, a title and a summary per row. */
 @Composable
 private fun SettingsCategoryList(onCategoryClick: (SettingsCategory) -> Unit) {
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        SettingsCatalog.forEach { category ->
-            ListItem(
-                headlineContent = { Text(category.title) },
-                supportingContent = { Text(category.summary) },
-                leadingContent = { Icon(category.icon, contentDescription = null) },
-                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                modifier = Modifier.clickable { onCategoryClick(category) }
-            )
+    val scrollState = rememberScrollState()
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState)) {
+            SettingsCatalog.forEach { category ->
+                ListItem(
+                    headlineContent = { Text(category.title) },
+                    supportingContent = { Text(category.summary) },
+                    leadingContent = { Icon(category.icon, contentDescription = null) },
+                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    modifier = Modifier.clickable { onCategoryClick(category) }
+                )
+            }
         }
+        DotScrollbar(state = scrollState)
     }
 }
 
@@ -110,13 +116,17 @@ private fun SettingsCategoryPage(
     fabHeight: Dp,
     isFabVisible: Boolean
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = if (isFabVisible) fabHeight + 16.dp else 16.dp)
-    ) {
-        category.items.forEach { item -> SettingsItemRow(item, environment) }
+    val scrollState = rememberScrollState()
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(bottom = if (isFabVisible) fabHeight + 16.dp else 16.dp)
+        ) {
+            category.items.forEach { item -> SettingsItemRow(item, environment) }
+        }
+        DotScrollbar(state = scrollState)
     }
 }
 

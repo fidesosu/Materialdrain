@@ -95,7 +95,8 @@ class ProviderSettingsViewModel(
     fun importConfig(text: String): Boolean {
         val config = ProviderConfigCodec.decode(text)
         if (config == null) {
-            _uiState.update { it.copy(importError = "This isn't a Materialdrain provider config (check the first line).") }
+            val reason = ProviderConfigCodec.explainFailure(text) ?: "it couldn't be read"
+            _uiState.update { it.copy(importError = "This isn't a usable provider config: $reason.") }
             return false
         }
         // The newly imported host is the one the Files, Lists and Filesystem screens use

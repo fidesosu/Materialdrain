@@ -10,7 +10,9 @@ enum class ProviderCapability {
     SEARCH, SHARE_LINK, PERMISSIONS,
     USER_QUOTA, RICH_FILE_STATS, LISTS,
     // Several files at once as one zip archive (Pixeldrain: comma separated ids). See FileStoreOps.downloadArchive
-    ARCHIVE_DOWNLOAD
+    ARCHIVE_DOWNLOAD,
+    // Looking inside an archive (zip, 7z, rar...) without downloading it. See ArchiveOps
+    ARCHIVE_BROWSE
 }
 
 enum class ProviderKind { PIXELDRAIN, WEBDAV, S3, GENERIC_REST }

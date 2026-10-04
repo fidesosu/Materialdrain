@@ -7,6 +7,8 @@
     <cloud-backup>
         <!-- The login session key is encrypted with a Keystore key which is not part of a backup -->
         <exclude domain="sharedpref" path="pixeldrain_secure_prefs.xml" />
+    <!-- The manually entered API key is encrypted in the secure file; the old plain copy is not backed up -->
+    <exclude domain="sharedpref" path="pixeldrain_prefs.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="pixeldrain_secure_prefs.xml" />

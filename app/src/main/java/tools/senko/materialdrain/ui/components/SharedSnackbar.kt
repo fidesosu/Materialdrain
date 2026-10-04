@@ -120,8 +120,9 @@ fun AppSnackbarHost(
                         Surface(
                             modifier = Modifier.fillMaxWidth().heightIn(min = fabSize),
                             shape = RoundedCornerShape(EdgeCorner),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            // The same colours as the standard snackbar, so both look like one kind of message
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
                             shadowElevation = 6.dp
                         ) {
                             Row(

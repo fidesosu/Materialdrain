@@ -283,7 +283,7 @@ class ProviderConfigStore(context: Context) {
 
     fun saveApiKey(id: String, apiKey: String) {
         securePrefs.edit { putEncrypted("secret", id, apiKey.trim()) }
-        ProviderLog.i("Config", "saved the API key of host $id (${apiKey.trim().length} chars)")
+        ProviderLog.i("Config", "saved the API key of host $id")
         changed()
     }
 

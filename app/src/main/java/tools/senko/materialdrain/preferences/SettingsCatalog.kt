@@ -103,6 +103,13 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                     "fullscreen image and is there while a preview is loading.",
                 isChecked = { appSettings.blurredBackdrop.collectAsState().value },
                 onCheckedChange = { appSettings.setBlurredBackdrop(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Wrap long lines",
+                summary = "Text previews (code, logs, configs) break long lines onto the next line. Off, the lines stay " +
+                    "as they are and can be scrolled sideways.",
+                isChecked = { appSettings.textWrap.collectAsState().value },
+                onCheckedChange = { appSettings.setTextWrap(it) }
             )
         )
     ),

@@ -12,6 +12,10 @@ import tools.senko.materialdrain.provider.api.AccountInfo
 import tools.senko.materialdrain.provider.api.AccountOps
 import tools.senko.materialdrain.provider.api.ApiResponse
 import tools.senko.materialdrain.provider.api.AuthType
+import tools.senko.materialdrain.provider.api.ZipInfo
+import tools.senko.materialdrain.provider.api.ArchiveOps
+import tools.senko.materialdrain.provider.api.ArchiveEntryDetails
+import tools.senko.materialdrain.provider.api.ArchiveEntry
 import tools.senko.materialdrain.provider.api.BrowseOps
 import tools.senko.materialdrain.provider.api.Credentials
 import tools.senko.materialdrain.provider.api.EndpointConfig
@@ -39,6 +43,8 @@ import java.io.OutputStream
 private const val ENDPOINT_UPLOAD = "upload"
 private const val ENDPOINT_DOWNLOAD = "download"
 private const val ENDPOINT_DOWNLOAD_ARCHIVE = "download_archive"
+private const val ENDPOINT_ARCHIVE_INFO = "archive_info"
+private const val ENDPOINT_ARCHIVE_FILE = "archive_file"
 private const val ENDPOINT_DELETE = "delete"
 private const val ENDPOINT_FILE_INFO = "file_info"
 private const val ENDPOINT_USER_INFO = "user_info"
@@ -60,6 +66,15 @@ private const val ENDPOINT_LIST_INFO = "list_info"
 private const val ENDPOINT_LIST_CREATE = "list_create"
 private const val ENDPOINT_LIST_UPDATE = "list_update"
 private const val ENDPOINT_LIST_DELETE = "list_delete"
+
+/** An entry of an archive as a node; a file keeps where it is inside which archive, so it can be read later. */
+private fun ArchiveEntry.toStorageNode(archivePath: String) = StorageNode(
+    ref = StorageRef(path = path),
+    name = name,
+    isDirectory = isDirectory,
+    size = size,
+    richDetails = if (isDirectory) null else ArchiveEntryDetails(archivePath, path),
+)
 
 /** Values of a node's "is_directory" mapping that mean it's a folder: the config maps whatever its API calls it. */
 private val DIRECTORY_VALUES = setOf("dir", "directory", "folder", "true")
@@ -94,6 +109,7 @@ class GenericRestStorageProvider(
         if (config.endpoints.containsKey(ENDPOINT_DELETE) || config.endpoints.containsKey(ENDPOINT_BROWSE_DELETE)) add(ProviderCapability.DELETE)
         if (config.endpoints.containsKey(ENDPOINT_FILE_INFO)) add(ProviderCapability.FILE_INFO)
         if (config.endpoints.containsKey(ENDPOINT_DOWNLOAD_ARCHIVE)) add(ProviderCapability.ARCHIVE_DOWNLOAD)
+        if (config.endpoints.containsKey(ENDPOINT_ARCHIVE_INFO)) add(ProviderCapability.ARCHIVE_BROWSE)
         if (config.endpoints.containsKey(ENDPOINT_USER_INFO)) add(ProviderCapability.USER_QUOTA)
         if (config.endpoints.containsKey(ENDPOINT_LIST)) add(ProviderCapability.ENUMERATE)
         if (config.endpoints.containsKey(ENDPOINT_BROWSE_LIST)) add(ProviderCapability.BROWSE)
@@ -105,6 +121,47 @@ class GenericRestStorageProvider(
 
     /** Lists of files, when the config declares the user_lists endpoint. */
     override val lists: ListOps? = config.endpoints[ENDPOINT_USER_LISTS]?.let { listsOps(it) }
+
+    /** Looking inside archives, when the config declares archive_info (the listing) and archive_file (one file). */
+    override val archives: ArchiveOps? = config.endpoints[ENDPOINT_ARCHIVE_INFO]?.let { infoEndpoint ->
+        object : ArchiveOps {
+            override suspend fun list(archivePath: String, inside: String): ApiResponse<List<StorageNode>> {
+                val result = buffered(infoEndpoint, mapOf("path" to archivePath.trim('/')))
+                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "archive_info endpoint could not be resolved."))
+                return when (val parsed = ZipInfo.entriesIn(result.bodyText, inside)) {
+                    is ApiResponse.Success -> ApiResponse.Success(parsed.data.map { it.toStorageNode(archivePath) })
+                    is ApiResponse.Error -> ApiResponse.Error(parsed.error)
+                }
+            }
+
+            override suspend fun read(
+                archivePath: String,
+                entryPath: String,
+                outputStream: java.io.OutputStream,
+                onProgress: (read: Long, total: Long?) -> Unit
+            ): ApiResponse<Long> {
+                val endpoint = config.endpoints[ENDPOINT_ARCHIVE_FILE]
+                    ?: return ApiResponse.Error(ProviderError("not_supported", "This host has no archive_file endpoint configured."))
+                var totalCopied = 0L
+                val code = authorized(
+                    { auth ->
+                        client.executeDownload(
+                            endpoint,
+                            mapOf("path" to archivePath.trim('/'), "entry" to "/" + entryPath.trim('/')),
+                            auth,
+                            outputStream
+                        ) { read, total ->
+                            totalCopied = read
+                            onProgress(read, total)
+                        }
+                    },
+                    { it }
+                ) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "archive_file endpoint could not be resolved."))
+                return if (code in 200..299) ApiResponse.Success(totalCopied)
+                else ApiResponse.Error(ProviderError("download_failed_status_$code", "Download failed: HTTP $code"))
+            }
+        }
+    }
 
     override val rootPath: String = config.browseRoot
 

@@ -38,6 +38,22 @@ interface FileStoreOps {
     ): ApiResponse<Long> = ApiResponse.Error(ProviderError("not_supported", "This host can't download several files as one archive."))
 }
 
+/**
+ * Looking inside archives (zip, 7z, rar, tar...) that are on the host. [archivePath] is the archive's own path on the
+ * host; [inside] is a folder within it, "" for its top. Only present with [ProviderCapability.ARCHIVE_BROWSE].
+ */
+interface ArchiveOps {
+    suspend fun list(archivePath: String, inside: String): ApiResponse<List<StorageNode>>
+
+    /** Writes one file of the archive, [entryPath] is its path within the archive (no leading slash). */
+    suspend fun read(
+        archivePath: String,
+        entryPath: String,
+        outputStream: OutputStream,
+        onProgress: (read: Long, total: Long?) -> Unit
+    ): ApiResponse<Long>
+}
+
 /** Hierarchical browsing: Pixeldrain's filesystem API, WebDAV. Only present when [ProviderCapability.BROWSE] is. */
 interface BrowseOps {
     suspend fun list(path: String): ApiResponse<StorageListing>

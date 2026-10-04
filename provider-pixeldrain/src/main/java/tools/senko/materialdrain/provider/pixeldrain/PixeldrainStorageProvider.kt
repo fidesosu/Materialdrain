@@ -19,6 +19,9 @@ import tools.senko.materialdrain.provider.api.ProviderError
 import tools.senko.materialdrain.provider.api.ProviderKind
 import tools.senko.materialdrain.provider.api.ProviderValidationResult
 import tools.senko.materialdrain.provider.api.StorageListing
+import tools.senko.materialdrain.provider.api.ArchiveEntryDetails
+import tools.senko.materialdrain.provider.api.ArchiveOps
+import tools.senko.materialdrain.provider.api.ZipInfo
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.provider.api.StorageProvider
 import tools.senko.materialdrain.provider.api.StorageRef
@@ -171,7 +174,7 @@ class PixeldrainStorageProvider(
         ProviderCapability.UPLOAD, ProviderCapability.DOWNLOAD, ProviderCapability.DELETE, ProviderCapability.FILE_INFO,
         ProviderCapability.BROWSE, ProviderCapability.MKDIR, ProviderCapability.RENAME,
         ProviderCapability.SHARE_LINK, ProviderCapability.RICH_FILE_STATS, ProviderCapability.LISTS, ProviderCapability.ENUMERATE,
-        ProviderCapability.ARCHIVE_DOWNLOAD
+        ProviderCapability.ARCHIVE_DOWNLOAD, ProviderCapability.ARCHIVE_BROWSE
         // Deliberately absent: SEARCH and PERMISSIONS (the pixeldrain API supports both, but nothing in this
         // app calls them yet, so claiming the capability here would be a promise the UI can't keep) and
         // USER_QUOTA (no account-info endpoint is wired up).
@@ -226,6 +229,38 @@ class PixeldrainStorageProvider(
                     is PdResult.Error -> ApiResponse.Error(result.errorDetails.toProviderError())
                 }
             }
+    }
+
+    /** Inside archives with ?zip_info and ?zip_file: the archive itself is never downloaded just to look at it. */
+    override val archives: ArchiveOps = object : ArchiveOps {
+        override suspend fun list(archivePath: String, inside: String): ApiResponse<List<StorageNode>> {
+            val body = when (val raw = filesystemApi.getZipInfo(apiKeyProvider(), archivePath)) {
+                is PdResult.Success -> raw.data
+                else -> return ApiResponse.Error(ProviderError("network_error", "The archive couldn't be read."))
+            }
+            return when (val parsed = ZipInfo.entriesIn(body, inside)) {
+                is ApiResponse.Success -> ApiResponse.Success(
+                    parsed.data.map {
+                        StorageNode(
+                            ref = StorageRef(path = it.path),
+                            name = it.name,
+                            isDirectory = it.isDirectory,
+                            size = it.size,
+                            richDetails = if (it.isDirectory) null else ArchiveEntryDetails(archivePath, it.path),
+                        )
+                    }
+                )
+                is ApiResponse.Error -> ApiResponse.Error(parsed.error)
+            }
+        }
+
+        override suspend fun read(
+            archivePath: String,
+            entryPath: String,
+            outputStream: OutputStream,
+            onProgress: (read: Long, total: Long?) -> Unit
+        ): ApiResponse<Long> =
+            filesystemApi.downloadZipEntry(apiKeyProvider(), archivePath, "/" + entryPath.trimStart('/'), outputStream, onProgress).map { it }
     }
 
     override val fileStore = object : FileStoreOps {

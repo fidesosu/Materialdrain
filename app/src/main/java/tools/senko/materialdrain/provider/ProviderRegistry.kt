@@ -1,6 +1,7 @@
 package tools.senko.materialdrain.provider
 
 import tools.senko.materialdrain.provider.api.Credentials
+import tools.senko.materialdrain.provider.api.allowsAccountFallback
 import tools.senko.materialdrain.provider.api.GenericRestConfig
 import tools.senko.materialdrain.provider.api.S3Config
 import tools.senko.materialdrain.provider.api.StorageProvider
@@ -41,7 +42,7 @@ class ProviderRegistry(
     private fun ownOrAccountCredentials(id: String, config: GenericRestConfig): Credentials {
         val own = configStore.credentials(id)
         val hasOwn = own.apiKey.isNotBlank() || own.loginToken != null || own.hasPassword
-        return if (config.accountFallback && !hasOwn) accountCredentials() else own
+        return if (!hasOwn && allowsAccountFallback(config)) accountCredentials() else own
     }
 
     // Built providers are reused: the screens ask for one per row, and building one creates an HTTP client.

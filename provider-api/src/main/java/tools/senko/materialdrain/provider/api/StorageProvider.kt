@@ -39,6 +39,10 @@ interface StorageProvider {
     val lists: ListOps?
         get() = null
 
+    /** Looking inside archives on the host, null when [ProviderCapability.ARCHIVE_BROWSE] is absent. */
+    val archives: ArchiveOps?
+        get() = null
+
     /** Public link to view/share [node], or null if [ProviderCapability.SHARE_LINK] is absent. */
     fun shareUrl(node: StorageNode): String?
 

@@ -23,6 +23,7 @@ private const val NAV_MENU_PREVIEW_PREF = "dev_nav_menu_preview"
 private const val NAV_FAB_POSITION_PREF = "nav_fab_position"
 private const val FILES_SORT_FIELD_PREF = "files_sort_field"
 private const val FILES_SORT_ASCENDING_PREF = "files_sort_ascending"
+private const val TEXT_WRAP_PREF = "text_wrap"
 private const val BIOMETRIC_LOCK_PREF = "biometric_lock"
 
 /** Pixeldrain keeps the paths of the files of a filesystem in this file, it is re-created when removed. */
@@ -124,6 +125,15 @@ class AppSettings(context: Context) {
     /** Whether this device has a fingerprint, face or screen lock to ask for. */
     fun biometricLockAvailable(): Boolean =
         BiometricManager.from(appContext).canAuthenticate(LOCK_AUTHENTICATORS) == BiometricManager.BIOMETRIC_SUCCESS
+
+    private val _textWrap = MutableStateFlow(prefs.getBoolean(TEXT_WRAP_PREF, true))
+    /** Whether long lines of a text preview wrap onto the next line, or scroll sideways. On by default. */
+    val textWrap: StateFlow<Boolean> = _textWrap.asStateFlow()
+
+    fun setTextWrap(wrap: Boolean) {
+        prefs.edit { putBoolean(TEXT_WRAP_PREF, wrap) }
+        _textWrap.value = wrap
+    }
 
     private inline fun <reified T : Enum<T>> enumPref(key: String, default: T): T =
         prefs.getString(key, null)?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: default

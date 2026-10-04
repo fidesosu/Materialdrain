@@ -20,6 +20,9 @@ val LocalReduceMotion = compositionLocalOf { false }
  */
 val LocalBlurredBackdrop = compositionLocalOf { true }
 
+/** Whether long lines of a text preview wrap, or scroll sideways (see the Previews settings). */
+val LocalTextWrap = compositionLocalOf { true }
+
 /** Whether videos start over when they end, and how to change that. One setting for every video. */
 @Immutable
 class VideoLoopSetting(val enabled: Boolean, val onChange: (Boolean) -> Unit)

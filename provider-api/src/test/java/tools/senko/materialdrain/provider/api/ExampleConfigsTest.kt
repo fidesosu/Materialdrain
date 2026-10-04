@@ -26,7 +26,7 @@ class ExampleConfigsTest {
         val config = ProviderConfigCodec.decode(File(examplesDir, "pixeldrain.json").readText()) as GenericRestConfig
         assertEquals(
             setOf(
-                "upload", "download", "download_archive", "delete", "file_info", "user_info", "list",
+                "upload", "download", "download_archive", "archive_info", "archive_file", "delete", "file_info", "user_info", "list",
                 "browse_list", "browse_upload", "browse_download", "browse_thumbnail",
                 "browse_mkdir", "browse_rename", "browse_delete", "browse_import",
                 "user_lists", "list_info", "list_create", "list_update", "list_delete", "share_id", "share_path",

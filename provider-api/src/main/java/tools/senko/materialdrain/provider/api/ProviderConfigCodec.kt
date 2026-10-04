@@ -62,6 +62,33 @@ object ProviderConfigCodec {
         }
     }
 
+    /**
+     * Why [text] isn't a config, for the import message: null when it is one. The first line doesn't matter, the
+     * marker is optional; what matters is the JSON after it.
+     */
+    fun explainFailure(text: String): String? {
+        val markerLine = text.lineSequence().firstOrNull()?.trim()
+        val body = (if (markerLine == PROVIDER_CONFIG_MARKER) text.substringAfter('\n', missingDelimiterValue = "") else text).trim()
+        if (body.isEmpty()) return "the text is empty"
+        val obj = try {
+            json.parseToJsonElement(body).jsonObject
+        } catch (e: Exception) {
+            return "the JSON can't be read (${e.message?.lineSequence()?.firstOrNull() ?: "syntax error"})"
+        }
+        val kind = obj["kind"]?.jsonPrimitive?.content ?: return "there is no \"kind\" field"
+        if (kind !in setOf(KIND_GENERIC_REST, KIND_WEBDAV, KIND_S3)) return "the kind \"$kind\" is unknown"
+        return try {
+            when (kind) {
+                KIND_GENERIC_REST -> json.decodeFromJsonElement(GenericRestConfig.serializer(), obj)
+                KIND_WEBDAV -> json.decodeFromJsonElement(WebDavConfig.serializer(), obj)
+                else -> json.decodeFromJsonElement(S3Config.serializer(), obj)
+            }
+            null
+        } catch (e: Exception) {
+            "a field doesn't fit (${e.message?.lineSequence()?.firstOrNull() ?: "unknown"})"
+        }
+    }
+
     /** Cheap check for a paste/import sheet: is this text even worth trying to [decode]? */
     fun looksLikeProviderConfig(text: String): Boolean {
         val trimmed = text.trim()

@@ -197,3 +197,17 @@ data class S3Config(
     val prefix: String = "",
     override val meta: ProviderConfigMeta? = null
 ) : ProviderConfig
+
+/** The address of a host's own service, or null when the base URL isn't a valid one. */
+private fun hostOf(baseUrl: String): String? = try {
+    java.net.URI(baseUrl.trim()).host?.lowercase()
+} catch (_: Exception) {
+    null
+}
+
+/**
+ * Whether the account's own login may be sent to this host. Only Pixeldrain's own address qualifies: a config can
+ * come from anyone, and the login must never be sent to another server, whatever the config says.
+ */
+fun allowsAccountFallback(config: GenericRestConfig): Boolean =
+    config.accountFallback && hostOf(config.baseUrl).let { it == "pixeldrain.com" || it == "www.pixeldrain.com" }

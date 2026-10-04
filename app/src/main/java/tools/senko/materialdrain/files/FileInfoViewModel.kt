@@ -34,6 +34,7 @@ import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.provider.ProviderConfigStore
 import tools.senko.materialdrain.provider.ProviderRegistry
 import tools.senko.materialdrain.provider.api.ApiResponse
+import tools.senko.materialdrain.provider.api.ArchiveEntryDetails
 import tools.senko.materialdrain.provider.forDisplay
 import tools.senko.materialdrain.provider.api.ProviderCapability
 import tools.senko.materialdrain.provider.api.FileList
@@ -101,6 +102,14 @@ fun StorageNode.previewMimeType(): String? {
     return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: mimeType
 }
 
+/** The folder [inside] of the archive at [path], and its entries once they've loaded. */
+data class ArchiveView(val path: String, val inside: String, val entries: List<StorageNode>?, val error: String?)
+
+/** Archives which can be looked inside from the file details (see ArchiveOps). */
+private val ARCHIVE_EXTENSIONS = setOf("zip", "7z", "rar", "tar", "tgz", "apk")
+
+fun isArchiveName(name: String): Boolean = name.substringAfterLast('.', "").lowercase() in ARCHIVE_EXTENSIONS
+
 data class FileInfoUiState(
     // For single file info
     val isLoadingFileInfo: Boolean = false,
@@ -142,6 +151,8 @@ data class FileInfoUiState(
     val fileDownloadSuccessMessage: String? = null,
     // The last finished download, when it can be opened (it's saved on the device)
     val fileDownloadOpen: OpenableDownload? = null,
+    // The contents of an archive shown in the file details, see loadArchive
+    val archive: ArchiveView? = null,
     val fileDownloadErrorMessage: String? = null,
 
     // Scroll state preservation
@@ -276,6 +287,12 @@ class FileInfoViewModel(
         onProgress: (Long, Long?) -> Unit
     ): ApiResponse<Long> {
         val current = provider()
+        // A file inside an archive is read from the archive
+        (node.richDetails as? ArchiveEntryDetails)?.let { entry ->
+            val archives = current.archives
+                ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't look inside archives."))
+            return archives.read(entry.archivePath, entry.entryPath, outputStream, onProgress)
+        }
         val id = node.ref.id
         return if (id != null) {
             val store = current.fileStore
@@ -303,6 +320,7 @@ class FileInfoViewModel(
         val commonTextExtensions = listOf(".log", ".ini", ".conf", ".cfg", ".md", ".yaml", ".yml", ".toml")
 
         val isLikelyTextFile = commonTextMimeTypes.any { mimeType.startsWith(it, ignoreCase = true) } ||
+                isTextFile(fileInfo.name, mimeType) ||
                 (mimeType.startsWith("application/octet-stream", ignoreCase = true) &&
                         commonTextExtensions.any { fileInfo.name.endsWith(it, ignoreCase = true) })
 
@@ -378,6 +396,42 @@ class FileInfoViewModel(
     }
 
     /** Shows the details of a file node (from the filesystem or the file list). Folders have no details. */
+    /** Shows the folder [inside] of the archive in the details (its top when empty). */
+    fun openArchiveFolder(inside: String) {
+        val path = uiState.value.archive?.path ?: return
+        loadArchive(path, inside)
+    }
+
+    /** Lists the folder [inside] of the archive at [path] for the details, see FileDetailsScreen. */
+    private fun loadArchive(path: String, inside: String) {
+        val archives = provider().archives ?: return
+        _uiState.update { it.copy(archive = ArchiveView(path, inside, entries = null, error = null)) }
+        viewModelScope.launch {
+            val result = archives.list(path, inside)
+            _uiState.update { state ->
+                if (state.archive?.path != path) return@update state
+                when (result) {
+                    is ApiResponse.Success -> state.copy(
+                        archive = ArchiveView(
+                            path,
+                            inside,
+                            result.data.sortedWith(compareBy<StorageNode> { !it.isDirectory }.thenBy { it.name.lowercase() }),
+                            error = null
+                        )
+                    )
+                    is ApiResponse.Error -> state.copy(
+                        archive = ArchiveView(path, inside, entries = null, error = result.error.message.ifBlank { "This file can't be opened as an archive." })
+                    )
+                }
+            }
+        }
+    }
+
+    /** Saves one file of the archive shown in the details, as any other download. */
+    fun downloadArchiveEntry(entry: StorageNode) {
+        initiateDownloadFile(entry)
+    }
+
     fun setFileInfoFromNode(node: StorageNode) {
         if (node.isDirectory) {
             _uiState.update {
@@ -398,10 +452,13 @@ class FileInfoViewModel(
             )
         }
         fetchTextFilePreviewContent(node)
+        // An archive shows what's inside it, in the details
+        _uiState.update { it.copy(archive = null) }
+        if (isArchiveName(node.name)) loadArchive(node.ref.path, "")
     }
 
     fun clearFileInfoDisplay() {
-        _uiState.update { it.copy(fileInfo = null, isLoadingFileInfo = false) }
+        _uiState.update { it.copy(fileInfo = null, isLoadingFileInfo = false, archive = null) }
         clearTextPreviewStates()
     }
 

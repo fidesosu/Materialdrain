@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
@@ -65,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
@@ -110,6 +112,8 @@ fun NavFabMenu(
     onFabHeightChanged: (Dp) -> Unit,
     /** How far the button rises above its corner, e.g. over the selection bar or a snackbar */
     lift: Dp = 0.dp,
+    /** When false the button slides down out of the screen (and is gone once it has) */
+    visible: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var open by rememberSaveable { mutableStateOf(false) }
@@ -120,6 +124,15 @@ fun NavFabMenu(
     val isSelected: (NavMenuItem) -> Boolean = { item -> item.screen?.let { it == currentScreen } ?: (item.id == mockSelectedId) }
     val allItems = menu.pinned + menu.sections.flatMap { it.items }
     val selectedItem = allItems.firstOrNull(isSelected)
+
+    // 0 = shown, 1 = gone. Animated by its own state, so the button is still there while it slides down
+    val hidden by animateFloatAsState(
+        targetValue = if (visible) 0f else 1f,
+        animationSpec = tween(320, easing = FastOutSlowInEasing),
+        label = "navFabHidden"
+    )
+    LaunchedEffect(visible) { if (!visible) open = false }
+    val hiddenPx = with(LocalDensity.current) { EntryOffset.toPx() }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val maxWindowHeight = maxHeight * 0.6f
@@ -159,7 +172,7 @@ fun NavFabMenu(
             ?: currentScreen.iconResId?.takeIf { allItems.any { it.screen != null } }?.let { painterResource(it) }
             ?: rememberVectorPainter(Icons.Filled.Menu)
 
-        NavFab(
+        if (hidden < 1f) NavFab(
             open = open,
             icon = fabIcon,
             position = position,
@@ -167,7 +180,10 @@ fun NavFabMenu(
             onClick = { open = !open },
             onPositionChange = onPositionChange,
             onFabHeightChanged = onFabHeightChanged,
-            modifier = Modifier.align(Alignment.BottomStart).offset(y = -lift)
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .offset(y = -lift)
+                .graphicsLayer { translationY = hidden * hiddenPx }
         )
     }
 }

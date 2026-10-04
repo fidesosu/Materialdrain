@@ -88,6 +88,7 @@ import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.provider.api.StorageRef
 import tools.senko.materialdrain.settings.SEARCH_INDEX_DELETE_WARNING
 import tools.senko.materialdrain.settings.isSearchIndex
+import tools.senko.materialdrain.ui.components.DotScrollbar
 import tools.senko.materialdrain.ui.components.CenteredTextMessage
 import tools.senko.materialdrain.ui.components.ConfirmDialog
 import tools.senko.materialdrain.ui.components.ErrorMessage
@@ -510,46 +511,49 @@ fun BrowserScreen(
                 entries.isEmpty() && !isLoading -> PullableFill {
                     CenteredTextMessage(emptyText(mode, openedList != null, fileState.filterQuery))
                 }
-                else -> LazyColumn(
-                    state = scrollState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = if (isFabVisible) fabHeight + 16.dp else 16.dp)
-                ) {
-                    items(entries, key = { it.key }) { node ->
-                        BrowserEntry(
-                            node = node,
-                            mode = mode,
-                            openedList = openedList,
-                            selectionMode = selectionMode,
-                            selected = node.key in selectedKeys,
-                            canWriteFs = canWriteFs,
-                            canDeleteFs = fsState.canDelete && !fsState.isModifying,
-                            listCanEdit = listCanEdit,
-                            thumbnailUrl = if (node.isDirectory) null else fileInfoViewModel.thumbnailFor(node),
-                            shareUrl = if (node.isDirectory) null else fileInfoViewModel.shareUrlFor(node),
-                            onOpen = { onOpen(node) },
-                            onToggleSelection = {
-                                selectedKeys = if (node.key in selectedKeys) selectedKeys - node.key else selectedKeys + node.key
-                            },
-                            onLongClick = { startSelecting(node.key) },
-                            onDownload = { fileInfoViewModel.initiateDownloadFile(node) },
-                            onSelect = { startSelecting(node.key) },
-                            onRename = { entryToRename = node },
-                            onMove = { entryToMove = node },
-                            onDelete = { if (mode == BrowserMode.FILESYSTEM) entryToDelete = node else actionRequest = FileActionRequest.Delete(listOf(node)) },
-                            onAddToFilesystem = { actionRequest = FileActionRequest.AddToFilesystem(listOf(node)) },
-                            onAddToList = { actionRequest = FileActionRequest.AddToList(listOf(node)) },
-                            onRemoveFromList = { openedList?.let { actionRequest = FileActionRequest.RemoveFromList(listOf(node), it, entries.size) } },
-                            // Lists have web links only on Pixeldrain; other hosts' lists are not on pixeldrain.com
-                            pixeldrainLinks = activeKind == ProviderKind.PIXELDRAIN,
-                            onCopyLink = { url -> copyLinkToClipboard(context, url) },
-                            onShareLink = { url -> shareLink(context, url) }
-                        )
-                        HorizontalDivider(
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
+                else -> Box(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        state = scrollState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = if (isFabVisible) fabHeight + 16.dp else 16.dp)
+                    ) {
+                        items(entries, key = { it.key }) { node ->
+                            BrowserEntry(
+                                node = node,
+                                mode = mode,
+                                openedList = openedList,
+                                selectionMode = selectionMode,
+                                selected = node.key in selectedKeys,
+                                canWriteFs = canWriteFs,
+                                canDeleteFs = fsState.canDelete && !fsState.isModifying,
+                                listCanEdit = listCanEdit,
+                                thumbnailUrl = if (node.isDirectory) null else fileInfoViewModel.thumbnailFor(node),
+                                shareUrl = if (node.isDirectory) null else fileInfoViewModel.shareUrlFor(node),
+                                onOpen = { onOpen(node) },
+                                onToggleSelection = {
+                                    selectedKeys = if (node.key in selectedKeys) selectedKeys - node.key else selectedKeys + node.key
+                                },
+                                onLongClick = { startSelecting(node.key) },
+                                onDownload = { fileInfoViewModel.initiateDownloadFile(node) },
+                                onSelect = { startSelecting(node.key) },
+                                onRename = { entryToRename = node },
+                                onMove = { entryToMove = node },
+                                onDelete = { if (mode == BrowserMode.FILESYSTEM) entryToDelete = node else actionRequest = FileActionRequest.Delete(listOf(node)) },
+                                onAddToFilesystem = { actionRequest = FileActionRequest.AddToFilesystem(listOf(node)) },
+                                onAddToList = { actionRequest = FileActionRequest.AddToList(listOf(node)) },
+                                onRemoveFromList = { openedList?.let { actionRequest = FileActionRequest.RemoveFromList(listOf(node), it, entries.size) } },
+                                // Lists have web links only on Pixeldrain; other hosts' lists are not on pixeldrain.com
+                                pixeldrainLinks = activeKind == ProviderKind.PIXELDRAIN,
+                                onCopyLink = { url -> copyLinkToClipboard(context, url) },
+                                onShareLink = { url -> shareLink(context, url) }
+                            )
+                            HorizontalDivider(
+                                thickness = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            )
+                        }
                     }
+                    DotScrollbar(state = scrollState)
                 }
             }
             }
