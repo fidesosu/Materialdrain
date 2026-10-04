@@ -1,6 +1,5 @@
 package tools.senko.materialdrain.ui.components
 
-import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -24,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,9 +34,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import tools.senko.materialdrain.ui.media.HostRequestAuth
 import tools.senko.materialdrain.util.formatSize
-
-private const val TAG_FILE_LIST_ITEM = "FileListItem"
 
 /**
  * A row of a file or folder. This is a plain row instead of a Material ListItem, whose trailing area
@@ -51,7 +50,6 @@ fun FileListItem(
     modified: String? = null,
     mimeType: String? = null,
     thumbnailUrl: String? = null,
-    apiKey: String = "",
     trailingContent: (@Composable () -> Unit)? = null,
     selectionMode: Boolean = false,
     selected: Boolean = false,
@@ -81,17 +79,19 @@ fun FileListItem(
             }
 
             thumbnailUrl != null -> {
-                val requestBuilder = ImageRequest.Builder(LocalContext.current)
-                    .data(thumbnailUrl)
-                    .crossfade(true)
-
-                if (thumbnailUrl.contains("pixeldrain.com/api/filesystem") && apiKey.isNotBlank()) {
-                    requestBuilder.addHeader("Cookie", "pd_auth_key=$apiKey")
-                    Log.d(TAG_FILE_LIST_ITEM, "Adding auth header for $thumbnailUrl")
+                val context = LocalContext.current
+                // Built once per URL and login: a new request on every recomposition makes Coil load the thumbnail again
+                val headers = HostRequestAuth.headersFor(thumbnailUrl)
+                val request = remember(thumbnailUrl, headers) {
+                    ImageRequest.Builder(context)
+                        .data(thumbnailUrl)
+                        .crossfade(true)
+                        .apply { headers.forEach { (name, value) -> addHeader(name, value) } }
+                        .build()
                 }
 
                 AsyncImage(
-                    model = requestBuilder.build(),
+                    model = request,
                     contentDescription = "$name thumbnail",
                     contentScale = ContentScale.Crop,
                     modifier = iconModifier,

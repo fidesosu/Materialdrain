@@ -2,39 +2,43 @@
 agp = "9.4.1"
 coilCompose = "2.7.0"
 coilGif = "2.7.0"
-coreSplashscreen = "1.0.1"
+coreSplashscreen = "1.2.0"
 kotlin = "2.2.20"
-kotlinComposeCompiler = "2.2.20" # Added for Compose Compiler compatibility
-kotlinSerialization = "2.2.20"
-coreKtx = "1.17.0"
+kotlinComposeCompiler = "2.4.20" # Added for Compose Compiler compatibility
+kotlinSerialization = "2.4.20"
+coreKtx = "1.19.1"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
-kotlinxSerializationJson = "1.6.3"
-ktorClientAuth = "3.3.0"
-ktorClientCio = "3.3.0"
-ktorClientContentNegotiation = "3.3.0"
-ktorClientCore = "3.3.0"
-ktorClientLogging = "3.3.0"
-ktorClientOkhttp = "3.3.0"
-ktorSerializationKotlinxJson = "3.3.0"
-lifecycleRuntimeKtx = "2.9.4"
-activityCompose = "1.11.0"
-composeBom = "2026.03.01"
+kotlinxSerializationJson = "1.11.0"
+ktorClientAuth = "3.6.0"
+ktorClientCio = "3.6.0"
+ktorClientContentNegotiation = "3.6.0"
+ktorClientCore = "3.6.0"
+ktorClientLogging = "3.6.0"
+ktorClientOkhttp = "3.6.0"
+ktorSerializationKotlinxJson = "3.6.0"
+lifecycleRuntimeKtx = "2.11.0"
+activityCompose = "1.13.0"
+composeBom = "2026.09.00"
 materialIconsExtended = "1.7.8"
-googleMaterial = "1.13.0"
-media3Exoplayer = "1.8.0"
-okhttp = "5.1.0"
+biometric = "1.1.0"
+googleMaterial = "1.14.0"
+media3Exoplayer = "1.11.1"
+okhttp = "5.5.0"
 coreKtxVersion = "1.19.1"
+profileinstaller = "1.4.1"
 
 [libraries]
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
+androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
 androidx-media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3Exoplayer" }
 androidx-media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3Exoplayer" }
 androidx-media3-datasource-okhttp = { module = "androidx.media3:media3-datasource-okhttp", version.ref = "media3Exoplayer" }
+androidx-profileinstaller = { module = "androidx.profileinstaller:profileinstaller", version.ref = "profileinstaller" }
 coil-gif = { module = "io.coil-kt:coil-gif", version.ref = "coilGif" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -65,5 +69,6 @@ core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtxV
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlinComposeCompiler" } # Updated to use specific compiler version
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlinSerialization" } # Or your kotlin version

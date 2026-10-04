@@ -11,10 +11,10 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import tools.senko.materialdrain.api.ApiResponse
-import tools.senko.materialdrain.api.FileUploadResponse
-import tools.senko.materialdrain.api.LoginResult
-import tools.senko.materialdrain.api.PixeldrainUserApi
+import tools.senko.materialdrain.provider.pixeldrain.internal.ApiResponse
+import tools.senko.materialdrain.provider.pixeldrain.internal.FileUploadResponse
+import tools.senko.materialdrain.provider.pixeldrain.internal.LoginResult
+import tools.senko.materialdrain.provider.pixeldrain.internal.PixeldrainUserApi
 import tools.senko.materialdrain.auth.ApiKeySource
 import tools.senko.materialdrain.auth.SessionManager
 
@@ -114,10 +114,6 @@ class AuthViewModel(
             }
             _apiKeyChanged.tryEmit(Unit)
         }
-    }
-
-    fun clearMessages() {
-        _uiState.update { it.copy(errorMessage = null, infoMessage = null) }
     }
 
     /** Called when the manually entered API key was saved, so that the source shown in the UI is current. */

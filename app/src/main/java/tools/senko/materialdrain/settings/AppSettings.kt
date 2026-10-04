@@ -1,18 +1,29 @@
 package tools.senko.materialdrain.settings
 
 import android.content.Context
+import androidx.biometric.BiometricManager
+import tools.senko.materialdrain.auth.LOCK_AUTHENTICATORS
 import android.provider.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import androidx.core.content.edit
-import tools.senko.materialdrain.api.FilesystemEntry
+import tools.senko.materialdrain.files.SortableField
+import tools.senko.materialdrain.navmenu.NavFabPosition
+import tools.senko.materialdrain.navmenu.NavMenuPreview
+import tools.senko.materialdrain.provider.api.StorageNode
 
 private const val PREFS_NAME = "pixeldrain_prefs"
 private const val HIDE_SEARCH_INDEX_PREF = "hide_search_index"
 private const val REDUCE_ANIMATIONS_PREF = "reduce_animations"
 private const val BLURRED_BACKDROP_PREF = "blurred_backdrop"
 private const val LOOP_VIDEOS_PREF = "loop_videos"
+private const val NAV_PROTOTYPE_PREF = "dev_nav_prototype"
+private const val NAV_MENU_PREVIEW_PREF = "dev_nav_menu_preview"
+private const val NAV_FAB_POSITION_PREF = "nav_fab_position"
+private const val FILES_SORT_FIELD_PREF = "files_sort_field"
+private const val FILES_SORT_ASCENDING_PREF = "files_sort_ascending"
+private const val BIOMETRIC_LOCK_PREF = "biometric_lock"
 
 /** Pixeldrain keeps the paths of the files of a filesystem in this file, it is re-created when removed. */
 const val SEARCH_INDEX_FILE_NAME = ".search_index.gz"
@@ -21,7 +32,7 @@ const val SEARCH_INDEX_DELETE_WARNING =
     "$SEARCH_INDEX_FILE_NAME is used by Pixeldrain itself to store the paths of your files. " +
         "Almost nobody has a reason to delete it, and Pixeldrain will re-create it after a while anyway."
 
-fun FilesystemEntry.isSearchIndex(): Boolean = type == "file" && name == SEARCH_INDEX_FILE_NAME
+fun StorageNode.isSearchIndex(): Boolean = !isDirectory && name == SEARCH_INDEX_FILE_NAME
 
 class AppSettings(context: Context) {
 
@@ -63,6 +74,59 @@ class AppSettings(context: Context) {
         prefs.edit { putBoolean(LOOP_VIDEOS_PREF, loop) }
         _loopVideos.value = loop
     }
+
+    private val _navPrototype = MutableStateFlow(prefs.getBoolean(NAV_PROTOTYPE_PREF, false))
+    /** Developer setting: the FAB navigation prototype replaces the drawer. Off by default. */
+    val navPrototype: StateFlow<Boolean> = _navPrototype.asStateFlow()
+
+    fun setNavPrototype(enabled: Boolean) {
+        prefs.edit { putBoolean(NAV_PROTOTYPE_PREF, enabled) }
+        _navPrototype.value = enabled
+    }
+
+    private val _navMenuPreview = MutableStateFlow(enumPref(NAV_MENU_PREVIEW_PREF, NavMenuPreview.PIXELDRAIN))
+    /** Developer setting: which provider's menu the FAB navigation prototype shows. */
+    val navMenuPreview: StateFlow<NavMenuPreview> = _navMenuPreview.asStateFlow()
+
+    fun setNavMenuPreview(preview: NavMenuPreview) {
+        prefs.edit { putString(NAV_MENU_PREVIEW_PREF, preview.name) }
+        _navMenuPreview.value = preview
+    }
+
+    private val _navFabPosition = MutableStateFlow(enumPref(NAV_FAB_POSITION_PREF, NavFabPosition.END))
+    /** Where the navigation FAB sits, changed by swiping the FAB sideways. */
+    val navFabPosition: StateFlow<NavFabPosition> = _navFabPosition.asStateFlow()
+
+    fun setNavFabPosition(position: NavFabPosition) {
+        prefs.edit { putString(NAV_FAB_POSITION_PREF, position.name) }
+        _navFabPosition.value = position
+    }
+
+    /** The field the Files screen is sorted by, kept across restarts. */
+    var filesSortField: SortableField
+        get() = enumPref(FILES_SORT_FIELD_PREF, SortableField.NAME)
+        set(value) = prefs.edit { putString(FILES_SORT_FIELD_PREF, value.name) }
+
+    /** The direction of the sorting of the Files screen, kept across restarts. */
+    var filesSortAscending: Boolean
+        get() = prefs.getBoolean(FILES_SORT_ASCENDING_PREF, true)
+        set(value) = prefs.edit { putBoolean(FILES_SORT_ASCENDING_PREF, value) }
+
+    private val _biometricLock = MutableStateFlow(prefs.getBoolean(BIOMETRIC_LOCK_PREF, false))
+    /** Asks for the fingerprint, face or screen lock when the app is opened again, see AppLock. Off by default. */
+    val biometricLock: StateFlow<Boolean> = _biometricLock.asStateFlow()
+
+    fun setBiometricLock(enabled: Boolean) {
+        prefs.edit { putBoolean(BIOMETRIC_LOCK_PREF, enabled) }
+        _biometricLock.value = enabled
+    }
+
+    /** Whether this device has a fingerprint, face or screen lock to ask for. */
+    fun biometricLockAvailable(): Boolean =
+        BiometricManager.from(appContext).canAuthenticate(LOCK_AUTHENTICATORS) == BiometricManager.BIOMETRIC_SUCCESS
+
+    private inline fun <reified T : Enum<T>> enumPref(key: String, default: T): T =
+        prefs.getString(key, null)?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: default
 
     /** True when animations are turned off in the Android settings ("Remove animations" / animator scale 0). */
     fun systemAnimationsDisabled(): Boolean =

@@ -7,6 +7,7 @@ import tools.senko.materialdrain.files.FileInfoViewModel
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
 import tools.senko.materialdrain.lists.ListViewModel
 import tools.senko.materialdrain.preferences.AuthViewModel
+import tools.senko.materialdrain.preferences.ProviderSettingsViewModel
 import tools.senko.materialdrain.upload.UploadViewModel
 
 class ViewModelFactory(
@@ -17,19 +18,22 @@ class ViewModelFactory(
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(UploadViewModel::class.java)) {
-            return UploadViewModel(application, container.coreApi, container.sessionManager, container.transferRegistry) as T
+            return UploadViewModel(application, container.providerRegistry, container.providerConfigStore, container.sessionManager, container.transferRegistry) as T
         }
         if (modelClass.isAssignableFrom(FileInfoViewModel::class.java)) {
-            return FileInfoViewModel(application, container.coreApi, container.userApi, container.filesystemApi, container.sessionManager, container.transferRegistry) as T
+            return FileInfoViewModel(application, container.providerRegistry, container.providerConfigStore, container.sessionManager, container.transferRegistry, container.appSettings) as T
         }
         if (modelClass.isAssignableFrom(FilesystemViewModel::class.java)) {
-            return FilesystemViewModel(application, container.filesystemApi, container.sessionManager, container.transferRegistry, container.appSettings) as T
+            return FilesystemViewModel(application, container.providerRegistry, container.providerConfigStore, container.sessionManager, container.transferRegistry, container.appSettings) as T
         }
         if (modelClass.isAssignableFrom(ListViewModel::class.java)) {
-            return ListViewModel(container.coreApi, container.userApi, container.sessionManager) as T
+            return ListViewModel(container.providerRegistry, container.providerConfigStore, container.sessionManager) as T
         }
         if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
             return AuthViewModel(container.userApi, container.sessionManager) as T
+        }
+        if (modelClass.isAssignableFrom(ProviderSettingsViewModel::class.java)) {
+            return ProviderSettingsViewModel(container.providerConfigStore, container.providerRegistry, container.providerUpdater) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: " + modelClass.name)
     }

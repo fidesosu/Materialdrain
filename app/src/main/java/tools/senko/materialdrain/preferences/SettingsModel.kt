@@ -13,7 +13,8 @@ class SettingsEnvironment(
     val appSettings: AppSettings,
     val authViewModel: AuthViewModel,
     val apiKeyInput: String,
-    val onApiKeyInputChange: (String) -> Unit
+    val onApiKeyInputChange: (String) -> Unit,
+    val providerSettingsViewModel: ProviderSettingsViewModel
 )
 
 /** One entry of a settings category. The kinds of entries are rendered by `SettingsCategoryPage`. */

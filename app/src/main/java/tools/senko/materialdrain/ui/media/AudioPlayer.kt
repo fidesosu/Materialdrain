@@ -108,7 +108,7 @@ fun AudioPlayerPreview(
                         }
                         is Uri, is String -> {
                             val artRequest = remember(albumArtSource, apiKey) {
-                                imageRequest(context, albumArtSource, apiKey) { crossfade(true) }
+                                imageRequest(context, albumArtSource) { crossfade(true) }
                             }
                             AsyncImage(
                                 model = artRequest,

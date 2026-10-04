@@ -1,0 +1,14 @@
+{
+  "kind": "s3",
+  "name": "MinIO",
+  "endpoint": "https://nas.example.com:9000",
+  "region": "us-east-1",
+  "bucket": "materialdrain",
+  "path_style": true,
+  "prefix": "",
+  "meta": {
+    "id": "tools.senko.materialdrain.examples.minio",
+    "version": 1,
+    "author": "Materialdrain"
+  }
+}

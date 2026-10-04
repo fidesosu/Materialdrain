@@ -10,17 +10,24 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import tools.senko.materialdrain.api.ApiResponse
-import tools.senko.materialdrain.api.FileUploadResponse
-import tools.senko.materialdrain.api.FilesystemEntry
-import tools.senko.materialdrain.api.FilesystemPermissions
-import tools.senko.materialdrain.api.PixeldrainFilesystemApi
 import tools.senko.materialdrain.auth.SessionManager
+import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
+import tools.senko.materialdrain.provider.ProviderConfigStore
+import tools.senko.materialdrain.provider.ProviderRegistry
+import tools.senko.materialdrain.provider.api.ApiResponse
+import tools.senko.materialdrain.provider.forDisplay
+import tools.senko.materialdrain.provider.api.BrowseOps
+import tools.senko.materialdrain.provider.api.ProviderError
+import tools.senko.materialdrain.provider.api.ProviderKind
+import tools.senko.materialdrain.provider.api.ProviderLog
+import tools.senko.materialdrain.provider.api.StorageNode
+import tools.senko.materialdrain.provider.api.StorageProvider
 import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.settings.isSearchIndex
 import tools.senko.materialdrain.transfer.TransferInfo
@@ -35,14 +42,17 @@ private const val TAG_FS_VM = "FilesystemViewModel"
 const val FILESYSTEM_ROOT_PATH = "me"
 
 data class FilesystemUiState(
+    val hostName: String = "",
     val isLoading: Boolean = false,
-    val currentPath: String = FILESYSTEM_ROOT_PATH,
-    val pathSegments: List<PathSegment> = listOf(PathSegment(FILESYSTEM_ROOT_PATH, FILESYSTEM_ROOT_PATH)), // Name and full path for breadcrumbs
-    val children: List<FilesystemEntry> = emptyList(),
-    val permissions: FilesystemPermissions? = null, // Permissions on the current directory
+    val currentPath: String = "",
+    val pathSegments: List<PathSegment> = emptyList(), // Name and full path for breadcrumbs
+    val children: List<StorageNode> = emptyList(),
+    val canWrite: Boolean = false,
+    val canDelete: Boolean = false,
+    val canImport: Boolean = false,
     val errorMessage: String? = null,
     val apiKeyMissingError: Boolean = false,
-    val apiKey: String = "", // Exposed API Key
+    val apiKey: String = "", // Exposed API Key, only the built-in Pixeldrain needs it
 
     // Modifications (create folder, rename, move, delete, import)
     val isModifying: Boolean = false,
@@ -57,11 +67,8 @@ data class FilesystemUiState(
     val hideSearchIndex: Boolean = true
 ) {
     /** [children] without the entries which are hidden by the settings. */
-    val visibleChildren: List<FilesystemEntry>
+    val visibleChildren: List<StorageNode>
         get() = if (hideSearchIndex) children.filterNot { it.isSearchIndex() } else children
-
-    val canWrite: Boolean get() = permissions?.write == true
-    val canDelete: Boolean get() = permissions?.delete == true
 }
 
 data class PathSegment(
@@ -83,12 +90,15 @@ data class FilesystemUploadProgress(
     val etaSeconds: Long? = null
 )
 
-/** "/me/photos/" -> "me/photos"; blank -> "me". */
-private fun normalizeFsPath(path: String): String = path.trim().trim('/').ifEmpty { FILESYSTEM_ROOT_PATH }
-
+/**
+ * The universal file browser: folders, files, upload, rename, move, delete, for whichever provider is
+ * active. Everything goes through [StorageProvider.browse], so a host with the BROWSE capability shows here
+ * with the actions its capabilities and permissions allow.
+ */
 class FilesystemViewModel(
     private val application: Application,
-    private val filesystemApi: PixeldrainFilesystemApi,
+    private val registry: ProviderRegistry,
+    private val configStore: ProviderConfigStore,
     private val sessionManager: SessionManager,
     private val transfers: TransferRegistry,
     private val appSettings: AppSettings
@@ -97,169 +107,137 @@ class FilesystemViewModel(
     private val _uiState = MutableStateFlow(FilesystemUiState())
     val uiState: StateFlow<FilesystemUiState> = _uiState.asStateFlow()
 
-    private var internalApiKey: String = ""
     private var uploadJob: Job? = null
     private val speedTracker = TransferSpeedTracker()
     private var nextTransferNumber = 0
 
     init {
-        Log.d(TAG_FS_VM, "ViewModel init. Loading API Key and initial path.")
         viewModelScope.launch {
             appSettings.hideSearchIndex.collect { hide -> _uiState.update { it.copy(hideSearchIndex = hide) } }
         }
-        loadApiKeyAndFetchCurrentPath()
+        Log.d(TAG_FS_VM, "ViewModel init. Loading the active provider and its root.")
+        loadActiveProviderAndRoot()
+        viewModelScope.launch {
+            // Choosing another host as the active one re-roots the screen on it
+            configStore.changes.drop(1).collect { loadActiveProviderAndRoot() }
+        }
     }
 
-    private fun loadApiKeyAndFetchCurrentPath() {
-        internalApiKey = sessionManager.currentApiKey()
-        Log.d(TAG_FS_VM, "API Key loaded: '${if (internalApiKey.isNotBlank()) "PRESENT" else "MISSING"}'")
+    private fun activeProvider(): StorageProvider = registry.resolve(configStore.activeProviderId.value)
 
-        if (internalApiKey.isBlank()) {
-            _uiState.update {
-                it.copy(
-                    apiKey = "",
-                    apiKeyMissingError = true,
-                    errorMessage = "API Key is missing. Please set it in Settings to browse the filesystem.",
-                    isLoading = false
-                )
-            }
-        } else {
-            _uiState.update {
-                it.copy(
-                    apiKey = internalApiKey,
-                    apiKeyMissingError = false,
-                    errorMessage = null
-                )
-            }
-            fetchPathContent(uiState.value.currentPath)
+    /** The root of the active provider, as the provider declares it (Pixeldrain's "me" bucket, a config's browse_root). */
+    private fun rootPath(provider: StorageProvider): String = provider.rootPath
+
+    private fun loadActiveProviderAndRoot() {
+        val provider = activeProvider()
+        val apiKey = if (provider.kind == ProviderKind.PIXELDRAIN) sessionManager.currentApiKey() else ""
+        _uiState.update {
+            it.copy(
+                hostName = provider.displayName,
+                apiKey = apiKey,
+                apiKeyMissingError = provider.kind == ProviderKind.PIXELDRAIN && apiKey.isBlank(),
+                errorMessage = if (provider.kind == ProviderKind.PIXELDRAIN && apiKey.isBlank()) API_KEY_MISSING else null,
+                canWrite = false,
+                canDelete = false
+            )
+        }
+        if (provider.browse == null) {
+            _uiState.update { it.copy(isLoading = false, errorMessage = "This host can't browse files.") }
+        } else if (provider.kind != ProviderKind.PIXELDRAIN || sessionManager.currentApiKey().isNotBlank()) {
+            fetchPathContent(rootPath(provider))
         }
     }
 
     fun refreshCurrentPath() {
-        if (internalApiKey.isBlank()) {
-            _uiState.update {
-                it.copy(
-                    apiKeyMissingError = true,
-                    errorMessage = "API Key is missing. Please set it in Settings to browse the filesystem.",
-                    isLoading = false,
-                    children = emptyList()
-                )
-            }
+        val provider = activeProvider()
+        if (provider.kind == ProviderKind.PIXELDRAIN && sessionManager.currentApiKey().isBlank()) {
+            _uiState.update { it.copy(apiKeyMissingError = true, errorMessage = API_KEY_MISSING, isLoading = false, children = emptyList()) }
             return
         }
-        _uiState.update { it.copy(apiKey = internalApiKey, apiKeyMissingError = false, errorMessage = null) }
         fetchPathContent(uiState.value.currentPath)
     }
 
     /** Called after the API key changed (settings saved, logged in or out). */
     fun updateApiKey() {
-        val oldApiKey = internalApiKey
-        internalApiKey = sessionManager.currentApiKey()
-        Log.d(TAG_FS_VM, "API Key updated. New Key: '${if (internalApiKey.isNotBlank()) "PRESENT" else "MISSING"}'")
-
-        if (internalApiKey.isNotBlank()) {
-            _uiState.update {
-                it.copy(
-                    apiKey = internalApiKey,
-                    apiKeyMissingError = false,
-                    errorMessage = if (oldApiKey.isBlank()) null else it.errorMessage
-                )
-            }
-            if (internalApiKey != oldApiKey) {
-                // Another account may have a different directory structure
-                _uiState.update { it.copy(children = emptyList(), permissions = null) }
-                fetchPathContent(FILESYSTEM_ROOT_PATH)
-            }
-        } else {
-            _uiState.update {
-                it.copy(
-                    apiKey = "",
-                    apiKeyMissingError = true,
-                    errorMessage = "API Key is missing. Please set it in Settings.",
-                    isLoading = false,
-                    children = emptyList(),
-                    permissions = null
-                )
-            }
-        }
+        loadActiveProviderAndRoot()
     }
 
+    private fun normalizePath(path: String, root: String): String = path.trim('/').ifEmpty { root }
+
     private fun generatePathSegments(fullPath: String): List<PathSegment> {
+        if (fullPath.isEmpty()) return emptyList()
         var built = ""
-        return normalizeFsPath(fullPath).split('/').map { name ->
+        return fullPath.split('/').filter { it.isNotEmpty() }.map { name ->
             built = if (built.isEmpty()) name else "$built/$name"
             PathSegment(name, built)
         }
     }
 
     fun fetchPathContent(path: String) {
-        val currentApiKey = uiState.value.apiKey
-        val normalizedPath = normalizeFsPath(path)
-        if (currentApiKey.isBlank()) {
-            Log.w(TAG_FS_VM, "fetchPathContent called with blank API key for path: $normalizedPath")
-            _uiState.update {
-                it.copy(
-                    apiKeyMissingError = true,
-                    errorMessage = "API Key is missing. Please set it in Settings.",
-                    isLoading = false,
-                    children = emptyList()
-                )
-            }
+        val provider = activeProvider()
+        val browse = provider.browse ?: run {
+            _uiState.update { it.copy(isLoading = false, errorMessage = "This host can't browse files.") }
             return
         }
-
+        val normalized = normalizePath(path, rootPath(provider))
+        ProviderLog.d("Filesystem", "listing '$normalized' on '${provider.displayName}' (${provider.kind})")
         _uiState.update { it.copy(isLoading = true, errorMessage = null, apiKeyMissingError = false) }
         viewModelScope.launch {
-            Log.d(TAG_FS_VM, "Fetching content for path: $normalizedPath with API key.")
-            when (val response = filesystemApi.getFilesystemPath(currentApiKey, normalizedPath)) {
+            when (val response = browse.list(normalized)) {
                 is ApiResponse.Success -> {
                     val sortedChildren = response.data.children.sortedWith(
-                        compareBy<FilesystemEntry> { it.type != "dir" }
-                        .thenByDescending { it.modified }
-                        .thenBy { it.name.lowercase() }
+                        compareBy<StorageNode> { !it.isDirectory }
+                            .thenBy { it.name.lowercase() }
                     )
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            currentPath = normalizedPath,
-                            pathSegments = generatePathSegments(normalizedPath),
+                            currentPath = normalized,
+                            pathSegments = generatePathSegments(normalized),
                             children = sortedChildren,
-                            permissions = response.data.permissions,
+                            canWrite = response.data.canWrite,
+                            canDelete = response.data.canDelete,
+                            canImport = provider.kind == ProviderKind.PIXELDRAIN,
                             errorMessage = null
                         )
                     }
-                    Log.d(TAG_FS_VM, "Successfully fetched ${response.data.children.size} children for path: $normalizedPath")
                 }
                 is ApiResponse.Error -> {
-                    Log.e(TAG_FS_VM, "Error fetching path '$normalizedPath': ${response.errorDetails.message ?: response.errorDetails.value}")
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = response.errorDetails.message ?: response.errorDetails.value ?: "Unknown error fetching filesystem."
-                        )
-                    }
+                    ProviderLog.e("Filesystem", "listing '$normalized' failed (${response.error.code}): ${response.error.message}")
+                    _uiState.update { it.copy(isLoading = false, errorMessage = response.error.forDisplay()) }
                 }
             }
         }
     }
 
-    fun navigateToChild(childEntry: FilesystemEntry) {
-        if (childEntry.type == "dir") {
-            fetchPathContent(childEntry.path)
-        }
+    /** The preview image of a node, from the active provider; null when it has none. */
+    fun thumbnailFor(node: StorageNode): String? = activeProvider().thumbnailUrl(node)
+
+    fun navigateToChild(node: StorageNode) {
+        if (node.isDirectory) fetchPathContent(node.ref.path)
     }
 
     fun navigateToPathSegment(segment: PathSegment) {
         fetchPathContent(segment.fullPath)
     }
 
+    /** The folder above the current one, or null when the current one is the top of the host. */
+    private fun parentPath(): String? {
+        val current = normalizePath(uiState.value.currentPath, rootPath(activeProvider()))
+        val parent = current.substringBeforeLast('/', "")
+        return if (parent.isEmpty() || parent == current) null else parent
+    }
+
+    /** Whether there is a folder above the current one (false at the top of the host). */
+    fun canNavigateToParent(): Boolean = parentPath() != null
+
     fun navigateToParentPath(): Boolean {
-        val parentPath = normalizeFsPath(uiState.value.currentPath).substringBeforeLast('/', "")
-        if (parentPath.isEmpty()) {
+        val parent = parentPath()
+        if (parent == null) {
             Log.d(TAG_FS_VM, "Already at root. Cannot navigate to parent.")
             return false
         }
-        fetchPathContent(parentPath)
+        fetchPathContent(parent)
         return true
     }
 
@@ -271,78 +249,72 @@ class FilesystemViewModel(
             reportOperationError("A folder name can't be empty or contain a slash.")
             return
         }
-        runModification { apiKey, dir -> filesystemApi.createDirectory(apiKey, "$dir/$folderName") }
+        runModification { browse -> browse?.createDirectory(joinPath(currentDir(), folderName), makeParents = false) ?: notBrowsable() }
     }
 
-    fun renameEntry(entry: FilesystemEntry, newName: String) {
+    fun renameEntry(entry: StorageNode, newName: String) {
         val name = newName.trim()
         if (!isValidNodeName(name)) {
             reportOperationError("A name can't be empty or contain a slash.")
             return
         }
         if (name == entry.name) return
-        val parent = normalizeFsPath(entry.path).substringBeforeLast('/', FILESYSTEM_ROOT_PATH)
-        runModification { apiKey, _ -> filesystemApi.renameNode(apiKey, entry.path, "$parent/$name") }
+        val parent = entry.ref.path.trim('/').substringBeforeLast('/', "")
+        runModification { browse -> browse?.rename(entry.ref.path, joinPath(parent, name), makeParents = false)?.discard() ?: notBrowsable() }
     }
 
-    fun moveEntry(entry: FilesystemEntry, destinationDirectory: String) {
-        val destination = normalizeFsPath(destinationDirectory)
-        val source = normalizeFsPath(entry.path)
+    fun moveEntry(entry: StorageNode, destinationDirectory: String) {
+        val destination = normalizePath(destinationDirectory, rootPath(activeProvider()))
+        val source = entry.ref.path.trim('/')
         if (destination == source || destination.startsWith("$source/")) {
             reportOperationError("A folder can't be moved into itself.")
             return
         }
         if (destination == source.substringBeforeLast('/', "")) return // already there
-        runModification { apiKey, _ -> filesystemApi.renameNode(apiKey, entry.path, "$destination/${entry.name}") }
+        runModification { browse -> browse?.rename(entry.ref.path, joinPath(destination, entry.name), makeParents = false)?.discard() ?: notBrowsable() }
     }
 
-    fun deleteEntry(entry: FilesystemEntry) {
+    fun deleteEntry(entry: StorageNode) {
         // Deleting a folder always removes what is inside it, the UI asks for confirmation first
-        runModification { apiKey, _ -> filesystemApi.deleteNode(apiKey, entry.path, recursive = entry.type == "dir") }
+        runModification { browse -> browse?.delete(entry.ref.path, recursive = entry.isDirectory) ?: notBrowsable() }
     }
 
-    /** There is no endpoint to delete several nodes, so this deletes them one by one (folders with their contents). */
-    fun deleteEntries(entries: List<FilesystemEntry>) {
-        runBulkModification(entries, "deleted") { apiKey, entry ->
-            filesystemApi.deleteNode(apiKey, entry.path, recursive = entry.type == "dir")
-        }
+    /** There is no endpoint to delete several nodes everywhere, so this deletes them one by one. */
+    fun deleteEntries(entries: List<StorageNode>) {
+        runBulkModification(entries, "deleted") { browse, entry -> browse.delete(entry.ref.path, recursive = entry.isDirectory) }
     }
 
-    fun moveEntries(entries: List<FilesystemEntry>, destinationDirectory: String) {
-        val destination = normalizeFsPath(destinationDirectory)
-        runBulkModification(entries, "moved") { apiKey, entry ->
-            val source = normalizeFsPath(entry.path)
+    fun moveEntries(entries: List<StorageNode>, destinationDirectory: String) {
+        val destination = normalizePath(destinationDirectory, rootPath(activeProvider()))
+        runBulkModification(entries, "moved") { browse, entry ->
+            val source = entry.ref.path.trim('/')
             when {
                 destination == source || destination.startsWith("$source/") ->
-                    ApiResponse.Error(FileUploadResponse(success = false, value = "circular_dependency"))
+                    ApiResponse.Error(ProviderError("circular_dependency", "A folder can't be moved into itself."))
                 destination == source.substringBeforeLast('/', "") ->
-                    ApiResponse.Success(FileUploadResponse(success = true, value = "ok")) // already in that folder
-                else -> filesystemApi.renameNode(apiKey, entry.path, "$destination/${entry.name}")
+                    ApiResponse.Success(Unit) // already in that folder
+                else -> browse.rename(entry.ref.path, joinPath(destination, entry.name), makeParents = false).discard()
             }
         }
     }
 
     private fun runBulkModification(
-        entries: List<FilesystemEntry>,
+        entries: List<StorageNode>,
         pastTense: String,
-        operation: suspend (apiKey: String, entry: FilesystemEntry) -> ApiResponse<FileUploadResponse>
+        operation: suspend (browse: BrowseOps, entry: StorageNode) -> ApiResponse<Unit>
     ) {
         if (entries.isEmpty()) return
-        val apiKey = internalApiKey
-        if (apiKey.isBlank()) {
-            reportOperationError("API Key is missing. Please set it in Settings.")
-            return
-        }
+        val browse = activeProvider().browse ?: return
         if (_uiState.value.isModifying) return
-        val dir = normalizeFsPath(_uiState.value.currentPath)
+        val dir = currentDir()
         _uiState.update { it.copy(isModifying = true, operationMessage = null, operationError = null) }
         viewModelScope.launch {
             var succeeded = 0
             val failures = mutableListOf<String>()
             for (entry in entries) {
-                when (val response = operation(apiKey, entry)) {
+                when (val response = operation(browse, entry)) {
                     is ApiResponse.Success -> succeeded++
-                    is ApiResponse.Error -> failures.add("${entry.name}: ${describeError(response.errorDetails)}")
+                    is ApiResponse.Error -> failures.add("${entry.name}: ${describeError(response.error)}")
                 }
             }
             _uiState.update {
@@ -358,58 +330,61 @@ class FilesystemViewModel(
     }
 
     /** The folders inside [path], for the folder picker. */
-    suspend fun listSubdirectories(path: String): ApiResponse<List<FilesystemEntry>> {
-        val apiKey = internalApiKey
-        if (apiKey.isBlank()) {
-            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "API Key is missing. Please set it in Settings."))
-        }
-        return when (val response = filesystemApi.getFilesystemPath(apiKey, normalizeFsPath(path))) {
+    suspend fun listSubdirectories(path: String): ApiResponse<List<StorageNode>> {
+        val provider = activeProvider()
+        val browse = provider.browse ?: return ApiResponse.Error(ProviderError("not_browsable", "This host can't browse files."))
+        return when (val response = browse.list(normalizePath(path, rootPath(provider)))) {
             is ApiResponse.Success -> ApiResponse.Success(
-                response.data.children.filter { it.type == "dir" }.sortedBy { it.name.lowercase() }
+                response.data.children.filter { it.isDirectory }.sortedBy { it.name.lowercase() }
             )
-            is ApiResponse.Error -> ApiResponse.Error(response.errorDetails)
+            is ApiResponse.Error -> ApiResponse.Error(response.error)
         }
     }
 
+    /** Pixeldrain's import from the file list into a folder: the one action no other host has, so it goes through the built-in API. */
     fun importFilesById(fileIds: List<String>) {
         val ids = fileIds.map { it.trim() }.filter { it.isNotEmpty() }
         if (ids.isEmpty()) {
             reportOperationError("Enter at least one file ID.")
             return
         }
-        runModification { apiKey, dir -> filesystemApi.importFiles(apiKey, dir, ids) }
+        val dir = currentDir()
+        runModification { browse -> browse?.importFiles(dir, ids) ?: notBrowsable() }
     }
+
+    private fun currentDir(): String = normalizePath(_uiState.value.currentPath, rootPath(activeProvider()))
+
+    private fun joinPath(dir: String, name: String) = if (dir.isEmpty()) name else "$dir/$name"
 
     private fun isValidNodeName(name: String) = name.isNotEmpty() && !name.contains('/') && name != "." && name != ".."
 
-    private fun runModification(operation: suspend (apiKey: String, currentDir: String) -> ApiResponse<FileUploadResponse>) {
-        val apiKey = internalApiKey
-        if (apiKey.isBlank()) {
-            reportOperationError("API Key is missing. Please set it in Settings.")
-            return
-        }
+    private fun runModification(operation: suspend (browse: BrowseOps?) -> ApiResponse<Unit>) {
+        val browse = activeProvider().browse
         if (_uiState.value.isModifying) return
-        val dir = normalizeFsPath(_uiState.value.currentPath)
+        val dir = currentDir()
         _uiState.update { it.copy(isModifying = true, operationMessage = null, operationError = null) }
         viewModelScope.launch {
-            when (val response = operation(apiKey, dir)) {
-                is ApiResponse.Success -> {
-                    _uiState.update { it.copy(isModifying = false, operationMessage = response.data.message ?: "Done.") }
-                    fetchPathContent(dir)
-                }
-                is ApiResponse.Error -> {
-                    _uiState.update { it.copy(isModifying = false, operationError = describeError(response.errorDetails)) }
-                }
+            when (val response = operation(browse)) {
+                is ApiResponse.Success -> _uiState.update { it.copy(isModifying = false, operationMessage = "Done.") }
+                is ApiResponse.Error -> _uiState.update { it.copy(isModifying = false, operationError = describeError(response.error)) }
             }
+            fetchPathContent(dir)
         }
+    }
+
+    private fun notBrowsable(): ApiResponse<Unit> = ApiResponse.Error(ProviderError("not_browsable", "This host can't browse files."))
+
+    private fun <T> ApiResponse<T>.discard(): ApiResponse<Unit> = when (this) {
+        is ApiResponse.Success -> ApiResponse.Success(Unit)
+        is ApiResponse.Error -> this
     }
 
     private fun reportOperationError(message: String) {
         _uiState.update { it.copy(operationError = message) }
     }
 
-    private fun describeError(error: FileUploadResponse): String {
-        val hint = when (error.value) {
+    private fun describeError(error: ProviderError): String {
+        val hint = when (error.code) {
             "node_already_exists" -> "An item with this name already exists."
             "directory_not_empty" -> "The folder is not empty."
             "permission_denied" -> "You don't have permission to do this here."
@@ -421,7 +396,7 @@ class FilesystemViewModel(
             "list_file_not_found" -> "One of the file IDs does not exist."
             else -> null
         }
-        return hint ?: error.message ?: error.value ?: "Unknown error."
+        return hint ?: error.message.ifBlank { "Unknown error." }
     }
 
     fun clearOperationMessage() {
@@ -472,12 +447,8 @@ class FilesystemViewModel(
     }
 
     private fun startUpload(items: List<FilesystemUploadItem>) {
-        val apiKey = internalApiKey
-        if (apiKey.isBlank()) {
-            reportOperationError("API Key is missing. Please set it in Settings.")
-            return
-        }
-        val dir = normalizeFsPath(_uiState.value.currentPath)
+        val browse = activeProvider().browse ?: return
+        val dir = currentDir()
         val totalBytes = items.sumOf { it.sizeBytes ?: 0L }.takeIf { it > 0 && items.all { item -> item.sizeBytes != null } }
         speedTracker.reset()
         _uiState.update {
@@ -502,7 +473,7 @@ class FilesystemViewModel(
             var outcomeMessage: String? = null
             try {
                 items.forEachIndexed { index, item ->
-                    val response = filesystemApi.uploadFileFromUri(apiKey, "$dir/${item.name}", item.uri, application) { sent, _ ->
+                    val response = browse.upload(joinPath(dir, item.name), item.uri, application, makeParents = false) { sent, _ ->
                         val overall = completedBytes + sent
                         val speed = speedTracker.update(overall)
                         transfers.progress(transferId, overall, totalBytes, speed, estimateEtaSeconds(totalBytes, overall, speed))
@@ -523,7 +494,7 @@ class FilesystemViewModel(
                     completedBytes += item.sizeBytes ?: 0L
                     when (response) {
                         is ApiResponse.Success -> uploaded++
-                        is ApiResponse.Error -> failures.add("${item.name}: ${describeError(response.errorDetails)}")
+                        is ApiResponse.Error -> failures.add("${item.name}: ${describeError(response.error)}")
                     }
                 }
                 if (failures.isEmpty()) {
@@ -545,8 +516,12 @@ class FilesystemViewModel(
                 throw e
             } finally {
                 transfers.finish(transferId, outcome, outcomeMessage)
-                if (normalizeFsPath(_uiState.value.currentPath) == dir) fetchPathContent(dir)
+                if (currentDir() == dir) fetchPathContent(dir)
             }
         }
+    }
+
+    private companion object {
+        const val API_KEY_MISSING = "API Key is missing. Please set it in Settings to browse the filesystem."
     }
 }

@@ -15,7 +15,6 @@ enum class Screen(val title: String, @DrawableRes val iconResId: Int?) {
     Filesystem("Filesystem", R.drawable.icon_hard_drive_outlined),
     FileDetail("File Details", null), // Using null for now, direct usage for its icon
     Lists("Lists", R.drawable.icon_list),
-    ListDetail("List", null),
     Settings("Settings", R.drawable.icon_settings_outlined)
 }
 data class FabDetails(

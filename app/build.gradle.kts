@@ -21,17 +21,24 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("../materialdrain-release.jks")
+            storeFile = rootProject.file("materialdrain-release.jks")
             storePassword = System.getenv("KEYSTORE_PASSWORD")
             keyAlias = "materialdrain"
             keyPassword = System.getenv("KEY_PASSWORD")
         }
     }
 
+    // The example provider configs are bundled as assets (the Pixeldrain one is imported on first start)
+    sourceSets {
+        getByName("main") {
+            assets.srcDirs("../docs/provider-configs")
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -66,6 +73,12 @@ kotlin {
 
 dependencies {
 
+    implementation(project(":provider-api"))
+    implementation(project(":provider-pixeldrain"))
+    implementation(project(":provider-generic-rest"))
+    implementation(project(":provider-webdav"))
+    implementation(project(":provider-s3"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -75,6 +88,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.biometric)
     implementation(libs.androidx.compose.foundation) // This line is un-commented
     implementation(libs.androidx.lifecycle.viewmodel.compose) // Added ViewModel Compose
     implementation(libs.coil.compose) // Added Coil for image loading

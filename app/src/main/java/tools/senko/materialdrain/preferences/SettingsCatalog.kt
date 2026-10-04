@@ -7,9 +7,12 @@ import android.provider.Settings
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Accessibility
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.collectAsState
 import tools.senko.materialdrain.settings.SEARCH_INDEX_FILE_NAME
 import tools.senko.materialdrain.transfer.CHANNEL_TRANSFER_COMPLETE
@@ -118,6 +121,52 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                 onCheckedChange = { appSettings.setReduceAnimations(it) }
             ),
             SettingsItem.Note("Animations are also reduced when they are turned off in the Android settings.")
+        )
+    ),
+
+    SettingsCategory(
+        id = "security",
+        title = "Security",
+        summary = "Locking the app",
+        icon = Icons.Filled.Lock,
+        items = listOf(
+            SettingsItem.Toggle(
+                title = "Lock with fingerprint or face",
+                summary = "Asks for your fingerprint, face or screen lock each time the app is opened again, after it " +
+                    "was in the background for a while. Needs a fingerprint, face or screen lock set up on this device.",
+                isChecked = { appSettings.biometricLock.collectAsState().value },
+                onCheckedChange = { if (appSettings.biometricLockAvailable()) appSettings.setBiometricLock(it) }
+            )
+        )
+    ),
+
+    SettingsCategory(
+        id = "advanced",
+        title = "Advanced",
+        summary = "Custom host settings",
+        icon = Icons.Filled.Tune,
+        items = listOf(
+            SettingsItem.Header("Custom host settings"),
+            SettingsItem.Custom { ProviderHostsSection() }
+        )
+    ),
+
+    SettingsCategory(
+        id = "developer",
+        title = "Developer",
+        summary = "Prototypes and previews",
+        icon = Icons.Filled.Code,
+        items = listOf(
+            SettingsItem.Toggle(
+                title = "FAB navigation prototype",
+                summary = "Replaces the drawer with a navigation button at the bottom. Swipe the button sideways to " +
+                    "move it left, center or right. While this is on, the Upload and Save Settings buttons are hidden.",
+                isChecked = { appSettings.navPrototype.collectAsState().value },
+                onCheckedChange = { appSettings.setNavPrototype(it) }
+            ),
+            SettingsItem.Header("Preview navigation as"),
+            SettingsItem.Custom { NavMenuPreviewSection() },
+            SettingsItem.Note("Mock providers only show how their menu looks, their items don't open anything.")
         )
     )
 )

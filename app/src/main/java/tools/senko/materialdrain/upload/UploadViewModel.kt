@@ -33,8 +33,11 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStreamReader
-import tools.senko.materialdrain.api.FileUploadResponse
-import tools.senko.materialdrain.api.PixeldrainCoreApi
+import tools.senko.materialdrain.provider.ProviderConfigStore
+import tools.senko.materialdrain.provider.ProviderRegistry
+import tools.senko.materialdrain.provider.api.ApiResponse
+import tools.senko.materialdrain.provider.api.ProviderKind
+import tools.senko.materialdrain.provider.pixeldrain.internal.PixeldrainCoreApi
 import tools.senko.materialdrain.auth.SessionManager
 import tools.senko.materialdrain.transfer.TransferInfo
 import tools.senko.materialdrain.transfer.TransferKind
@@ -68,7 +71,7 @@ data class UploadItem(
 
 data class UploadUiState(
     val isLoading: Boolean = false,
-    val uploadResult: FileUploadResponse? = null,
+    val uploadResult: UploadResult? = null,
     val errorMessage: String? = null,
     val selectedFileName: String? = null,
     val uploadTotalSizeBytes: Long? = null,
@@ -173,12 +176,39 @@ data class UploadUiState(
     }
 }
 
+/** The outcome of one upload, the same for every host. */
+data class UploadResult(val success: Boolean, val id: String? = null, val message: String? = null)
+
 class UploadViewModel(
     private val application: Application,
-    private val coreApi: PixeldrainCoreApi,
+    private val registry: ProviderRegistry,
+    private val configStore: ProviderConfigStore,
     private val sessionManager: SessionManager,
     private val transfers: TransferRegistry
 ) : ViewModel() {
+
+    private fun provider() = registry.resolve(configStore.activeProviderId.value)
+
+    /** Pixeldrain uploads need the login; other hosts take their own credentials. */
+    private fun missingKey(): Boolean = provider().kind == ProviderKind.PIXELDRAIN && apiKey.isBlank()
+
+    private suspend fun uploadFile(fileName: String, uri: Uri, onProgress: (Long, Long?) -> Unit): UploadResult {
+        val store = provider().fileStore ?: return UploadResult(false, message = "This host can't receive uploads.")
+        return when (val response = store.upload(fileName, uri, application, onProgress)) {
+            is ApiResponse.Success -> UploadResult(true, id = response.data.ref.id)
+            is ApiResponse.Error -> UploadResult(false, message = response.error.message)
+        }
+    }
+
+    /** Text is uploaded as a file: it's written to a temporary file first, which is removed again afterwards. */
+    private suspend fun uploadText(fileName: String, text: ByteArray, onProgress: (Long, Long?) -> Unit): UploadResult {
+        val file = File(application.cacheDir, fileName).apply { writeBytes(text) }
+        return try {
+            uploadFile(fileName, Uri.fromFile(file), onProgress)
+        } finally {
+            file.delete()
+        }
+    }
 
     private val _uiState = MutableStateFlow(UploadUiState())
     val uiState: StateFlow<UploadUiState> = _uiState.asStateFlow()
@@ -326,7 +356,7 @@ class UploadViewModel(
                         pfd = context.contentResolver.openFileDescriptor(uri, "r")
                         pfd?.let {
                             renderer = PdfRenderer(it)
-                            newPdfPageCount = renderer?.pageCount
+                            newPdfPageCount = renderer.pageCount
                         }
                     } catch (e: Exception) {
                         Log.e(TAG, "Error getting PDF page count: ${e.message}", e)
@@ -577,7 +607,7 @@ class UploadViewModel(
             it.status == UploadItemStatus.PENDING || it.status == UploadItemStatus.FAILED
         }
         if (batch.isEmpty()) return
-        if (apiKey.isBlank()) {
+        if (missingKey()) {
             _uiState.update { it.copy(errorMessage = "API Key is missing. Please set it in Settings.") }
             return
         }
@@ -636,7 +666,7 @@ class UploadViewModel(
                     async {
                         semaphore.withPermit {
                             updateItem(item.id) { it.copy(status = UploadItemStatus.UPLOADING) }
-                            val response = coreApi.uploadFileFromUri(apiKey, item.name, item.uri, application) { sent, _ ->
+                            val response = uploadFile(item.name, item.uri) { sent, _ ->
                                 synchronized(lock) { bytesPerItem[item.id] = sent }
                                 updateItem(item.id) { it.copy(uploadedBytes = sent) }
                             }
@@ -646,7 +676,7 @@ class UploadViewModel(
                                     it.copy(status = UploadItemStatus.DONE, uploadedBytes = item.sizeBytes ?: it.uploadedBytes, fileId = response.id)
                                 }
                             } else {
-                                val message = response.message ?: response.value ?: "Upload failed."
+                                val message = response.message ?: "Upload failed."
                                 updateItem(item.id) { it.copy(status = UploadItemStatus.FAILED, uploadedBytes = 0L, errorMessage = message) }
                             }
                         }
@@ -698,7 +728,7 @@ class UploadViewModel(
         val currentTextToUpload = _uiState.value.textToUpload
         val currentSelectedFileUri = _uiState.value.selectedFileUri
 
-        if (apiKey.isBlank()) {
+        if (missingKey()) {
             _uiState.update {
                 it.copy(
                     isLoading = false,
@@ -799,15 +829,15 @@ class UploadViewModel(
                 }
             }
 
-            val response: FileUploadResponse? = try {
+            val response: UploadResult? = try {
                 if (currentSelectedFileUri != null) {
                     operationType = "file from URI"
                     val fileName = currentFileNameForUpload ?: "pixeldrain_upload_${System.currentTimeMillis()}"
-                    coreApi.uploadFileFromUri(apiKey, fileName, currentSelectedFileUri, application, progressCallback)
+                    uploadFile(fileName, currentSelectedFileUri, progressCallback)
                 } else if (currentTextToUpload.isNotBlank()) {
                     operationType = "text"
                     val fileName = "text_upload_${System.currentTimeMillis()}.txt"
-                    coreApi.uploadFile(apiKey, fileName, currentTextToUpload.toByteArray(), progressCallback)
+                    uploadText(fileName, currentTextToUpload.toByteArray(), progressCallback)
                 } else {
                     null
                 }
@@ -858,7 +888,7 @@ class UploadViewModel(
                         it.copy(
                             isLoading = false,
                             uploadResult = response,
-                            errorMessage = response.message ?: response.value ?: "Upload failed with no specific message."
+                            errorMessage = response.message ?: "Upload failed with no specific message."
                         )
                     }
                 }
@@ -873,7 +903,7 @@ class UploadViewModel(
             if (response?.success == true) {
                 transfers.finish(transferId, TransferOutcome.COMPLETED, "${currentFileNameForUpload ?: "Text"} was uploaded.")
             } else {
-                transfers.finish(transferId, TransferOutcome.FAILED, response?.message ?: response?.value ?: "The upload failed.")
+                transfers.finish(transferId, TransferOutcome.FAILED, response?.message ?: "The upload failed.")
             }
         }
     }

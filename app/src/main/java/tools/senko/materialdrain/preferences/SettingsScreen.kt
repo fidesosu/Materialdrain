@@ -49,6 +49,7 @@ fun SettingsScreenContent(
     authViewModel: AuthViewModel,
     apiKeyInput: String,
     onApiKeyInputChange: (String) -> Unit,
+    providerSettingsViewModel: ProviderSettingsViewModel,
     fabHeight: Dp,
     isFabVisible: Boolean,
     onNavigateBack: () -> Unit
@@ -58,7 +59,7 @@ fun SettingsScreenContent(
         if (categoryId != null) onCategoryChange(null) else onNavigateBack()
     }
 
-    val environment = SettingsEnvironment(appSettings, authViewModel, apiKeyInput, onApiKeyInputChange)
+    val environment = SettingsEnvironment(appSettings, authViewModel, apiKeyInput, onApiKeyInputChange, providerSettingsViewModel)
     val reduceMotion = LocalReduceMotion.current
 
     AnimatedContent(

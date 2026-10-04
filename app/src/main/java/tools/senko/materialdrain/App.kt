@@ -19,6 +19,7 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
+import kotlin.math.roundToInt
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -32,7 +33,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -51,6 +52,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.layout.offset
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -69,21 +72,29 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 import androidx.core.content.edit
 import tools.senko.materialdrain.files.DownloadStatus
-import tools.senko.materialdrain.files.EnterFileIdDialog
+import tools.senko.materialdrain.navmenu.NavFabPosition
+import tools.senko.materialdrain.files.SelectionBarHeight
+import tools.senko.materialdrain.files.openDownloadedFile
+import tools.senko.materialdrain.hosts.HostSwitcher
+import tools.senko.materialdrain.hosts.hostOptions
 import tools.senko.materialdrain.files.FileInfoDetailsCard
 import tools.senko.materialdrain.files.FileInfoViewModel
-import tools.senko.materialdrain.files.FilesScreenContent
-import tools.senko.materialdrain.filesystem.FilesystemScreen
+import tools.senko.materialdrain.browser.BrowserMode
+import tools.senko.materialdrain.provider.api.ProviderCapability
+import tools.senko.materialdrain.browser.BrowserScreen
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
-import tools.senko.materialdrain.lists.ListDetailScreenContent
 import tools.senko.materialdrain.lists.ListViewModel
-import tools.senko.materialdrain.lists.ListsScreenContent
+import tools.senko.materialdrain.navmenu.NavFabMenu
+import tools.senko.materialdrain.navmenu.menu
 import tools.senko.materialdrain.preferences.ACCOUNT_CATEGORY_ID
 import tools.senko.materialdrain.preferences.AuthViewModel
+import tools.senko.materialdrain.preferences.ProviderSettingsViewModel
 import tools.senko.materialdrain.preferences.SettingsScreenContent
 import tools.senko.materialdrain.preferences.settingsCategory
 import tools.senko.materialdrain.settings.SEARCH_INDEX_DELETE_WARNING
 import tools.senko.materialdrain.settings.SEARCH_INDEX_FILE_NAME
+import tools.senko.materialdrain.settings.isSearchIndex
+import tools.senko.materialdrain.files.key
 import tools.senko.materialdrain.ui.LocalBlurredBackdrop
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.LocalVideoLoop
@@ -121,6 +132,7 @@ fun MaterialdrainScreen() {
     val filesystemViewModel: FilesystemViewModel = viewModel(viewModelStoreOwner = transferOwner, factory = viewModelFactory)
     val listViewModel: ListViewModel = viewModel(factory = viewModelFactory)
     val authViewModel: AuthViewModel = viewModel(factory = viewModelFactory)
+    val providerSettingsViewModel: ProviderSettingsViewModel = viewModel(factory = viewModelFactory)
 
     val snackbarHostState = remember { SnackbarHostState() }
     val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
@@ -145,6 +157,9 @@ fun MaterialdrainScreen() {
     val reduceMotion = reduceAnimationsSetting || appContainer.appSettings.systemAnimationsDisabled()
     val blurredBackdrop by appContainer.appSettings.blurredBackdrop.collectAsState()
     val loopVideos by appContainer.appSettings.loopVideos.collectAsState()
+    val navPrototype by appContainer.appSettings.navPrototype.collectAsState()
+    val navMenuPreview by appContainer.appSettings.navMenuPreview.collectAsState()
+    val navFabPosition by appContainer.appSettings.navFabPosition.collectAsState()
     val videoLoop = remember(loopVideos) { VideoLoopSetting(loopVideos, appContainer.appSettings::setLoopVideos) }
     LaunchedEffect(activeTransfers.isNotEmpty()) {
         if (activeTransfers.isNotEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -171,7 +186,6 @@ fun MaterialdrainScreen() {
     val localClipboardManager = LocalContext.current.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
 
-    val filesScreenListState = rememberLazyListState()
 
     var apiKeyInput by rememberSaveable { mutableStateOf("") }
     // The opened category of the settings (see SettingsCatalog), null shows the list of categories
@@ -179,19 +193,61 @@ fun MaterialdrainScreen() {
     var fabHeightDp by remember { mutableStateOf(0.dp) }
     val localDensity = LocalDensity.current
 
-    // Define the order of screens in the bottom navigation bar
-    val navBarOrder = listOf(
-        Screen.Upload,
-        Screen.Files,
-        Screen.Lists,
-        Screen.Filesystem
-    )
+    // The tabs follow what the active host offers: its config decides which of Files, Lists and Filesystem exist
+    val configChanges by appContainer.providerConfigStore.changes.collectAsState()
+    val activeHostId by appContainer.providerConfigStore.activeProviderId.collectAsState()
+    val loggedInUser by sessionManager.loggedInUser.collectAsState()
+    val hostReachability by appContainer.hostHealth.states.collectAsState()
+    // The screens which show the files of the active host, and so the host switcher in the top bar
+    val browseScreens = setOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem)
+    // The active host is checked whenever it changes, the others when the switcher is opened
+    LaunchedEffect(activeHostId, configChanges) {
+        appContainer.hostHealth.check(listOf(activeHostId))
+    }
+    val activeCapabilities = remember(configChanges) {
+        appContainer.providerRegistry.resolve(appContainer.providerConfigStore.activeProviderId.value).capabilities
+    }
+    val navBarOrder = remember(activeCapabilities) {
+        buildList {
+            add(Screen.Upload)
+            if (ProviderCapability.ENUMERATE in activeCapabilities) add(Screen.Files)
+            if (ProviderCapability.LISTS in activeCapabilities) add(Screen.Lists)
+            if (ProviderCapability.BROWSE in activeCapabilities) add(Screen.Filesystem)
+        }
+    }
+    LaunchedEffect(navBarOrder) {
+        // A tab which the new host doesn't offer falls back to the upload screen
+        if (currentScreen in setOf(Screen.Files, Screen.Lists, Screen.Filesystem) && currentScreen !in navBarOrder) {
+            currentScreen = Screen.Upload
+        }
+    }
     var showFileDetailMenu by remember { mutableStateOf(false) }
+    // While items are selected the bar is at the bottom, so the FAB and the snackbars move up over it
+    var selectingItems by remember { mutableStateOf(false) }
+    // The height of the snackbar while one is shown (0 when none is); the FAB rises above it
+    var snackbarHeightDp by remember { mutableStateOf(0.dp) }
+    // The scroll position of each list survives visits to other screens, so it's kept here rather than in the screen
+    val filesListState = rememberLazyListState()
+    val listsListState = rememberLazyListState()
+    val listContentsListState = rememberLazyListState()
+    val filesystemListState = rememberLazyListState()
 
     val navigateTo = { screen: Screen ->
         if (currentScreen != screen) {
             previousScreen = currentScreen
             currentScreen = screen
+        }
+    }
+
+    // Files shared from another app go to the upload screen, which queues them like picked files
+    val pendingShares by appContainer.pendingShares.collectAsState()
+    val appLocked by appContainer.appLock.locked.collectAsState()
+    // A share waits for the unlock: nothing uploads while the app is locked
+    LaunchedEffect(pendingShares, appLocked) {
+        if (pendingShares.isNotEmpty() && !appLocked) {
+            navigateTo(Screen.Upload)
+            uploadViewModel.onFilesSelected(pendingShares, context)
+            appContainer.pendingShares.value = emptyList()
         }
     }
 
@@ -207,17 +263,11 @@ fun MaterialdrainScreen() {
         }
     }
 
-    val closeListDetail = {
-        listViewModel.closeList()
-        navigateTo(Screen.Lists)
-    }
-
     LaunchedEffect(currentScreen) {
         Log.d("App", "currentScreen changed to: ${currentScreen.name}")
         // The next visit of the settings starts at the list of categories
         if (currentScreen != Screen.Settings) settingsCategoryId = null
         when (currentScreen) {
-            Screen.Files -> { /* Scroll handling is managed by FilesScreenContent and its LazyListState */ }
             Screen.Filesystem -> { /* Placeholder for Filesystem specific logic if needed. ViewModel handles its own loading. */ }
             Screen.FileDetail -> fileInfoViewModel.setFilterInputVisible(false)
             else -> {
@@ -234,7 +284,7 @@ fun MaterialdrainScreen() {
             uiState.uploadResult?.let {
                 if (!it.success) {
                     genericDialogTitle = "Upload Failed"
-                    genericDialogContent = "Error: ${it.message ?: it.value ?: "Unknown error"}"
+                    genericDialogContent = "Error: ${it.message ?: "Unknown error"}"
                     showGenericDialog = true
                 }
             }
@@ -243,7 +293,6 @@ fun MaterialdrainScreen() {
                     !it.contains("preview", ignoreCase = true) &&
                     !it.contains("metadata", ignoreCase = true) &&
                     !showGenericDialog &&
-                    !fileInfoUiState.showEnterFileIdDialog &&
                     currentScreen == Screen.Upload) {
                     genericDialogTitle = "Upload Error"
                     genericDialogContent = it
@@ -253,7 +302,7 @@ fun MaterialdrainScreen() {
         }
     }
 
-    if (uploadUiState.errorMessage?.contains("API Key is missing") == true && currentScreen == Screen.Upload && !fileInfoUiState.showEnterFileIdDialog) {
+    if (uploadUiState.errorMessage?.contains("API Key is missing") == true && currentScreen == Screen.Upload) {
         LaunchedEffect(uploadUiState.errorMessage, currentScreen) {
             genericDialogTitle = "API Key Required for Upload"
             genericDialogContent = "Please set your API Key in the Settings screen to upload files."
@@ -314,7 +363,9 @@ fun MaterialdrainScreen() {
 
     LaunchedEffect(fileInfoUiState.fileDownloadSuccessMessage) {
         fileInfoUiState.fileDownloadSuccessMessage?.let {
-            snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Long)
+            val openable = fileInfoUiState.fileDownloadOpen
+            val result = snackbarHostState.showSnackbar(it, actionLabel = openable?.let { "Open" }, duration = SnackbarDuration.Long)
+            if (result == SnackbarResult.ActionPerformed && openable != null) openDownloadedFile(context, openable)
             fileInfoViewModel.clearDownloadMessages()
         }
     }
@@ -327,7 +378,7 @@ fun MaterialdrainScreen() {
 
     if (fileInfoUiState.apiKeyMissingError && (currentScreen == Screen.Files || currentScreen == Screen.FileDetail) &&
         !fileInfoUiState.userFilesListErrorMessage.isNullOrBlank() &&
-        !showGenericDialog && !fileInfoUiState.initiateDeleteFile && !fileInfoUiState.showEnterFileIdDialog) {
+        !showGenericDialog && !fileInfoUiState.initiateDeleteFile) {
         LaunchedEffect(true, currentScreen, fileInfoUiState.userFilesListErrorMessage) {
             if (fileInfoUiState.userFilesListErrorMessage!!.contains("API Key", ignoreCase = true)) {
                 genericDialogTitle = if (currentScreen == Screen.FileDetail) "API Key Required" else "API Key Required for Files"
@@ -350,7 +401,9 @@ fun MaterialdrainScreen() {
 
     val fabState by remember {
         derivedStateOf {
-            when (currentScreen) {
+            // The navigation prototype takes the FAB's place (and its bottom padding), see NavFabMenu
+            // The navigation prototype has its own button in the corner; the upload screen keeps its upload button
+            if (navPrototype && currentScreen != Screen.Upload) null else when (currentScreen) {
                 // Nothing to upload yet (or already uploading): the upload screen offers its own actions instead
                 Screen.Upload -> if (uploadUiState.hasUploadable && !uploadUiState.isLoading) FabDetails(
                     screen = Screen.Upload,
@@ -399,7 +452,6 @@ fun MaterialdrainScreen() {
                     isExtended = true
                 ) else null
                 Screen.FileDetail -> null
-                Screen.ListDetail -> null
                 Screen.Filesystem ->
                     if (filesystemUiState.canWrite) FabDetails(
                         screen = Screen.Filesystem,
@@ -411,7 +463,19 @@ fun MaterialdrainScreen() {
             }
         }
     }
-    val isFabVisible = fabState != null
+    // Like the old bottom bar, the navigation FAB stays out of the way on detail screens
+    // With the navigation button at an edge, the snackbar is beside it, so the button doesn't rise over it
+    val edgeSnackbar = navPrototype && fabState == null && navFabPosition != NavFabPosition.CENTER
+    val fabLiftTarget = (if (selectingItems) SelectionBarHeight else 0.dp) +
+        (if (!edgeSnackbar && snackbarHeightDp > 0.dp) snackbarHeightDp + 8.dp else 0.dp)
+    val fabLift by animateDpAsState(targetValue = fabLiftTarget, label = "fabLift")
+    // The navigation button sits in the same corner: it rises over the upload button when both are shown
+    val navLiftTarget = fabLiftTarget + (if (navPrototype && fabState != null) fabHeightDp + 16.dp else 0.dp)
+    val navLift by animateDpAsState(targetValue = navLiftTarget, label = "navLift")
+    // How far below its corner a button starts before it slides up (see NavFabMenu)
+    val entryOffsetPx = with(localDensity) { 160.dp.toPx() }
+    val showNavFab = navPrototype && currentScreen != Screen.FileDetail
+    val isFabVisible = showNavFab || fabState != null
 
     CompositionLocalProvider(
         LocalReduceMotion provides reduceMotion,
@@ -419,17 +483,18 @@ fun MaterialdrainScreen() {
         LocalVideoLoop provides videoLoop
     ) {
     SharedTransitionLayout {
+        // The Box lets the FAB navigation prototype (Developer settings) sit on top of the Scaffold
+        Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
                 Column {
-                    TopAppBar(
+                    // The switcher is centred on the bar itself, so the icons at the edges don't move it
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                    CenterAlignedTopAppBar(
                         title = {
                             val titleText = when (currentScreen) {
                                 Screen.FileDetail -> {
                                     fileInfoUiState.fileInfo?.name ?: Screen.FileDetail.title
-                                }
-                                Screen.ListDetail -> {
-                                    listsUiState.openedList?.title ?: Screen.ListDetail.title
                                 }
                                 Screen.Settings -> {
                                     settingsCategory(settingsCategoryId)?.title ?: Screen.Settings.title
@@ -438,7 +503,8 @@ fun MaterialdrainScreen() {
                                     currentScreen.title
                                 }
                             }
-                            AnimatedContent(
+                            // On the browse screens the host switcher is drawn over the bar instead (see below)
+                            if (currentScreen in browseScreens) Unit else AnimatedContent(
                                 targetState = titleText,
                                 transitionSpec = {
                                     if (reduceMotion) {
@@ -480,11 +546,6 @@ fun MaterialdrainScreen() {
                                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                                     }
                                 }
-                                Screen.ListDetail -> {
-                                    IconButton(onClick = closeListDetail) {
-                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                                    }
-                                }
                                 Screen.Settings -> {
                                     // Back leaves a category first, then the settings
                                     IconButton(onClick = {
@@ -501,12 +562,7 @@ fun MaterialdrainScreen() {
                         actions = {
                             if (currentScreen == Screen.FileDetail) {
                                 fileInfoUiState.fileInfo?.let { currentFile ->
-                                    // The "id" of a filesystem file is its path, which starts with a slash
-                                    val fileUrl = if (currentFile.id.startsWith("/")) {
-                                        "https://pixeldrain.com/d/${currentFile.id.removePrefix("/")}"
-                                    } else {
-                                        "https://pixeldrain.com/u/${currentFile.id}"
-                                    }
+                                    val fileUrl = fileInfoViewModel.shareUrlFor(currentFile)
                                     IconButton(onClick = { showFileDetailMenu = true }) {
                                         Icon(Icons.Filled.MoreVert, contentDescription = "More options")
                                     }
@@ -523,35 +579,37 @@ fun MaterialdrainScreen() {
                                             },
                                             leadingIcon = { Icon(Icons.Filled.Download, contentDescription = "Download", modifier = Modifier.size(28.dp))}
                                         )
-                                        DropdownMenuItem(
-                                            text = { Text("Share Link") },
-                                            onClick = {
-                                                val sendIntent: Intent = Intent().apply {
-                                                    action = Intent.ACTION_SEND
-                                                    putExtra(Intent.EXTRA_TEXT, fileUrl)
-                                                    type = "text/plain"
-                                                }
-                                                context.startActivity(Intent.createChooser(sendIntent, null))
-                                                showFileDetailMenu = false
-                                            },
-                                            leadingIcon = { Icon(Icons.Filled.Share, contentDescription = "Share Link", modifier = Modifier.size(28.dp))}
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Copy Link") },
-                                            onClick = {
-                                                val clip = ClipData.newPlainText("Pixeldrain URL", fileUrl)
-                                                localClipboardManager.setPrimaryClip(clip)
-                                                coroutineScope.launch { snackbarHostState.showSnackbar("Link copied to clipboard!") }
-                                                showFileDetailMenu = false
-                                            },
-                                            leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = "Copy Link", modifier = Modifier.size(28.dp))}
-                                        )
-                                        if (currentFile.canEdit == true) {
+                                        if (fileUrl != null) {
+                                            DropdownMenuItem(
+                                                text = { Text("Share Link") },
+                                                onClick = {
+                                                    val sendIntent: Intent = Intent().apply {
+                                                        action = Intent.ACTION_SEND
+                                                        putExtra(Intent.EXTRA_TEXT, fileUrl)
+                                                        type = "text/plain"
+                                                    }
+                                                    context.startActivity(Intent.createChooser(sendIntent, null))
+                                                    showFileDetailMenu = false
+                                                },
+                                                leadingIcon = { Icon(Icons.Filled.Share, contentDescription = "Share Link", modifier = Modifier.size(28.dp))}
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Copy Link") },
+                                                onClick = {
+                                                    val clip = ClipData.newPlainText("File link", fileUrl)
+                                                    localClipboardManager.setPrimaryClip(clip)
+                                                    coroutineScope.launch { snackbarHostState.showSnackbar("Link copied to clipboard!") }
+                                                    showFileDetailMenu = false
+                                                },
+                                                leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = "Copy Link", modifier = Modifier.size(28.dp))}
+                                            )
+                                        }
+                                        if (fileInfoViewModel.canDeleteFiles()) {
                                             HorizontalDivider()
                                             DropdownMenuItem(
                                                 text = { Text("Delete File", color = MaterialTheme.colorScheme.error) },
                                                 onClick = {
-                                                    fileInfoViewModel.initiateDeleteFile(currentFile.id)
+                                                    fileInfoViewModel.initiateDeleteFile(currentFile)
                                                     showFileDetailMenu = false
                                                 },
                                                 leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = "Delete File", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(28.dp))}
@@ -560,12 +618,38 @@ fun MaterialdrainScreen() {
                                     }
                                 }
                             } else if (currentScreen != Screen.Settings) { // Show settings icon for other screens not FileDetail or Settings itself
+                                // Refreshing is pulling down the list (see BrowserScreen)
                                 IconButton(onClick = { navigateTo(Screen.Settings) }) {
                                     Icon(painterResource(id = R.drawable.icon_settings_outlined), contentDescription = "Settings")
                                 }
                             }
                         }
                     )
+                    if (currentScreen in browseScreens) {
+                        // Centred on the band the bar's icons sit in (below the status bar), not on the whole bar
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .windowInsetsPadding(TopAppBarDefaults.windowInsets)
+                                .fillMaxWidth()
+                                .height(64.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            HostSwitcher(
+                                hosts = hostOptions(appContainer.providerConfigStore, sessionManager, loggedInUser),
+                                activeId = activeHostId,
+                                reachability = hostReachability,
+                                onSelect = { appContainer.providerConfigStore.setActive(it) },
+                                onManage = { navigateTo(Screen.Settings) },
+                                onOpened = {
+                                    appContainer.hostHealth.check(
+                                        hostOptions(appContainer.providerConfigStore, sessionManager, loggedInUser).map { it.id }
+                                    )
+                                }
+                            )
+                        }
+                    }
+                    }
                     val activeTransfer: TransferProgress? = when (currentScreen) {
                         Screen.Upload if uploadUiState.isLoading -> TransferProgress(
                             transferredBytes = uploadUiState.uploadedBytes,
@@ -590,8 +674,8 @@ fun MaterialdrainScreen() {
                                 download.status == DownloadStatus.DOWNLOADING || download.status == DownloadStatus.PENDING
                             }
                             val activeDownload = when (currentScreen) {
-                                Screen.FileDetail -> fileInfoUiState.fileInfo?.id?.let { fileInfoUiState.activeDownloads[it] }?.takeIf(isActive)
-                                Screen.Files, Screen.Filesystem, Screen.ListDetail -> fileInfoUiState.activeDownloads.values.firstOrNull(isActive)
+                                Screen.FileDetail -> fileInfoUiState.fileInfo?.key?.let { fileInfoUiState.activeDownloads[it] }?.takeIf(isActive)
+                                Screen.Files, Screen.Filesystem, Screen.Lists -> fileInfoUiState.activeDownloads.values.firstOrNull(isActive)
                                 else -> null
                             }
                             activeDownload?.let {
@@ -624,7 +708,8 @@ fun MaterialdrainScreen() {
             },
             bottomBar = {
                 AnimatedVisibility(
-                    visible = currentScreen != Screen.FileDetail && currentScreen != Screen.ListDetail,
+                    // The FAB navigation prototype (Developer settings) replaces the bar while it's on
+                    visible = !navPrototype && currentScreen != Screen.FileDetail,
                     enter = if (reduceMotion) fadeIn(tween(100)) else fadeIn() + expandVertically(),
                     exit = if (reduceMotion) fadeOut(tween(100)) else fadeOut() + shrinkVertically()
                 ) {
@@ -634,6 +719,8 @@ fun MaterialdrainScreen() {
                 }
             },
             floatingActionButton = {
+                // Moved visually (an offset, not padding), so the FAB rises over the selection bar and a snackbar
+                Box(modifier = Modifier.offset(y = -fabLift)) {
                 // Keep the last button around so it can animate out instead of vanishing
                 var lastFab by remember { mutableStateOf<FabDetails?>(null) }
                 LaunchedEffect(fabState) { if (fabState != null) lastFab = fabState }
@@ -655,8 +742,8 @@ fun MaterialdrainScreen() {
 
                 AnimatedVisibility(
                     visible = fabState != null,
-                    enter = if (reduceMotion) fadeIn(tween(100)) else scaleIn(animationSpec = tween(200)) + fadeIn(animationSpec = tween(200)),
-                    exit = if (reduceMotion) fadeOut(tween(100)) else scaleOut(animationSpec = tween(150)) + fadeOut(animationSpec = tween(150))
+                    enter = if (reduceMotion) fadeIn(tween(100)) else slideInVertically(animationSpec = tween(420, easing = FastOutSlowInEasing)) { it + entryOffsetPx.roundToInt() } + fadeIn(animationSpec = tween(200)),
+                    exit = if (reduceMotion) fadeOut(tween(100)) else slideOutVertically(animationSpec = tween(320, easing = FastOutSlowInEasing)) { it + entryOffsetPx.roundToInt() } + fadeOut(animationSpec = tween(200))
                 ) {
                 (fabState ?: lastFab)?.let { details ->
                     ExtendedFloatingActionButton(
@@ -708,133 +795,141 @@ fun MaterialdrainScreen() {
                     )
                 }
                 }
+                }
             },
             snackbarHost = {
+                // The snackbar stays at the bottom; while selecting it sits above the selection bar
                 AppSnackbarHost(
                     hostState = snackbarHostState,
-                    modifier = Modifier.zIndex(1f)
+                    edgeFab = if (edgeSnackbar) navFabPosition else null,
+                    fabSize = fabHeightDp,
+                    modifier = Modifier
+                        .zIndex(1f)
+                        .offset(y = if (selectingItems) -SelectionBarHeight else 0.dp)
+                        .onSizeChanged { snackbarHeightDp = with(localDensity) { it.height.toDp() } }
                 )
             }
         ) { paddingValues ->
-            CompositionLocalProvider(LocalOverscrollFactory provides null) {
-                AnimatedContent(
-                    targetState = currentScreen,
-                    transitionSpec = {
-                        val initialIndex = navBarOrder.indexOf(initialState)
-                        val targetIndex = navBarOrder.indexOf(targetState)
+            AnimatedContent(
+                targetState = currentScreen,
+                transitionSpec = {
+                    val initialIndex = navBarOrder.indexOf(initialState)
+                    val targetIndex = navBarOrder.indexOf(targetState)
 
-                        val sliding = if (initialIndex != -1 && targetIndex != -1) {
-                            // Both screens are in the main navigation bar
-                            if (targetIndex > initialIndex) {
-                                (slideInVertically { height -> height } + fadeIn())
-                                    .togetherWith(slideOutVertically { height -> -height } + fadeOut())
-                            } else {
-                                (slideInVertically { height -> -height } + fadeIn())
-                                    .togetherWith(slideOutVertically { height -> height } + fadeOut())
-                            }
+                    val sliding = if (initialIndex != -1 && targetIndex != -1) {
+                        // Both screens are in the main navigation bar
+                        if (targetIndex > initialIndex) {
+                            (slideInVertically { height -> height } + fadeIn())
+                                .togetherWith(slideOutVertically { height -> -height } + fadeOut())
                         } else {
-                            // Default transition for screens not in navBarOrder (e.g., FileDetail, Settings)
-                            // Or if one of them is not in navBarOrder (should ideally not happen for main nav)
-                            if (targetState.ordinal > initialState.ordinal) {
-                                (slideInVertically { height -> height } + fadeIn())
-                                    .togetherWith(slideOutVertically { height -> -height } + fadeOut())
-                            } else {
-                                (slideInVertically { height -> -height } + fadeIn())
-                                    .togetherWith(slideOutVertically { height -> height } + fadeOut())
-                            }
-                        }.using(
-                            SizeTransform(clip = false)
-                        )
-
-                        if (reduceMotion) {
-                            // Reduced animations: a quick crossfade instead of sliding
-                            (fadeIn(tween(100)) togetherWith fadeOut(tween(100)))
-                                .using(SizeTransform(clip = false) { _, _ -> snap() })
-                        } else {
-                            sliding
+                            (slideInVertically { height -> -height } + fadeIn())
+                                .togetherWith(slideOutVertically { height -> height } + fadeOut())
                         }
-                    },
-                    label = "screenTransition"
-                ) { targetScreen ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues)
-                    ) {
-                        when (targetScreen) {
-                            Screen.Upload -> UploadScreenContent(
-                                uploadViewModel = uploadViewModel,
-                                fabHeight = fabHeightDp,
-                                isFabVisible = isFabVisible
-                            )
-                            Screen.Files -> FilesScreenContent(
-                                filesystemViewModel = filesystemViewModel,
-                                fileInfoViewModel = fileInfoViewModel,
-                                onFileSelected = { navigateTo(Screen.FileDetail) },
-                                listState = filesScreenListState,
-                                fabHeight = fabHeightDp,
-                                isFabVisible = isFabVisible
-                            )
-                            Screen.Filesystem -> FilesystemScreen(
-                                filesystemViewModel = filesystemViewModel,
-                                fileInfoViewModel = fileInfoViewModel,
-                                onFileSelected = { navigateTo(Screen.FileDetail) },
-                                fabHeight = fabHeightDp,
-                                isFabVisible = isFabVisible
-                            )
-                            Screen.FileDetail -> {
-                                fileInfoUiState.fileInfo?.let { info ->
-                                    FileInfoDetailsCard(
-                                        fileInfo = info,
-                                        fileInfoViewModel = fileInfoViewModel,
-                                        context = LocalContext.current,
-                                        snackbarHostState = snackbarHostState
-                                    )
-                                } ?: run {
-                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        if (fileInfoUiState.isLoadingFileInfo) {
-                                            CircularProgressIndicator()
-                                        } else {
-                                            val errorMessage = fileInfoUiState.fileInfoErrorMessage ?: "File details not available."
-                                            Text(
-                                                text = "$errorMessage Please go back and select a different file.",
-                                                modifier = Modifier.padding(16.dp),
-                                                textAlign = TextAlign.Center
-                                            )
-                                        }
+                    } else {
+                        // Default transition for screens not in navBarOrder (e.g., FileDetail, Settings)
+                        // Or if one of them is not in navBarOrder (should ideally not happen for main nav)
+                        if (targetState.ordinal > initialState.ordinal) {
+                            (slideInVertically { height -> height } + fadeIn())
+                                .togetherWith(slideOutVertically { height -> -height } + fadeOut())
+                        } else {
+                            (slideInVertically { height -> -height } + fadeIn())
+                                .togetherWith(slideOutVertically { height -> height } + fadeOut())
+                        }
+                    }.using(
+                        SizeTransform(clip = false)
+                    )
+
+                    if (reduceMotion) {
+                        // Reduced animations: a quick crossfade instead of sliding
+                        (fadeIn(tween(100)) togetherWith fadeOut(tween(100)))
+                            .using(SizeTransform(clip = false) { _, _ -> snap() })
+                    } else {
+                        sliding
+                    }
+                },
+                label = "screenTransition"
+            ) { targetScreen ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {
+                    when (targetScreen) {
+                        Screen.Upload -> UploadScreenContent(
+                            uploadViewModel = uploadViewModel,
+                            fabHeight = fabHeightDp,
+                            isFabVisible = isFabVisible
+                        )
+                        Screen.Files, Screen.Lists, Screen.Filesystem -> BrowserScreen(
+                            mode = when (targetScreen) {
+                                Screen.Files -> BrowserMode.FILES
+                                Screen.Lists -> BrowserMode.LISTS
+                                else -> BrowserMode.FILESYSTEM
+                            },
+                            filesystemViewModel = filesystemViewModel,
+                            fileInfoViewModel = fileInfoViewModel,
+                            listViewModel = listViewModel,
+                            activeKind = appContainer.providerRegistry.resolve(activeHostId).kind,
+                            onSelectingChange = { selectingItems = it },
+                            scrollState = when (targetScreen) {
+                                Screen.Files -> filesListState
+                                Screen.Lists -> if (listsUiState.openedList != null) listContentsListState else listsListState
+                                else -> filesystemListState
+                            },
+                            onFileSelected = { navigateTo(Screen.FileDetail) },
+                            fabHeight = fabHeightDp,
+                            isFabVisible = isFabVisible
+                        )
+                        Screen.FileDetail -> {
+                            fileInfoUiState.fileInfo?.let { info ->
+                                FileInfoDetailsCard(
+                                    fileInfo = info,
+                                    fileInfoViewModel = fileInfoViewModel,
+                                    context = LocalContext.current,
+                                    snackbarHostState = snackbarHostState
+                                )
+                            } ?: run {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    if (fileInfoUiState.isLoadingFileInfo) {
+                                        CircularProgressIndicator()
+                                    } else {
+                                        val errorMessage = fileInfoUiState.fileInfoErrorMessage ?: "File details not available."
+                                        Text(
+                                            text = "$errorMessage Please go back and select a different file.",
+                                            modifier = Modifier.padding(16.dp),
+                                            textAlign = TextAlign.Center
+                                        )
                                     }
                                 }
                             }
-                            Screen.Lists -> ListsScreenContent(
-                                listViewModel = listViewModel,
-                                onListSelected = { navigateTo(Screen.ListDetail) },
-                                fabHeight = fabHeightDp,
-                                isFabVisible = isFabVisible
-                            )
-                            Screen.ListDetail -> ListDetailScreenContent(
-                                filesystemViewModel = filesystemViewModel,
-                                listViewModel = listViewModel,
-                                fileInfoViewModel = fileInfoViewModel,
-                                onFileSelected = { navigateTo(Screen.FileDetail) },
-                                onBack = closeListDetail,
-                                fabHeight = fabHeightDp,
-                                isFabVisible = isFabVisible
-                            )
-                            Screen.Settings -> SettingsScreenContent(
-                                categoryId = settingsCategoryId,
-                                onCategoryChange = { settingsCategoryId = it },
-                                appSettings = appContainer.appSettings,
-                                apiKeyInput = apiKeyInput,
-                                onApiKeyInputChange = { apiKeyInput = it },
-                                authViewModel = authViewModel,
-                                fabHeight = fabHeightDp,
-                                isFabVisible = isFabVisible,
-                                onNavigateBack = { navigateTo(previousScreen) }
-                            )
                         }
+                        Screen.Settings -> SettingsScreenContent(
+                            categoryId = settingsCategoryId,
+                            onCategoryChange = { settingsCategoryId = it },
+                            appSettings = appContainer.appSettings,
+                            apiKeyInput = apiKeyInput,
+                            onApiKeyInputChange = { apiKeyInput = it },
+                            authViewModel = authViewModel,
+                            providerSettingsViewModel = providerSettingsViewModel,
+                            fabHeight = fabHeightDp,
+                            isFabVisible = isFabVisible,
+                            onNavigateBack = { navigateTo(previousScreen) }
+                        )
                     }
                 }
             }
+        }
+        if (showNavFab) {
+            NavFabMenu(
+                menu = navMenuPreview.menu(),
+                currentScreen = currentScreen,
+                position = navFabPosition,
+                onPositionChange = appContainer.appSettings::setNavFabPosition,
+                onNavigate = navigateTo,
+                onFabHeightChanged = { fabHeightDp = it },
+                lift = navLift
+            )
+        }
         }
 
         if (showGenericDialog) {
@@ -876,7 +971,7 @@ fun MaterialdrainScreen() {
                 onDismissRequest = { fileInfoViewModel.cancelDeleteFile() },
                 title = { Text("Confirm Deletion") },
                 text = {
-                    val isSearchIndex = fileInfoUiState.fileIdToDelete?.endsWith("/$SEARCH_INDEX_FILE_NAME") == true
+                    val isSearchIndex = fileInfoUiState.nodeToDelete?.isSearchIndex() == true
                     Text(
                         if (isSearchIndex) SEARCH_INDEX_DELETE_WARNING
                         else "Are you sure you want to delete file ID: ${fileInfoUiState.fileIdToDelete}? This action cannot be undone."
@@ -892,10 +987,6 @@ fun MaterialdrainScreen() {
                     Button(onClick = { fileInfoViewModel.cancelDeleteFile() }) { Text("Cancel") }
                 }
             )
-        }
-
-        if (fileInfoUiState.showEnterFileIdDialog) {
-            EnterFileIdDialog(fileInfoViewModel = fileInfoViewModel)
         }
     }
     }

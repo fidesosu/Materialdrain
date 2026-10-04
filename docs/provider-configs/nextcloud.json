@@ -1,0 +1,18 @@
+{
+  "kind": "webdav",
+  "name": "Nextcloud",
+  "base_url": "https://cloud.example.com/remote.php/dav/files/{username}",
+  "auth": {
+    "type": "BASIC",
+    "key_username": "",
+    "password_auth": {
+      "mode": "BASIC"
+    }
+  },
+  "root_path": "/",
+  "meta": {
+    "id": "tools.senko.materialdrain.examples.nextcloud",
+    "version": 1,
+    "author": "Materialdrain"
+  }
+}

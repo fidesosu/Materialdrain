@@ -1,0 +1,14 @@
+{
+  "kind": "s3",
+  "name": "TrueNAS (S3)",
+  "endpoint": "https://cloud.riilab.uk",
+  "region": "us-east-1",
+  "bucket": "labra",
+  "path_style": true,
+  "prefix": "",
+  "meta": {
+    "id": "tools.senko.materialdrain.examples.truenas-s3",
+    "version": 2,
+    "author": "Materialdrain"
+  }
+}

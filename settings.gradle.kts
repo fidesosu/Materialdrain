@@ -21,4 +21,9 @@ dependencyResolutionManagement {
 
 rootProject.name = "Materialdrain"
 include(":app")
+include(":provider-api")
+include(":provider-pixeldrain")
+include(":provider-generic-rest")
+include(":provider-webdav")
+include(":provider-s3")
  

@@ -37,9 +37,14 @@ import kotlinx.coroutines.isActive
 import tools.senko.materialdrain.AppContainer
 import tools.senko.materialdrain.util.ExoPlayerCache
 
-/** Only requests to the (authenticated) filesystem need the login. */
-internal fun shouldAddAuthenticationHeader(url: String): Boolean =
-    url.startsWith("https://pixeldrain.com/api/filesystem/")
+/**
+ * The headers the active host needs for one of its URLs, installed by [AppContainer]. Images, thumbnails and media
+ * requests all ask it, so the login of whichever host is active reaches them.
+ */
+object HostRequestAuth {
+    @Volatile
+    var headersFor: (url: String) -> Map<String, String> = { emptyMap() }
+}
 
 // Playback starts as soon as a second of media is buffered (the default waits for two and a half),
 // and buffering goes on for up to fifty seconds ahead.
@@ -59,9 +64,8 @@ internal fun createMediaPlayer(context: Context, uri: Uri, apiKey: String?, isVi
 
     val dataSourceFactory: DataSource.Factory = if (isRemote) {
         val okHttpFactory = OkHttpDataSource.Factory(AppContainer.get(appContext as Application).okHttpClient)
-        if (!apiKey.isNullOrBlank() && shouldAddAuthenticationHeader(uri.toString())) {
-            okHttpFactory.setDefaultRequestProperties(mapOf("Cookie" to "pd_auth_key=$apiKey"))
-        }
+        val headers = HostRequestAuth.headersFor(uri.toString())
+        if (headers.isNotEmpty()) okHttpFactory.setDefaultRequestProperties(headers)
         CacheDataSource.Factory()
             .setCache(ExoPlayerCache.getInstance(appContext))
             .setUpstreamDataSourceFactory(okHttpFactory)

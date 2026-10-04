@@ -1,6 +1,5 @@
 package tools.senko.materialdrain.upload
 
-import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -8,7 +7,6 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
@@ -55,10 +53,6 @@ fun UploadScreenContent(
 
     var fullScreenPreviewUri by remember { mutableStateOf<Uri?>(null) }
     var fullScreenPreviewMimeType by remember { mutableStateOf<String?>(null) }
-
-    BackHandler(enabled = true) {
-        (context as? Activity)?.finish()
-    }
 
     if (fullScreenPreviewUri != null) {
         FullScreenMediaPreviewDialog(

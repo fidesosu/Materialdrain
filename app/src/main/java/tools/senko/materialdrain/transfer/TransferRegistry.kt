@@ -80,6 +80,4 @@ class TransferRegistry(context: Context) {
     fun cancelAll() {
         cancelHandlers.values.toList().forEach { it() }
     }
-
-    fun hasActiveTransfers(): Boolean = _active.value.isNotEmpty()
 }

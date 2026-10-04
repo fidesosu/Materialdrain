@@ -63,11 +63,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import tools.senko.materialdrain.ui.LocalBlurredBackdrop
 
 internal const val TAG_COIL = "CoilImageLoaderShared"
-internal fun imageRequest(context: Context, data: Any, apiKey: String?, configure: ImageRequest.Builder.() -> Unit = {}): ImageRequest {
+internal fun imageRequest(context: Context, data: Any, configure: ImageRequest.Builder.() -> Unit = {}): ImageRequest {
     val builder = ImageRequest.Builder(context).data(data).apply(configure)
-    if (!apiKey.isNullOrBlank() && shouldAddAuthenticationHeader(data.toString())) {
-        builder.addHeader("Cookie", "pd_auth_key=$apiKey")
-    }
+    HostRequestAuth.headersFor(data.toString()).forEach { (name, value) -> builder.addHeader(name, value) }
     return builder.build()
 }
 
@@ -82,7 +80,7 @@ internal fun BlurredBackdrop(source: Any, apiKey: String?, imageLoader: ImageLoa
     // A setting of the user
     if (!LocalBlurredBackdrop.current) return
     val context = LocalContext.current
-    val request = remember(source, apiKey) { imageRequest(context, source, apiKey) }
+    val request = remember(source, apiKey) { imageRequest(context, source) }
     AsyncImage(
         model = request,
         contentDescription = null,
@@ -134,7 +132,7 @@ fun LayeredPreviewImage(
     // Coil then takes it for a different request and starts loading (and fading in) again, every time the state
     // of the image changes, so that the image never gets to be visible.
     val fullRequest = remember(fullSource, apiKey, maxPixels) {
-        imageRequest(context, fullSource, apiKey) {
+        imageRequest(context, fullSource) {
             crossfade(true)
             if (maxPixels != null) size(Size(maxPixels, maxPixels))
             listener(onError = { _, result -> Log.e(TAG_COIL, "Error loading image: $fullSource", result.throwable) })

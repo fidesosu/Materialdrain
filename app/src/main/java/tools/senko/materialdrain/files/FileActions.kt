@@ -59,9 +59,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import tools.senko.materialdrain.api.ApiResponse
-import tools.senko.materialdrain.api.FileInfoResponse
-import tools.senko.materialdrain.api.UserList
+import tools.senko.materialdrain.provider.api.ApiResponse
+import tools.senko.materialdrain.provider.api.StorageNode
+import tools.senko.materialdrain.provider.api.FileList
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.components.ConfirmDialog
@@ -79,115 +79,11 @@ fun shareLink(context: Context, url: String) {
     context.startActivity(Intent.createChooser(sendIntent, null))
 }
 
-/**
- * The bar which slides in above the list while items are selected. All actions are in one menu, so they
- * come with a label; they are greyed out while nothing is selected. The menu only exists in this mode,
- * the menus of the individual items are replaced by checkboxes meanwhile.
- */
-@Composable
-fun SelectionActionBar(
-    visible: Boolean,
-    selectedCount: Int,
-    onClose: () -> Unit,
-    menuContent: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit
-) {
-    val reduceMotion = LocalReduceMotion.current
-    AnimatedVisibility(
-        visible = visible,
-        // Reduced animations: the bar appears without pushing the list down bit by bit
-        enter = if (reduceMotion) fadeIn(animationSpec = tween(100)) else expandVertically(animationSpec = tween(200)) + fadeIn(animationSpec = tween(200)),
-        exit = if (reduceMotion) fadeOut(animationSpec = tween(100)) else shrinkVertically(animationSpec = tween(200)) + fadeOut(animationSpec = tween(150))
-    ) {
-        Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Stop selecting") }
-                Text(
-                    text = if (selectedCount == 0) "Select items" else "$selectedCount selected",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f)
-                )
-                var menuExpanded by remember { mutableStateOf(false) }
-                Box {
-                    IconButton(onClick = { menuExpanded = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Actions for the selection") }
-                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        menuContent { menuExpanded = false }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** "Select all" / "Deselect all" entry of the selection menu. */
-@Composable
-fun SelectAllMenuItem(allSelected: Boolean, onToggle: () -> Unit, dismiss: () -> Unit) {
-    DropdownMenuItem(
-        text = { Text(if (allSelected) "Deselect all" else "Select all") },
-        leadingIcon = { Icon(Icons.Filled.SelectAll, contentDescription = null) },
-        onClick = { dismiss(); onToggle() }
-    )
-}
-
-/** The actions of the selection menu when files of the Files page or of a list are selected. */
-@Composable
-fun FileSelectionMenuItems(
-    hasSelection: Boolean,
-    allSelected: Boolean,
-    onToggleSelectAll: () -> Unit,
-    onDownloadZip: () -> Unit,
-    onAddToFilesystem: () -> Unit,
-    onAddToList: () -> Unit,
-    onDelete: () -> Unit,
-    dismiss: () -> Unit,
-    /** Only for the files of a list which can be changed: takes the files out of the list, they are not deleted. */
-    onRemoveFromList: (() -> Unit)? = null
-) {
-    SelectAllMenuItem(allSelected, onToggleSelectAll, dismiss)
-    HorizontalDivider()
-    DropdownMenuItem(
-        text = { Text("Download as ZIP") },
-        leadingIcon = { Icon(Icons.Filled.Download, contentDescription = null) },
-        enabled = hasSelection,
-        onClick = { dismiss(); onDownloadZip() }
-    )
-    DropdownMenuItem(
-        text = { Text("Add to filesystem") },
-        leadingIcon = { Icon(Icons.Filled.FolderCopy, contentDescription = null) },
-        enabled = hasSelection,
-        onClick = { dismiss(); onAddToFilesystem() }
-    )
-    DropdownMenuItem(
-        text = { Text("Add to list") },
-        leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null) },
-        enabled = hasSelection,
-        onClick = { dismiss(); onAddToList() }
-    )
-    if (onRemoveFromList != null) {
-        DropdownMenuItem(
-            text = { Text("Remove from this list") },
-            leadingIcon = { Icon(Icons.Filled.Remove, contentDescription = null) },
-            enabled = hasSelection,
-            onClick = { dismiss(); onRemoveFromList() }
-        )
-    }
-    HorizontalDivider()
-    DropdownMenuItem(
-        text = { Text("Delete", color = if (hasSelection) MaterialTheme.colorScheme.error else Color.Unspecified) },
-        leadingIcon = {
-            Icon(Icons.Filled.Delete, contentDescription = null, tint = if (hasSelection) MaterialTheme.colorScheme.error else LocalContentColor.current)
-        },
-        enabled = hasSelection,
-        onClick = { dismiss(); onDelete() }
-    )
-}
-
 /** The 3 dot menu of a file of the Files page or of a list. */
 @Composable
 fun FileItemMenu(
-    file: FileInfoResponse,
+    file: StorageNode,
+    shareUrl: String?,
     canDelete: Boolean,
     onDownload: () -> Unit,
     onSelect: () -> Unit,
@@ -198,7 +94,7 @@ fun FileItemMenu(
     onRemoveFromList: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val url = "https://pixeldrain.com/u/${file.id}"
+    val url = shareUrl
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }, modifier = Modifier.size(40.dp)) {
@@ -210,16 +106,18 @@ fun FileItemMenu(
                 leadingIcon = { Icon(Icons.Filled.Download, contentDescription = null) },
                 onClick = { expanded = false; onDownload() }
             )
-            DropdownMenuItem(
-                text = { Text("Copy link") },
-                leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = null) },
-                onClick = { expanded = false; copyLinkToClipboard(context, url) }
-            )
-            DropdownMenuItem(
-                text = { Text("Share link") },
-                leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
-                onClick = { expanded = false; shareLink(context, url) }
-            )
+            if (url != null) {
+                DropdownMenuItem(
+                    text = { Text("Copy link") },
+                    leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = null) },
+                    onClick = { expanded = false; copyLinkToClipboard(context, url) }
+                )
+                DropdownMenuItem(
+                    text = { Text("Share link") },
+                    leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
+                    onClick = { expanded = false; shareLink(context, url) }
+                )
+            }
             DropdownMenuItem(
                 text = { Text("Add to filesystem") },
                 leadingIcon = { Icon(Icons.Filled.FolderCopy, contentDescription = null) },
@@ -255,13 +153,13 @@ fun FileItemMenu(
 }
 
 /** An action on one or more files, which is confirmed or configured in a dialog first. */
-sealed class FileActionRequest(val files: List<FileInfoResponse>) {
-    class Delete(files: List<FileInfoResponse>) : FileActionRequest(files)
-    class AddToFilesystem(files: List<FileInfoResponse>) : FileActionRequest(files)
+sealed class FileActionRequest(val files: List<StorageNode>) {
+    class Delete(files: List<StorageNode>) : FileActionRequest(files)
+    class AddToFilesystem(files: List<StorageNode>) : FileActionRequest(files)
     /** Adds the files to a list of the user or to a new one, which one is picked in the dialog. */
-    class AddToList(files: List<FileInfoResponse>) : FileActionRequest(files)
+    class AddToList(files: List<StorageNode>) : FileActionRequest(files)
     /** Takes the files out of [list], which holds [listFileCount] files. */
-    class RemoveFromList(files: List<FileInfoResponse>, val list: UserList, val listFileCount: Int) : FileActionRequest(files)
+    class RemoveFromList(files: List<StorageNode>, val list: FileList, val listFileCount: Int) : FileActionRequest(files)
 }
 
 /** The dialogs behind [FileActionRequest]; [onStarted] is called once the action was started. */
@@ -301,7 +199,7 @@ fun FileActionDialogs(
                 initialPath = "me",
                 loadFolders = { filesystemViewModel.listSubdirectories(it) },
                 onConfirm = { path ->
-                    fileInfoViewModel.addFilesToFilesystem(request.files.map { it.id }, path)
+                    fileInfoViewModel.addFilesToFilesystem(request.files.mapNotNull { it.ref.id }, path)
                     onStarted()
                     onDismiss()
                 },
@@ -319,7 +217,7 @@ fun FileActionDialogs(
                     initialValue = "Pixeldrain List",
                     supportingText = "Creates a new list with " + (if (count == 1) "this file" else "these $count files") + ".",
                     onConfirm = { title ->
-                        fileInfoViewModel.createListFromFiles(request.files.map { it.id }, title)
+                        fileInfoViewModel.createListFromFiles(request.files.mapNotNull { it.ref.id }, title)
                         onStarted()
                         onDismiss()
                     },
@@ -330,7 +228,7 @@ fun FileActionDialogs(
                     loadLists = { fileInfoViewModel.loadEditableLists() },
                     onNewList = { creatingNewList = true },
                     onPick = { list ->
-                        fileInfoViewModel.addFilesToList(list, request.files.map { it.id })
+                        fileInfoViewModel.addFilesToList(list, request.files.mapNotNull { it.ref.id })
                         onStarted()
                         onDismiss()
                     },
@@ -352,7 +250,7 @@ fun FileActionDialogs(
                 confirmLabel = if (deletesList) "Delete list" else "Remove",
                 isDestructive = deletesList,
                 onConfirm = {
-                    fileInfoViewModel.removeFilesFromList(request.list, request.files.map { it.id })
+                    fileInfoViewModel.removeFilesFromList(request.list, request.files.mapNotNull { it.ref.id })
                     if (deletesList) onListDeleted()
                     onStarted()
                     onDismiss()
@@ -366,18 +264,18 @@ fun FileActionDialogs(
 /** Lets the user pick one of their lists, or start a new one. */
 @Composable
 private fun ListPickerDialog(
-    loadLists: suspend () -> ApiResponse<List<UserList>>,
+    loadLists: suspend () -> ApiResponse<List<FileList>>,
     onNewList: () -> Unit,
-    onPick: (UserList) -> Unit,
+    onPick: (FileList) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var lists by remember { mutableStateOf<List<UserList>?>(null) }
+    var lists by remember { mutableStateOf<List<FileList>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         when (val response = loadLists()) {
             is ApiResponse.Success -> lists = response.data
-            is ApiResponse.Error -> error = response.errorDetails.message ?: response.errorDetails.value ?: "Could not load your lists."
+            is ApiResponse.Error -> error = response.error.message
         }
     }
 

@@ -1,0 +1,225 @@
+{
+  "kind": "generic_rest",
+  "name": "Pixeldrain (generic REST)",
+  "base_url": "https://pixeldrain.com/api",
+  "browse_root": "me",
+  "account_fallback": true,
+  "auth": {
+    "type": "BASIC",
+    "key_username": "",
+    "password_auth": {
+      "mode": "LOGIN",
+      "login": {
+        "method": "POST",
+        "body": "FORM",
+        "path": "/user/login",
+        "fields": { "username": "{username}", "password": "{password}", "totp": "{otp}", "app_name": "Materialdrain" },
+        "token": "$.auth_key",
+        "otp": {
+          "required_when": { "path": "$.value", "equals": "otp_required" },
+          "rejected_when": { "path": "$.value", "equals": "otp_incorrect" }
+        }
+      },
+      "logout": { "method": "DELETE", "path": "/user/session" }
+    }
+  },
+  "endpoints": {
+    "upload": {
+      "method": "PUT",
+      "path": "/file/{filename}",
+      "body": "RAW",
+      "success_status": [201],
+      "response_map": {
+        "id": "$.id",
+        "name": "$.name",
+        "size": "$.size",
+        "mime_type": "$.mime_type"
+      }
+    },
+    "download": {
+      "method": "GET",
+      "path": "/file/{id}"
+    },
+    "download_archive": {
+      "method": "GET",
+      "path": "/file/{ids}"
+    },
+    "delete": {
+      "method": "DELETE",
+      "path": "/file/{id}",
+      "success_status": [200]
+    },
+    "file_info": {
+      "method": "GET",
+      "path": "/file/{id}/info",
+      "response_map": {
+        "name": "$.name",
+        "size": "$.size",
+        "mime_type": "$.mime_type"
+      }
+    },
+    "user_info": {
+      "method": "GET",
+      "path": "/user",
+      "response_map": {
+        "username": "$.username",
+        "quota_used": "$.storage_space_used",
+        "quota_total": "$.subscription.storage_space"
+      }
+    },
+    "list": {
+      "method": "GET",
+      "path": "/user/files",
+      "list_path": "$.files",
+      "response_map": {
+        "id": "$.id",
+        "name": "$.name",
+        "size": "$.size",
+        "mime_type": "$.mime_type",
+        "created": "$.date_upload",
+        "modified": "$.date_last_view"
+      }
+    },
+    "browse_list": {
+      "method": "GET",
+      "path": "/filesystem/{path}?stat",
+      "list_path": "$.children",
+      "breadcrumb_path": "$.path",
+      "listing_map": {
+        "can_write": "$.permissions.write",
+        "can_delete": "$.permissions.delete"
+      },
+      "response_map": {
+        "name": "$.name",
+        "path": "$.path",
+        "is_directory": "$.type",
+        "size": "$.file_size",
+        "created": "$.created",
+        "modified": "$.modified",
+        "mime_type": "$.mime_type",
+        "id": "$.id"
+      }
+    },
+    "browse_upload": {
+      "method": "PUT",
+      "path": "/filesystem/{path}",
+      "body": "RAW",
+      "query": { "make_parents": "{make_parents}" },
+      "success_status": [200],
+      "response_map": {
+        "name": "$.name",
+        "path": "$.path",
+        "size": "$.file_size",
+        "mime_type": "$.mime_type",
+        "id": "$.id"
+      }
+    },
+    "browse_download": {
+      "method": "GET",
+      "path": "/filesystem/{path}"
+    },
+    "browse_thumbnail": {
+      "method": "GET",
+      "path": "/filesystem/{path}?thumbnail"
+    },
+    "browse_mkdir": {
+      "method": "POST",
+      "path": "/filesystem/{path}",
+      "form": { "action": "{action}" },
+      "success_status": [201]
+    },
+    "browse_rename": {
+      "method": "POST",
+      "path": "/filesystem/{path}",
+      "form": { "action": "rename", "target": "{target}", "make_parents": "{make_parents}" },
+      "success_status": [200],
+      "response_map": {
+        "name": "$.name",
+        "path": "$.path"
+      }
+    },
+    "browse_delete": {
+      "method": "DELETE",
+      "path": "/filesystem/{path}",
+      "query": { "recursive": "{recursive}" },
+      "success_status": [200]
+    },
+    "browse_import": {
+      "method": "POST",
+      "path": "/filesystem/{path}",
+      "form": { "action": "import", "files": "{files_json}" },
+      "success_status": [201]
+    },
+    "user_lists": {
+      "method": "GET",
+      "path": "/user/lists",
+      "list_path": "$.lists",
+      "response_map": {
+        "id": "$.id",
+        "title": "$.title",
+        "file_count": "$.file_count",
+        "can_edit": "$.can_edit"
+      }
+    },
+    "list_info": {
+      "method": "GET",
+      "path": "/list/{list_id}",
+      "list_path": "$.files",
+      "listing_map": {
+        "title": "$.title",
+        "can_edit": "$.can_edit"
+      },
+      "response_map": {
+        "id": "$.id",
+        "name": "$.name",
+        "size": "$.size",
+        "mime_type": "$.mime_type",
+        "created": "$.date_upload",
+        "modified": "$.date_last_view"
+      }
+    },
+    "list_create": {
+      "method": "POST",
+      "path": "/list",
+      "body": "JSON",
+      "json": "{\"title\": {title_json}, \"anonymous\": false, \"files\": {files_json}}",
+      "success_status": [201],
+      "response_map": {
+        "id": "$.id"
+      }
+    },
+    "list_update": {
+      "method": "PUT",
+      "path": "/list/{list_id}",
+      "body": "JSON",
+      "json": "{\"title\": {title_json}, \"files\": {files_json}}",
+      "success_status": [200]
+    },
+    "list_delete": {
+      "method": "DELETE",
+      "path": "/list/{list_id}",
+      "success_status": [200]
+    },
+    "thumbnail_id": {
+      "method": "GET",
+      "path": "https://pixeldrain.com/api/file/{id}/thumbnail"
+    },
+    "raw_id": {
+      "method": "GET",
+      "path": "https://pixeldrain.com/api/file/{id}"
+    },
+    "share_id": {
+      "method": "GET",
+      "path": "https://pixeldrain.com/u/{id}"
+    },
+    "share_path": {
+      "method": "GET",
+      "path": "https://pixeldrain.com/d/{path}"
+    }
+  },
+  "meta": {
+    "id": "tools.senko.materialdrain.examples.pixeldrain",
+    "version": 4,
+    "author": "Materialdrain"
+  }
+}

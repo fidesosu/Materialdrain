@@ -6,35 +6,43 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
+import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import tools.senko.materialdrain.api.FilesystemEntry // Added import
-import tools.senko.materialdrain.api.toFileInfoResponse // Added import
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedOutputStream
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import kotlin.coroutines.cancellation.CancellationException
-import tools.senko.materialdrain.api.ApiResponse
-import tools.senko.materialdrain.api.FileInfoResponse
-import tools.senko.materialdrain.api.FileUploadResponse
-import tools.senko.materialdrain.api.PixeldrainCoreApi
-import tools.senko.materialdrain.api.PixeldrainFilesystemApi
-import tools.senko.materialdrain.api.PixeldrainUserApi
-import tools.senko.materialdrain.api.UserList
+import kotlin.coroutines.coroutineContext
 import tools.senko.materialdrain.auth.SessionManager
+import tools.senko.materialdrain.settings.AppSettings
+import tools.senko.materialdrain.provider.ProviderConfigStore
+import tools.senko.materialdrain.provider.ProviderRegistry
+import tools.senko.materialdrain.provider.api.ApiResponse
+import tools.senko.materialdrain.provider.forDisplay
+import tools.senko.materialdrain.provider.api.ProviderCapability
+import tools.senko.materialdrain.provider.api.FileList
+import tools.senko.materialdrain.provider.api.ProviderError
+import tools.senko.materialdrain.provider.api.ProviderKind
+import tools.senko.materialdrain.provider.api.ProviderLog
+import tools.senko.materialdrain.provider.api.StorageNode
+import tools.senko.materialdrain.provider.api.StorageProvider
+import tools.senko.materialdrain.provider.api.StorageRef
 import tools.senko.materialdrain.transfer.TransferInfo
 import tools.senko.materialdrain.transfer.TransferKind
 import tools.senko.materialdrain.transfer.TransferOutcome
@@ -47,6 +55,7 @@ private const val MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES = 1 * 1024 * 1024 // 1MB
 private const val MAX_TEXT_PREVIEW_DISPLAY_LENGTH = 8 * 1024 // 8KB
 private const val DOWNLOAD_WRITE_BUFFER_BYTES = 256 * 1024
 private const val MAX_FILES_PER_ZIP = 100
+private const val API_KEY_MISSING = "API Key is missing. Please set it in Settings."
 
 // Define SortableField enum
 enum class SortableField {
@@ -77,13 +86,26 @@ data class FileDownloadState(
 )
 // --- End Download State Management ---
 
+/** Identifies a node in the app: its file id, or its path when it has no id (the filesystem). */
+val StorageNode.key: String get() = ref.id ?: ref.path
+
+/**
+ * The type which decides how a file is previewed. Some hosts list files without a useful type (the filesystem can
+ * give a blank or generic one), so a missing or generic type is worked out from the file extension instead.
+ */
+fun StorageNode.previewMimeType(): String? {
+    val reported = mimeType?.takeIf { it.isNotBlank() && it != "application/octet-stream" }
+    if (reported != null) return reported
+    val extension = name.substringAfterLast('.', "").lowercase()
+    if (extension.isEmpty()) return mimeType
+    return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: mimeType
+}
+
 data class FileInfoUiState(
     // For single file info
     val isLoadingFileInfo: Boolean = false,
-    val fileInfo: FileInfoResponse? = null,
+    val fileInfo: StorageNode? = null,
     val fileInfoErrorMessage: String? = null,
-    val fileIdInput: String = "",
-    val showEnterFileIdDialog: Boolean = false,
 
     // For text preview
     val isLoadingTextPreview: Boolean = false,
@@ -91,7 +113,7 @@ data class FileInfoUiState(
     val textPreviewErrorMessage: String? = null,
 
     // For user's list of files
-    val userFilesList: List<FileInfoResponse> = emptyList(),
+    val userFilesList: List<StorageNode> = emptyList(),
     val isLoadingUserFiles: Boolean = false,
     val userFilesListErrorMessage: String? = null,
 
@@ -101,13 +123,14 @@ data class FileInfoUiState(
     val deleteFileErrorMessage: String? = null,
     val initiateDeleteFile: Boolean = false,
     val fileIdToDelete: String? = null,
+    val nodeToDelete: StorageNode? = null,
 
     val apiKeyMissingError: Boolean = false,
-    val apiKey: String = "", // Exposed API Key
+    val apiKey: String = "", // Exposed API Key, only the built-in Pixeldrain uses it
 
     // Sorting state
-    val sortField: SortableField = SortableField.UPLOAD_DATE,
-    val sortAscending: Boolean = false, // Default: Newest first for UPLOAD_DATE
+    val sortField: SortableField = SortableField.NAME,
+    val sortAscending: Boolean = true,
 
     // Filtering state
     val filterQuery: String = "",
@@ -117,6 +140,8 @@ data class FileInfoUiState(
     val activeDownloads: Map<String, FileDownloadState> = emptyMap(),
     // General messages, can be deprecated if per-file messages are sufficient
     val fileDownloadSuccessMessage: String? = null,
+    // The last finished download, when it can be opened (it's saved on the device)
+    val fileDownloadOpen: OpenableDownload? = null,
     val fileDownloadErrorMessage: String? = null,
 
     // Scroll state preservation
@@ -128,30 +153,37 @@ data class FileInfoUiState(
     val operationError: String? = null
 )
 
+/**
+ * The file details, the files of the account and the actions on them (download, delete, filesystem, lists),
+ * for whichever provider is active. Every action goes through the provider's operations; the API key is only
+ * checked for the built-in Pixeldrain, which is the one host that needs it for the UI.
+ */
 class FileInfoViewModel(
     private val application: Application,
-    private val coreApi: PixeldrainCoreApi,
-    private val userApi: PixeldrainUserApi,
-    private val filesystemApi: PixeldrainFilesystemApi,
+    private val registry: ProviderRegistry,
+    private val configStore: ProviderConfigStore,
     private val sessionManager: SessionManager,
-    private val transfers: TransferRegistry
+    private val transfers: TransferRegistry,
+    private val appSettings: AppSettings
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(FileInfoUiState())
+    private val _uiState = MutableStateFlow(
+        FileInfoUiState(sortField = appSettings.filesSortField, sortAscending = appSettings.filesSortAscending)
+    )
     val uiState: StateFlow<FileInfoUiState> = _uiState.asStateFlow()
 
-    private val _displayedFiles = MutableStateFlow<List<FileInfoResponse>>(emptyList())
-    val displayedFiles: StateFlow<List<FileInfoResponse>> = _displayedFiles.asStateFlow()
-
-
-    private var apiKey: String = ""
-    // Removed downloadJobs map
+    private val _displayedFiles = MutableStateFlow<List<StorageNode>>(emptyList())
+    val displayedFiles: StateFlow<List<StorageNode>> = _displayedFiles.asStateFlow()
 
     init {
-        Log.d(TAG, "ViewModel init: Calling loadApiKey()")
         loadApiKey()
 
-        // 👇 New: start recomputing displayedFiles whenever relevant state changes
+        // Choosing another host as the active one reloads the files of that host
+        viewModelScope.launch {
+            configStore.changes.drop(1).collect { onActiveProviderChanged() }
+        }
+
+        // Recomputes displayedFiles whenever the list, the sorting or the filter changes
         viewModelScope.launch {
             combine(
                 uiState.map { it.userFilesList },
@@ -163,11 +195,11 @@ class FileInfoViewModel(
                     files
                         .filter { it.name.contains(filterQuery, ignoreCase = true) }
                         .sortedWith(
-                            compareBy<FileInfoResponse> {
+                            compareBy<StorageNode> {
                                 when (sortField) {
                                     SortableField.NAME -> it.name.lowercase()
-                                    SortableField.SIZE -> it.size
-                                    SortableField.UPLOAD_DATE -> it.dateUpload
+                                    SortableField.SIZE -> it.size ?: 0L
+                                    SortableField.UPLOAD_DATE -> it.createdAt.orEmpty()
                                 }
                             }.let { comparator ->
                                 if (sortAscending) comparator else comparator.reversed()
@@ -180,53 +212,51 @@ class FileInfoViewModel(
         }
     }
 
+    private fun provider(): StorageProvider = registry.resolve(configStore.activeProviderId.value)
+
+    /** The public link of a node, or null when the active host has none. */
+    fun shareUrlFor(node: StorageNode): String? = provider().shareUrl(node)
+
+    /** The preview image of a node, from the active host; null when it has none. */
+    fun thumbnailFor(node: StorageNode): String? = provider().thumbnailUrl(node)
+
+    /** The content of a node itself (for previews and the full screen view), from the active host. */
+    fun rawUrlFor(node: StorageNode): String? = provider().rawContentUrl(node, attachment = false)
+
+    /** Whether the active host lets its files be deleted. */
+    fun canDeleteFiles(): Boolean = ProviderCapability.DELETE in provider().capabilities
+
+    /** The key the UI needs, only the built-in Pixeldrain has one. */
+    private fun apiKeyForUi(): String =
+        if (provider().kind == ProviderKind.PIXELDRAIN) sessionManager.currentApiKey() else ""
+
+    /** Pixeldrain's operations need the login: without it there's nothing to show or change. */
+    private fun needsKeyButMissing(): Boolean = provider().kind == ProviderKind.PIXELDRAIN && apiKeyForUi().isBlank()
+
+    private fun onActiveProviderChanged() {
+        val current = provider()
+        ProviderLog.i("Files", "active host is now '${current.displayName}' (${current.kind}), reloading its files")
+        _uiState.update {
+            it.copy(
+                userFilesList = emptyList(),
+                userFilesListErrorMessage = null,
+                fileInfo = null,
+                apiKeyMissingError = false
+            )
+        }
+        loadApiKey()
+    }
 
     fun loadApiKey() {
-        apiKey = sessionManager.currentApiKey()
-        _uiState.update { it.copy(apiKey = apiKey) }
-        Log.d(TAG, "loadApiKey called. API Key loaded: '${if (apiKey.isNotBlank()) "PRESENT (not showing value)" else "MISSING"}'")
-
-        if (apiKey.isBlank()) {
-            Log.d(TAG, "loadApiKey: API key is blank. Updating UI state for missing key.")
-            _uiState.update { it.copy(apiKeyMissingError = true, userFilesListErrorMessage = "API Key is missing. Please set it in Settings.") }
-        } else {
-            Log.d(TAG, "loadApiKey: API key is present.")
-            val currentState = _uiState.value
-            val wasApiKeyMissingError = currentState.apiKeyMissingError
-            val wasUserFilesListErrorMessageMissingKey = currentState.userFilesListErrorMessage?.contains("API Key is missing") == true
-            Log.d(TAG, "loadApiKey: Current State -> apiKeyMissingError: $wasApiKeyMissingError, userFilesListErrorMessage: '${currentState.userFilesListErrorMessage}'")
-
-            if (wasApiKeyMissingError || wasUserFilesListErrorMessageMissingKey) {
-                Log.d(TAG, "loadApiKey: Clearing previous API key related errors.")
-                _uiState.update { it.copy(apiKeyMissingError = false, userFilesListErrorMessage = null) }
-
-                val updatedState = _uiState.value
-                val isUserFilesListEmpty = updatedState.userFilesList.isEmpty()
-                val isNotLoadingUserFiles = !updatedState.isLoadingUserFiles
-                Log.d(TAG, "loadApiKey (after clearing error): Checking conditions to fetch files:")
-                Log.d(TAG, "loadApiKey (after clearing error): - userFilesList.isEmpty(): $isUserFilesListEmpty")
-                Log.d(TAG, "loadApiKey (after clearing error): - !isLoadingUserFiles: $isNotLoadingUserFiles")
-
-                if (isUserFilesListEmpty && isNotLoadingUserFiles) {
-                    Log.d(TAG, "loadApiKey (after clearing error): Conditions met. Calling fetchUserFiles().")
-                    fetchUserFiles()
-                } else {
-                    Log.d(TAG, "loadApiKey (after clearing error): Conditions NOT met for fetchUserFiles(). List empty: $isUserFilesListEmpty, Not loading: $isNotLoadingUserFiles")
-                }
-            } else {
-                val isUserFilesListEmpty = currentState.userFilesList.isEmpty()
-                val isNotLoadingUserFiles = !currentState.isLoadingUserFiles
-                Log.d(TAG, "loadApiKey: No previous API key errors. Checking conditions to fetch files:")
-                Log.d(TAG, "loadApiKey: - userFilesList.isEmpty(): $isUserFilesListEmpty")
-                Log.d(TAG, "loadApiKey: - !isLoadingUserFiles: $isNotLoadingUserFiles")
-                if (isUserFilesListEmpty && isNotLoadingUserFiles) {
-                    Log.d(TAG, "loadApiKey (no prior error path): Conditions met. Calling fetchUserFiles().")
-                    fetchUserFiles()
-                } else {
-                    Log.d(TAG, "loadApiKey (no prior error path): Conditions NOT met for fetchUserFiles(). List empty: $isUserFilesListEmpty, Not loading: $isNotLoadingUserFiles")
-                }
-            }
+        val key = apiKeyForUi()
+        _uiState.update { it.copy(apiKey = key) }
+        if (needsKeyButMissing()) {
+            _uiState.update { it.copy(apiKeyMissingError = true, userFilesListErrorMessage = API_KEY_MISSING) }
+            return
         }
+        _uiState.update { it.copy(apiKeyMissingError = false, userFilesListErrorMessage = null) }
+        val state = _uiState.value
+        if (state.userFilesList.isEmpty() && !state.isLoadingUserFiles) fetchUserFiles()
     }
 
     private fun clearTextPreviewStates() {
@@ -239,15 +269,32 @@ class FileInfoViewModel(
         }
     }
 
-    fun onFileIdInputChange(newFileId: String) {
-        _uiState.update { it.copy(fileIdInput = newFileId) }
-        if (newFileId != _uiState.value.fileInfo?.id) {
-            clearTextPreviewStates()
+    /** Reads the file from the provider, as the file id or the path it has. */
+    private suspend fun downloadNodeTo(
+        node: StorageNode,
+        outputStream: OutputStream,
+        onProgress: (Long, Long?) -> Unit
+    ): ApiResponse<Long> {
+        val current = provider()
+        val id = node.ref.id
+        return if (id != null) {
+            val store = current.fileStore
+                ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't download files by id."))
+            // Several ids joined by commas (see downloadFilesAsZip) are one archive; file ids never contain commas
+            if (',' in id) {
+                store.downloadArchive(id.split(',').map { StorageRef(id = it) }, outputStream, onProgress)
+            } else {
+                store.download(StorageRef(id = id), outputStream, onProgress)
+            }
+        } else {
+            val browse = current.browse
+                ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't download this file."))
+            browse.download(node.ref.path, outputStream, onProgress)
         }
     }
 
-    private fun fetchTextFilePreviewContent(fileInfo: FileInfoResponse) {
-        val mimeType = fileInfo.mimeType ?: ""
+    private fun fetchTextFilePreviewContent(fileInfo: StorageNode) {
+        val mimeType = fileInfo.previewMimeType() ?: ""
         val commonTextMimeTypes = listOf(
             "text/plain", "text/html", "text/css", "text/javascript", "text/xml", "text/csv",
             "application/json", "application/xml", "application/javascript", "application/rtf",
@@ -259,21 +306,24 @@ class FileInfoViewModel(
                 (mimeType.startsWith("application/octet-stream", ignoreCase = true) &&
                         commonTextExtensions.any { fileInfo.name.endsWith(it, ignoreCase = true) })
 
+        // An error replaces any text shown for the previous file, so the old preview can't stay on screen
         if (!isLikelyTextFile) {
-            _uiState.update { it.copy(textPreviewErrorMessage = "Preview not supported for this file type.") }
+            _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewContent = null, textPreviewErrorMessage = "Preview not supported for this file type.") }
             return
         }
 
-        if (fileInfo.size > MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES) {
-            _uiState.update { it.copy(textPreviewErrorMessage = "File is too large (${formatSize(fileInfo.size)}) for text preview. Max ${formatSize(MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES.toLong())}.") }
+        val size = fileInfo.size ?: 0L
+        if (size > MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES) {
+            _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewContent = null, textPreviewErrorMessage = "File is too large (${formatSize(size)}) for text preview. Max ${formatSize(MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES.toLong())}.") }
             return
         }
 
         _uiState.update { it.copy(isLoadingTextPreview = true, textPreviewContent = null, textPreviewErrorMessage = null) }
         viewModelScope.launch {
-            when (val response = coreApi.getFileContentAsText(fileInfo.id)) {
+            val buffer = ByteArrayOutputStream()
+            when (val response = downloadNodeTo(fileInfo, buffer) { _, _ -> }) {
                 is ApiResponse.Success -> {
-                    val content = response.data
+                    val content = buffer.toString(Charsets.UTF_8.name())
                     val truncatedContent = if (content.length > MAX_TEXT_PREVIEW_DISPLAY_LENGTH) {
                         content.substring(0, MAX_TEXT_PREVIEW_DISPLAY_LENGTH) + "\n... (truncated)"
                     } else {
@@ -287,7 +337,7 @@ class FileInfoViewModel(
                     _uiState.update {
                         it.copy(
                             isLoadingTextPreview = false,
-                            textPreviewErrorMessage = response.errorDetails.message ?: response.errorDetails.value ?: "Error fetching text preview."
+                            textPreviewErrorMessage = response.error.message.ifBlank { "Error fetching text preview." }
                         )
                     }
                 }
@@ -303,12 +353,14 @@ class FileInfoViewModel(
         _uiState.update { it.copy(isLoadingFileInfo = true, fileInfo = null, fileInfoErrorMessage = null) }
         clearTextPreviewStates()
         viewModelScope.launch {
-            // Pass the API key to the service method
-            when (val response = coreApi.getFileInfo(fileId, apiKey)) {
+            val store = provider().fileStore
+            if (store == null) {
+                _uiState.update { it.copy(isLoadingFileInfo = false, fileInfoErrorMessage = "This host can't show file details by id.") }
+                return@launch
+            }
+            when (val response = store.fileInfo(StorageRef(id = fileId))) {
                 is ApiResponse.Success -> {
-                    _uiState.update {
-                        it.copy(isLoadingFileInfo = false, fileInfo = response.data, fileIdInput = fileId)
-                    }
+                    _uiState.update { it.copy(isLoadingFileInfo = false, fileInfo = response.data) }
                     // Only fetch text preview if the main file info call was successful
                     fetchTextFilePreviewContent(response.data)
                 }
@@ -316,7 +368,7 @@ class FileInfoViewModel(
                     _uiState.update {
                         it.copy(
                             isLoadingFileInfo = false,
-                            fileInfoErrorMessage = response.errorDetails.message ?: response.errorDetails.value ?: "Unknown error fetching file info",
+                            fileInfoErrorMessage = response.error.message.ifBlank { "Unknown error fetching file info" },
                             fileInfo = null
                         )
                     }
@@ -325,105 +377,145 @@ class FileInfoViewModel(
         }
     }
 
-    // New function to set FileInfo from a FilesystemEntry
-    fun setFileInfoFromFilesystemEntry(entry: FilesystemEntry) {
-        val fileInfo = entry.toFileInfoResponse()
-        if (fileInfo != null) {
-            _uiState.update {
-                it.copy(
-                    isLoadingFileInfo = false, // Assuming conversion is quick
-                    fileInfo = fileInfo,
-                    fileIdInput = fileInfo.id, // Keep fileIdInput in sync
-                    fileInfoErrorMessage = null
-                )
-            }
-            fetchTextFilePreviewContent(fileInfo) // Attempt to load text preview if applicable
-        } else {
+    /** Shows the details of a file node (from the filesystem or the file list). Folders have no details. */
+    fun setFileInfoFromNode(node: StorageNode) {
+        if (node.isDirectory) {
             _uiState.update {
                 it.copy(
                     isLoadingFileInfo = false,
                     fileInfo = null,
-                    fileInfoErrorMessage = "Cannot display details. Item may be a folder or a file without a direct Pixeldrain ID."
+                    fileInfoErrorMessage = "Folders have no file details."
                 )
             }
-            clearTextPreviewStates() // Clear any previous preview
+            clearTextPreviewStates()
+            return
         }
+        _uiState.update {
+            it.copy(
+                isLoadingFileInfo = false,
+                fileInfo = node,
+                fileInfoErrorMessage = null
+            )
+        }
+        fetchTextFilePreviewContent(node)
     }
-
-    fun fetchFileInfoFromDialogInput() { fetchFileInfo(_uiState.value.fileIdInput) }
 
     fun clearFileInfoDisplay() {
         _uiState.update { it.copy(fileInfo = null, isLoadingFileInfo = false) }
         clearTextPreviewStates()
     }
 
-    fun dismissEnterFileIdDialog() {
-        _uiState.update { it.copy(showEnterFileIdDialog = false, fileInfoErrorMessage = null) }
-        clearTextPreviewStates()
-    }
 
     fun fetchUserFiles() {
-        if (apiKey.isBlank()) {
-            Log.d(TAG, "fetchUserFiles skipped: API key is blank.")
-            _uiState.update { it.copy(userFilesListErrorMessage = "API Key is required. Please set it in Settings.", isLoadingUserFiles = false, userFilesList = emptyList(), apiKeyMissingError = true) }
+        val files = provider().fileList
+        if (files == null) {
+            _uiState.update { it.copy(userFilesListErrorMessage = "This host has no list of its files.", isLoadingUserFiles = false) }
             return
         }
-        Log.d(TAG, "fetchUserFiles: Attempting to fetch files with API key.")
+        if (needsKeyButMissing()) {
+            _uiState.update { it.copy(userFilesListErrorMessage = API_KEY_MISSING, isLoadingUserFiles = false, userFilesList = emptyList(), apiKeyMissingError = true) }
+            return
+        }
         _uiState.update { it.copy(isLoadingUserFiles = true, userFilesListErrorMessage = null, apiKeyMissingError = false) }
+        ProviderLog.d("Files", "loading the file list of '${provider().displayName}'")
         viewModelScope.launch {
-            when (val response = userApi.getUserFiles(apiKey)) {
+            when (val response = files.list()) {
                 is ApiResponse.Success -> {
-                    Log.d(TAG, "fetchUserFiles: Successfully fetched ${response.data.files.size} files.")
-                    _uiState.update { it.copy(isLoadingUserFiles = false, userFilesList = response.data.files) }
+                    ProviderLog.i("Files", "loaded ${response.data.children.size} files")
+                    _uiState.update { it.copy(isLoadingUserFiles = false, userFilesList = response.data.children) }
                 }
                 is ApiResponse.Error -> {
-                    val errorMsg = response.errorDetails.message ?: response.errorDetails.value ?: "Unknown error fetching user files"
-                    Log.e(TAG, "fetchUserFiles: Error fetching files: $errorMsg")
-                    _uiState.update { it.copy(isLoadingUserFiles = false, userFilesListErrorMessage = errorMsg, apiKeyMissingError = errorMsg.contains("unauthorized", ignoreCase = true) || response.errorDetails.value == "api_key_missing") }
+                    val errorMsg = response.error.forDisplay().ifBlank { "Unknown error fetching user files" }
+                    ProviderLog.e("Files", "loading the file list failed (${response.error.code}): $errorMsg")
+                    _uiState.update {
+                        it.copy(
+                            isLoadingUserFiles = false,
+                            userFilesListErrorMessage = errorMsg,
+                            apiKeyMissingError = response.error.code == "api_key_missing" || response.error.code == "authentication_required"
+                        )
+                    }
                 }
             }
         }
     }
+
     fun clearUserFilesError() { _uiState.update { it.copy(userFilesListErrorMessage = null, apiKeyMissingError = false) } }
 
-    fun changeSortOrder(newField: SortableField? = null, newAscending: Boolean? = null) { _uiState.update { it.copy(sortField = newField ?: it.sortField, sortAscending = newAscending ?: it.sortAscending) } }
+    fun changeSortOrder(newField: SortableField? = null, newAscending: Boolean? = null) {
+        _uiState.update { it.copy(sortField = newField ?: it.sortField, sortAscending = newAscending ?: it.sortAscending) }
+        appSettings.filesSortField = _uiState.value.sortField
+        appSettings.filesSortAscending = _uiState.value.sortAscending
+    }
 
     fun onFilterQueryChanged(newQuery: String) { _uiState.update { it.copy(filterQuery = newQuery) } }
     fun toggleFilterInput() { _uiState.update { it.copy(showFilterInput = !it.showFilterInput) } }
     fun setFilterInputVisible(isVisible: Boolean) { _uiState.update { it.copy(showFilterInput = isVisible) } }
 
-    fun initiateDeleteFile(fileId: String) { _uiState.update { it.copy(initiateDeleteFile = true, fileIdToDelete = fileId) } }
-    fun cancelDeleteFile() { _uiState.update { it.copy(initiateDeleteFile = false, fileIdToDelete = null, deleteFileErrorMessage = null) } }
+    fun initiateDeleteFile(node: StorageNode) {
+        _uiState.update { it.copy(initiateDeleteFile = true, fileIdToDelete = node.key, nodeToDelete = node) }
+    }
+
+    fun cancelDeleteFile() { _uiState.update { it.copy(initiateDeleteFile = false, fileIdToDelete = null, nodeToDelete = null, deleteFileErrorMessage = null) } }
+
     fun confirmDeleteFile() {
-        val fileId = _uiState.value.fileIdToDelete ?: return
-        if (apiKey.isBlank()) {
+        val node = _uiState.value.nodeToDelete ?: return
+        if (needsKeyButMissing()) {
             _uiState.update { it.copy(initiateDeleteFile = false, deleteFileErrorMessage = "API Key is missing. Cannot delete file.", apiKeyMissingError = true) }
             return
         }
         _uiState.update { it.copy(isLoadingDeleteFile = true, deleteFileErrorMessage = null, deleteFileSuccessMessage = null) }
         viewModelScope.launch {
-            // Files which come from the filesystem are identified by their path instead of a file ID
-            val deleteResult = if (isFilesystemPath(fileId)) filesystemApi.deleteNode(apiKey, fileId) else coreApi.deleteFile(apiKey, fileId)
-            when (val response = deleteResult) {
+            when (val response = deleteNode(node)) {
                 is ApiResponse.Success -> _uiState.update {
-                    val newFileInfo = if (it.fileInfo?.id == fileId) null else it.fileInfo
+                    val newFileInfo = if (it.fileInfo?.key == node.key) null else it.fileInfo
                     if (newFileInfo == null) clearTextPreviewStates()
                     it.copy(
                         isLoadingDeleteFile = false,
                         initiateDeleteFile = false,
                         fileIdToDelete = null,
-                        deleteFileSuccessMessage = response.data.message ?: "File deleted successfully.",
-                        userFilesList = _uiState.value.userFilesList.filterNot { item -> item.id == fileId },
+                        nodeToDelete = null,
+                        deleteFileSuccessMessage = "File deleted successfully.",
+                        userFilesList = it.userFilesList.filterNot { item -> item.key == node.key },
                         fileInfo = newFileInfo,
-                        activeDownloads = it.activeDownloads.filterNot { entry -> entry.key == fileId }
+                        activeDownloads = it.activeDownloads.filterNot { entry -> entry.key == node.key }
                     )
                 }
-                is ApiResponse.Error -> _uiState.update { it.copy(isLoadingDeleteFile = false, initiateDeleteFile = false, fileIdToDelete = null, deleteFileErrorMessage = response.errorDetails.message ?: response.errorDetails.value ?: "Unknown error deleting file.") }
+                is ApiResponse.Error -> _uiState.update {
+                    it.copy(
+                        isLoadingDeleteFile = false,
+                        initiateDeleteFile = false,
+                        fileIdToDelete = null,
+                        nodeToDelete = null,
+                        deleteFileErrorMessage = response.error.message.ifBlank { "Unknown error deleting file." }
+                    )
+                }
             }
         }
     }
+
+    /** Deletes a file by its id when it has one, otherwise by its path (folders are only deleted from the filesystem). */
+    private suspend fun deleteNode(node: StorageNode): ApiResponse<Unit> {
+        val current = provider()
+        val id = node.ref.id
+        return if (id != null) {
+            val store = current.fileStore ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't delete files by id."))
+            store.delete(StorageRef(id = id))
+        } else {
+            val browse = current.browse ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't delete this file."))
+            browse.delete(node.ref.path, recursive = node.isDirectory)
+        }
+    }
+
     fun clearDeleteMessages() { _uiState.update { it.copy(deleteFileSuccessMessage = null, deleteFileErrorMessage = null) } }
-    fun clearApiKeyMissingError() { _uiState.update { it.copy(apiKeyMissingError = false, userFilesListErrorMessage = if(it.userFilesListErrorMessage?.contains("API Key is missing") == true) null else it.userFilesListErrorMessage) } }
+
+    fun clearApiKeyMissingError() {
+        _uiState.update {
+            it.copy(
+                apiKeyMissingError = false,
+                userFilesListErrorMessage = if (it.userFilesListErrorMessage == API_KEY_MISSING) null else it.userFilesListErrorMessage
+            )
+        }
+    }
 
     // --- File Download Functions ---
 
@@ -450,14 +542,14 @@ class FileInfoViewModel(
                         Log.e(TAG, "ContentResolver.openOutputStream returned null for $uri")
                     }
                 }
-                if (outputStream == null && uri != null) { 
-                    contentResolver.delete(uri, null, null) 
+                if (outputStream == null && uri != null) {
+                    contentResolver.delete(uri, null, null)
                     uri = null
                     throw IOException("Failed to open output stream for $uri")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to prepare download target for '$fileName': ${e.message}", e)
-                uri?.let { contentResolver.delete(it, null, null) } 
+                uri?.let { contentResolver.delete(it, null, null) }
                 return@withContext null to null
             }
             uri to outputStream
@@ -488,20 +580,21 @@ class FileInfoViewModel(
     }
 
     /** Starts the download and returns its job. When [queue] is given, cancelling this download cancels the queue too. */
-    fun initiateDownloadFile(file: FileInfoResponse, queue: Job? = null): Job {
-        // Removed check for existing active job from downloadJobs map
+    fun initiateDownloadFile(node: StorageNode, queue: Job? = null): Job {
+        val key = node.key
+        val size = node.size ?: 0L
 
         _uiState.update { currentState ->
             val newDownloadState = FileDownloadState(
-                fileId = file.id,
-                fileName = file.name,
-                totalBytes = file.size,
+                fileId = key,
+                fileName = node.name,
+                totalBytes = size,
                 status = DownloadStatus.PENDING
             )
-            currentState.copy(activeDownloads = currentState.activeDownloads + (file.id to newDownloadState))
+            currentState.copy(activeDownloads = currentState.activeDownloads + (key to newDownloadState))
         }
 
-        val transferId = "download-${file.id}"
+        val transferId = "download-$key"
         // Started lazily so that the transfer is registered before it can possibly finish
         val downloadJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             var targetUri: Uri? = null
@@ -511,13 +604,13 @@ class FileInfoViewModel(
             var outcomeMessage: String? = null
 
             try {
-                _uiState.value.activeDownloads[file.id]?.let { 
+                _uiState.value.activeDownloads[key]?.let {
                     targetUri = it.targetUri
                 }
-                if (targetUri == null) { 
-                     val (uri, stream) = prepareDownloadTargetUriAndStream(file.name, file.mimeType)
-                     targetUri = uri
-                     outputStream = stream
+                if (targetUri == null) {
+                    val (uri, stream) = prepareDownloadTargetUriAndStream(node.name, node.mimeType)
+                    targetUri = uri
+                    outputStream = stream
                 } else {
                     application.contentResolver.openOutputStream(targetUri)?.let {
                         outputStream = BufferedOutputStream(it, DOWNLOAD_WRITE_BUFFER_BYTES)
@@ -529,12 +622,12 @@ class FileInfoViewModel(
                 }
 
                 _uiState.update { currentState ->
-                    val updatedDownload = currentState.activeDownloads[file.id]?.copy(
+                    val updatedDownload = currentState.activeDownloads[key]?.copy(
                         status = DownloadStatus.DOWNLOADING,
                         targetUri = targetUri
                     )
                     if (updatedDownload != null) {
-                        currentState.copy(activeDownloads = currentState.activeDownloads + (file.id to updatedDownload))
+                        currentState.copy(activeDownloads = currentState.activeDownloads + (key to updatedDownload))
                     } else currentState
                 }
 
@@ -544,9 +637,9 @@ class FileInfoViewModel(
                         (bytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
                     } else 0f
                     val speed = speedTracker.update(bytesRead)
-                    transfers.progress(transferId, bytesRead, totalBytes, speed, estimateEtaSeconds(totalBytes ?: file.size.takeIf { it > 0 }, bytesRead, speed))
+                    transfers.progress(transferId, bytesRead, totalBytes, speed, estimateEtaSeconds(totalBytes ?: size.takeIf { it > 0 }, bytesRead, speed))
                     _uiState.update { currentState ->
-                        val currentDownload = currentState.activeDownloads[file.id]
+                        val currentDownload = currentState.activeDownloads[key]
                         val effectiveTotal = totalBytes ?: currentDownload?.totalBytes
                         val updatedDownload = currentDownload?.copy(
                             downloadedBytes = bytesRead,
@@ -556,26 +649,20 @@ class FileInfoViewModel(
                             etaSeconds = estimateEtaSeconds(effectiveTotal, bytesRead, speed)
                         )
                         if (updatedDownload != null) {
-                            currentState.copy(activeDownloads = currentState.activeDownloads + (file.id to updatedDownload))
+                            currentState.copy(activeDownloads = currentState.activeDownloads + (key to updatedDownload))
                         } else currentState
                     }
                 }
 
-                val response = if (isFilesystemPath(file.id)) {
-                    filesystemApi.downloadFile(apiKey, file.id, outputStream!!, onProgress)
-                } else {
-                    coreApi.downloadFileToOutputStream(file.id, outputStream!!, apiKey, onProgress)
-                }
-
-                when (response) {
+                when (val response = downloadNodeTo(node, outputStream!!, onProgress)) {
                     is ApiResponse.Success -> {
                         downloadSuccessful = true
                         val bytesCopied = response.data
-                        val message = "File '${file.name}' downloaded (${formatSize(bytesCopied)})."
+                        val message = "File '${node.name}' downloaded (${formatSize(bytesCopied)})."
                         outcome = TransferOutcome.COMPLETED
                         outcomeMessage = message
                         _uiState.update { currentState ->
-                            val updatedDownload = currentState.activeDownloads[file.id]?.copy(
+                            val updatedDownload = currentState.activeDownloads[key]?.copy(
                                 status = DownloadStatus.COMPLETED,
                                 message = message,
                                 downloadedBytes = bytesCopied,
@@ -584,38 +671,39 @@ class FileInfoViewModel(
                                 etaSeconds = null
                             )
                             currentState.copy(
-                                activeDownloads = if (updatedDownload != null) currentState.activeDownloads + (file.id to updatedDownload) else currentState.activeDownloads,
-                                fileDownloadSuccessMessage = message
+                                activeDownloads = if (updatedDownload != null) currentState.activeDownloads + (key to updatedDownload) else currentState.activeDownloads,
+                                fileDownloadSuccessMessage = message,
+                                fileDownloadOpen = targetUri?.let { OpenableDownload(it, node.previewMimeType() ?: "*/*") }
                             )
                         }
                     }
                     is ApiResponse.Error -> {
-                        throw IOException(response.errorDetails.message ?: "Download failed due to API error.")
+                        throw IOException(response.error.message.ifBlank { "Download failed due to API error." })
                     }
                 }
             } catch (e: Exception) {
                 downloadSuccessful = false
                 outcome = if (e is CancellationException) TransferOutcome.CANCELLED else TransferOutcome.FAILED
                 val errorMsg = if (e is CancellationException) {
-                    Log.i(TAG, "Download for ${file.id} was cancelled by scope.")
-                    "Download for '${file.name}' was cancelled."
+                    Log.i(TAG, "Download for $key was cancelled by scope.")
+                    "Download for '${node.name}' was cancelled."
                 } else {
-                    Log.e(TAG, "Error during file download process for ${file.id}: ${e.message}", e)
-                    "Download error for '${file.name}': ${e.localizedMessage ?: "Unexpected error"}"
+                    Log.e(TAG, "Error during file download process for $key: ${e.message}", e)
+                    "Download error for '${node.name}': ${e.localizedMessage ?: "Unexpected error"}"
                 }
                 outcomeMessage = errorMsg
                 _uiState.update { currentState ->
-                    val updatedDownload = currentState.activeDownloads[file.id]?.copy(
+                    val updatedDownload = currentState.activeDownloads[key]?.copy(
                         status = DownloadStatus.FAILED,
                         message = errorMsg,
                         bytesPerSecond = 0L,
                         etaSeconds = null,
-                        progressFraction = if (e is CancellationException) 0f else currentState.activeDownloads[file.id]?.progressFraction ?: 0f,
-                        downloadedBytes = if (e is CancellationException) 0L else currentState.activeDownloads[file.id]?.downloadedBytes ?: 0L
+                        progressFraction = if (e is CancellationException) 0f else currentState.activeDownloads[key]?.progressFraction ?: 0f,
+                        downloadedBytes = if (e is CancellationException) 0L else currentState.activeDownloads[key]?.downloadedBytes ?: 0L
                     )
                     if (updatedDownload != null) {
                         currentState.copy(
-                            activeDownloads = currentState.activeDownloads + (file.id to updatedDownload),
+                            activeDownloads = currentState.activeDownloads + (key to updatedDownload),
                             fileDownloadErrorMessage = if (e !is CancellationException) errorMsg else null
                         )
                     } else currentState
@@ -624,18 +712,18 @@ class FileInfoViewModel(
                 try {
                     outputStream?.close()
                 } catch (e: IOException) {
-                    Log.e(TAG, "Error closing output stream for ${file.name}: ${e.message}", e)
+                    Log.e(TAG, "Error closing output stream for ${node.name}: ${e.message}", e)
                 }
                 targetUri?.let {
                     // NonCancellable: a cancelled coroutine could otherwise not clean up the partial file
                     withContext(NonCancellable) { finalizeMediaStoreEntry(it, downloadSuccessful) }
                 }
                 // Reported after the file was finalized, so the notification can open it
-                transfers.finish(transferId, outcome, outcomeMessage, if (downloadSuccessful) targetUri else null, file.mimeType)
+                transfers.finish(transferId, outcome, outcomeMessage, if (downloadSuccessful) targetUri else null, node.mimeType)
             }
         }
         transfers.start(
-            TransferInfo(transferId, TransferKind.DOWNLOAD, file.name, totalBytes = file.size.takeIf { it > 0 }),
+            TransferInfo(transferId, TransferKind.DOWNLOAD, node.name, totalBytes = size.takeIf { it > 0 }),
             onCancel = {
                 downloadJob.cancel()
                 queue?.cancel()
@@ -645,12 +733,10 @@ class FileInfoViewModel(
         return downloadJob
     }
 
-    // Removed fun cancelDownload(fileId: String)
-
     // --- Actions on several files at once ---
 
     /** Downloads the files one after another, several simultaneous downloads can run into the download limits. */
-    fun downloadFilesSequentially(files: List<FileInfoResponse>) {
+    fun downloadFilesSequentially(files: List<StorageNode>) {
         if (files.isEmpty()) return
         if (files.size == 1) {
             initiateDownloadFile(files.first())
@@ -665,21 +751,29 @@ class FileInfoViewModel(
         }
     }
 
-    /** Downloads the files as zip archive(s), the API serves several comma separated IDs as one archive. */
-    fun downloadFilesAsZip(files: List<FileInfoResponse>, archiveName: String) {
+    /**
+     * Downloads the files as zip archive(s) when the provider serves several ids as one archive (Pixeldrain does,
+     * with comma separated ids). Otherwise the files are downloaded one after another.
+     */
+    fun downloadFilesAsZip(files: List<StorageNode>, archiveName: String) {
         if (files.isEmpty()) return
         if (files.size == 1) {
             initiateDownloadFile(files.first())
             return
         }
+        if (files.any { it.ref.id == null || it.isDirectory } || ProviderCapability.ARCHIVE_DOWNLOAD !in provider().capabilities) {
+            downloadFilesSequentially(files)
+            return
+        }
         val baseName = archiveName.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "files" }
         val chunks = files.chunked(MAX_FILES_PER_ZIP)
         val archives = chunks.mapIndexed { index, chunk ->
-            FileInfoResponse(
-                id = chunk.joinToString(",") { it.id },
+            StorageNode(
+                ref = StorageRef(id = chunk.joinToString(",") { it.ref.id.orEmpty() }),
                 name = if (chunks.size == 1) "$baseName.zip" else "$baseName (part ${index + 1}).zip",
-                size = chunk.sumOf { it.size },
-                dateUpload = chunk.first().dateUpload,
+                isDirectory = false,
+                size = chunk.sumOf { it.size ?: 0L },
+                createdAt = chunk.first().createdAt,
                 mimeType = "application/zip"
             )
         }
@@ -688,8 +782,8 @@ class FileInfoViewModel(
 
     /** Checks the preconditions of an action on several files and marks it as running. */
     private fun beginBulkOperation(): Boolean {
-        if (apiKey.isBlank()) {
-            _uiState.update { it.copy(operationError = "API Key is missing. Please set it in Settings.") }
+        if (needsKeyButMissing()) {
+            _uiState.update { it.copy(operationError = API_KEY_MISSING) }
             return false
         }
         if (_uiState.value.isBulkOperationRunning) return false
@@ -700,42 +794,45 @@ class FileInfoViewModel(
     private fun failureSummary(failures: List<String>): String =
         failures.take(3).joinToString("; ") + if (failures.size > 3) " and ${failures.size - 3} more" else ""
 
-    /** There is no endpoint to delete several files, so this deletes them one by one. */
-    fun deleteFiles(files: List<FileInfoResponse>) {
-        val targets = files.distinctBy { it.id }
+    /** There is no endpoint to delete several files everywhere, so this deletes them one by one. */
+    fun deleteFiles(files: List<StorageNode>) {
+        val targets = files.distinctBy { it.key }
         if (targets.isEmpty() || !beginBulkOperation()) return
         viewModelScope.launch {
-            val deletedIds = mutableSetOf<String>()
+            val deletedKeys = mutableSetOf<String>()
             val failures = mutableListOf<String>()
             for (file in targets) {
-                when (val response = coreApi.deleteFile(apiKey, file.id)) {
-                    is ApiResponse.Success -> deletedIds.add(file.id)
-                    is ApiResponse.Error -> failures.add("${file.name} (${response.errorDetails.message ?: response.errorDetails.value ?: "unknown error"})")
+                when (val response = deleteNode(file)) {
+                    is ApiResponse.Success -> deletedKeys.add(file.key)
+                    is ApiResponse.Error -> failures.add("${file.name} (${response.error.message.ifBlank { "unknown error" }})")
                 }
             }
             _uiState.update {
-                val openedFileDeleted = it.fileInfo?.id in deletedIds
+                val openedFileDeleted = it.fileInfo?.key in deletedKeys
                 it.copy(
                     isBulkOperationRunning = false,
-                    userFilesList = it.userFilesList.filterNot { file -> file.id in deletedIds },
+                    userFilesList = it.userFilesList.filterNot { file -> file.key in deletedKeys },
                     fileInfo = if (openedFileDeleted) null else it.fileInfo,
-                    activeDownloads = it.activeDownloads.filterKeys { id -> id !in deletedIds },
+                    activeDownloads = it.activeDownloads.filterKeys { key -> key !in deletedKeys },
                     operationMessage = if (failures.isEmpty()) {
-                        if (deletedIds.size == 1) "File deleted." else "${deletedIds.size} files deleted."
+                        if (deletedKeys.size == 1) "File deleted." else "${deletedKeys.size} files deleted."
                     } else null,
                     operationError = if (failures.isEmpty()) null
-                    else "Deleted ${deletedIds.size} of ${targets.size} files. Failed: ${failureSummary(failures)}"
+                    else "Deleted ${deletedKeys.size} of ${targets.size} files. Failed: ${failureSummary(failures)}"
                 )
             }
         }
     }
 
-    /** Copies the files into a directory of the filesystem, this is a single request for any number of files. */
+    /** Copies the files into a folder, this is a single request for any number of files. */
     fun addFilesToFilesystem(fileIds: List<String>, directoryPath: String) {
         val ids = fileIds.distinct()
         if (ids.isEmpty() || !beginBulkOperation()) return
         viewModelScope.launch {
-            when (val response = filesystemApi.importFiles(apiKey, directoryPath, ids)) {
+            val browse = provider().browse
+            val response = browse?.importFiles(directoryPath, ids)
+                ?: ApiResponse.Error(ProviderError("not_supported", "This host can't add files to a folder."))
+            when (response) {
                 is ApiResponse.Success -> _uiState.update {
                     it.copy(
                         isBulkOperationRunning = false,
@@ -745,7 +842,7 @@ class FileInfoViewModel(
                 is ApiResponse.Error -> _uiState.update {
                     it.copy(
                         isBulkOperationRunning = false,
-                        operationError = "Could not add the files: ${response.errorDetails.message ?: response.errorDetails.value ?: "unknown error"}"
+                        operationError = "Could not add the files: ${response.error.message.ifBlank { "unknown error" }}"
                     )
                 }
             }
@@ -756,36 +853,42 @@ class FileInfoViewModel(
         val ids = fileIds.distinct()
         if (ids.isEmpty() || !beginBulkOperation()) return
         viewModelScope.launch {
-            when (val response = coreApi.createList(apiKey, title, ids)) {
+            val lists = provider().lists
+            val response = lists?.create(title, ids)
+                ?: ApiResponse.Error(ProviderError("not_supported", "This host has no lists."))
+            when (response) {
                 is ApiResponse.Success -> _uiState.update {
                     it.copy(
                         isBulkOperationRunning = false,
-                        operationMessage = "List created" + (response.data.id?.let { id -> ": pixeldrain.com/l/$id" } ?: ".")
+                        operationMessage = "List created" + linkSuffix(response.data)
                     )
                 }
                 is ApiResponse.Error -> _uiState.update {
                     it.copy(
                         isBulkOperationRunning = false,
-                        operationError = "Could not create the list: ${response.errorDetails.message ?: response.errorDetails.value ?: "unknown error"}"
+                        operationError = "Could not create the list: ${response.error.message.ifBlank { "unknown error" }}"
                     )
                 }
             }
         }
     }
 
+    /** A link to a list, for the hosts that have one; the id on its own otherwise. */
+    private fun linkSuffix(listId: String): String =
+        if (provider().kind == ProviderKind.PIXELDRAIN) ": pixeldrain.com/l/$listId" else "."
+
     /** The lists of the user which can be changed, for choosing the list to add files to. */
-    suspend fun loadEditableLists(): ApiResponse<List<UserList>> {
-        if (apiKey.isBlank()) {
-            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "API Key is missing. Please set it in Settings."))
-        }
-        return when (val response = userApi.getUserLists(apiKey)) {
-            is ApiResponse.Success -> ApiResponse.Success(response.data.lists.filter { it.canEdit })
-            is ApiResponse.Error -> ApiResponse.Error(response.errorDetails)
+    suspend fun loadEditableLists(): ApiResponse<List<FileList>> {
+        if (needsKeyButMissing()) return ApiResponse.Error(ProviderError("api_key_missing", API_KEY_MISSING))
+        val lists = provider().lists ?: return ApiResponse.Error(ProviderError("not_supported", "This host has no lists."))
+        return when (val response = lists.lists()) {
+            is ApiResponse.Success -> ApiResponse.Success(response.data.filter { it.canEdit })
+            is ApiResponse.Error -> ApiResponse.Error(response.error)
         }
     }
 
     /** Adds files to a list; files which are in it already stay where they are. */
-    fun addFilesToList(list: UserList, fileIds: List<String>) {
+    fun addFilesToList(list: FileList, fileIds: List<String>) {
         val newIds = fileIds.distinct()
         if (newIds.isEmpty() || !beginBulkOperation()) return
         viewModelScope.launch {
@@ -807,7 +910,7 @@ class FileInfoViewModel(
      * Removes files from a list, a list can't be empty so removing all of its files deletes the list. Files
      * are only taken out of the list, they are not deleted.
      */
-    fun removeFilesFromList(list: UserList, fileIds: List<String>) {
+    fun removeFilesFromList(list: FileList, fileIds: List<String>) {
         val removeIds = fileIds.toSet()
         if (removeIds.isEmpty() || !beginBulkOperation()) return
         viewModelScope.launch {
@@ -829,50 +932,49 @@ class FileInfoViewModel(
         object Updated : ListRewrite()
         object Deleted : ListRewrite()
         /** The list was replaced by a new one with another id, see [rewriteList]. */
-        class Replaced(val newId: String?) : ListRewrite()
+        class Replaced(val newId: String) : ListRewrite()
         class Failed(val message: String) : ListRewrite()
     }
 
-    private fun FileUploadResponse.text() = message ?: value ?: "unknown error"
-
     /**
      * Gives a list other files: the current files are fetched, [transform] makes the new list of ids out of
-     * them, and the list is changed in place with PUT /list/{id}. If the server doesn't accept that, the list
-     * is rebuilt: a new list with the same title is created first and only when that worked the old one is
-     * deleted, so nothing is lost when a step fails. A rebuilt list has a new id, so its old links stop working.
+     * them, and the list is changed in place. If the host doesn't accept that, the list is rebuilt: a new list
+     * with the same title is created first and only when that worked the old one is deleted, so nothing is lost
+     * when a step fails. A rebuilt list has a new id, so its old links stop working.
      */
-    private suspend fun rewriteList(list: UserList, transform: (current: List<String>) -> List<String>): ListRewrite {
-        val current = when (val response = coreApi.getList(list.id, apiKey)) {
-            is ApiResponse.Success -> response.data.files.map { it.id }
-            is ApiResponse.Error -> return ListRewrite.Failed("Could not read the list: ${response.errorDetails.text()}")
+    private suspend fun rewriteList(list: FileList, transform: (current: List<String>) -> List<String>): ListRewrite {
+        val lists = provider().lists ?: return ListRewrite.Failed("This host has no lists.")
+        val current = when (val response = lists.listContents(list.id)) {
+            is ApiResponse.Success -> response.data.files.mapNotNull { it.ref.id }
+            is ApiResponse.Error -> return ListRewrite.Failed("Could not read the list: ${response.error.message}")
         }
         val newIds = transform(current)
         if (newIds == current) return ListRewrite.Updated
         if (newIds.isEmpty()) {
-            return when (val response = coreApi.deleteList(apiKey, list.id)) {
+            return when (val response = lists.delete(list.id)) {
                 is ApiResponse.Success -> ListRewrite.Deleted
-                is ApiResponse.Error -> ListRewrite.Failed("Could not delete the list: ${response.errorDetails.text()}")
+                is ApiResponse.Error -> ListRewrite.Failed("Could not delete the list: ${response.error.message}")
             }
         }
 
-        val updateError = when (val response = coreApi.updateList(apiKey, list.id, list.title, newIds)) {
+        val updateError = when (val response = lists.update(list.id, list.title, newIds)) {
             is ApiResponse.Success -> return ListRewrite.Updated
-            is ApiResponse.Error -> response.errorDetails
+            is ApiResponse.Error -> response.error
         }
         // These say the request itself is the problem (or it never arrived), a rebuilt list would fail or be a copy
-        val value = updateError.value.orEmpty()
-        if (value.startsWith("network_exception") || value in setOf("forbidden", "authentication_required", "api_key_missing")) {
-            return ListRewrite.Failed("Could not change the list: ${updateError.text()}")
+        val code = updateError.code
+        if (code.startsWith("network_exception") || code in setOf("forbidden", "authentication_required", "api_key_missing")) {
+            return ListRewrite.Failed("Could not change the list: ${updateError.message}")
         }
 
-        val newId = when (val created = coreApi.createList(apiKey, list.title, newIds)) {
-            is ApiResponse.Success -> created.data.id
-            is ApiResponse.Error -> return ListRewrite.Failed("Could not change the list: ${created.errorDetails.text()}")
+        val newId = when (val created = lists.create(list.title, newIds)) {
+            is ApiResponse.Success -> created.data
+            is ApiResponse.Error -> return ListRewrite.Failed("Could not change the list: ${created.error.message}")
         }
-        return when (val deleted = coreApi.deleteList(apiKey, list.id)) {
+        return when (val deleted = lists.delete(list.id)) {
             is ApiResponse.Success -> ListRewrite.Replaced(newId)
             is ApiResponse.Error -> ListRewrite.Failed(
-                "The list was rebuilt as a new list, but the old one could not be deleted: ${deleted.errorDetails.text()}"
+                "The list was rebuilt as a new list, but the old one could not be deleted: ${deleted.error.message}"
             )
         }
     }
@@ -884,7 +986,10 @@ class FileInfoViewModel(
                 is ListRewrite.Failed -> it.copy(isBulkOperationRunning = false, operationError = result.message)
                 is ListRewrite.Replaced -> it.copy(
                     isBulkOperationRunning = false,
-                    operationMessage = message(" The list has a new link: pixeldrain.com/l/${result.newId}")
+                    operationMessage = message(
+                        if (provider().kind == ProviderKind.PIXELDRAIN) " The list has a new link: pixeldrain.com/l/${result.newId}"
+                        else " The list has a new id: ${result.newId}"
+                    )
                 )
                 else -> it.copy(isBulkOperationRunning = false, operationMessage = message(""))
             }
@@ -903,30 +1008,16 @@ class FileInfoViewModel(
         _uiState.update {
             it.copy(
                 fileDownloadSuccessMessage = null,
+                fileDownloadOpen = null,
                 fileDownloadErrorMessage = null
             )
         }
-    }
-
-    fun clearDownloadState(fileId: String) {
-        // Removed logic related to downloadJobs and cancelDownload
-        val targetUriToClean = _uiState.value.activeDownloads[fileId]?.targetUri
-        _uiState.update { currentState ->
-            currentState.copy(activeDownloads = currentState.activeDownloads - fileId)
-        }
-        targetUriToClean?.let {
-            viewModelScope.launch { finalizeMediaStoreEntry(it, false) } 
-        }
-        // Removed downloadJobs.remove(fileId)
     }
 
     fun setPreserveScrollPosition(preserve: Boolean) {
         _uiState.update { it.copy(shouldPreserveScrollPosition = preserve) }
     }
 }
-
-/** Files opened from the filesystem use their path (which starts with a slash) as id. */
-internal fun isFilesystemPath(fileId: String): Boolean = fileId.startsWith("/")
 
 internal fun formatSize(bytes: Long): String {
     if (bytes < 0) return "0 B"

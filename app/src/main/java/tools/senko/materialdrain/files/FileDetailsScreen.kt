@@ -8,8 +8,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource // Added
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ImageNotSupported
@@ -21,14 +19,13 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import io.ktor.http.encodeURLPathPart
+import tools.senko.materialdrain.ui.media.imageRequest
 import kotlinx.coroutines.launch
-import tools.senko.materialdrain.api.FileInfoResponse
+import tools.senko.materialdrain.provider.api.PixeldrainRichDetails
+import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.ui.media.AudioPlayerPreview
 import tools.senko.materialdrain.ui.media.FullScreenMediaPreviewDialog
 import tools.senko.materialdrain.ui.media.InlineImagePreview
@@ -40,62 +37,9 @@ import tools.senko.materialdrain.ui.components.InfoRow
 private const val TAG_FILE_DETAILS_SCREEN = "FileDetailsScreen"
 
 @Composable
-fun EnterFileIdDialog(fileInfoViewModel: FileInfoViewModel) {
-    val uiState by fileInfoViewModel.uiState.collectAsState()
-
-    AlertDialog(
-        onDismissRequest = { fileInfoViewModel.dismissEnterFileIdDialog() },
-        title = { Text("Search File by ID") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = uiState.fileIdInput,
-                    onValueChange = { fileInfoViewModel.onFileIdInputChange(it) },
-                    label = { Text("Enter File ID") },
-                    singleLine = true,
-                    isError = uiState.fileInfoErrorMessage?.let { it.contains("Please enter", true) || it.contains("not found", true) || it.contains("error fetching", true) } == true,
-                    keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = {
-                        if (uiState.fileIdInput.isNotBlank()) {
-                            fileInfoViewModel.fetchFileInfoFromDialogInput()
-                        }
-                    })
-                )
-                uiState.fileInfoErrorMessage?.let {
-                    if (it != "Please enter or select a File ID.") {
-                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (uiState.fileIdInput.isNotBlank()) {
-                        fileInfoViewModel.fetchFileInfoFromDialogInput()
-                    }
-                },
-                enabled = uiState.fileIdInput.isNotBlank() && !uiState.isLoadingFileInfo
-            ) {
-                if (uiState.isLoadingFileInfo) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                } else {
-                    Text("Search")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = { fileInfoViewModel.dismissEnterFileIdDialog() }) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-@Composable
 @androidx.media3.common.util.UnstableApi
 fun FileInfoDetailsCard(
-    fileInfo: FileInfoResponse,
+    fileInfo: StorageNode,
     fileInfoViewModel: FileInfoViewModel,
     context: Context,
     snackbarHostState: SnackbarHostState
@@ -109,26 +53,18 @@ fun FileInfoDetailsCard(
     var fullScreenPreviewMimeType by remember { mutableStateOf<String?>(null) }
     var showPreviews by remember { mutableStateOf(false) }
 
-    val isFilesystemFile = fileInfo.id.startsWith("/")
+    // A file without an id is a path in the filesystem, which is private: only that needs the login for previews
+    val isFilesystemFile = fileInfo.ref.id == null
+    val rich = fileInfo.richDetails as? PixeldrainRichDetails
+    val actualThumbnailUrl = fileInfoViewModel.thumbnailFor(fileInfo)
+    val rawFileApiUrl = fileInfoViewModel.rawUrlFor(fileInfo).orEmpty()
+    val shareUrl = fileInfoViewModel.shareUrlFor(fileInfo)
 
-    val (actualThumbnailUrl, rawFileApiUrl) = remember(fileInfo.id, isFilesystemFile) {
-        if (isFilesystemFile) {
-            val encodedPath = fileInfo.id.removePrefix("/").split('/').joinToString("/") { it.encodeURLPathPart() }
-            Pair(
-                "https://pixeldrain.com/api/filesystem/$encodedPath?thumbnail",
-                "https://pixeldrain.com/api/filesystem/$encodedPath"
-            )
-        } else {
-            Pair(
-                "https://pixeldrain.com/api/file/${fileInfo.id}/thumbnail",
-                "https://pixeldrain.com/api/file/${fileInfo.id}"
-            )
-        }
-    }
-
-    LaunchedEffect(fileInfo.id) {
+    LaunchedEffect(fileInfo.key) {
         showPreviews = true
     }
+
+    val previewType = fileInfo.previewMimeType()
 
     if (fullScreenPreviewUri != null) {
         FullScreenMediaPreviewDialog(
@@ -149,10 +85,10 @@ fun FileInfoDetailsCard(
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp)
             .verticalScroll(rememberScrollState())
     ) {
+        // Only the private filesystem needs the login for previews
+        val previewApiKey = uiState.apiKey.takeIf { isFilesystemFile && it.isNotBlank() }
         if (showPreviews) {
-            // Only the private filesystem needs the login for previews
-            val previewApiKey = uiState.apiKey.takeIf { isFilesystemFile && it.isNotBlank() }
-            if (fileInfo.mimeType?.startsWith("image/") == true) {
+            if (previewType?.startsWith("image/") == true) {
                 InlineImagePreview(
                     imageSource = rawFileApiUrl,
                     thumbnailSource = actualThumbnailUrl,
@@ -162,20 +98,20 @@ fun FileInfoDetailsCard(
                     filterQuality = FilterQuality.None,
                     onFullScreenClick = {
                         fullScreenPreviewUri = rawFileApiUrl.toUri()
-                        fullScreenPreviewMimeType = fileInfo.mimeType
+                        fullScreenPreviewMimeType = previewType
                     }
                 )
-            } else if (fileInfo.mimeType?.startsWith("video/") == true) {
+            } else if (previewType?.startsWith("video/") == true) {
                 InlineVideoPreview(
                     thumbnailSource = actualThumbnailUrl,
                     contentDescription = "Video thumbnail for ${fileInfo.name}",
                     apiKey = previewApiKey,
                     onFullScreenClick = {
                         fullScreenPreviewUri = rawFileApiUrl.toUri()
-                        fullScreenPreviewMimeType = fileInfo.mimeType
+                        fullScreenPreviewMimeType = previewType
                     }
                 )
-            } else if (fileInfo.mimeType?.startsWith("audio/") == true) {
+            } else if (previewType?.startsWith("audio/") == true) {
                 AudioPlayerPreview(
                     audioUri = rawFileApiUrl.toUri(),
                     apiKey = previewApiKey,
@@ -211,10 +147,7 @@ fun FileInfoDetailsCard(
             } 
             
             else {
-                val request = ImageRequest.Builder(localContext)
-                    .data(actualThumbnailUrl)
-                    .crossfade(true)
-                    .build()
+                val request = imageRequest(localContext, actualThumbnailUrl.orEmpty()) { crossfade(true) }
 
                 Card(
                     modifier = Modifier
@@ -238,38 +171,30 @@ fun FileInfoDetailsCard(
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
         Text("File Details", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-        InfoRow(
-            label = "Link",
-            value = if (isFilesystemFile) {
-                "pixeldrain.com/d/" + fileInfo.id.removePrefix("/")
-            } else {
-                "pixeldrain.com/u/" + fileInfo.id
-            },
-            isValueSelectable = true,
-            onValueClick = {
-                val link = if (isFilesystemFile) {
-                    "pixeldrain.com/d/" + fileInfo.id.removePrefix("/")
-                } else {
-                    "pixeldrain.com/u/" + fileInfo.id
-                }
-
-                val clip = ClipData.newPlainText("File Link", link)
-                clipboardManager.setPrimaryClip(clip)
-
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar("Link copied to clipboard!")
-                }
-            }
-        )
-
-        // Only show the ID for non-filesystem files, since filesystem "IDs" are actually paths and can be very long and not look user-friendly. (this will possibly be changed)
-        if (!isFilesystemFile) {
+        shareUrl?.let { link ->
             InfoRow(
-                label = "ID",
-                value = fileInfo.id,
+                label = "Link",
+                value = link.removePrefix("https://"),
                 isValueSelectable = true,
                 onValueClick = {
-                    val clip = ClipData.newPlainText("File ID", fileInfo.id)
+                    val clip = ClipData.newPlainText("File Link", link)
+                    clipboardManager.setPrimaryClip(clip)
+
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("Link copied to clipboard!")
+                    }
+                }
+            )
+        }
+
+        // Only show the ID for files with one, a filesystem path is shown as the file's name is
+        fileInfo.ref.id?.let { id ->
+            InfoRow(
+                label = "ID",
+                value = id,
+                isValueSelectable = true,
+                onValueClick = {
+                    val clip = ClipData.newPlainText("File ID", id)
                     clipboardManager.setPrimaryClip(clip)
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar("ID copied to clipboard!")
@@ -277,7 +202,7 @@ fun FileInfoDetailsCard(
                 }
             )
         }
-        InfoRow("Size", formatSize(fileInfo.size))
+        InfoRow("Size", formatSize(fileInfo.size ?: 0L))
         fileInfo.mimeType?.let {
             InfoRow(
                 label = "Type",
@@ -292,11 +217,11 @@ fun FileInfoDetailsCard(
                 }
             )
         }
-        InfoRow("Upload Date", formatApiDateTimeString(fileInfo.dateUpload))
-        fileInfo.dateLastView?.let { InfoRow("Last View", formatApiDateTimeString(it)) }
-        fileInfo.views?.let { InfoRow("Views", it.toString()) }
-        fileInfo.downloads?.let { InfoRow("Downloads", it.toString()) }
-        fileInfo.hashSha256?.let {
+        fileInfo.createdAt?.let { InfoRow("Upload Date", formatApiDateTimeString(it)) }
+        fileInfo.modifiedAt?.let { InfoRow("Last View", formatApiDateTimeString(it)) }
+        rich?.views?.let { InfoRow("Views", it.toString()) }
+        rich?.downloads?.let { InfoRow("Downloads", it.toString()) }
+        rich?.sha256?.let {
             InfoRow(
                 label = "SHA256",
                 value = it,

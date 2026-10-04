@@ -1,0 +1,18 @@
+{
+  "kind": "webdav",
+  "name": "TrueNAS (WebDAV)",
+  "base_url": "https://cloud.riilab.uk/labra",
+  "auth": {
+    "type": "BASIC",
+    "key_username": "",
+    "password_auth": {
+      "mode": "BASIC"
+    }
+  },
+  "root_path": "/",
+  "meta": {
+    "id": "tools.senko.materialdrain.examples.truenas-webdav",
+    "version": 2,
+    "author": "Materialdrain"
+  }
+}
