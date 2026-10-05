@@ -13,14 +13,28 @@
         "method": "POST",
         "body": "FORM",
         "path": "/user/login",
-        "fields": { "username": "{username}", "password": "{password}", "totp": "{otp}", "app_name": "Materialdrain" },
+        "fields": {
+          "username": "{username}",
+          "password": "{password}",
+          "totp": "{otp}",
+          "app_name": "Materialdrain"
+        },
         "token": "$.auth_key",
         "otp": {
-          "required_when": { "path": "$.value", "equals": "otp_required" },
-          "rejected_when": { "path": "$.value", "equals": "otp_incorrect" }
+          "required_when": {
+            "path": "$.value",
+            "equals": "otp_required"
+          },
+          "rejected_when": {
+            "path": "$.value",
+            "equals": "otp_incorrect"
+          }
         }
       },
-      "logout": { "method": "DELETE", "path": "/user/session" }
+      "logout": {
+        "method": "DELETE",
+        "path": "/user/session"
+      }
     }
   },
   "endpoints": {
@@ -28,7 +42,9 @@
       "method": "PUT",
       "path": "/file/{filename}",
       "body": "RAW",
-      "success_status": [201],
+      "success_status": [
+        201
+      ],
       "response_map": {
         "id": "$.id",
         "name": "$.name",
@@ -47,17 +63,23 @@
     "archive_info": {
       "method": "GET",
       "path": "/filesystem/{path}",
-      "query": { "zip_info": "" }
+      "query": {
+        "zip_info": ""
+      }
     },
     "archive_file": {
       "method": "GET",
       "path": "/filesystem/{path}",
-      "query": { "zip_file": "{entry}" }
+      "query": {
+        "zip_file": "{entry}"
+      }
     },
     "delete": {
       "method": "DELETE",
       "path": "/file/{id}",
-      "success_status": [200]
+      "success_status": [
+        200
+      ]
     },
     "file_info": {
       "method": "GET",
@@ -114,8 +136,12 @@
       "method": "PUT",
       "path": "/filesystem/{path}",
       "body": "RAW",
-      "query": { "make_parents": "{make_parents}" },
-      "success_status": [200],
+      "query": {
+        "make_parents": "{make_parents}"
+      },
+      "success_status": [
+        200
+      ],
       "response_map": {
         "name": "$.name",
         "path": "$.path",
@@ -135,14 +161,24 @@
     "browse_mkdir": {
       "method": "POST",
       "path": "/filesystem/{path}",
-      "form": { "action": "{action}" },
-      "success_status": [201]
+      "form": {
+        "action": "{action}"
+      },
+      "success_status": [
+        201
+      ]
     },
     "browse_rename": {
       "method": "POST",
       "path": "/filesystem/{path}",
-      "form": { "action": "rename", "target": "{target}", "make_parents": "{make_parents}" },
-      "success_status": [200],
+      "form": {
+        "action": "rename",
+        "target": "{target}",
+        "make_parents": "{make_parents}"
+      },
+      "success_status": [
+        200
+      ],
       "response_map": {
         "name": "$.name",
         "path": "$.path"
@@ -151,14 +187,23 @@
     "browse_delete": {
       "method": "DELETE",
       "path": "/filesystem/{path}",
-      "query": { "recursive": "{recursive}" },
-      "success_status": [200]
+      "query": {
+        "recursive": "{recursive}"
+      },
+      "success_status": [
+        200
+      ]
     },
     "browse_import": {
       "method": "POST",
       "path": "/filesystem/{path}",
-      "form": { "action": "import", "files": "{files_json}" },
-      "success_status": [201]
+      "form": {
+        "action": "import",
+        "files": "{files_json}"
+      },
+      "success_status": [
+        201
+      ]
     },
     "user_lists": {
       "method": "GET",
@@ -193,7 +238,9 @@
       "path": "/list",
       "body": "JSON",
       "json": "{\"title\": {title_json}, \"anonymous\": false, \"files\": {files_json}}",
-      "success_status": [201],
+      "success_status": [
+        201
+      ],
       "response_map": {
         "id": "$.id"
       }
@@ -203,12 +250,16 @@
       "path": "/list/{list_id}",
       "body": "JSON",
       "json": "{\"title\": {title_json}, \"files\": {files_json}}",
-      "success_status": [200]
+      "success_status": [
+        200
+      ]
     },
     "list_delete": {
       "method": "DELETE",
       "path": "/list/{list_id}",
-      "success_status": [200]
+      "success_status": [
+        200
+      ]
     },
     "thumbnail_id": {
       "method": "GET",

@@ -1,9 +1,9 @@
 {
   "kind": "s3",
   "name": "TrueNAS (S3)",
-  "endpoint": "https://cloud.riilab.uk",
+  "endpoint": "",
   "region": "us-east-1",
-  "bucket": "labra",
+  "bucket": "",
   "path_style": true,
   "prefix": "",
   "meta": {

@@ -19,3 +19,11 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# SMB (jCIFS-ng) finds its protocol classes, name services and crypto provider by name at runtime, so R8 must keep them
+-keep class jcifs.** { *; }
+-keep interface jcifs.** { *; }
+-dontwarn jcifs.**
+-keep class org.bouncycastle.** { *; }
+-dontwarn org.bouncycastle.**
+-dontwarn org.slf4j.**

@@ -145,12 +145,15 @@ val ProviderConfig.passwordAuth: PasswordAuth?
         is GenericRestConfig -> auth.passwordAuth
         is WebDavConfig -> auth.passwordAuth
         is S3Config -> null
+        // Only a username and password is asked for (an SMB share has no API key); the guest and anonymous modes need none
+        is SmbConfig -> PasswordAuth(mode = PasswordAuthMode.BASIC)
     }
 
 fun ProviderConfig.withMeta(meta: ProviderConfigMeta?): ProviderConfig = when (this) {
     is GenericRestConfig -> copy(meta = meta)
     is WebDavConfig -> copy(meta = meta)
     is S3Config -> copy(meta = meta)
+    is SmbConfig -> copy(meta = meta)
 }
 
 /**
@@ -195,6 +198,37 @@ data class S3Config(
     val bucket: String,
     @SerialName("path_style") val pathStyle: Boolean = true,
     val prefix: String = "",
+    override val meta: ProviderConfigMeta? = null
+) : ProviderConfig
+
+/** How an SMB host is signed into: a username and password, as a guest, or with no sign-in at all. */
+@Serializable
+enum class SmbAuthMode { CREDENTIALS, GUEST, ANONYMOUS }
+
+/**
+ * The oldest SMB protocol version the host may speak. SMB1 is never used: it's old and has known weaknesses. The newest
+ * version is always negotiated, so SMB 3 is used whenever the host offers it.
+ */
+@Serializable
+enum class SmbMinVersion { SMB2, SMB3 }
+
+/**
+ * A Windows, Samba or NAS share over SMB (CIFS). Protocol logic lives in the smb adapter module. [share] is the top of the
+ * host the browser sees, [rootPath] the folder inside it the browser starts at.
+ */
+@Serializable
+data class SmbConfig(
+    override val name: String,
+    val host: String,
+    val port: Int = 445,
+    val share: String,
+    @SerialName("root_path") val rootPath: String = "",
+    /** The Windows domain or workgroup of the login; empty for a local or workgroup account. */
+    val domain: String = "",
+    val auth: SmbAuthMode = SmbAuthMode.CREDENTIALS,
+    @SerialName("min_version") val minVersion: SmbMinVersion = SmbMinVersion.SMB2,
+    /** Encrypts the traffic on the wire. Needs SMB 3 on the host, the connection fails when it doesn't offer it. */
+    val encrypt: Boolean = false,
     override val meta: ProviderConfigMeta? = null
 ) : ProviderConfig
 

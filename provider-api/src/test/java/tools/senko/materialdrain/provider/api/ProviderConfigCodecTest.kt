@@ -41,6 +41,22 @@ class ProviderConfigCodecTest {
     }
 
     @Test
+    fun `round trips an smb config and fills in the defaults of a hand-written one`() {
+        val smb = SmbConfig(
+            name = "Office share", host = "nas.example.com", share = "Public", rootPath = "projects",
+            domain = "WORKGROUP", auth = SmbAuthMode.CREDENTIALS, minVersion = SmbMinVersion.SMB3, encrypt = true
+        )
+        assertEquals(smb, ProviderConfigCodec.decode(ProviderConfigCodec.encode(smb)))
+
+        val handWritten = """{"kind": "smb", "name": "Share", "host": "10.0.2.2", "share": "MDTest"}"""
+        assertEquals(
+            SmbConfig(name = "Share", host = "10.0.2.2", share = "MDTest"),
+            ProviderConfigCodec.decode(handWritten)
+        )
+        assertNull(ProviderConfigCodec.explainFailure(handWritten))
+    }
+
+    @Test
     fun `a hand-written config without the marker line decodes as plain json`() {
         val plainJson = """{"kind":"generic_rest","name":"x","base_url":"https://x","endpoints":{}}"""
         val decoded = ProviderConfigCodec.decode(plainJson) as GenericRestConfig

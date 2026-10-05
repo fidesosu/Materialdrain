@@ -1,7 +1,7 @@
 {
   "kind": "webdav",
   "name": "TrueNAS (WebDAV)",
-  "base_url": "https://cloud.riilab.uk/labra",
+  "base_url": "",
   "auth": {
     "type": "BASIC",
     "key_username": "",

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.FolderShared
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -47,6 +48,8 @@ import tools.senko.materialdrain.provider.api.AuthType
 import tools.senko.materialdrain.provider.api.GenericRestConfig
 import tools.senko.materialdrain.provider.api.ProviderKind
 import tools.senko.materialdrain.provider.api.S3Config
+import tools.senko.materialdrain.provider.api.SmbAuthMode
+import tools.senko.materialdrain.provider.api.SmbConfig
 import tools.senko.materialdrain.provider.api.WebDavConfig
 
 /** Whether a host has a sign-in, shown next to its name in the switcher. */
@@ -70,6 +73,7 @@ data class HostOption(
             ProviderKind.WEBDAV -> Icons.Filled.FolderShared
             ProviderKind.S3 -> Icons.Filled.Storage
             ProviderKind.GENERIC_REST -> Icons.Filled.Dns
+            ProviderKind.SMB -> Icons.Filled.Share
         }
 }
 
@@ -102,6 +106,8 @@ private fun StoredProvider.toHostOption(configStore: ProviderConfigStore): HostO
         is GenericRestConfig -> ProviderKind.GENERIC_REST to (config.auth.type != AuthType.NONE)
         is WebDavConfig -> ProviderKind.WEBDAV to true
         is S3Config -> ProviderKind.S3 to true
+        // A share can be open to guests or anonymous: then there's nothing to sign in to
+        is SmbConfig -> ProviderKind.SMB to (config.auth == SmbAuthMode.CREDENTIALS)
     }
     val creds = configStore.credentials(id)
     val signedIn = creds.apiKey.isNotBlank() || creds.loginToken != null || creds.hasPassword

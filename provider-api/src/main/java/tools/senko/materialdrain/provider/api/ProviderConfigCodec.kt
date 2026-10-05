@@ -15,6 +15,7 @@ const val PROVIDER_CONFIG_MARKER = "MATERIALDRAIN-PROVIDER-CONFIG-V1"
 private const val KIND_GENERIC_REST = "generic_rest"
 private const val KIND_WEBDAV = "webdav"
 private const val KIND_S3 = "s3"
+private const val KIND_SMB = "smb"
 
 /**
  * Encodes/decodes [ProviderConfig] as JSON, discriminated by a top-level "kind" field. [encode] always
@@ -30,6 +31,7 @@ object ProviderConfigCodec {
             is GenericRestConfig -> KIND_GENERIC_REST to json.encodeToJsonElement(GenericRestConfig.serializer(), config)
             is WebDavConfig -> KIND_WEBDAV to json.encodeToJsonElement(WebDavConfig.serializer(), config)
             is S3Config -> KIND_S3 to json.encodeToJsonElement(S3Config.serializer(), config)
+            is SmbConfig -> KIND_SMB to json.encodeToJsonElement(SmbConfig.serializer(), config)
         }
         val withKind = JsonObject(element.jsonObject.toMutableMap().apply { put("kind", JsonPrimitive(kind)) })
         return PROVIDER_CONFIG_MARKER + "\n" + json.encodeToString(JsonObject.serializer(), withKind)
@@ -55,6 +57,7 @@ object ProviderConfigCodec {
                 KIND_GENERIC_REST -> json.decodeFromJsonElement(GenericRestConfig.serializer(), obj)
                 KIND_WEBDAV -> json.decodeFromJsonElement(WebDavConfig.serializer(), obj)
                 KIND_S3 -> json.decodeFromJsonElement(S3Config.serializer(), obj)
+                KIND_SMB -> json.decodeFromJsonElement(SmbConfig.serializer(), obj)
                 else -> null
             }
         } catch (_: Exception) {
@@ -76,11 +79,12 @@ object ProviderConfigCodec {
             return "the JSON can't be read (${e.message?.lineSequence()?.firstOrNull() ?: "syntax error"})"
         }
         val kind = obj["kind"]?.jsonPrimitive?.content ?: return "there is no \"kind\" field"
-        if (kind !in setOf(KIND_GENERIC_REST, KIND_WEBDAV, KIND_S3)) return "the kind \"$kind\" is unknown"
+        if (kind !in setOf(KIND_GENERIC_REST, KIND_WEBDAV, KIND_S3, KIND_SMB)) return "the kind \"$kind\" is unknown"
         return try {
             when (kind) {
                 KIND_GENERIC_REST -> json.decodeFromJsonElement(GenericRestConfig.serializer(), obj)
                 KIND_WEBDAV -> json.decodeFromJsonElement(WebDavConfig.serializer(), obj)
+                KIND_SMB -> json.decodeFromJsonElement(SmbConfig.serializer(), obj)
                 else -> json.decodeFromJsonElement(S3Config.serializer(), obj)
             }
             null

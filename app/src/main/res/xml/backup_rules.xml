@@ -6,8 +6,10 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <!-- The login session key is encrypted with a Keystore key which is not part of a backup -->
+    <!-- The login and the provider credentials are encrypted with a Keystore key which is not part of a backup -->
     <exclude domain="sharedpref" path="pixeldrain_secure_prefs.xml" />
-    <!-- The manually entered API key is encrypted in the secure file; the old plain copy is not backed up -->
+    <exclude domain="sharedpref" path="provider_secure_prefs.xml" />
+    <!-- The plain copies of the settings which hold the API key and the provider config state are not backed up -->
     <exclude domain="sharedpref" path="pixeldrain_prefs.xml" />
+    <exclude domain="sharedpref" path="provider_prefs.xml" />
 </full-backup-content>

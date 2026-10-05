@@ -68,6 +68,8 @@ import tools.senko.materialdrain.provider.api.PasswordAuthMode
 import tools.senko.materialdrain.provider.api.ProviderCapability
 import tools.senko.materialdrain.provider.api.ProviderConfig
 import tools.senko.materialdrain.provider.api.S3Config
+import tools.senko.materialdrain.provider.api.SmbAuthMode
+import tools.senko.materialdrain.provider.api.SmbConfig
 import tools.senko.materialdrain.provider.api.WebDavConfig
 import tools.senko.materialdrain.provider.api.passwordAuth
 import tools.senko.materialdrain.ui.LocalReduceMotion
@@ -76,6 +78,7 @@ private fun kindLabel(config: ProviderConfig): String = when (config) {
     is GenericRestConfig -> "Generic REST"
     is WebDavConfig -> "WebDAV"
     is S3Config -> "S3-compatible"
+    is SmbConfig -> "SMB share"
 }
 
 /** "Custom host settings": the list of imported configs, their update state, and importing new ones. */
@@ -299,25 +302,33 @@ private fun HostCard(
                         }
                     }
 
-                    if (stored.config is S3Config) {
+                    if (stored.config is S3Config || stored.config is SmbConfig) {
                         // S3 always needs both halves of a key pair - there's no single "API key" concept to
-                        // fall back to, unlike WebDAV/generic REST hosts.
+                        // fall back to, unlike WebDAV/generic REST hosts. An SMB share signs in with a username and password.
+                        val smb = stored.config as? SmbConfig
                         Text("Credentials", style = MaterialTheme.typography.labelLarge, color = colors.primary)
-                        OutlinedTextField(
-                            value = username,
-                            onValueChange = { username = it },
-                            label = { Text("Access Key ID") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        OutlinedTextField(
-                            value = password,
-                            onValueChange = { password = it },
-                            label = { Text("Secret Access Key") },
-                            singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        if (smb != null && smb.auth != SmbAuthMode.CREDENTIALS) {
+                            Text(
+                                "This share is opened as ${smb.auth.name.lowercase()}, so there's nothing to sign in to.",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        } else {
+                            OutlinedTextField(
+                                value = username,
+                                onValueChange = { username = it },
+                                label = { Text(if (smb != null) "Username" else "Access Key ID") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = password,
+                                onValueChange = { password = it },
+                                label = { Text(if (smb != null) "Password" else "Secret Access Key") },
+                                singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     } else {
                         Text("Sign-in", style = MaterialTheme.typography.labelLarge, color = colors.primary)
                         when (passwordMode) {
@@ -406,7 +417,7 @@ private fun HostCard(
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             onClick = {
-                                if (stored.config is S3Config) {
+                                if (stored.config is S3Config || stored.config is SmbConfig) {
                                     viewModel.savePasswordCredentials(stored.id, username, password)
                                 } else {
                                     viewModel.saveApiKey(stored.id, apiKey)

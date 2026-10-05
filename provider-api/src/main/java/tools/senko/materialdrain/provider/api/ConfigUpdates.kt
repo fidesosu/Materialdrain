@@ -102,6 +102,7 @@ object ConfigUpdates {
             is GenericRestConfig -> config.baseUrl
             is WebDavConfig -> config.baseUrl
             is S3Config -> config.endpoint
+            is SmbConfig -> "smb://${config.host.trim().lowercase()}:${config.port}"
         }
         val paths = (config as? GenericRestConfig)?.endpoints?.values?.map { it.path }.orEmpty() +
             listOfNotNull(config.passwordAuth?.login?.path, config.passwordAuth?.logout?.path)
@@ -122,11 +123,13 @@ object ConfigUpdates {
         is GenericRestConfig -> config.auth
         is WebDavConfig -> config.auth
         is S3Config -> null
+        is SmbConfig -> null
     }
 
     private fun kindName(config: ProviderConfig) = when (config) {
         is GenericRestConfig -> "generic REST"
         is WebDavConfig -> "WebDAV"
         is S3Config -> "S3"
+        is SmbConfig -> "SMB"
     }
 }

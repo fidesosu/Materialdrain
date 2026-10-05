@@ -1,0 +1,12 @@
+{
+  "kind": "smb",
+  "name": "SMB share",
+  "host": "nas.local",
+  "port": 445,
+  "share": "Documents",
+  "root_path": "",
+  "domain": "",
+  "auth": "CREDENTIALS",
+  "min_version": "SMB2",
+  "encrypt": false
+}

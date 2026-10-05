@@ -27,7 +27,7 @@ without it.
 Removing a host just stops using it. The active host falls back to the built-in Pixeldrain, and the Pixeldrain
 sign-in in **Account** keeps working on its own.
 
-## The three kinds
+## The kinds
 
 Every config has a `kind`, which decides how the host is talked to:
 
@@ -35,6 +35,7 @@ Every config has a `kind`, which decides how the host is talked to:
   Pixeldrain and for most REST services.
 - **`webdav`**: a WebDAV server (Nextcloud, ownCloud, TrueNAS and others). The protocol is built into the app.
 - **`s3`**: an S3-compatible bucket (MinIO, Backblaze B2, Cloudflare R2, Wasabi, AWS). The signing is built into the app.
+- **`smb`**: a Windows, Samba or NAS share (SMB2 and SMB3). The protocol is built into the app.
 
 Only `generic_rest` lets you describe a host in detail, so most of this guide is about that kind.
 
@@ -42,7 +43,7 @@ Only `generic_rest` lets you describe a host in detail, so most of this guide is
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `kind` | yes | `generic_rest`, `webdav` or `s3` |
+| `kind` | yes | `generic_rest`, `webdav`, `s3` or `smb` |
 | `name` | yes | The name shown in the app |
 | `meta` | no | Identity, version and update information, see [Sharing and updates](#sharing-and-updates) |
 
@@ -65,6 +66,23 @@ Only `generic_rest` lets you describe a host in detail, so most of this guide is
 | `prefix` | `""` | Only show keys under this prefix |
 
 The access key and secret key are entered in the app, like any other sign-in.
+
+### `smb`
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `host` | required | The server's name or address, for example `nas.local` or `192.168.1.10` |
+| `port` | `445` | The SMB port |
+| `share` | required | The share to browse, by its name (not a path) |
+| `root_path` | `""` | The folder inside the share the app starts in |
+| `domain` | `""` | The Windows domain or workgroup of the login; empty for a local account |
+| `auth` | `CREDENTIALS` | `CREDENTIALS` (a username and password, entered in the app), `GUEST` or `ANONYMOUS` |
+| `min_version` | `SMB2` | The oldest protocol allowed: `SMB2` or `SMB3`. The newest the host offers is always used |
+| `encrypt` | `false` | Encrypts the traffic. Needs SMB 3 on the host; without it the connection fails rather than sending unencrypted |
+
+An SMB share has no web address for its files, so files show their name, size and modified time, without thumbnails,
+previews or share links. Browsing, upload, download, folders, renaming and deleting all work. The top of the share can't
+be deleted.
 
 ### `generic_rest`
 

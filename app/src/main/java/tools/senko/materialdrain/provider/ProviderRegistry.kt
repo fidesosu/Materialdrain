@@ -4,11 +4,13 @@ import tools.senko.materialdrain.provider.api.Credentials
 import tools.senko.materialdrain.provider.api.allowsAccountFallback
 import tools.senko.materialdrain.provider.api.GenericRestConfig
 import tools.senko.materialdrain.provider.api.S3Config
+import tools.senko.materialdrain.provider.api.SmbConfig
 import tools.senko.materialdrain.provider.api.StorageProvider
 import tools.senko.materialdrain.provider.api.WebDavConfig
 import tools.senko.materialdrain.provider.genericrest.GenericRestStorageProvider
 import tools.senko.materialdrain.provider.pixeldrain.PixeldrainStorageProvider
 import tools.senko.materialdrain.provider.s3.S3StorageProvider
+import tools.senko.materialdrain.provider.smb.SmbStorageProvider
 import tools.senko.materialdrain.provider.webdav.WebDavStorageProvider
 
 /**
@@ -32,6 +34,7 @@ class ProviderRegistry(
             )
             is WebDavConfig -> WebDavStorageProvider(stored.id, config, credentials = { configStore.credentials(stored.id) })
             is S3Config -> S3StorageProvider(stored.id, config, credentials = { configStore.credentials(stored.id) })
+            is SmbConfig -> SmbStorageProvider(stored.id, config, credentials = { configStore.credentials(stored.id) })
         }
     }
 

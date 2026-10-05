@@ -15,4 +15,4 @@ enum class ProviderCapability {
     ARCHIVE_BROWSE
 }
 
-enum class ProviderKind { PIXELDRAIN, WEBDAV, S3, GENERIC_REST }
+enum class ProviderKind { PIXELDRAIN, WEBDAV, S3, GENERIC_REST, SMB }
