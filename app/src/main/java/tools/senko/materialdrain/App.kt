@@ -681,7 +681,21 @@ fun MaterialdrainScreen() {
                                 label = "${it.currentIndex} / ${it.totalFiles} files"
                             )
                         }
-                        else -> {
+                        else -> fileInfoUiState.downloadBatch?.takeIf {
+                            currentScreen in listOf(Screen.Files, Screen.Filesystem, Screen.Lists, Screen.FileDetail)
+                        }?.let { batch ->
+                            // One bar for the whole batch: the finished files plus the bytes of the file in progress
+                            val current = fileInfoUiState.activeDownloads.values.firstOrNull {
+                                it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.PENDING
+                            }
+                            TransferProgress(
+                                transferredBytes = batch.doneBytes + (current?.downloadedBytes ?: 0L),
+                                totalBytes = batch.totalBytes,
+                                bytesPerSecond = current?.bytesPerSecond ?: 0L,
+                                etaSeconds = current?.etaSeconds,
+                                label = "${batch.doneFiles} of ${batch.totalFiles} files done"
+                            )
+                        } ?: run {
                             val isActive = { download: tools.senko.materialdrain.files.FileDownloadState ->
                                 download.status == DownloadStatus.DOWNLOADING || download.status == DownloadStatus.PENDING
                             }

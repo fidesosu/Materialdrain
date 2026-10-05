@@ -86,6 +86,16 @@ data class FileDownloadState(
     val message: String? = null, // For individual success/error messages
     val targetUri: Uri? = null // To store the MediaStore URI
 )
+/**
+ * A batch of files downloaded one after another. [doneBytes] are the bytes of the files finished so far; [totalBytes] is
+ * null when a file's size is unknown, then the batch shows how many files are done but no percentage.
+ */
+data class DownloadBatch(
+    val totalFiles: Int,
+    val doneFiles: Int = 0,
+    val totalBytes: Long?,
+    val doneBytes: Long = 0L
+)
 // --- End Download State Management ---
 
 /** Identifies a node in the app: its file id, or its path when it has no id (the filesystem). */
@@ -148,6 +158,8 @@ data class FileInfoUiState(
 
     // For multiple file downloads
     val activeDownloads: Map<String, FileDownloadState> = emptyMap(),
+    // Several files downloaded one after another, while that batch runs; null when none is running
+    val downloadBatch: DownloadBatch? = null,
     // General messages, can be deprecated if per-file messages are sufficient
     val fileDownloadSuccessMessage: String? = null,
     // The last finished download, when it can be opened (it's saved on the device)
@@ -649,7 +661,7 @@ class FileInfoViewModel(
     }
 
     /** Starts the download and returns its job. When [queue] is given, cancelling this download cancels the queue too. */
-    fun initiateDownloadFile(node: StorageNode, queue: Job? = null): Job {
+    fun initiateDownloadFile(node: StorageNode, queue: Job? = null, batchId: String? = null): Job {
         val key = node.key
         val size = node.size ?: 0L
 
@@ -663,7 +675,8 @@ class FileInfoViewModel(
             currentState.copy(activeDownloads = currentState.activeDownloads + (key to newDownloadState))
         }
 
-        val transferId = "download-$key"
+        // A file of a batch reports into the batch's transfer, see downloadFilesSequentially
+        val transferId = batchId ?: "download-$key"
         // Started lazily so that the transfer is registered before it can possibly finish
         val downloadJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             var targetUri: Uri? = null
@@ -706,7 +719,14 @@ class FileInfoViewModel(
                         (bytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
                     } else 0f
                     val speed = speedTracker.update(bytesRead)
-                    transfers.progress(transferId, bytesRead, totalBytes, speed, estimateEtaSeconds(totalBytes ?: size.takeIf { it > 0 }, bytesRead, speed))
+                    val eta = estimateEtaSeconds(totalBytes ?: size.takeIf { it > 0 }, bytesRead, speed)
+                    if (batchId == null) {
+                        transfers.progress(transferId, bytesRead, totalBytes, speed, eta)
+                    } else {
+                        // Within a batch: the bytes of the finished files plus this one, against the whole batch
+                        val batch = _uiState.value.downloadBatch
+                        transfers.progress(transferId, (batch?.doneBytes ?: 0L) + bytesRead, batch?.totalBytes, speed, eta)
+                    }
                     _uiState.update { currentState ->
                         val currentDownload = currentState.activeDownloads[key]
                         val effectiveTotal = totalBytes ?: currentDownload?.totalBytes
@@ -788,10 +808,10 @@ class FileInfoViewModel(
                     withContext(NonCancellable) { finalizeMediaStoreEntry(it, downloadSuccessful) }
                 }
                 // Reported after the file was finalized, so the notification can open it
-                transfers.finish(transferId, outcome, outcomeMessage, if (downloadSuccessful) targetUri else null, node.mimeType)
+                if (batchId == null) transfers.finish(transferId, outcome, outcomeMessage, if (downloadSuccessful) targetUri else null, node.mimeType)
             }
         }
-        transfers.start(
+        if (batchId == null) transfers.start(
             TransferInfo(transferId, TransferKind.DOWNLOAD, node.name, totalBytes = size.takeIf { it > 0 }),
             onCancel = {
                 downloadJob.cancel()
@@ -811,13 +831,46 @@ class FileInfoViewModel(
             initiateDownloadFile(files.first())
             return
         }
-        viewModelScope.launch {
+        // The total is only known when every file has a size
+        val totalBytes = files.map { it.size }.takeIf { sizes -> sizes.all { it != null } }?.sumOf { it ?: 0L }
+        _uiState.update { it.copy(downloadBatch = DownloadBatch(totalFiles = files.size, totalBytes = totalBytes)) }
+        val batchId = "download-batch-${System.nanoTime()}"
+        // The whole batch is one transfer: one notification with its total, and one result when it ends
+        val batchJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
             val queue = coroutineContext[Job]
-            for (file in files) {
-                ensureActive()
-                initiateDownloadFile(file, queue).join()
+            var savedFiles = 0
+            try {
+                for (file in files) {
+                    ensureActive()
+                    initiateDownloadFile(file, queue, batchId).join()
+                    if (_uiState.value.activeDownloads[file.key]?.status == DownloadStatus.COMPLETED) savedFiles++
+                    // Counted once the file is over, whether it was saved or failed
+                    _uiState.update { state ->
+                        val batch = state.downloadBatch ?: return@update state
+                        val finishedBytes = state.activeDownloads[file.key]?.downloadedBytes ?: file.size ?: 0L
+                        state.copy(downloadBatch = batch.copy(doneFiles = batch.doneFiles + 1, doneBytes = batch.doneBytes + finishedBytes))
+                    }
+                }
+            } finally {
+                _uiState.update { it.copy(downloadBatch = null) }
+                val outcome = when {
+                    coroutineContext[Job]?.isCancelled == true -> TransferOutcome.CANCELLED
+                    savedFiles == files.size -> TransferOutcome.COMPLETED
+                    else -> TransferOutcome.FAILED
+                }
+                val message = when (outcome) {
+                    TransferOutcome.COMPLETED -> "${files.size} files downloaded."
+                    TransferOutcome.FAILED -> "$savedFiles of ${files.size} files downloaded."
+                    TransferOutcome.CANCELLED -> null
+                }
+                transfers.finish(batchId, outcome, message)
             }
         }
+        transfers.start(
+            TransferInfo(batchId, TransferKind.DOWNLOAD, "${files.size} files", totalBytes = totalBytes),
+            onCancel = { batchJob.cancel() }
+        )
+        batchJob.start()
     }
 
     /**
