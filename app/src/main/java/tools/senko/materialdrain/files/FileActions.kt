@@ -196,7 +196,9 @@ fun FileActionDialogs(
             FolderPickerDialog(
                 title = "Add to filesystem",
                 confirmLabel = "Add here",
-                initialPath = "me",
+                initialPath = filesystemViewModel.browseRootPath,
+                rootPath = filesystemViewModel.browseRootPath,
+                rootName = filesystemViewModel.browseRootName,
                 loadFolders = { filesystemViewModel.listSubdirectories(it) },
                 onConfirm = { path ->
                     fileInfoViewModel.addFilesToFilesystem(request.files.mapNotNull { it.ref.id }, path)

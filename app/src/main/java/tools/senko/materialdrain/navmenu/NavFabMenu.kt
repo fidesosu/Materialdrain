@@ -4,6 +4,7 @@ import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.CubicBezierEasing
@@ -16,6 +17,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -143,7 +145,8 @@ fun NavFabMenu(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.32f))
+                    // A light dim: the window floats over the screen rather than shutting it away
+                    .background(Color.Black.copy(alpha = 0.16f))
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { open = false }
             )
         }
@@ -300,29 +303,38 @@ private fun NavMenuWindow(
     isSelected: (NavMenuItem) -> Boolean,
     onItemClick: (NavMenuItem) -> Unit
 ) {
+    // A floating card like the ones above the file list and in the search: slightly see-through, with a hairline edge and
+    // a soft shadow, rather than a heavy sheet
     Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = 6.dp
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        shadowElevation = 3.dp
     ) {
         // Items only, no header: Settings is the gear at the top right of the screen.
         // Reversed: item 0 (the pinned row) is laid out at the bottom and the list starts scrolled to it
         LazyColumn(
             reverseLayout = true,
             modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth().heightIn(max = maxHeight),
-            contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
+            contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
         ) {
             item(key = "pinned") { TileGrid(menu.pinned, isSelected, onItemClick) }
             if (menu.sections.isNotEmpty()) {
-                item(key = "divider") { HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) }
+                item(key = "divider") {
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                    )
+                }
             }
             items(menu.sections.asReversed(), key = { it.title }) { section ->
                 Column {
                     Text(
-                        section.title.uppercase(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp)
+                        section.title,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 2.dp)
                     )
                     TileGrid(section.items, isSelected, onItemClick)
                 }
@@ -333,7 +345,7 @@ private fun NavMenuWindow(
 
 @Composable
 private fun TileGrid(items: List<NavMenuItem>, isSelected: (NavMenuItem) -> Boolean, onItemClick: (NavMenuItem) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column {
         items.chunked(GRID_COLUMNS).forEach { row ->
             Row(modifier = Modifier.fillMaxWidth()) {
                 row.forEach { item ->
@@ -345,27 +357,33 @@ private fun TileGrid(items: List<NavMenuItem>, isSelected: (NavMenuItem) -> Bool
     }
 }
 
+/**
+ * One destination: its icon and name, no tile behind it. The current one gets a pill behind its icon, the way the
+ * bottom navigation bar marks it, so the window reads as light as that bar.
+ */
 @Composable
 private fun Tile(item: NavMenuItem, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
+    val indicator by animateColorAsState(if (selected) colors.secondaryContainer else Color.Transparent, label = "navTileIndicator")
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp, horizontal = 4.dp)
+            .padding(vertical = 6.dp, horizontal = 2.dp)
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(52.dp)
+                .size(width = 56.dp, height = 32.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(if (selected) colors.primaryContainer else colors.surfaceVariant)
+                .background(indicator)
         ) {
             Icon(
                 item.icon.painter(),
                 contentDescription = null,
-                tint = if (selected) colors.onPrimaryContainer else colors.onSurfaceVariant
+                tint = if (selected) colors.onSecondaryContainer else colors.onSurfaceVariant,
+                modifier = Modifier.size(22.dp)
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
@@ -374,7 +392,7 @@ private fun Tile(item: NavMenuItem, selected: Boolean, onClick: () -> Unit, modi
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            color = if (selected) colors.primary else colors.onSurface
+            color = if (selected) colors.onSurface else colors.onSurfaceVariant
         )
     }
 }

@@ -16,8 +16,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
-import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.FolderZip
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,7 +36,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -109,17 +117,30 @@ fun FileListItem(
 }
 
 /**
- * The picture of a file or folder: a folder icon, the file's thumbnail when it has one, or a plain file icon. The
+ * The picture of a file or folder: a soft tile in the colour of its kind (folder, image, video, audio, archive,
+ * document...) with a small glyph of it, and the file's thumbnail over it when it has one. The thumbnail fades in over
+ * the tile, so a row looks the same while it loads, and a file whose thumbnail fails just keeps its tile. The
  * thumbnail is decoded at [size], not at the size of the original image.
  */
 @Composable
-fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp, cornerRadius: Dp = 6.dp) {
-    val iconModifier = Modifier
-        .size(size)
-        .clip(RoundedCornerShape(cornerRadius))
-    when {
-        isDirectory -> Icon(imageVector = Icons.Filled.Folder, contentDescription = "Folder", modifier = iconModifier)
-        thumbnailUrl != null -> {
+fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp, cornerRadius: Dp = size / 4) {
+    val shape = RoundedCornerShape(cornerRadius)
+    val kind = remember(name, isDirectory) { FileKind.of(name, isDirectory) }
+    val (container, content) = kind.colors()
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(shape)
+            .background(container),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = kind.icon,
+            contentDescription = kind.label,
+            tint = content,
+            modifier = Modifier.size(size * 0.46f)
+        )
+        if (thumbnailUrl != null && !isDirectory) {
             val context = LocalContext.current
             // Built once per URL and login: a new request on every recomposition makes Coil load the thumbnail again
             val headers = HostRequestAuth.headersFor(thumbnailUrl)
@@ -132,16 +153,67 @@ fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp
                     .apply { headers.forEach { (name, value) -> addHeader(name, value) } }
                     .build()
             }
+            // No placeholder or error picture: the tile underneath is both
             AsyncImage(
                 model = request,
                 contentDescription = "$name thumbnail",
                 contentScale = ContentScale.Crop,
-                modifier = iconModifier,
-                placeholder = rememberVectorPainter(Icons.AutoMirrored.Filled.InsertDriveFile),
-                error = rememberVectorPainter(Icons.Filled.BrokenImage)
+                modifier = Modifier.size(size)
             )
         }
-        else -> Icon(imageVector = Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = "File", modifier = iconModifier)
+    }
+}
+
+/** What kind of file a name is, for the colour and glyph of its tile (see [FileIcon]). */
+private enum class FileKind(val icon: ImageVector, val label: String) {
+    FOLDER(Icons.Filled.Folder, "Folder"),
+    IMAGE(Icons.Filled.Image, "Image"),
+    VIDEO(Icons.Filled.Movie, "Video"),
+    AUDIO(Icons.Filled.MusicNote, "Audio"),
+    ARCHIVE(Icons.Filled.FolderZip, "Archive"),
+    PDF(Icons.Filled.PictureAsPdf, "PDF"),
+    CODE(Icons.Filled.Code, "Code"),
+    TEXT(Icons.Filled.Description, "Document"),
+    APP(Icons.Filled.Android, "App"),
+    OTHER(Icons.AutoMirrored.Filled.InsertDriveFile, "File");
+
+    /** The tile's colour and the glyph's: from the theme, so they follow the app's colours (and dark mode). */
+    @Composable
+    fun colors(): Pair<Color, Color> {
+        val scheme = MaterialTheme.colorScheme
+        return when (this) {
+            FOLDER -> scheme.primaryContainer to scheme.onPrimaryContainer
+            IMAGE, VIDEO, AUDIO -> scheme.tertiaryContainer to scheme.onTertiaryContainer
+            PDF, TEXT, CODE -> scheme.secondaryContainer to scheme.onSecondaryContainer
+            ARCHIVE, APP, OTHER -> scheme.surfaceContainerHighest to scheme.onSurfaceVariant
+        }
+    }
+
+    companion object {
+        private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif", "avif", "svg", "tif", "tiff", "raw", "dng")
+        private val VIDEO_EXTENSIONS = setOf("mp4", "m4v", "mkv", "webm", "mov", "avi", "3gp", "ts", "wmv", "flv")
+        private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "flac", "ogg", "opus", "aac", "wav", "wma", "alac", "aiff")
+        private val ARCHIVE_EXTENSIONS = setOf("zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "xz", "zst", "iso")
+        private val CODE_EXTENSIONS = setOf(
+            "kt", "kts", "java", "js", "ts", "tsx", "jsx", "py", "rb", "go", "rs", "c", "cpp", "h", "hpp", "cs", "swift",
+            "php", "sh", "bash", "html", "css", "json", "xml", "yaml", "yml", "toml", "sql", "gradle"
+        )
+        private val TEXT_EXTENSIONS = setOf("txt", "md", "log", "csv", "rtf", "doc", "docx", "odt", "xls", "xlsx", "ods", "ppt", "pptx", "odp", "ini", "conf", "cfg", "epub")
+
+        fun of(name: String, isDirectory: Boolean): FileKind {
+            if (isDirectory) return FOLDER
+            return when (name.substringAfterLast('.', "").lowercase()) {
+                in IMAGE_EXTENSIONS -> IMAGE
+                in VIDEO_EXTENSIONS -> VIDEO
+                in AUDIO_EXTENSIONS -> AUDIO
+                in ARCHIVE_EXTENSIONS -> ARCHIVE
+                "pdf" -> PDF
+                in CODE_EXTENSIONS -> CODE
+                in TEXT_EXTENSIONS -> TEXT
+                "apk", "aab", "xapk" -> APP
+                else -> OTHER
+            }
+        }
     }
 }
 

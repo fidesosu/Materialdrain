@@ -341,6 +341,8 @@ fun BrowserScreen(
             title = "Move \"${entry.name}\"",
             confirmLabel = "Move here",
             initialPath = fsState.currentPath,
+            rootPath = filesystemViewModel.browseRootPath,
+            rootName = filesystemViewModel.browseRootName,
             excludedPaths = if (entry.isDirectory) setOf(entry.ref.path.trim('/')) else emptySet(),
             loadFolders = { filesystemViewModel.listSubdirectories(it) },
             onConfirm = {
@@ -355,6 +357,8 @@ fun BrowserScreen(
             title = "Move ${selectedEntries.size} items",
             confirmLabel = "Move here",
             initialPath = fsState.currentPath,
+            rootPath = filesystemViewModel.browseRootPath,
+            rootName = filesystemViewModel.browseRootName,
             // A folder can't be moved into itself
             excludedPaths = selectedEntries.filter { it.isDirectory }.mapTo(HashSet()) { it.ref.path.trim('/') },
             loadFolders = { filesystemViewModel.listSubdirectories(it) },
