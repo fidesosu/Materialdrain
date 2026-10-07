@@ -8,4 +8,6 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="ic_launcher_background_color">#1C1C1E</color>
+    <!-- The pixeldrain green of the icon; Android 12 and up use the system accent instead (values-v31) -->
+    <color name="pixeldrain_icon">#FF97B57C</color>
 </resources>
