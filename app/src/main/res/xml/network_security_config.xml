@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Everything stays HTTPS-only, except the app's own server on this device: it hands files of SMB shares to the image
+     loader and the players (see SmbContentServer), and never leaves the device, so there's nothing to encrypt -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

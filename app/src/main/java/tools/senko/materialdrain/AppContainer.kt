@@ -65,6 +65,8 @@ class AppContainer private constructor(application: Application) {
 
     init {
         importBundledPixeldrainConfig(application, providerConfigStore)
+        // Thumbnails of files on SMB shares are made on this device, and kept here between runs
+        tools.senko.materialdrain.provider.smb.SmbContentServer.cacheDir = java.io.File(application.cacheDir, "smb-thumbnails")
         HostRequestAuth.headersFor = { url ->
             providerRegistry.resolve(providerConfigStore.activeProviderId.value).requestHeaders(url)
         }

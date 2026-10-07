@@ -50,7 +50,7 @@ class SmbStorageProvider(
     private val credentials: () -> Credentials = { Credentials() }
 ) : StorageProvider {
 
-    private val client = SmbClient(config, credentials)
+    private val client = SmbClient(config, credentials).also { SmbContentServer.register(id, it) }
 
     override val displayName: String = config.name
     override val kind: ProviderKind = ProviderKind.SMB
@@ -156,10 +156,15 @@ class SmbStorageProvider(
 
     // --- Media ---
 
-    // No public or web address for a file on a share, so nothing to share, preview or stream by URL
+    // No public or web address for a file on a share, so nothing to share. Thumbnails and previews come from the app's
+    // own server on this device instead (see SmbContentServer), so the image loader and the players work as for any host
     override fun shareUrl(node: StorageNode): String? = null
-    override fun thumbnailUrl(node: StorageNode): String? = null
-    override fun rawContentUrl(node: StorageNode, attachment: Boolean): String? = null
+
+    override fun thumbnailUrl(node: StorageNode): String? =
+        if (node.isDirectory) null else SmbContentServer.thumbnailUrl(id, node.ref.path, version = node.modifiedAt ?: node.size?.toString())
+
+    override fun rawContentUrl(node: StorageNode, attachment: Boolean): String? =
+        if (node.isDirectory) null else SmbContentServer.rawUrl(id, node.ref.path)
 
     // --- Checks ---
 
