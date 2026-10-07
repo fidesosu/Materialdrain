@@ -23,8 +23,8 @@ private const val LOOP_VIDEOS_PREF = "loop_videos"
 private const val NAV_PROTOTYPE_PREF = "dev_nav_prototype"
 private const val NAV_MENU_PREVIEW_PREF = "dev_nav_menu_preview"
 private const val NAV_FAB_POSITION_PREF = "nav_fab_position"
-private const val FILES_SORT_FIELD_PREF = "files_sort_field"
-private const val FILES_SORT_ASCENDING_PREF = "files_sort_ascending"
+private const val SORT_FIELD_PREF = "files_sort_field"
+private const val SORT_ASCENDING_PREF = "files_sort_ascending"
 private const val TEXT_WRAP_PREF = "text_wrap"
 private const val LAST_SCREEN_PREF = "last_screen"
 private const val FILESYSTEM_PATH_PREFIX = "filesystem_path_"
@@ -121,15 +121,31 @@ class AppSettings(context: Context) {
         _navFabPosition.value = position
     }
 
-    /** The field the Files screen is sorted by, kept across restarts. */
-    var filesSortField: SortableField
-        get() = enumPref(FILES_SORT_FIELD_PREF, SortableField.NAME)
-        set(value) = prefs.edit { putString(FILES_SORT_FIELD_PREF, value.name) }
+    private val _sortField = MutableStateFlow(enumPref(SORT_FIELD_PREF, SortableField.NAME))
+    /** The field every sortable file list in the app is sorted by (Files, Filesystem, and an opened list's files share
+     * one order, like a standing preference rather than something tied to one screen). Kept across restarts. */
+    val sortField: StateFlow<SortableField> = _sortField.asStateFlow()
 
-    /** The direction of the sorting of the Files screen, kept across restarts. */
-    var filesSortAscending: Boolean
-        get() = prefs.getBoolean(FILES_SORT_ASCENDING_PREF, true)
-        set(value) = prefs.edit { putBoolean(FILES_SORT_ASCENDING_PREF, value) }
+    private val _sortAscending = MutableStateFlow(prefs.getBoolean(SORT_ASCENDING_PREF, true))
+    /** The direction of [sortField], kept across restarts. */
+    val sortAscending: StateFlow<Boolean> = _sortAscending.asStateFlow()
+
+    fun setSortField(field: SortableField) {
+        prefs.edit { putString(SORT_FIELD_PREF, field.name) }
+        _sortField.value = field
+    }
+
+    fun setSortAscending(ascending: Boolean) {
+        prefs.edit { putBoolean(SORT_ASCENDING_PREF, ascending) }
+        _sortAscending.value = ascending
+    }
+
+    fun toggleSortDirection() = setSortAscending(!_sortAscending.value)
+
+    /** Choosing the field already sorted on flips its direction; choosing another field starts it ascending. */
+    fun changeSortOrder(field: SortableField) {
+        if (field == _sortField.value) toggleSortDirection() else { setSortField(field); setSortAscending(true) }
+    }
 
     private val _biometricLock = MutableStateFlow(prefs.getBoolean(BIOMETRIC_LOCK_PREF, false))
     /** Asks for the fingerprint, face or screen lock when the app is opened again, see AppLock. Off by default. */

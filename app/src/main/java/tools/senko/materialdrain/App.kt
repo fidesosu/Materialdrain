@@ -861,6 +861,7 @@ fun MaterialdrainScreen() {
                             filesystemViewModel = filesystemViewModel,
                             fileInfoViewModel = fileInfoViewModel,
                             listViewModel = listViewModel,
+                            appSettings = appContainer.appSettings,
                             activeKind = appContainer.providerRegistry.resolve(activeHostId).kind,
                             onSelectingChange = { selectingItems = it },
                             scrollState = when (targetScreen) {

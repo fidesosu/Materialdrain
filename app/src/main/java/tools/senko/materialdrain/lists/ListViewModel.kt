@@ -2,13 +2,18 @@ package tools.senko.materialdrain.lists
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import tools.senko.materialdrain.auth.SessionManager
+import tools.senko.materialdrain.files.fileComparator
 import tools.senko.materialdrain.provider.ProviderConfigStore
 import tools.senko.materialdrain.provider.ProviderRegistry
 import tools.senko.materialdrain.provider.api.ApiResponse
@@ -30,7 +35,10 @@ data class ListsUiState(
     val openedList: FileList? = null,
     val isLoadingListFiles: Boolean = false,
     val listFiles: List<StorageNode> = emptyList(),
-    val listFilesErrorMessage: String? = null
+    val listFilesErrorMessage: String? = null,
+
+    // Filtering state for the opened list's files; reset whenever the opened list changes
+    val listFilterQuery: String = ""
 )
 
 /** The lists of files of the active provider: the overview, and the contents of the list which is opened. */
@@ -44,6 +52,10 @@ class ListViewModel(
     private val _uiState = MutableStateFlow(ListsUiState())
     val uiState: StateFlow<ListsUiState> = _uiState.asStateFlow()
 
+    private val _displayedListFiles = MutableStateFlow<List<StorageNode>>(emptyList())
+    /** The opened list's files, filtered and sorted by the shared sort order. */
+    val displayedListFiles: StateFlow<List<StorageNode>> = _displayedListFiles.asStateFlow()
+
     init {
         loadApiKey()
         restoreOpenedList()
@@ -51,10 +63,32 @@ class ListViewModel(
             configStore.changes.drop(1).collect {
                 ProviderLog.i("Lists", "active host changed, reloading the lists")
                 appSettings.openedList = null
-                _uiState.update { it.copy(lists = emptyList(), openedList = null, listFiles = emptyList(), errorMessage = null) }
+                _uiState.update {
+                    it.copy(lists = emptyList(), openedList = null, listFiles = emptyList(), errorMessage = null, listFilterQuery = "")
+                }
                 loadApiKey()
             }
         }
+
+        // Recomputes displayedListFiles whenever the opened list's files, the filter, or the shared sorting changes
+        viewModelScope.launch {
+            combine(
+                uiState.map { it.listFiles },
+                uiState.map { it.listFilterQuery },
+                appSettings.sortField,
+                appSettings.sortAscending
+            ) { files, filterQuery, sortField, sortAscending ->
+                withContext(Dispatchers.Default) {
+                    files
+                        .filter { it.name.contains(filterQuery, ignoreCase = true) }
+                        .sortedWith(fileComparator(sortField, sortAscending))
+                }
+            }.collect { sortedAndFiltered -> _displayedListFiles.value = sortedAndFiltered }
+        }
+    }
+
+    fun onListFilterQueryChanged(query: String) {
+        _uiState.update { it.copy(listFilterQuery = query) }
     }
 
     /** Reopens the list that was open when the app was closed, if it belongs to the active host. */
@@ -111,7 +145,7 @@ class ListViewModel(
 
     fun openList(list: FileList) {
         appSettings.openedList = SavedOpenedList(configStore.activeProviderId.value, list)
-        _uiState.update { it.copy(openedList = list, listFiles = emptyList(), listFilesErrorMessage = null) }
+        _uiState.update { it.copy(openedList = list, listFiles = emptyList(), listFilesErrorMessage = null, listFilterQuery = "") }
         fetchOpenedListFiles()
     }
 
@@ -119,7 +153,9 @@ class ListViewModel(
 
     fun closeList() {
         appSettings.openedList = null
-        _uiState.update { it.copy(openedList = null, listFiles = emptyList(), isLoadingListFiles = false, listFilesErrorMessage = null) }
+        _uiState.update {
+            it.copy(openedList = null, listFiles = emptyList(), isLoadingListFiles = false, listFilesErrorMessage = null, listFilterQuery = "")
+        }
     }
 
     private fun fetchOpenedListFiles() {
@@ -137,7 +173,7 @@ class ListViewModel(
                         if (it.openedList?.id != list.id) it
                         else it.copy(
                             isLoadingListFiles = false,
-                            listFiles = response.data.files.sortedBy { it.name.lowercase() },
+                            listFiles = response.data.files,
                             openedList = list.copy(fileCount = response.data.files.size, canEdit = response.data.canEdit, title = response.data.title)
                         )
                     }

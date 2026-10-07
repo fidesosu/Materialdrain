@@ -10,13 +10,16 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tools.senko.materialdrain.auth.SessionManager
+import tools.senko.materialdrain.files.fileComparator
 import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
 import tools.senko.materialdrain.provider.ProviderConfigStore
 import tools.senko.materialdrain.provider.ProviderRegistry
@@ -64,7 +67,10 @@ data class FilesystemUiState(
     val pendingUpload: PendingFilesystemUpload? = null, // Waiting for the user to confirm overwriting existing files
 
     // The pixeldrain search index is useless to nearly everyone, hidden unless the user turns that off in the settings
-    val hideSearchIndex: Boolean = true
+    val hideSearchIndex: Boolean = true,
+
+    // Filtering state; reset whenever the folder changes
+    val filterQuery: String = ""
 ) {
     /**
      * [children] without the entries which are hidden by the settings. Computed once per state, so the screen gets the same
@@ -111,6 +117,10 @@ class FilesystemViewModel(
     private val _uiState = MutableStateFlow(FilesystemUiState())
     val uiState: StateFlow<FilesystemUiState> = _uiState.asStateFlow()
 
+    private val _displayedChildren = MutableStateFlow<List<StorageNode>>(emptyList())
+    /** [FilesystemUiState.visibleChildren], filtered and sorted by the shared sort order. Folders always come first. */
+    val displayedChildren: StateFlow<List<StorageNode>> = _displayedChildren.asStateFlow()
+
     private var uploadJob: Job? = null
     private val speedTracker = TransferSpeedTracker()
     private var nextTransferNumber = 0
@@ -125,6 +135,26 @@ class FilesystemViewModel(
             // Choosing another host as the active one re-roots the screen on it
             configStore.changes.drop(1).collect { loadActiveProviderAndRoot() }
         }
+
+        // Recomputes displayedChildren whenever the folder's contents, the filter, or the shared sorting changes
+        viewModelScope.launch {
+            combine(
+                uiState.map { it.visibleChildren },
+                uiState.map { it.filterQuery },
+                appSettings.sortField,
+                appSettings.sortAscending
+            ) { children, filterQuery, sortField, sortAscending ->
+                withContext(Dispatchers.Default) {
+                    children
+                        .filter { it.name.contains(filterQuery, ignoreCase = true) }
+                        .sortedWith(fileComparator(sortField, sortAscending, directoriesFirst = true))
+                }
+            }.collect { sortedAndFiltered -> _displayedChildren.value = sortedAndFiltered }
+        }
+    }
+
+    fun onFilterQueryChanged(query: String) {
+        _uiState.update { it.copy(filterQuery = query) }
     }
 
     private fun activeProvider(): StorageProvider = registry.resolve(configStore.activeProviderId.value)
@@ -205,7 +235,9 @@ class FilesystemViewModel(
                             canWrite = response.data.canWrite,
                             canDelete = response.data.canDelete,
                             canImport = provider.kind == ProviderKind.PIXELDRAIN,
-                            errorMessage = null
+                            errorMessage = null,
+                            // A filter from the folder just left doesn't carry over into this one
+                            filterQuery = ""
                         )
                     }
                 }

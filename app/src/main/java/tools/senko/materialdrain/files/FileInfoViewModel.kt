@@ -59,13 +59,6 @@ private const val DOWNLOAD_WRITE_BUFFER_BYTES = 256 * 1024
 private const val MAX_FILES_PER_ZIP = 100
 private const val API_KEY_MISSING = "API Key is missing. Please set it in Settings."
 
-// Define SortableField enum
-enum class SortableField {
-    NAME,
-    SIZE,
-    UPLOAD_DATE
-}
-
 // --- Download State Management ---
 enum class DownloadStatus {
     PENDING,
@@ -148,10 +141,6 @@ data class FileInfoUiState(
     val apiKeyMissingError: Boolean = false,
     val apiKey: String = "", // Exposed API Key, only the built-in Pixeldrain uses it
 
-    // Sorting state
-    val sortField: SortableField = SortableField.NAME,
-    val sortAscending: Boolean = true,
-
     // Filtering state
     val filterQuery: String = "",
     val showFilterInput: Boolean = false,
@@ -191,9 +180,7 @@ class FileInfoViewModel(
     private val appSettings: AppSettings
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(
-        FileInfoUiState(sortField = appSettings.filesSortField, sortAscending = appSettings.filesSortAscending)
-    )
+    private val _uiState = MutableStateFlow(FileInfoUiState())
     val uiState: StateFlow<FileInfoUiState> = _uiState.asStateFlow()
 
     private val _displayedFiles = MutableStateFlow<List<StorageNode>>(emptyList())
@@ -207,28 +194,18 @@ class FileInfoViewModel(
             configStore.changes.drop(1).collect { onActiveProviderChanged() }
         }
 
-        // Recomputes displayedFiles whenever the list, the sorting or the filter changes
+        // Recomputes displayedFiles whenever the list, the shared sorting, or the filter changes
         viewModelScope.launch {
             combine(
                 uiState.map { it.userFilesList },
-                uiState.map { it.sortField },
-                uiState.map { it.sortAscending },
-                uiState.map { it.filterQuery }
-            ) { files, sortField, sortAscending, filterQuery ->
+                uiState.map { it.filterQuery },
+                appSettings.sortField,
+                appSettings.sortAscending
+            ) { files, filterQuery, sortField, sortAscending ->
                 withContext(Dispatchers.Default) {
                     files
                         .filter { it.name.contains(filterQuery, ignoreCase = true) }
-                        .sortedWith(
-                            compareBy<StorageNode> {
-                                when (sortField) {
-                                    SortableField.NAME -> it.name.lowercase()
-                                    SortableField.SIZE -> it.size ?: 0L
-                                    SortableField.UPLOAD_DATE -> it.createdAt.orEmpty()
-                                }
-                            }.let { comparator ->
-                                if (sortAscending) comparator else comparator.reversed()
-                            }
-                        )
+                        .sortedWith(fileComparator(sortField, sortAscending))
                 }
             }.collect { sortedAndFiltered ->
                 _displayedFiles.value = sortedAndFiltered
@@ -521,12 +498,6 @@ class FileInfoViewModel(
     }
 
     fun clearUserFilesError() { _uiState.update { it.copy(userFilesListErrorMessage = null, apiKeyMissingError = false) } }
-
-    fun changeSortOrder(newField: SortableField? = null, newAscending: Boolean? = null) {
-        _uiState.update { it.copy(sortField = newField ?: it.sortField, sortAscending = newAscending ?: it.sortAscending) }
-        appSettings.filesSortField = _uiState.value.sortField
-        appSettings.filesSortAscending = _uiState.value.sortAscending
-    }
 
     fun onFilterQueryChanged(newQuery: String) { _uiState.update { it.copy(filterQuery = newQuery) } }
     fun toggleFilterInput() { _uiState.update { it.copy(showFilterInput = !it.showFilterInput) } }

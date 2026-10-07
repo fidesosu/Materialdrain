@@ -86,6 +86,7 @@ import tools.senko.materialdrain.provider.api.FileList
 import tools.senko.materialdrain.provider.api.ProviderKind
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.provider.api.StorageRef
+import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.settings.SEARCH_INDEX_DELETE_WARNING
 import tools.senko.materialdrain.settings.isSearchIndex
 import tools.senko.materialdrain.ui.components.DotScrollbar
@@ -120,6 +121,7 @@ fun BrowserScreen(
     filesystemViewModel: FilesystemViewModel,
     fileInfoViewModel: FileInfoViewModel,
     listViewModel: ListViewModel,
+    appSettings: AppSettings,
     onFileSelected: () -> Unit,
     scrollState: LazyListState,
     fabHeight: Dp,
@@ -128,19 +130,31 @@ fun BrowserScreen(
     onSelectingChange: (Boolean) -> Unit
 ) {
     val fsState by filesystemViewModel.uiState.collectAsState()
+    val fsDisplayedChildren by filesystemViewModel.displayedChildren.collectAsState()
     val fileState by fileInfoViewModel.uiState.collectAsState()
     val displayedFiles by fileInfoViewModel.displayedFiles.collectAsState()
     val listState by listViewModel.uiState.collectAsState()
+    val listDisplayedFiles by listViewModel.displayedListFiles.collectAsState()
     val openedList = listState.openedList.takeIf { mode == BrowserMode.LISTS }
     val context = LocalContext.current
+
+    // The sort order: shared by every sortable list in the app (see AppSettings.sortField)
+    val sortField by appSettings.sortField.collectAsState()
+    val sortAscending by appSettings.sortAscending.collectAsState()
 
     // The lists as folders, sorted again only when the lists change
     val listFolders = remember(listState.lists) { listState.lists.sortedBy { it.title.lowercase() }.map { it.asFolder() } }
     // What this mode lists, and how it loads and fails
     val entries: List<StorageNode> = when (mode) {
-        BrowserMode.FILESYSTEM -> fsState.visibleChildren
+        BrowserMode.FILESYSTEM -> fsDisplayedChildren
         BrowserMode.FILES -> displayedFiles
-        BrowserMode.LISTS -> if (openedList == null) listFolders else listState.listFiles
+        BrowserMode.LISTS -> if (openedList == null) listFolders else listDisplayedFiles
+    }
+    // The filter query of whichever list this mode shows, for the empty-state message
+    val activeFilterQuery = when (mode) {
+        BrowserMode.FILESYSTEM -> fsState.filterQuery
+        BrowserMode.FILES -> fileState.filterQuery
+        BrowserMode.LISTS -> listState.listFilterQuery
     }
     val isLoading = when (mode) {
         BrowserMode.FILESYSTEM -> fsState.isLoading
@@ -397,7 +411,8 @@ fun BrowserScreen(
             add(SelectionAction("Delete", Icons.Filled.Delete, { actionRequest = FileActionRequest.Delete(files) }, enabled = files.isNotEmpty(), destructive = true))
             add(SelectionAction("Add to filesystem", Icons.Filled.FolderCopy, { actionRequest = FileActionRequest.AddToFilesystem(files) }, enabled = files.isNotEmpty()))
             openedList?.takeIf { it.canEdit }?.let { list ->
-                add(SelectionAction("Remove from this list", Icons.Filled.Remove, { actionRequest = FileActionRequest.RemoveFromList(files, list, entries.size) }, enabled = files.isNotEmpty()))
+                // The list's own file count, not the filtered entries (see the single-item action below)
+                add(SelectionAction("Remove from this list", Icons.Filled.Remove, { actionRequest = FileActionRequest.RemoveFromList(files, list, listState.listFiles.size) }, enabled = files.isNotEmpty()))
             }
             add(selectAll)
         }
@@ -413,57 +428,90 @@ fun BrowserScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header: the path (filesystem), the list being shown (lists), or the sorting and filter (files)
+            // Header: the path (filesystem), the list being shown (lists), and the sorting and filter of whichever
+            // mode's list is sortable (every mode except the lists overview, which is just titles)
             when (mode) {
-                BrowserMode.FILESYSTEM -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    PathBreadcrumb(
-                        pathSegments = fsState.pathSegments,
-                        onPathSegmentClick = { filesystemViewModel.navigateToPathSegment(it) },
-                        modifier = Modifier.weight(1f)
+                BrowserMode.FILESYSTEM -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        PathBreadcrumb(
+                            pathSegments = fsState.pathSegments,
+                            onPathSegmentClick = { filesystemViewModel.navigateToPathSegment(it) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (fsState.canWrite && !selectionMode) {
+                            IconButton(onClick = { showNewFolderDialog = true }, enabled = !fsState.isModifying) {
+                                Icon(Icons.Filled.CreateNewFolder, contentDescription = "New folder")
+                            }
+                            if (fsState.canImport) {
+                                IconButton(onClick = { showImportDialog = true }, enabled = !fsState.isModifying) {
+                                    Icon(Icons.Filled.Link, contentDescription = "Import files by ID")
+                                }
+                            }
+                        }
+                    }
+                    SortControls(
+                        sortField = sortField,
+                        sortAscending = sortAscending,
+                        onSortFieldSelected = { appSettings.changeSortOrder(it) },
+                        filterQuery = fsState.filterQuery,
+                        onFilterQueryChanged = { filesystemViewModel.onFilterQueryChanged(it) },
+                        filteredCount = fsDisplayedChildren.size,
+                        totalCount = fsState.visibleChildren.size,
+                        filterFocusRequester = filterFocusRequester,
+                        onFilterSubmitted = {}
                     )
-                    if (fsState.canWrite && !selectionMode) {
-                        IconButton(onClick = { showNewFolderDialog = true }, enabled = !fsState.isModifying) {
-                            Icon(Icons.Filled.CreateNewFolder, contentDescription = "New folder")
-                        }
-                        if (fsState.canImport) {
-                            IconButton(onClick = { showImportDialog = true }, enabled = !fsState.isModifying) {
-                                Icon(Icons.Filled.Link, contentDescription = "Import files by ID")
-                            }
-                        }
-                    }
                 }
-                BrowserMode.LISTS -> if (openedList != null && !selectionMode) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        IconButton(onClick = { listViewModel.closeList() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to the lists")
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(openedList.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Text(
-                                "Files: ${openedList.fileCount}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        if (entries.isNotEmpty()) {
-                            Button(
-                                onClick = { fileInfoViewModel.downloadFilesAsZip(entries, openedList.title) },
-                                contentPadding = ButtonDefaults.ButtonWithIconContentPadding
-                            ) {
-                                Icon(Icons.Filled.FolderZip, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
-                                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                                Text("All (ZIP)")
+                BrowserMode.LISTS -> if (openedList != null) {
+                    if (!selectionMode) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            IconButton(onClick = { listViewModel.closeList() }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to the lists")
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(openedList.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    "Files: ${openedList.fileCount}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            // Always the whole list, even while a filter narrows what's shown below
+                            if (listState.listFiles.isNotEmpty()) {
+                                Button(
+                                    onClick = { fileInfoViewModel.downloadFilesAsZip(listState.listFiles, openedList.title) },
+                                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+                                ) {
+                                    Icon(Icons.Filled.FolderZip, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                                    Text("All (ZIP)")
+                                }
                             }
                         }
                     }
+                    SortControls(
+                        sortField = sortField,
+                        sortAscending = sortAscending,
+                        onSortFieldSelected = { appSettings.changeSortOrder(it) },
+                        filterQuery = listState.listFilterQuery,
+                        onFilterQueryChanged = { listViewModel.onListFilterQueryChanged(it) },
+                        filteredCount = listDisplayedFiles.size,
+                        totalCount = listState.listFiles.size,
+                        filterFocusRequester = filterFocusRequester,
+                        onFilterSubmitted = {}
+                    )
                 }
                 BrowserMode.FILES -> SortControls(
-                    uiState = fileState,
-                    fileInfoViewModel = fileInfoViewModel,
+                    sortField = sortField,
+                    sortAscending = sortAscending,
+                    onSortFieldSelected = { appSettings.changeSortOrder(it) },
+                    filterQuery = fileState.filterQuery,
+                    onFilterQueryChanged = { fileInfoViewModel.onFilterQueryChanged(it) },
+                    filteredCount = displayedFiles.size,
+                    totalCount = fileState.userFilesList.size,
                     filterFocusRequester = filterFocusRequester,
                     onFilterSubmitted = {}
                 )
@@ -511,7 +559,7 @@ fun BrowserScreen(
                     }
                 }
                 entries.isEmpty() && !isLoading -> PullableFill {
-                    CenteredTextMessage(emptyText(mode, openedList != null, fileState.filterQuery))
+                    CenteredTextMessage(emptyText(mode, openedList != null, activeFilterQuery))
                 }
                 else -> Box(modifier = Modifier.fillMaxSize()) {
                     LazyColumn(
@@ -543,7 +591,9 @@ fun BrowserScreen(
                                 onDelete = { if (mode == BrowserMode.FILESYSTEM) entryToDelete = node else actionRequest = FileActionRequest.Delete(listOf(node)) },
                                 onAddToFilesystem = { actionRequest = FileActionRequest.AddToFilesystem(listOf(node)) },
                                 onAddToList = { actionRequest = FileActionRequest.AddToList(listOf(node)) },
-                                onRemoveFromList = { openedList?.let { actionRequest = FileActionRequest.RemoveFromList(listOf(node), it, entries.size) } },
+                                // The list's own file count, not the filtered entries: removing the last matching file
+                                // mustn't look like the list itself went empty when a filter just hides the rest
+                                onRemoveFromList = { openedList?.let { actionRequest = FileActionRequest.RemoveFromList(listOf(node), it, listState.listFiles.size) } },
                                 // Lists have web links only on Pixeldrain; other hosts' lists are not on pixeldrain.com
                                 pixeldrainLinks = activeKind == ProviderKind.PIXELDRAIN,
                                 onCopyLink = { url -> copyLinkToClipboard(context, url) },
