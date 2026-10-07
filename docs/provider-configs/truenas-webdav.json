@@ -10,7 +10,7 @@
     }
   },
   "root_path": "/",
-  "screens": [{"screen": "FILESYSTEM"}],
+  "screens": ["UPLOAD", "FILESYSTEM"],
   "meta": {
     "id": "tools.senko.materialdrain.examples.truenas-webdav",
     "version": 2,

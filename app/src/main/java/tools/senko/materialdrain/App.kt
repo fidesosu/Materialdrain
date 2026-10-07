@@ -89,6 +89,7 @@ import tools.senko.materialdrain.browser.BrowserMode
 import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
 import tools.senko.materialdrain.provider.api.HostScreen
 import tools.senko.materialdrain.provider.api.ProviderCapability
+import tools.senko.materialdrain.provider.api.resolveScreens
 import tools.senko.materialdrain.browser.BrowserScreen
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
 import tools.senko.materialdrain.lists.ListViewModel
@@ -233,8 +234,7 @@ fun MaterialdrainScreen() {
         appContainer.providerRegistry.resolve(appContainer.providerConfigStore.activeProviderId.value).capabilities
     }
     // The built-in Pixeldrain host isn't config-driven, so it keeps today's capability-based navigation. Every other
-    // host is a config the user (or a config's author) wrote, and its own "screens" field decides what shows for it;
-    // a config which doesn't set it is unfinished, not "show everything the host might support"
+    // host is a config, whose "screens" field picks what shows for it (or, left out, everything the host can back)
     val activeConfig = remember(configChanges) {
         if (activeHostId == PIXELDRAIN_PROVIDER_ID) {
             null
@@ -242,28 +242,26 @@ fun MaterialdrainScreen() {
             appContainer.providerConfigStore.providers.value.firstOrNull { it.id == activeHostId }?.config
         }
     }
-    // Each config entry in its own order, so a config can put its screens in whichever order makes sense for that
-    // host (the tabs follow it); duplicates of the same screen collapse to its first position
-    val navBarOrder = remember(activeCapabilities, activeConfig) {
-        if (activeConfig != null) {
-            activeConfig.screens.map { it.screen.toScreen() }.distinct()
-        } else {
-            buildList {
-                add(Screen.Upload)
-                if (ProviderCapability.ENUMERATE in activeCapabilities) add(Screen.Files)
-                if (ProviderCapability.LISTS in activeCapabilities) add(Screen.Lists)
-                if (ProviderCapability.BROWSE in activeCapabilities) add(Screen.Filesystem)
-            }
+    // The config's screens in its own order, so a config can put them in whichever order makes sense for that host
+    // (the tabs follow it), without those the host can't back (see resolveScreens)
+    val configScreens = remember(activeCapabilities, activeConfig) {
+        activeConfig?.let { resolveScreens(it.screens, activeCapabilities) }
+    }
+    val navBarOrder = remember(activeCapabilities, configScreens) {
+        configScreens?.map { it.screen.toScreen() } ?: buildList {
+            add(Screen.Upload)
+            if (ProviderCapability.ENUMERATE in activeCapabilities) add(Screen.Files)
+            if (ProviderCapability.LISTS in activeCapabilities) add(Screen.Lists)
+            if (ProviderCapability.BROWSE in activeCapabilities) add(Screen.Filesystem)
         }
     }
-    // A config with no screens turned on at all: nothing to fall back to, so the current screen shows a message
-    // instead (see the main content below) rather than bouncing to an upload screen that isn't offered either
+    // A config with no screens to show (it chose none, or only ones the host can't back): nothing to fall back to, so
+    // the current screen shows a message instead (see the main content below)
     val noScreensConfigured = activeConfig != null && navBarOrder.isEmpty()
     // This screen's entry in the config, for its custom name and the capabilities it takes away (see ScreenConfig).
-    // Not config-driven (the built-in Pixeldrain, or a screen the active config doesn't mention) means nothing is
-    // taken away and the screen keeps its default name
-    val activeScreenConfigs = remember(activeConfig) {
-        activeConfig?.screens?.associateBy { it.screen.toScreen() } ?: emptyMap()
+    // Not config-driven (the built-in Pixeldrain) means nothing is taken away and the screen keeps its default name
+    val activeScreenConfigs = remember(configScreens) {
+        configScreens?.associateBy { it.screen.toScreen() } ?: emptyMap()
     }
     fun screenTitle(screen: Screen): String = activeScreenConfigs[screen]?.name?.takeIf { it.isNotBlank() } ?: screen.title
     LaunchedEffect(navBarOrder, currentScreen) {
@@ -906,8 +904,9 @@ fun MaterialdrainScreen() {
                         .fillMaxSize()
                         .padding(paddingValues)
                 ) {
-                    val noScreensMessage = "${activeConfig?.name ?: "This host"} has no screens turned on. " +
-                        "Add a \"screens\" field to its config (in Settings) to use it."
+                    val noScreensMessage = "${activeConfig?.name ?: "This host"} has no screens to show: its config's " +
+                        "\"screens\" list is empty, or only names screens this host can't offer. Edit the config in " +
+                        "Settings → Advanced, or remove \"screens\" to show everything the host can do."
                     when (targetScreen) {
                         Screen.Upload if noScreensConfigured -> CenteredTextMessage(noScreensMessage)
                         Screen.Files if noScreensConfigured -> CenteredTextMessage(noScreensMessage)

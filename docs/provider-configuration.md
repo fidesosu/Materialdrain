@@ -9,14 +9,18 @@ The shipped examples are in [`provider-configs/`](provider-configs/):
 
 | File | Kind | What it is |
 | --- | --- | --- |
-| `pixeldrain.json` | `generic_rest` | Pixeldrain itself, described as a config (imported and activated on first start) |
+| `pixeldrain.json` | `generic_rest` | Pixeldrain itself, described as a config (imported and activated on first start). Uses almost every endpoint there is |
 | `nextcloud.json` | `webdav` | A Nextcloud account over WebDAV |
+| `truenas-webdav.json` | `webdav` | A TrueNAS share over WebDAV |
 | `minio.json` | `s3` | A MinIO (or any S3-compatible) bucket |
+| `truenas-s3.json` | `s3` | A TrueNAS S3 bucket |
+| `smb.json` | `smb` | A Windows, Samba or NAS share |
 
 ## Adding a host
 
 1. Open **Settings → Advanced**, then the **Add a custom host** section.
-2. Paste the config JSON and press **Import host**. The host is saved and becomes the active one, which the Files,
+2. Paste the config JSON, or press one of the **Start from** buttons to get a ready one to fill in (see
+   [Templates](#templates)), and press **Import host**. The host is saved and becomes the active one, which the Files,
    Lists and Filesystem screens then use.
 3. Enter the host's sign-in (API key, or username and password) on its card in the same section. Credentials are
    never part of a config, so configs can be shared safely.
@@ -26,6 +30,23 @@ without it.
 
 Removing a host just stops using it. The active host falls back to the built-in Pixeldrain, and the Pixeldrain
 sign-in in **Account** keeps working on its own.
+
+### Templates
+
+**Start from** fills the text box with a complete config of a kind: every field the app reads for it is there, set to
+its default or to an example value, so nothing has to be looked up. Change the address (and anything else that
+differs), press **Import host**, then enter the sign-in on the host's card.
+
+| Button | Kind | Starts from |
+| --- | --- | --- |
+| REST API (Pixeldrain) | `generic_rest` | `pixeldrain.json`, the config with the most endpoints, to adapt to another API |
+| WebDAV | `webdav` | A Nextcloud account |
+| S3 | `s3` | A MinIO bucket |
+| SMB | `smb` | A share on a NAS |
+
+The WebDAV, S3 and SMB templates are made by the app from its own config format, so they always have every field the
+installed version of the app knows about. A field that's `null` or empty in a template is simply unset; it can stay as
+it is, or be removed.
 
 ## The kinds
 
@@ -45,52 +66,63 @@ Only `generic_rest` lets you describe a host in detail, so most of this guide is
 | --- | --- | --- |
 | `kind` | yes | `generic_rest`, `webdav`, `s3` or `smb` |
 | `name` | yes | The name shown in the app |
-| `screens` | no | Which of `UPLOAD`, `FILES`, `LISTS` and `FILESYSTEM` to show for this host, see [Screens](#screens) |
+| `screens` | no | Which of `UPLOAD`, `FILES`, `LISTS` and `FILESYSTEM` to show; left out, every one the host can do. See [Screens](#screens) |
 | `meta` | no | Identity, version and update information, see [Sharing and updates](#sharing-and-updates) |
 
 ### Screens
 
-The Files, Lists and Filesystem screens, and the Upload screen, are the same code for every host; `screens` is the
-list of which of them this host shows, and in what order (the tabs follow it). Leaving it out (or writing `[]`)
-isn't "show whatever the host can do" — the host shows no screens at all, with a message asking for `screens` to be
-filled in. This is deliberate: a config's author, not the app, decides what makes sense to show for their host.
+The Upload, Files, Lists and Filesystem screens are the same for every host; `screens` picks which of them this host
+shows, and in what order (the tabs follow it).
 
-Each entry is an object, not just a name:
+- **Leave `screens` out** to show every screen the host can do. This is what most configs want.
+- **List the ones to show** to pick and order them yourself, e.g. only the folder browser:
+
+  ```json
+  "screens": ["FILESYSTEM"]
+  ```
+
+- **`"screens": []`** shows none: the app then says the host has no screens to show.
+
+Screen names can be written in any case (`"filesystem"` works too). A screen the host can't do (see the table below)
+is left out rather than shown broken, and a screen listed twice counts once, where it's first listed.
+
+When the bottom bar would only have one screen, it's hidden and that screen is simply shown.
+
+Which screens each kind can do:
+
+| Screen | What it is | `generic_rest` | `webdav`, `s3`, `smb` |
+| --- | --- | --- | --- |
+| `UPLOAD` | Picking files to upload, with no folder of their own | with an `upload` (or `browse_upload`) endpoint | yes, into the config's top folder (`root_path`/`prefix`) |
+| `FILES` | A flat, sortable list of every file on the account (what Pixeldrain calls "my files") | with a `list` endpoint | no |
+| `LISTS` | Pixeldrain-style shareable lists of files | with `user_lists`, `list_info`… | no |
+| `FILESYSTEM` | The folder browser, with its own upload button for the open folder | with a `browse_list` endpoint | yes |
+
+#### Naming a screen, or taking actions away from it
+
+A screen can also be written as an object, to give it a name of its own or take actions away from it:
 
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `screen` | required | `UPLOAD`, `FILES`, `LISTS` or `FILESYSTEM` |
-| `name` | the screen's own name | Overrides the tab's label ("Files", "Lists", "Filesystem", "Upload") and the title bar, e.g. a Filesystem screen that's really one share called `"name": "Media"` |
-| `disabled_capabilities` | `[]` | Takes specific actions away from this screen alone, without touching the host's other screens or its own capabilities, see below |
+| `name` | the screen's own name | Replaces the tab's label and the title bar, e.g. a Filesystem screen that's really one share called `"name": "Media"` |
+| `disabled_capabilities` | `[]` | Actions this screen alone doesn't offer, even though the host can do them |
 
-For example, a Filesystem screen which can't create folders or delete anything, shown as "Media":
+For example, a Filesystem screen shown as "Media" which can't create folders or delete anything, next to a plain
+Upload screen:
 
 ```json
 "screens": [
+  "UPLOAD",
   { "screen": "FILESYSTEM", "name": "Media", "disabled_capabilities": ["MKDIR", "DELETE"] }
 ]
 ```
 
-`disabled_capabilities` only takes away, it can't grant something the host doesn't actually support. The ones the
-app acts on today are `UPLOAD` (the upload button, and Filesystem's own one), `MKDIR` (new folder), `RENAME`
-(rename and move) and `DELETE`.
+`disabled_capabilities` only takes away, it can't grant something the host doesn't support. The ones the app acts on
+are `UPLOAD` (the upload button, and Filesystem's own one), `MKDIR` (new folder), `RENAME` (rename and move) and
+`DELETE`.
 
-Only turn on a screen the host can actually back:
-
-- `UPLOAD` is the standalone Upload screen: picking a file with no folder of its own. A `generic_rest` config with
-  an `upload` endpoint (what Pixeldrain's own config uses) uploads into the host's flat storage; `webdav`, `s3` and
-  `smb` have none of that, so it uploads into the config's root folder instead (`root_path`/`prefix`), through the
-  same browsing the Filesystem screen uses
-- `FILES` is a flat, sortable list of every file on the account — only meaningful for a `generic_rest` config with a
-  `list` endpoint (the thing Pixeldrain itself calls "my files")
-- `LISTS` is Pixeldrain's shareable lists of files — only a `generic_rest` config with `user_lists`/`list_info` etc.
-  can offer this
-- `FILESYSTEM` is the folder browser, with its own upload button that uploads into whichever folder is open. It's the
-  only screen `webdav`, `s3` and `smb` can offer besides `UPLOAD`, since none of them have a flat file list or
-  Pixeldrain-style lists
-
-The built-in Pixeldrain host (the one Materialdrain signs into directly, not the `pixeldrain.json` example) isn't a
-config at all, so `screens` doesn't apply to it; it keeps showing everything it supports, under its own names.
+The built-in Pixeldrain host (the one Materialdrain signs into directly, not the `pixeldrain.json` config) isn't a
+config at all, so `screens` doesn't apply to it; it shows everything it supports, under its own names.
 
 ### `webdav`
 
@@ -125,9 +157,10 @@ The access key and secret key are entered in the app, like any other sign-in.
 | `min_version` | `SMB2` | The oldest protocol allowed: `SMB2` or `SMB3`. The newest the host offers is always used |
 | `encrypt` | `false` | Encrypts the traffic. Needs SMB 3 on the host; without it the connection fails rather than sending unencrypted |
 
-An SMB share has no web address for its files, so files show their name, size and modified time, without thumbnails,
-previews or share links. Browsing, upload, download, folders, renaming and deleting all work. The top of the share can't
-be deleted.
+Browsing, upload, download, folders, renaming and deleting all work, and files show their last modified time. A
+share has no web address for its files, so the app serves them itself, on the device only, for thumbnails (photos,
+video frames and album covers, kept in the app's cache) and for previews, including streaming video and audio with
+seeking. There are no share links. The top of the share can't be deleted.
 
 ### `generic_rest`
 

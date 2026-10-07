@@ -9,9 +9,7 @@
   "auth": "CREDENTIALS",
   "min_version": "SMB2",
   "encrypt": false,
-  "screens": [
-    { "screen": "FILESYSTEM" }
-  ],
+  "screens": ["UPLOAD", "FILESYSTEM"],
   "meta": {
     "id": "tools.senko.materialdrain.examples.smb",
     "version": 1,

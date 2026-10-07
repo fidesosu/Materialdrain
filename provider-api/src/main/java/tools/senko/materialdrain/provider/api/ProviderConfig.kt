@@ -137,11 +137,11 @@ data class ProviderConfigMeta(
 sealed interface ProviderConfig {
     val name: String
     /**
-     * Which tabs this host shows. Empty by default: a config which doesn't set this is treated as unfinished, not as
-     * "show everything possible" — the UI shows a message asking for it to be filled in instead of guessing from
-     * capabilities. Pixeldrain's own built-in host isn't config-driven and so isn't affected by this.
+     * Which tabs this host shows, in order; null (left out of the config) for every screen the host can back. An empty
+     * list shows none. Screens the host can't back are left out either way, see [resolveScreens]. Pixeldrain's own
+     * built-in host isn't config-driven and so isn't affected by this.
      */
-    val screens: List<ScreenConfig>
+    val screens: List<ScreenConfig>?
     val meta: ProviderConfigMeta?
 }
 
@@ -182,7 +182,7 @@ data class GenericRestConfig(
     @SerialName("send_credentials") val sendCredentials: Boolean = true,
     /** Whether the account's own login (Settings → Account) is used when this host has no sign-in or API key of its own. */
     @SerialName("account_fallback") val accountFallback: Boolean = false,
-    override val screens: List<ScreenConfig> = emptyList(),
+    override val screens: List<@Serializable(with = ScreenEntrySerializer::class) ScreenConfig>? = null,
     override val meta: ProviderConfigMeta? = null
 ) : ProviderConfig
 
@@ -193,7 +193,7 @@ data class WebDavConfig(
     @SerialName("base_url") val baseUrl: String,
     val auth: AuthConfig = AuthConfig(type = AuthType.BASIC),
     @SerialName("root_path") val rootPath: String = "/",
-    override val screens: List<ScreenConfig> = emptyList(),
+    override val screens: List<@Serializable(with = ScreenEntrySerializer::class) ScreenConfig>? = null,
     override val meta: ProviderConfigMeta? = null
 ) : ProviderConfig
 
@@ -206,7 +206,7 @@ data class S3Config(
     val bucket: String,
     @SerialName("path_style") val pathStyle: Boolean = true,
     val prefix: String = "",
-    override val screens: List<ScreenConfig> = emptyList(),
+    override val screens: List<@Serializable(with = ScreenEntrySerializer::class) ScreenConfig>? = null,
     override val meta: ProviderConfigMeta? = null
 ) : ProviderConfig
 
@@ -238,7 +238,7 @@ data class SmbConfig(
     @SerialName("min_version") val minVersion: SmbMinVersion = SmbMinVersion.SMB2,
     /** Encrypts the traffic on the wire. Needs SMB 3 on the host, the connection fails when it doesn't offer it. */
     val encrypt: Boolean = false,
-    override val screens: List<ScreenConfig> = emptyList(),
+    override val screens: List<@Serializable(with = ScreenEntrySerializer::class) ScreenConfig>? = null,
     override val meta: ProviderConfigMeta? = null
 ) : ProviderConfig
 

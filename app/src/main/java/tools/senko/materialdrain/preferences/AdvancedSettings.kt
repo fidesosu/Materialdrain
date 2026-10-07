@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -73,6 +76,7 @@ import tools.senko.materialdrain.provider.api.SmbConfig
 import tools.senko.materialdrain.provider.api.WebDavConfig
 import tools.senko.materialdrain.provider.api.passwordAuth
 import tools.senko.materialdrain.ui.LocalReduceMotion
+import tools.senko.materialdrain.provider.api.ProviderConfigTemplates
 
 private fun kindLabel(config: ProviderConfig): String = when (config) {
     is GenericRestConfig -> "Generic REST"
@@ -90,8 +94,8 @@ fun SettingsEnvironment.ProviderHostsSection() {
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            "Pixeldrain is always available and is the default. Custom hosts below can be tested and " +
-                "kept configured, but browsing/uploading through them from the rest of the app is still being built.",
+            "Pixeldrain is always available. Custom hosts below are used by the Files, Lists, Filesystem and Upload " +
+                "screens once they're the active host (the switcher at the top of those screens).",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -117,6 +121,31 @@ fun SettingsEnvironment.ProviderHostsSection() {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        Spacer(modifier = Modifier.height(8.dp))
+        // A complete config to fill in, for each kind of host the app speaks: every field it reads is in it
+        Text("Start from", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val context = LocalContext.current
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            AssistChip(
+                onClick = {
+                    runCatching { context.assets.open("pixeldrain.json").bufferedReader().use { it.readText() } }
+                        .onSuccess { importText = it; viewModel.clearImportError() }
+                },
+                label = { Text("REST API (Pixeldrain)") }
+            )
+            ProviderConfigTemplates.Kind.entries.forEach { kind ->
+                AssistChip(
+                    onClick = {
+                        importText = ProviderConfigTemplates.text(kind)
+                        viewModel.clearImportError()
+                    },
+                    label = { Text(kind.label) }
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = importText,

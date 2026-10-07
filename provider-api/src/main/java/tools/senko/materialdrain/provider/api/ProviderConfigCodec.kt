@@ -1,6 +1,9 @@
 package tools.senko.materialdrain.provider.api
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -26,16 +29,40 @@ private const val KIND_SMB = "smb"
 object ProviderConfigCodec {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; prettyPrint = true }
 
-    fun encode(config: ProviderConfig): String {
+    /** Writes every field, set or not: for templates, which show everything a config of their kind can have. */
+    private val fullJson = Json(json) { encodeDefaults = true; explicitNulls = true }
+
+    /**
+     * The config as text. With [allFields], every field the app reads is written, even those left at their defaults,
+     * and every screen in its full form (see [ProviderConfigTemplates]); otherwise only what differs from the defaults.
+     */
+    fun encode(config: ProviderConfig, allFields: Boolean = false): String {
+        val format = if (allFields) fullJson else json
         val (kind, element) = when (config) {
-            is GenericRestConfig -> KIND_GENERIC_REST to json.encodeToJsonElement(GenericRestConfig.serializer(), config)
-            is WebDavConfig -> KIND_WEBDAV to json.encodeToJsonElement(WebDavConfig.serializer(), config)
-            is S3Config -> KIND_S3 to json.encodeToJsonElement(S3Config.serializer(), config)
-            is SmbConfig -> KIND_SMB to json.encodeToJsonElement(SmbConfig.serializer(), config)
+            is GenericRestConfig -> KIND_GENERIC_REST to format.encodeToJsonElement(GenericRestConfig.serializer(), config)
+            is WebDavConfig -> KIND_WEBDAV to format.encodeToJsonElement(WebDavConfig.serializer(), config)
+            is S3Config -> KIND_S3 to format.encodeToJsonElement(S3Config.serializer(), config)
+            is SmbConfig -> KIND_SMB to format.encodeToJsonElement(SmbConfig.serializer(), config)
         }
-        val withKind = JsonObject(element.jsonObject.toMutableMap().apply { put("kind", JsonPrimitive(kind)) })
-        return PROVIDER_CONFIG_MARKER + "\n" + json.encodeToString(JsonObject.serializer(), withKind)
+        // The kind first, as it decides what the rest means
+        val fields = linkedMapOf<String, JsonElement>("kind" to JsonPrimitive(kind))
+        element.jsonObject.forEach { (key, value) ->
+            fields[key] = if (allFields && key == "screens" && value is JsonArray) fullScreens(value) else value
+        }
+        return PROVIDER_CONFIG_MARKER + "\n" + format.encodeToString(JsonObject.serializer(), JsonObject(fields))
     }
+
+    /** Screens written by name alone (see ScreenEntrySerializer), spelled out with every field instead. */
+    private fun fullScreens(screens: JsonArray): JsonArray = JsonArray(screens.map { entry ->
+        val obj = entry as? JsonObject ?: JsonObject(mapOf("screen" to entry))
+        JsonObject(
+            linkedMapOf(
+                "screen" to obj.getValue("screen"),
+                "name" to (obj["name"] ?: JsonNull),
+                "disabled_capabilities" to (obj["disabled_capabilities"] ?: JsonArray(emptyList()))
+            )
+        )
+    })
 
     /** Returns null when [text] isn't a Materialdrain provider config (unknown kind, or malformed JSON). */
     fun decode(text: String): ProviderConfig? {
