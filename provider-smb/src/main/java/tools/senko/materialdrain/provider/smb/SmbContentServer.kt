@@ -1,6 +1,7 @@
 package tools.senko.materialdrain.provider.smb
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.media.MediaDataSource
 import android.media.MediaMetadataRetriever
@@ -313,8 +314,31 @@ object SmbContentServer {
         null
     }
 
-    /** [bytes] as an image no bigger than [THUMBNAIL_PX], turned the way its EXIF data says. */
-    private fun decodeScaled(bytes: ByteArray): Bitmap =
+    /**
+     * [bytes] as an image no bigger than [THUMBNAIL_PX], turned the way its EXIF data says. Some HEIC photos (from some
+     * phones' cameras) are refused by ImageDecoder but read by BitmapFactory, which is tried next, unturned.
+     */
+    private fun decodeScaled(bytes: ByteArray): Bitmap = try {
+        decodeWithImageDecoder(bytes)
+    } catch (e: Exception) {
+        decodeWithBitmapFactory(bytes) ?: throw e
+    }
+
+    private fun decodeWithBitmapFactory(bytes: ByteArray): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= THUMBNAIL_PX) sample *= 2
+        val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
+        val longest = maxOf(decoded.width, decoded.height)
+        if (longest <= THUMBNAIL_PX) return decoded
+        val scale = THUMBNAIL_PX.toFloat() / longest
+        return Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt().coerceAtLeast(1), (decoded.height * scale).toInt().coerceAtLeast(1), true)
+            .also { if (it !== decoded) decoded.recycle() }
+    }
+
+    private fun decodeWithImageDecoder(bytes: ByteArray): Bitmap =
         ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, info, _ ->
             val longest = maxOf(info.size.width, info.size.height)
             if (longest > THUMBNAIL_PX) {

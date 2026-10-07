@@ -33,7 +33,9 @@ data class PixeldrainRichDetails(
     val deleteAfterDate: String? = null,
     val deleteAfterDownloads: Int? = null,
     val abuseReporterName: String? = null,
-    val downloadSpeedLimit: Long? = null
+    val downloadSpeedLimit: Long? = null,
+    /** When the file was last viewed. Kept here, not as the node's modifiedAt: a file on Pixeldrain is never modified. */
+    val dateLastView: String? = null
 ) : RichDetails
 
 /** One file or directory, normalized across providers. */

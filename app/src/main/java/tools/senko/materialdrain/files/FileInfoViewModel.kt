@@ -113,6 +113,9 @@ data class ArchiveView(val path: String, val inside: String, val entries: List<S
 /** Archives which can be looked inside from the file details (see ArchiveOps). */
 private val ARCHIVE_EXTENSIONS = setOf("zip", "7z", "rar", "tar", "tgz", "apk")
 
+/** Image formats whose thumbnails are made on the device rather than by the host (see FileInfoViewModel.thumbnailFor). */
+private val DEVICE_THUMBNAIL_EXTENSIONS = setOf("heic", "heif", "avif")
+
 fun isArchiveName(name: String): Boolean = name.substringAfterLast('.', "").lowercase() in ARCHIVE_EXTENSIONS
 
 data class FileInfoUiState(
@@ -228,6 +231,11 @@ class FileInfoViewModel(
             provider.rawContentUrl(node, attachment = false)?.let { raw ->
                 return AudioCovers.audioCoverUrl(raw, fallback = thumbnail, version = node.modifiedAt ?: node.createdAt)
             }
+        }
+        // Photos in formats the hosts' own thumbnailers often can't read (HEIC from phones, AVIF): decoded on the device
+        // from the file itself, scaled to the thumbnail's size, as the preview already does
+        if (!node.isDirectory && provider.kind != ProviderKind.SMB && node.name.substringAfterLast('.', "").lowercase() in DEVICE_THUMBNAIL_EXTENSIONS) {
+            provider.rawContentUrl(node, attachment = false)?.let { return it }
         }
         return thumbnail
     }

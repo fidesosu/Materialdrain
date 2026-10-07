@@ -10,6 +10,8 @@ import androidx.compose.runtime.*
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZonedDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -56,14 +58,32 @@ internal fun formatApiDateTimeString(dateTimeString: String?): String {
     if (dateTimeString.isNullOrBlank()) {
         return "N/A"
     }
+    val instant = parseDateTime(dateTimeString) ?: run {
+        Log.e("DateTimeFormat", "Error parsing date: $dateTimeString")
+        return dateTimeString
+    }
+    return DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withZone(ZoneId.systemDefault()).format(instant)
+}
+
+/**
+ * A date and time as the hosts write it: ISO 8601 with or without a zone (Pixeldrain, S3, SMB; no zone means UTC), or
+ * RFC 1123 ("Mon, 01 Jan 2024 10:00:00 GMT", WebDAV). Null when it's none of those.
+ */
+fun parseDateTime(text: String?): Instant? {
+    if (text.isNullOrBlank()) return null
+    val value = text.trim()
     return try {
-        val parsedDateTime = LocalDateTime.parse(dateTimeString, DateTimeFormatter.ISO_DATE_TIME)
-        val formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
-            .withZone(ZoneId.systemDefault())
-        parsedDateTime.atZone(ZoneId.of("UTC")).withZoneSameInstant(ZoneId.systemDefault()).format(formatter)
-    } catch (e: DateTimeParseException) {
-        Log.e("DateTimeFormat", "Error parsing date: $dateTimeString", e)
-        dateTimeString
+        OffsetDateTime.parse(value, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toInstant()
+    } catch (_: DateTimeParseException) {
+        try {
+            LocalDateTime.parse(value, DateTimeFormatter.ISO_LOCAL_DATE_TIME).atZone(ZoneId.of("UTC")).toInstant()
+        } catch (_: DateTimeParseException) {
+            try {
+                ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant()
+            } catch (_: DateTimeParseException) {
+                null
+            }
+        }
     }
 }
 
@@ -73,11 +93,7 @@ internal fun formatApiDateTimeString(dateTimeString: String?): String {
  */
 internal fun formatRelativeDateTime(dateTimeString: String?, now: Instant = Instant.now()): String? {
     if (dateTimeString.isNullOrBlank()) return null
-    val then = try {
-        LocalDateTime.parse(dateTimeString, DateTimeFormatter.ISO_DATE_TIME).atZone(ZoneId.of("UTC")).toInstant()
-    } catch (e: DateTimeParseException) {
-        return null
-    }
+    val then = parseDateTime(dateTimeString) ?: return null
     val seconds = Duration.between(then, now).seconds
     fun ago(amount: Long, unit: String) = "$amount $unit${if (amount == 1L) "" else "s"} ago"
     return when {

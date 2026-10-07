@@ -85,7 +85,7 @@ fun StorageNode.toPixeldrainFileInfo(): FileInfoResponse? {
         bandwidthUsedPaid = details?.bandwidthUsedPaid,
         downloads = details?.downloads,
         dateUpload = createdAt.orEmpty(),
-        dateLastView = modifiedAt,
+        dateLastView = details?.dateLastView,
         mimeType = mimeType,
         thumbnailHref = details?.thumbnailHref,
         hashSha256 = details?.sha256,
@@ -109,7 +109,6 @@ private fun FileInfoResponse.toStorageNode(): StorageNode = StorageNode(
     isDirectory = false,
     size = size,
     createdAt = dateUpload,
-    modifiedAt = dateLastView,
     mimeType = mimeType,
     richDetails = PixeldrainRichDetails(
         fileId = id,
@@ -129,7 +128,8 @@ private fun FileInfoResponse.toStorageNode(): StorageNode = StorageNode(
         deleteAfterDate = deleteAfterDate,
         deleteAfterDownloads = deleteAfterDownloads,
         abuseReporterName = abuseReporterName,
-        downloadSpeedLimit = downloadSpeedLimit
+        downloadSpeedLimit = downloadSpeedLimit,
+        dateLastView = dateLastView
     )
 )
 

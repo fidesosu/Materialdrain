@@ -77,6 +77,7 @@ import kotlinx.coroutines.delay
 import tools.senko.materialdrain.files.FileActionDialogs
 import tools.senko.materialdrain.files.FileActionRequest
 import tools.senko.materialdrain.files.FileInfoViewModel
+import tools.senko.materialdrain.files.listDate
 import tools.senko.materialdrain.files.FileItemMenu
 import tools.senko.materialdrain.files.SelectionAction
 import tools.senko.materialdrain.files.SelectionActionBar
@@ -743,7 +744,7 @@ private fun BrowserEntry(
     pixeldrainLinks: Boolean
 ) {
     val folderLink = if (node.isDirectory && mode == BrowserMode.LISTS && pixeldrainLinks) "https://pixeldrain.com/l/${node.ref.id}" else null
-    val modified = remember(node.createdAt) { formatRelativeDateTime(node.createdAt) }
+    val modified = remember(node.listDate) { formatRelativeDateTime(node.listDate) }
     FileListItem(
         name = node.name,
         type = if (node.isDirectory) "dir" else "file",

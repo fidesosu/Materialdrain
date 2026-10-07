@@ -230,7 +230,8 @@ fun FileInfoDetailsCard(
                 )
             }
             fileInfo.createdAt?.let { InfoRow("Upload Date", formatApiDateTimeString(it)) }
-            fileInfo.modifiedAt?.let { InfoRow("Last View", formatApiDateTimeString(it)) }
+            fileInfo.modifiedAt?.let { InfoRow("Last Modified", formatApiDateTimeString(it)) }
+            rich?.dateLastView?.let { InfoRow("Last View", formatApiDateTimeString(it)) }
             rich?.views?.let { InfoRow("Views", it.toString()) }
             rich?.downloads?.let { InfoRow("Downloads", it.toString()) }
             rich?.sha256?.let {

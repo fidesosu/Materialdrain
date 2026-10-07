@@ -1,6 +1,13 @@
 package tools.senko.materialdrain.files
 
 import tools.senko.materialdrain.provider.api.StorageNode
+import tools.senko.materialdrain.util.parseDateTime
+
+/**
+ * The date a file is listed and sorted by: when it was last modified where the host knows (SMB, WebDAV, S3, Pixeldrain's
+ * filesystem), else when it was uploaded (Pixeldrain's files, which never change).
+ */
+val StorageNode.listDate: String? get() = modifiedAt ?: createdAt
 
 /** The field a file list is sorted by. One choice for every sortable list in the app (see AppSettings.sortField). */
 enum class SortableField {
@@ -19,7 +26,8 @@ val SortOptions: List<Pair<String, SortableField>> = listOf(
 private fun StorageNode.sortKey(field: SortableField): Comparable<*> = when (field) {
     SortableField.NAME -> name.lowercase()
     SortableField.SIZE -> size ?: 0L
-    SortableField.UPLOAD_DATE -> createdAt.orEmpty()
+    // By the moment itself, not the text: hosts write dates differently, and RFC 1123 doesn't sort as text
+    SortableField.UPLOAD_DATE -> parseDateTime(listDate)?.toEpochMilli() ?: Long.MIN_VALUE
 }
 
 /**
