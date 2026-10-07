@@ -37,6 +37,10 @@ private const val OPENED_FILE_ID_PREF = "opened_file_id"
 private const val OPENED_FILE_PATH_PREF = "opened_file_path"
 private const val OPENED_FILE_HOST_PREF = "opened_file_host"
 private const val BIOMETRIC_LOCK_PREF = "biometric_lock"
+private const val SEARCH_RESULT_LIMIT_PREF = "search_result_limit"
+
+/** The choices for [AppSettings.searchResultLimit]; 0 is no limit. */
+val SEARCH_RESULT_LIMITS = listOf(0, 200, 50, 20)
 
 /** Pixeldrain keeps the paths of the files of a filesystem in this file, it is re-created when removed. */
 const val SEARCH_INDEX_FILE_NAME = ".search_index.gz"
@@ -159,6 +163,18 @@ class AppSettings(context: Context) {
     /** Whether this device has a fingerprint, face or screen lock to ask for. */
     fun biometricLockAvailable(): Boolean =
         BiometricManager.from(appContext).canAuthenticate(LOCK_AUTHENTICATORS) == BiometricManager.BIOMETRIC_SUCCESS
+
+    private val _searchResultLimit = MutableStateFlow(prefs.getInt(SEARCH_RESULT_LIMIT_PREF, 0))
+    /**
+     * How many matches a search shows at most, 0 for all of them (the default). For slower devices: a search through a big
+     * folder tree can match thousands of files, and only the cards on screen are drawn, but each match still costs a little.
+     */
+    val searchResultLimit: StateFlow<Int> = _searchResultLimit.asStateFlow()
+
+    fun setSearchResultLimit(limit: Int) {
+        prefs.edit { putInt(SEARCH_RESULT_LIMIT_PREF, limit) }
+        _searchResultLimit.value = limit
+    }
 
     private val _textWrap = MutableStateFlow(prefs.getBoolean(TEXT_WRAP_PREF, true))
     /** Whether long lines of a text preview wrap onto the next line, or scroll sideways. On by default. */

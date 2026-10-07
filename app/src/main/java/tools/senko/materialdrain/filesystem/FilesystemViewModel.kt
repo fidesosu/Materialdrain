@@ -3,6 +3,7 @@ package tools.senko.materialdrain.filesystem
 import android.app.Application
 import android.content.Context
 import android.net.Uri
+import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -16,8 +17,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 import tools.senko.materialdrain.auth.SessionManager
 import tools.senko.materialdrain.files.fileComparator
 import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
@@ -42,6 +49,10 @@ import tools.senko.materialdrain.transfer.estimateEtaSeconds
 import tools.senko.materialdrain.util.readContentUriInfo
 
 private const val TAG_FS_VM = "FilesystemViewModel"
+/** How many folders are listed at once while indexing the folder tree: quick, without flooding the host. */
+private const val TREE_INDEX_PARALLEL_LISTINGS = 4
+/** How often the folder tree index shows what it has found so far while it's still going. */
+private const val TREE_INDEX_PUBLISH_MS = 250L
 const val FILESYSTEM_ROOT_PATH = "me"
 
 data class FilesystemUiState(
@@ -80,6 +91,18 @@ data class FilesystemUiState(
         if (hideSearchIndex) children.filterNot { it.isSearchIndex() } else children
     }
 }
+
+/**
+ * Everything found so far under [root] (the folder the search was opened in) and all its subfolders, for the search to
+ * match against. Filled in level by level while [done] is false: the folders closest to [root] come first.
+ */
+data class FolderTreeIndex(
+    val root: String,
+    val nodes: List<StorageNode> = emptyList(),
+    val foldersScanned: Int = 0,
+    val foldersFailed: Int = 0,
+    val done: Boolean = false
+)
 
 data class PathSegment(
     val name: String,
@@ -122,6 +145,16 @@ class FilesystemViewModel(
     val displayedChildren: StateFlow<List<StorageNode>> = _displayedChildren.asStateFlow()
 
     private var uploadJob: Job? = null
+
+    // --- Searching the folder tree ---
+
+    private val _treeIndex = MutableStateFlow<FolderTreeIndex?>(null)
+    /** What [indexFolderTree] has found; null when it hasn't run since the last change. */
+    val treeIndex: StateFlow<FolderTreeIndex?> = _treeIndex.asStateFlow()
+    private var treeIndexJob: Job? = null
+    // The listings of the folders seen, by path: a search opened again (or from a folder already crawled) reuses them
+    // instead of listing everything again. Of the active host only, and dropped whenever something may have changed
+    private val folderCache = ConcurrentHashMap<String, List<StorageNode>>()
     private val speedTracker = TransferSpeedTracker()
     private var nextTransferNumber = 0
 
@@ -163,6 +196,7 @@ class FilesystemViewModel(
     private fun rootPath(provider: StorageProvider): String = provider.rootPath
 
     private fun loadActiveProviderAndRoot() {
+        forgetFolderTree()
         val provider = activeProvider()
         val apiKey = if (provider.kind == ProviderKind.PIXELDRAIN) sessionManager.currentApiKey() else ""
         _uiState.update {
@@ -185,6 +219,7 @@ class FilesystemViewModel(
     }
 
     fun refreshCurrentPath() {
+        forgetFolderTree()
         val provider = activeProvider()
         if (provider.kind == ProviderKind.PIXELDRAIN && sessionManager.currentApiKey().isBlank()) {
             _uiState.update { it.copy(apiKeyMissingError = true, errorMessage = API_KEY_MISSING, isLoading = false, children = emptyList()) }
@@ -226,6 +261,7 @@ class FilesystemViewModel(
                         compareBy<StorageNode> { !it.isDirectory }
                             .thenBy { it.name.lowercase() }
                     )
+                    folderCache[normalized] = response.data.children
                     appSettings.setFilesystemPath(configStore.activeProviderId.value, normalized)
                     _uiState.update {
                         it.copy(
@@ -285,6 +321,87 @@ class FilesystemViewModel(
         }
         fetchPathContent(parent)
         return true
+    }
+
+    /**
+     * Lists the current folder and every folder under it, level by level, into [treeIndex], so a search can find what's
+     * anywhere below. Folders already listed are taken from the cache; a few are listed at a time. Started again for
+     * another folder, or after a change, it starts over; for the same folder it carries on from what's known.
+     */
+    fun indexFolderTree() {
+        val browse = activeProvider().browse ?: return
+        val root = currentDir()
+        val known = _treeIndex.value
+        if (known != null && known.root == root && (known.done || treeIndexJob?.isActive == true)) return
+        treeIndexJob?.cancel()
+        _treeIndex.value = FolderTreeIndex(root)
+        treeIndexJob = viewModelScope.launch {
+            val hideSearchIndex = _uiState.value.hideSearchIndex
+            val permits = Semaphore(TREE_INDEX_PARALLEL_LISTINGS)
+            val lock = Mutex()
+            val nodes = ArrayList<StorageNode>()
+            val visited = HashSet<String>().apply { add(root) }
+            var scanned = 0
+            var failed = 0
+            var lastPublished = 0L
+            fun publish(done: Boolean) {
+                _treeIndex.value = FolderTreeIndex(root, nodes.toList(), scanned, failed, done)
+            }
+            var level = listOf(root)
+            while (level.isNotEmpty()) {
+                val next = ArrayList<String>()
+                coroutineScope {
+                    level.forEach { folder ->
+                        launch {
+                            val children = folderCache[folder] ?: permits.withPermit {
+                                when (val response = browse.list(folder)) {
+                                    is ApiResponse.Success -> response.data.children.also { folderCache[folder] = it }
+                                    is ApiResponse.Error -> null
+                                }
+                            }
+                            lock.withLock {
+                                if (children == null) {
+                                    failed++
+                                } else {
+                                    scanned++
+                                    children.forEach { child ->
+                                        if (hideSearchIndex && child.isSearchIndex()) return@forEach
+                                        nodes += child
+                                        // A folder reachable twice (a link back up the tree) is only listed once
+                                        if (child.isDirectory && visited.add(child.ref.path)) next += child.ref.path
+                                    }
+                                }
+                                // Often enough to feel live, not so often that copying a big list each time adds up
+                                val now = SystemClock.uptimeMillis()
+                                if (now - lastPublished >= TREE_INDEX_PUBLISH_MS) {
+                                    lastPublished = now
+                                    publish(done = false)
+                                }
+                            }
+                        }
+                    }
+                }
+                level = next
+            }
+            lock.withLock { publish(done = true) }
+        }
+    }
+
+    /** Stops indexing the folder tree and forgets what was found, for after something may have changed on the host. */
+    private fun forgetFolderTree() {
+        treeIndexJob?.cancel()
+        treeIndexJob = null
+        _treeIndex.value = null
+        folderCache.clear()
+    }
+
+    /** Stops indexing, keeping what was found and listed so far for the next search. */
+    fun pauseFolderTreeIndex() {
+        if (treeIndexJob?.isActive == true) {
+            treeIndexJob?.cancel()
+            // Not done: the next search of this folder starts over, quickly, from the listings cached so far
+            _treeIndex.value = null
+        }
     }
 
     // --- Modifications ---
@@ -371,6 +488,7 @@ class FilesystemViewModel(
                         ?.let { f -> f.take(3).joinToString("\n") + if (f.size > 3) "\nand ${f.size - 3} more failed" else "" }
                 )
             }
+            forgetFolderTree()
             fetchPathContent(dir)
         }
     }
@@ -414,6 +532,7 @@ class FilesystemViewModel(
                 is ApiResponse.Success -> _uiState.update { it.copy(isModifying = false, operationMessage = "Done.") }
                 is ApiResponse.Error -> _uiState.update { it.copy(isModifying = false, operationError = describeError(response.error)) }
             }
+            forgetFolderTree()
             fetchPathContent(dir)
         }
     }
@@ -562,6 +681,7 @@ class FilesystemViewModel(
                 throw e
             } finally {
                 transfers.finish(transferId, outcome, outcomeMessage)
+                forgetFolderTree()
                 if (currentDir() == dir) fetchPathContent(dir)
             }
         }

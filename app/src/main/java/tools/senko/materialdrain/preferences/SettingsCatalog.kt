@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.collectAsState
 import tools.senko.materialdrain.settings.SEARCH_INDEX_FILE_NAME
@@ -53,6 +54,22 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                 isChecked = { appSettings.hideSearchIndex.collectAsState().value },
                 onCheckedChange = { appSettings.setHideSearchIndex(it) }
             )
+        )
+    ),
+
+    SettingsCategory(
+        id = "search",
+        title = "Search",
+        summary = "How many results are shown",
+        icon = Icons.Filled.Search,
+        items = listOf(
+            SettingsItem.Note(
+                "Searching the filesystem looks through the open folder and every folder inside it, so a big tree can " +
+                    "match thousands of files. All of them are shown unless you set a limit here, which can help on " +
+                    "slower devices."
+            ),
+            SettingsItem.Header("Most results shown"),
+            SettingsItem.Custom { SearchResultLimitSection() }
         )
     ),
 

@@ -1,13 +1,13 @@
 package tools.senko.materialdrain.browser
 
 import android.os.Build
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
@@ -39,17 +40,10 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -64,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -175,28 +170,25 @@ fun SortControls(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Sort: a dropdown. Reselecting the field already sorted on flips its direction (see
-        // AppSettings.changeSortOrder); the direction otherwise only shows in the menu.
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = !expanded },
-            modifier = Modifier.width(SortControlWidth)
-        ) {
-            OutlinedTextField(
-                value = currentSortName,
-                onValueChange = {},
-                readOnly = true,
-                singleLine = true,
-                label = { Text("Sort by", maxLines = 1) },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier
-                    .menuAnchor(
-                        type = ExposedDropdownMenuAnchorType.PrimaryNotEditable,
-                        enabled = true
+        // Sort: a floating card with a menu. Reselecting the field already sorted on flips its direction (see
+        // AppSettings.changeSortOrder); the direction shows by the field's name and in the menu.
+        Box {
+            FloatingCardButton(
+                onClick = { expanded = true },
+                modifier = Modifier.width(SortControlWidth)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Sort by",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
-                    .fillMaxWidth()
-            )
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    Text(currentSortName, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Icon(directionIcon, contentDescription = directionDescription, modifier = Modifier.size(16.dp))
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 SortOptions.forEach { (name, field) ->
                     val selected = field == sortField
                     DropdownMenuItem(
@@ -228,29 +220,16 @@ data class SortRowAction(
     val onClick: () -> Unit
 )
 
-/**
- * The sort row's actions behind one outlined "New" button, shaped and bordered like the "Sort by" field beside it (the
- * same height and corners, moved down by the room the field keeps above itself for its floating label, so the two line
- * up). Each action is listed in its menu with its name.
- */
+/** The sort row's actions behind one "New" card, the same floating card as "Sort by" beside it; its menu names each. */
 @Composable
 private fun SortRowActions(actions: List<SortRowAction>) {
     var expanded by remember { mutableStateOf(false) }
-    Box(modifier = Modifier.padding(top = SortFieldLabelSpace)) {
-        val enabled = actions.any { it.enabled }
-        OutlinedButton(
-            onClick = { expanded = true },
-            enabled = enabled,
-            shape = OutlinedTextFieldDefaults.shape,
-            // The field's own outline and text colours, so the two read as a pair
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (enabled) 1f else 0.38f)),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-            contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-            modifier = Modifier.height(OutlinedTextFieldDefaults.MinHeight)
-        ) {
-            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
-            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-            Text("New")
+    Box {
+        FloatingCardButton(onClick = { expanded = true }, enabled = actions.any { it.enabled }) {
+            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("New", style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.width(4.dp))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             actions.forEach { action ->
@@ -268,8 +247,35 @@ private fun SortRowActions(actions: List<SortRowAction>) {
     }
 }
 
-/** The room an outlined field with a label keeps above its border, for the label to sit on it. */
-private val SortFieldLabelSpace = 8.dp
+/** The height of the controls above the list. */
+private val ControlHeight = 48.dp
+
+/** A control above the list, in the same floating card look as the search results (see [FloatingCardShape]). */
+@Composable
+private fun FloatingCardButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable RowScope.() -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = FloatingCardShape,
+        color = floatingCardColor(),
+        border = floatingCardBorder(),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = modifier.height(ControlHeight)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 14.dp)
+                .graphicsLayer { alpha = if (enabled) 1f else 0.38f },
+            verticalAlignment = Alignment.CenterVertically,
+            content = content
+        )
+    }
+}
 
 /** The active search, with how many of the items it matches and a button to clear it. */
 @Composable
@@ -295,12 +301,6 @@ private fun FilterChipRow(activeFilterQuery: String, filteredCount: Int, totalCo
     }
 }
 
-/** At most this many matches float under the search card, so they're a glance rather than a second list. */
-private const val MAX_SEARCH_RESULTS = 6
-
-/** The search card, the gap under it and the "more" note: what's left of the height after them is for the matches. */
-private val SearchChromeHeight = 140.dp
-
 /** How far the dialog window dims what's behind it while that is blurred too (see [SearchModal]); a lighter touch than the default, which would mostly hide the blur. */
 private const val BLURRED_DIM_AMOUNT = 0.25f
 
@@ -313,29 +313,47 @@ private const val BLURRED_DIM_AMOUNT = 0.25f
  *
  * Its own window: the screen underneath is blurred by App.kt while this is open (Android 12 and up), and the
  * dialog's own dim is lightened to match; before Android 12 the dim is all there is.
+ *
+ * @param candidates what can match, in no particular order: they're sorted by [order] once matched
+ * @param resultLimit the most matches shown, 0 for all (see AppSettings.searchResultLimit)
+ * @param locationOf where a match is, for matches outside the open folder; null when it's right there
+ * @param status a line about the search itself, e.g. that subfolders are still being looked through
  */
 @Composable
 fun SearchModal(
     query: String,
     onQueryCommit: (String) -> Unit,
     candidates: List<StorageNode>,
+    order: Comparator<StorageNode>,
+    resultLimit: Int,
     thumbnailFor: (StorageNode) -> String?,
     placeholder: String,
     onResultClick: (StorageNode) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    locationOf: (StorageNode) -> String? = { null },
+    status: String? = null
 ) {
     // The cursor starts at the end of a query that's already there, so it can just be typed on
     var fieldValue by remember { mutableStateOf(TextFieldValue(query, selection = TextRange(query.length))) }
-    // Every way of closing hands the query over to the list, to filter it by
+    // Closing hands the query over to the list, to filter it by
     val close = {
         onQueryCommit(fieldValue.text)
         onDismiss()
     }
-    // Matched the same way the list filters, in the list's own order
-    val matches = remember(candidates, fieldValue.text) {
+    // Matched the same way the list filters, then sorted the way the list is. Off the main thread: a folder tree can
+    // hold tens of thousands of files, and they keep coming in while it's being looked through
+    var matches by remember { mutableStateOf(emptyList<StorageNode>()) }
+    LaunchedEffect(candidates, fieldValue.text, order) {
         val text = fieldValue.text
-        if (text.isBlank()) emptyList() else candidates.filter { it.name.contains(text, ignoreCase = true) }
+        matches = if (text.isBlank()) {
+            emptyList()
+        } else {
+            withContext(Dispatchers.Default) {
+                candidates.filter { it.name.contains(text, ignoreCase = true) }.sortedWith(order)
+            }
+        }
     }
+    val shown = if (resultLimit > 0) matches.take(resultLimit) else matches
 
     Dialog(
         onDismissRequest = close,
@@ -349,9 +367,9 @@ fun SearchModal(
         val focusRequester = remember { FocusRequester() }
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-        // Fills the window so a tap beside the card closes it. Above the keyboard (safeDrawing includes it), so the
-        // matches are only as many as fit there
-        BoxWithConstraints(
+        // Fills the window so a tap beside the cards closes it. Above the keyboard (safeDrawing includes it), so the
+        // matches scroll in the space left between the search card and the keyboard
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .clickable(interactionSource = null, indication = null, onClick = close)
@@ -359,10 +377,6 @@ fun SearchModal(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             contentAlignment = Alignment.TopCenter
         ) {
-            // Room for the card and the "more" note taken off; never more than a handful, so it stays a glance
-            val fit = ((maxHeight - SearchChromeHeight) / (SearchResultHeight + SearchResultGap)).toInt()
-                .coerceIn(1, MAX_SEARCH_RESULTS)
-            val shown = matches.take(fit)
             Column(
                 modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -403,9 +417,13 @@ fun SearchModal(
                                 .fillMaxWidth()
                                 .focusRequester(focusRequester)
                         )
-                        if (fieldValue.text.isNotBlank()) {
+                        val lines = listOfNotNull(
+                            if (fieldValue.text.isNotBlank()) "Showing ${matches.size} of ${candidates.size}" else null,
+                            status
+                        )
+                        if (lines.isNotEmpty()) {
                             Text(
-                                text = "Showing ${matches.size} of ${candidates.size}",
+                                text = lines.joinToString("\n"),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 // Under the query, lined up with its text (past the leading icon)
@@ -417,26 +435,30 @@ fun SearchModal(
                 SearchResultStack(
                     results = shown,
                     thumbnailFor = thumbnailFor,
+                    locationOf = locationOf,
+                    // Opening a match leaves the list as it was: the match may well be in another folder
                     onClick = { node ->
-                        close()
+                        onDismiss()
                         onResultClick(node)
                     },
-                    modifier = Modifier.padding(top = SearchResultGap * 1.5f)
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .padding(top = SearchResultGap * 1.5f)
                 )
-                // The matches past what fits are counted, not listed: closing the search filters the list by them all
+                // Only with a limit set (in the settings): the matches past it are counted, not listed
                 AnimatedVisibility(
                     visible = matches.size > shown.size,
                     enter = fadeIn() + scaleIn(initialScale = 0.8f),
                     exit = fadeOut() + scaleOut(targetScale = 0.8f)
                 ) {
                     Text(
-                        text = "+${matches.size - shown.size} more · search to filter the list",
+                        text = "+${matches.size - shown.size} more matches",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .padding(top = SearchResultGap)
                             .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f))
+                            .background(floatingCardColor())
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     )
                 }

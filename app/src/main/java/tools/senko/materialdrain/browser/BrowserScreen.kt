@@ -56,6 +56,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -416,26 +417,48 @@ fun BrowserScreen(
     // Search: whichever list this mode shows (the lists overview has nothing to search, App.kt offers no magnifier there).
     // Back closes it before anything else, as a dialog takes the press itself
     if (showSearchModal) {
-        // Everything the list holds (not just what its current filter leaves), in the list's order: the modal does its
-        // own matching, and the list only takes the query once it closes
+        val resultLimit by appSettings.searchResultLimit.collectAsState()
+        // Everything the list holds (not just what its current filter leaves): the modal does its own matching and
+        // sorting, and the list only takes the query once it closes
         when (mode) {
-            BrowserMode.FILESYSTEM -> SearchModal(
-                query = fsState.filterQuery,
-                onQueryCommit = { filesystemViewModel.onFilterQueryChanged(it) },
-                candidates = remember(fsState.visibleChildren, sortField, sortAscending) {
-                    fsState.visibleChildren.sortedWith(fileComparator(sortField, sortAscending, directoriesFirst = true))
-                },
-                thumbnailFor = { fileInfoViewModel.thumbnailFor(it) },
-                placeholder = "Search this folder",
-                onResultClick = onOpen,
-                onDismiss = onDismissSearchModal
-            )
+            BrowserMode.FILESYSTEM -> {
+                // The open folder and everything under it, looked through while the search is open (see
+                // FilesystemViewModel.indexFolderTree); until the first of it arrives, the open folder itself
+                DisposableEffect(Unit) {
+                    filesystemViewModel.indexFolderTree()
+                    onDispose { filesystemViewModel.pauseFolderTreeIndex() }
+                }
+                val treeIndex by filesystemViewModel.treeIndex.collectAsState()
+                val root = fsState.currentPath.trim('/')
+                val tree = treeIndex?.takeIf { it.root == root }
+                SearchModal(
+                    query = fsState.filterQuery,
+                    onQueryCommit = { filesystemViewModel.onFilterQueryChanged(it) },
+                    candidates = tree?.nodes?.takeIf { it.isNotEmpty() } ?: fsState.visibleChildren,
+                    order = remember(sortField, sortAscending) { fileComparator(sortField, sortAscending, directoriesFirst = true) },
+                    resultLimit = resultLimit,
+                    thumbnailFor = { fileInfoViewModel.thumbnailFor(it) },
+                    placeholder = "Search this folder and its subfolders",
+                    onResultClick = onOpen,
+                    onDismiss = onDismissSearchModal,
+                    locationOf = { node ->
+                        val parent = node.ref.path.trim('/').substringBeforeLast('/', "")
+                        parent.removePrefix(root).trim('/').ifEmpty { null }
+                    },
+                    status = when {
+                        tree == null -> null
+                        !tree.done -> "Looking through subfolders… ${tree.foldersScanned} so far"
+                        tree.foldersFailed > 0 -> "${tree.foldersFailed} folders couldn't be opened"
+                        else -> null
+                    }
+                )
+            }
             BrowserMode.FILES -> SearchModal(
                 query = fileState.filterQuery,
                 onQueryCommit = { fileInfoViewModel.onFilterQueryChanged(it) },
-                candidates = remember(fileState.userFilesList, sortField, sortAscending) {
-                    fileState.userFilesList.sortedWith(fileComparator(sortField, sortAscending))
-                },
+                candidates = fileState.userFilesList,
+                order = remember(sortField, sortAscending) { fileComparator(sortField, sortAscending) },
+                resultLimit = resultLimit,
                 thumbnailFor = { fileInfoViewModel.thumbnailFor(it) },
                 placeholder = "Search your files",
                 onResultClick = onOpen,
@@ -444,9 +467,9 @@ fun BrowserScreen(
             BrowserMode.LISTS -> if (openedList != null) SearchModal(
                 query = listState.listFilterQuery,
                 onQueryCommit = { listViewModel.onListFilterQueryChanged(it) },
-                candidates = remember(listState.listFiles, sortField, sortAscending) {
-                    listState.listFiles.sortedWith(fileComparator(sortField, sortAscending))
-                },
+                candidates = listState.listFiles,
+                order = remember(sortField, sortAscending) { fileComparator(sortField, sortAscending) },
+                resultLimit = resultLimit,
                 thumbnailFor = { fileInfoViewModel.thumbnailFor(it) },
                 placeholder = "Search ${openedList.title}",
                 onResultClick = onOpen,
