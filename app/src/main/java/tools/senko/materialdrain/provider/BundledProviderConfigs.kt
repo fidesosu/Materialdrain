@@ -38,3 +38,26 @@ fun importBundledPixeldrainConfig(context: Context, store: ProviderConfigStore) 
     prefs.edit().putBoolean(KEY_PIXELDRAIN_IMPORTED, true).apply()
     ProviderLog.i("Config", "imported the bundled '${config.name}' config and made it the active host")
 }
+
+/**
+ * Brings an imported copy of the bundled Pixeldrain config up to the version this app ships with, when it's older. The
+ * bundled config has no update URL, so this is the only way it gets fixes (e.g. version 7, which lists files by their
+ * upload date rather than the last time they were viewed). Applied as an update: the copy it replaces is kept, so
+ * "Revert update" in the host's settings brings back one the user had edited.
+ */
+fun refreshBundledPixeldrainConfig(context: Context, store: ProviderConfigStore) {
+    val bundled = try {
+        context.assets.open(BUNDLED_PIXELDRAIN_FILE).bufferedReader().use { it.readText() }.let { ProviderConfigCodec.decode(it) }
+    } catch (e: Exception) {
+        ProviderLog.e("Config", "could not read the bundled $BUNDLED_PIXELDRAIN_FILE", e)
+        null
+    } ?: return
+    val bundledVersion = bundled.meta?.version ?: return
+    store.providers.value
+        .filter { it.config.meta?.id == PIXELDRAIN_CONFIG_ID && it.updateUrl == null }
+        .filter { (it.config.meta?.version ?: 0) < bundledVersion }
+        .forEach { stored ->
+            store.applyUpdate(stored.id, bundled, clearSecret = false)
+            ProviderLog.i("Config", "updated '${stored.config.name}' to the bundled version $bundledVersion")
+        }
+}

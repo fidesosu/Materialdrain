@@ -108,8 +108,7 @@
         "name": "$.name",
         "size": "$.size",
         "mime_type": "$.mime_type",
-        "created": "$.date_upload",
-        "modified": "$.date_last_view"
+        "created": "$.date_upload"
       }
     },
     "browse_list": {
@@ -229,8 +228,7 @@
         "name": "$.name",
         "size": "$.size",
         "mime_type": "$.mime_type",
-        "created": "$.date_upload",
-        "modified": "$.date_last_view"
+        "created": "$.date_upload"
       }
     },
     "list_create": {
@@ -281,7 +279,7 @@
   "screens": [{"screen": "UPLOAD"}, {"screen": "FILES"}, {"screen": "LISTS"}, {"screen": "FILESYSTEM"}],
   "meta": {
     "id": "tools.senko.materialdrain.examples.pixeldrain",
-    "version": 6,
+    "version": 7,
     "author": "fides"
   }
 }

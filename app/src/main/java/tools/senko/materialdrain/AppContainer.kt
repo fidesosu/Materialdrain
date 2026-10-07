@@ -12,6 +12,7 @@ import tools.senko.materialdrain.hosts.HostHealth
 import tools.senko.materialdrain.provider.ProviderConfigStore
 import tools.senko.materialdrain.provider.api.Credentials
 import tools.senko.materialdrain.provider.importBundledPixeldrainConfig
+import tools.senko.materialdrain.provider.refreshBundledPixeldrainConfig
 import tools.senko.materialdrain.ui.media.HostRequestAuth
 import tools.senko.materialdrain.provider.ProviderRegistry
 import tools.senko.materialdrain.provider.ProviderUpdater
@@ -65,6 +66,7 @@ class AppContainer private constructor(application: Application) {
 
     init {
         importBundledPixeldrainConfig(application, providerConfigStore)
+        refreshBundledPixeldrainConfig(application, providerConfigStore)
         // The image loader of the whole app, with album covers read out of songs as their thumbnails (see AudioCovers)
         coil.Coil.setImageLoader {
             coil.ImageLoader.Builder(application)

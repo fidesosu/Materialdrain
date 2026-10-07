@@ -5,6 +5,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -137,7 +138,8 @@ class PixeldrainConfigListsTest {
         )
         val file = (provider().fileList!!.list() as ApiResponse.Success).data.children.single()
         assertEquals("2024-01-02T00:00:00Z", file.createdAt)
-        assertEquals("2024-03-04T00:00:00Z", file.modifiedAt)
+        // The last view isn't a change to the file: the list sorts and dates it by its upload instead
+        assertNull(file.modifiedAt)
     }
 
     @Test
