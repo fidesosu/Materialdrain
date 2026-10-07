@@ -266,10 +266,12 @@ fun MaterialdrainScreen() {
         activeConfig?.screens?.associateBy { it.screen.toScreen() } ?: emptyMap()
     }
     fun screenTitle(screen: Screen): String = activeScreenConfigs[screen]?.name?.takeIf { it.isNotBlank() } ?: screen.title
-    LaunchedEffect(navBarOrder) {
+    LaunchedEffect(navBarOrder, currentScreen) {
         // A tab the new host doesn't offer falls back to the first one it does (e.g. Upload isn't reachable on a
-        // host which only turned on Filesystem, even if Upload was the screen open before switching to it)
-        if (currentScreen in setOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem) &&
+        // host which only turned on Filesystem, even if Upload was the screen open before switching to it). Also
+        // checked when the screen changes: a host added or switched to from Settings only meets its tabs when Settings
+        // goes back to the screen open before it, and with a single tab there's no bar to leave a missing one by
+        if (currentScreen in browseScreens &&
             currentScreen !in navBarOrder && navBarOrder.isNotEmpty()
         ) {
             currentScreen = navBarOrder.first()
