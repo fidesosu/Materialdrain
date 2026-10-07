@@ -25,8 +25,8 @@ import java.security.MessageDigest
 /**
  * Album covers as thumbnails, for hosts that stream their files over HTTP(S) (Pixeldrain, and configs like it). The
  * cover is read out of the audio file itself, only the parts of it that hold the cover rather than the whole song, and
- * kept on disk; a song without one shows the host's own thumbnail instead. (SMB shares make theirs on the device, see
- * SmbContentServer.)
+ * kept on disk; a song without one shows the fallback given, if any, or else nothing (the file's own tile stays). (SMB
+ * shares make theirs on the device, see SmbContentServer.)
  *
  * A thumbnail URL of the form `audiocover://cover?src=…&fallback=…&v=…`, see [audioCoverUrl], loaded by [Fetcher].
  */
@@ -72,8 +72,9 @@ object AudioCovers {
             if (cover != null) {
                 return SourceResult(ImageSource(Buffer().write(cover), context), mimeType = null, dataSource = DataSource.DISK)
             }
-            // No cover in the file: the host's own thumbnail, fetched as any other, with the login it needs
-            val fallback = data.getQueryParameter("fallback") ?: return null
+            // No cover in the file: the host's own thumbnail, fetched as any other, with the login it needs. Without one,
+            // the load fails, and the file's tile underneath stays (see FileIcon)
+            val fallback = data.getQueryParameter("fallback") ?: throw NoCoverException()
             val fallbackOptions = options.copy(headers = HostRequestAuth.headersFor(fallback).toHeaders())
             val fetcher = imageLoader.components.newFetcher(Uri.parse(fallback), fallbackOptions, imageLoader)?.first ?: return null
             return fetcher.fetch()
@@ -132,6 +133,9 @@ object AudioCovers {
         bitmap.recycle()
         return out.toByteArray()
     }
+
+    /** A song with no cover and no other thumbnail to show instead. */
+    private class NoCoverException : Exception("No cover in this file")
 
     private fun sha1(text: String): String =
         MessageDigest.getInstance("SHA-1").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }

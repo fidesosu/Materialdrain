@@ -226,10 +226,11 @@ class FileInfoViewModel(
     fun thumbnailFor(node: StorageNode): String? {
         val provider = provider()
         val thumbnail = provider.thumbnailUrl(node)
-        // Songs show their album cover, read out of the file itself (SMB shares already make theirs on the device)
+        // Songs show their album cover, read out of the file itself (SMB shares already make theirs on the device). One
+        // without a cover keeps the app's own music tile (see FileIcon) rather than the host's generic picture
         if (!node.isDirectory && provider.kind != ProviderKind.SMB && node.previewMimeType()?.startsWith("audio/") == true) {
             provider.rawContentUrl(node, attachment = false)?.let { raw ->
-                return AudioCovers.audioCoverUrl(raw, fallback = thumbnail, version = node.modifiedAt ?: node.createdAt)
+                return AudioCovers.audioCoverUrl(raw, fallback = null, version = node.modifiedAt ?: node.createdAt)
             }
         }
         // Photos in formats the hosts' own thumbnailers often can't read (HEIC from phones, AVIF): decoded on the device
