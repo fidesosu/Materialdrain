@@ -264,7 +264,10 @@ class SmbStorageProvider(
 
     /** Turns a failure of the share into a message the app can show. The sign-in and the protocol errors are named. */
     private fun failure(e: Exception): ProviderError = when (e) {
-        is SmbAuthException -> ProviderError("auth_failed", "The share refused the username or password.")
+        is SmbAuthException -> when (e.ntStatus) {
+            STATUS_ACCESS_DENIED -> ProviderError("access_denied", "The share doesn't allow write access for this account.")
+            else -> ProviderError("auth_failed", "The share refused the username or password.")
+        }
         // jCIFS wraps a failed connection in its own status, so the cause tells which it was
         is SmbException -> when (e.cause) {
             is UnknownHostException -> ProviderError("unknown_host", "The host can't be found: check its name or address.")

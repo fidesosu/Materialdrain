@@ -23,21 +23,22 @@ internal class SmbClient(private val config: SmbConfig, private val credentials:
     // the main thread. Every use is already on a background thread (see SmbStorageProvider.onShare).
     private val base: BaseContext by lazy { BaseContext(PropertyConfiguration(protocolSettings(config))) }
 
-    // The context for the sign-in in use; rebuilt only when the username or password changes
-    private var signedIn: Triple<String, String, CIFSContext>? = null
+    // The context for the sign-in in use; rebuilt when credentials or auth settings change
+    private var signedIn: Triple<SmbConfig, Credentials, CIFSContext>? = null
 
     @Synchronized
     fun context(): CIFSContext {
         val login = credentials()
         val username = login.username.trim()
         val password = login.password
-        signedIn?.takeIf { it.first == username && it.second == password }?.let { return it.third }
+        val currentLogin = Credentials(username = username, password = password)
+        signedIn?.takeIf { it.first == config && it.second == currentLogin }?.let { return it.third }
         val context = when (config.auth) {
             SmbAuthMode.CREDENTIALS -> base.withCredentials(NtlmPasswordAuthenticator(config.domain.trim(), username, password))
             SmbAuthMode.GUEST -> base.withGuestCrendentials()
             SmbAuthMode.ANONYMOUS -> base.withAnonymousCredentials()
         }
-        signedIn = Triple(username, password, context)
+        signedIn = Triple(config, currentLogin, context)
         return context
     }
 

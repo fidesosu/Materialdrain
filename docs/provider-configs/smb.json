@@ -8,5 +8,6 @@
   "domain": "",
   "auth": "CREDENTIALS",
   "min_version": "SMB2",
-  "encrypt": false
+  "encrypt": false,
+  "screens": [{"screen": "FILESYSTEM"}]
 }

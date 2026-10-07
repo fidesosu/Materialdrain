@@ -1,6 +1,9 @@
 package tools.senko.materialdrain.browser
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +34,7 @@ import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -83,6 +87,7 @@ import tools.senko.materialdrain.files.shareLink
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
 import tools.senko.materialdrain.lists.ListViewModel
 import tools.senko.materialdrain.provider.api.FileList
+import tools.senko.materialdrain.provider.api.ProviderCapability
 import tools.senko.materialdrain.provider.api.ProviderKind
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.provider.api.StorageRef
@@ -122,6 +127,11 @@ fun BrowserScreen(
     fileInfoViewModel: FileInfoViewModel,
     listViewModel: ListViewModel,
     appSettings: AppSettings,
+    // Capabilities this screen's config entry takes away, on top of what the host itself can't do (see ScreenConfig)
+    disabledCapabilities: Set<ProviderCapability> = emptySet(),
+    // The search modal, opened by the magnifier at the top of the screen (see App.kt)
+    showSearchModal: Boolean = false,
+    onDismissSearchModal: () -> Unit = {},
     onFileSelected: () -> Unit,
     scrollState: LazyListState,
     fabHeight: Dp,
@@ -177,7 +187,10 @@ fun BrowserScreen(
         BrowserMode.LISTS -> if (openedList == null) { { listViewModel.fetchUserLists() } } else { { listViewModel.refreshOpenedList() } }
     }
     // Only the filesystem can be changed here; the files of a list can be removed from it when the list allows
-    val canWriteFs = mode == BrowserMode.FILESYSTEM && fsState.canWrite
+    val canWriteFs = mode == BrowserMode.FILESYSTEM && fsState.canWrite && ProviderCapability.RENAME !in disabledCapabilities
+    val canUploadFs = ProviderCapability.UPLOAD !in disabledCapabilities
+    val canMkdirFs = ProviderCapability.MKDIR !in disabledCapabilities
+    val canDelete = ProviderCapability.DELETE !in disabledCapabilities
     val listCanEdit = openedList?.canEdit == true
 
     // Folders usually load within a fraction of a second, so the loading indicator only appears when it takes longer
@@ -255,6 +268,13 @@ fun BrowserScreen(
 
     val filterFocusRequester = remember { FocusRequester() }
 
+    // The Filesystem screen's own upload button, scoped here (not a FAB) so it works the same whichever navigation
+    // style is on — the classic bottom bar and the FAB navigation prototype don't always have a FAB of their own
+    val filesystemUploadLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents(),
+        onResult = { uris: List<Uri> -> filesystemViewModel.onFilesPickedForUpload(uris, context) }
+    )
+
     // Back: leaves the selection first, then the open list, then goes up a folder (filesystem). At the top, the
     // activity takes the press (see MainActivity).
     BackHandler(enabled = mode == BrowserMode.FILESYSTEM && filesystemViewModel.canNavigateToParent()) {
@@ -262,6 +282,8 @@ fun BrowserScreen(
     }
     BackHandler(enabled = openedList != null) { listViewModel.closeList() }
     BackHandler(enabled = selectionMode) { exitSelection() }
+    // Registered last, so it takes priority over the handlers above while the modal is open
+    BackHandler(enabled = showSearchModal) { onDismissSearchModal() }
 
     // What happens on tapping an entry
     val onOpen: (StorageNode) -> Unit = { node ->
@@ -418,13 +440,13 @@ fun BrowserScreen(
         BrowserMode.FILESYSTEM -> buildList {
             add(SelectionAction("Download", Icons.Filled.Download, { fileInfoViewModel.downloadFilesSequentially(files); exitSelection() }, enabled = files.isNotEmpty()))
             if (fsState.canWrite) add(SelectionAction("Move", Icons.AutoMirrored.Filled.DriveFileMove, { showBulkMove = true }, enabled = selectedEntries.isNotEmpty() && !fsState.isModifying))
-            if (fsState.canDelete) add(SelectionAction("Delete", Icons.Filled.Delete, { showBulkDelete = true }, enabled = selectedEntries.isNotEmpty() && !fsState.isModifying, destructive = true))
+            if (fsState.canDelete && canDelete) add(SelectionAction("Delete", Icons.Filled.Delete, { showBulkDelete = true }, enabled = selectedEntries.isNotEmpty() && !fsState.isModifying, destructive = true))
             add(selectAll)
         }
         BrowserMode.FILES, BrowserMode.LISTS -> buildList {
             add(SelectionAction("Download as ZIP", Icons.Filled.FolderZip, { fileInfoViewModel.downloadFilesAsZip(files, openedList?.title ?: "Pixeldrain files"); exitSelection() }, enabled = files.isNotEmpty()))
             add(SelectionAction("Add to list", Icons.AutoMirrored.Filled.PlaylistAdd, { actionRequest = FileActionRequest.AddToList(files) }, enabled = files.isNotEmpty()))
-            add(SelectionAction("Delete", Icons.Filled.Delete, { actionRequest = FileActionRequest.Delete(files) }, enabled = files.isNotEmpty(), destructive = true))
+            if (canDelete) add(SelectionAction("Delete", Icons.Filled.Delete, { actionRequest = FileActionRequest.Delete(files) }, enabled = files.isNotEmpty(), destructive = true))
             add(SelectionAction("Add to filesystem", Icons.Filled.FolderCopy, { actionRequest = FileActionRequest.AddToFilesystem(files) }, enabled = files.isNotEmpty()))
             openedList?.takeIf { it.canEdit }?.let { list ->
                 // The list's own file count, not the filtered entries (see the single-item action below)
@@ -455,8 +477,18 @@ fun BrowserScreen(
                             modifier = Modifier.weight(1f)
                         )
                         if (fsState.canWrite && !selectionMode) {
-                            IconButton(onClick = { showNewFolderDialog = true }, enabled = !fsState.isModifying) {
-                                Icon(Icons.Filled.CreateNewFolder, contentDescription = "New folder")
+                            if (canUploadFs) {
+                                IconButton(
+                                    onClick = { filesystemUploadLauncher.launch("*/*") },
+                                    enabled = !fsState.isModifying && fsState.uploadProgress == null
+                                ) {
+                                    Icon(Icons.Filled.Upload, contentDescription = "Upload")
+                                }
+                            }
+                            if (canMkdirFs) {
+                                IconButton(onClick = { showNewFolderDialog = true }, enabled = !fsState.isModifying) {
+                                    Icon(Icons.Filled.CreateNewFolder, contentDescription = "New folder")
+                                }
                             }
                             if (fsState.canImport) {
                                 IconButton(onClick = { showImportDialog = true }, enabled = !fsState.isModifying) {
@@ -469,12 +501,10 @@ fun BrowserScreen(
                         sortField = sortField,
                         sortAscending = sortAscending,
                         onSortFieldSelected = { appSettings.changeSortOrder(it) },
-                        filterQuery = fsState.filterQuery,
-                        onFilterQueryChanged = { filesystemViewModel.onFilterQueryChanged(it) },
+                        activeFilterQuery = fsState.filterQuery,
                         filteredCount = fsDisplayedChildren.size,
                         totalCount = fsState.visibleChildren.size,
-                        filterFocusRequester = filterFocusRequester,
-                        onFilterSubmitted = {}
+                        onClearFilter = { filesystemViewModel.onFilterQueryChanged("") }
                     )
                 }
                 BrowserMode.LISTS -> if (openedList != null) {
@@ -512,24 +542,20 @@ fun BrowserScreen(
                         sortField = sortField,
                         sortAscending = sortAscending,
                         onSortFieldSelected = { appSettings.changeSortOrder(it) },
-                        filterQuery = listState.listFilterQuery,
-                        onFilterQueryChanged = { listViewModel.onListFilterQueryChanged(it) },
+                        activeFilterQuery = listState.listFilterQuery,
                         filteredCount = listDisplayedFiles.size,
                         totalCount = listState.listFiles.size,
-                        filterFocusRequester = filterFocusRequester,
-                        onFilterSubmitted = {}
+                        onClearFilter = { listViewModel.onListFilterQueryChanged("") }
                     )
                 }
                 BrowserMode.FILES -> SortControls(
                     sortField = sortField,
                     sortAscending = sortAscending,
                     onSortFieldSelected = { appSettings.changeSortOrder(it) },
-                    filterQuery = fileState.filterQuery,
-                    onFilterQueryChanged = { fileInfoViewModel.onFilterQueryChanged(it) },
+                    activeFilterQuery = fileState.filterQuery,
                     filteredCount = displayedFiles.size,
                     totalCount = fileState.userFilesList.size,
-                    filterFocusRequester = filterFocusRequester,
-                    onFilterSubmitted = {}
+                    onClearFilter = { fileInfoViewModel.onFilterQueryChanged("") }
                 )
             }
 
@@ -591,7 +617,8 @@ fun BrowserScreen(
                                 selectionMode = selectionMode,
                                 selected = node.key in selectedKeys,
                                 canWriteFs = canWriteFs,
-                                canDeleteFs = fsState.canDelete && !fsState.isModifying,
+                                canDeleteFs = fsState.canDelete && !fsState.isModifying && canDelete,
+                                canDelete = canDelete,
                                 listCanEdit = listCanEdit,
                                 thumbnailUrl = if (node.isDirectory) null else fileInfoViewModel.thumbnailFor(node),
                                 shareUrl = if (node.isDirectory) null else fileInfoViewModel.shareUrlFor(node),
@@ -666,6 +693,7 @@ private fun BrowserEntry(
     selected: Boolean,
     canWriteFs: Boolean,
     canDeleteFs: Boolean,
+    canDelete: Boolean,
     listCanEdit: Boolean,
     thumbnailUrl: String?,
     shareUrl: String?,
@@ -717,7 +745,7 @@ private fun BrowserEntry(
                 else -> FileItemMenu(
                     file = node,
                     shareUrl = shareUrl,
-                    canDelete = if (mode == BrowserMode.LISTS) listCanEdit else true,
+                    canDelete = canDelete && (if (mode == BrowserMode.LISTS) listCanEdit else true),
                     onDownload = onDownload,
                     onSelect = onSelect,
                     onAddToFilesystem = onAddToFilesystem,

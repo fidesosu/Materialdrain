@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.R
+import tools.senko.materialdrain.provider.api.HostScreen
 
 // Define the screens in the app
 enum class Screen(val title: String, @DrawableRes val iconResId: Int?) {
@@ -16,6 +17,15 @@ enum class Screen(val title: String, @DrawableRes val iconResId: Int?) {
     FileDetail("File Details", null), // Using null for now, direct usage for its icon
     Lists("Lists", R.drawable.icon_list),
     Settings("Settings", R.drawable.icon_settings_outlined)
+}
+
+/** [HostScreen] is provider-api's own (it can't reference [Screen], which lives in the app module); this is the
+ * one place the two are matched up. */
+fun HostScreen.toScreen(): Screen = when (this) {
+    HostScreen.UPLOAD -> Screen.Upload
+    HostScreen.FILES -> Screen.Files
+    HostScreen.LISTS -> Screen.Lists
+    HostScreen.FILESYSTEM -> Screen.Filesystem
 }
 data class FabDetails(
     /** The button of one screen is a different button than that of another screen, they only share the widget. */
@@ -31,14 +41,19 @@ data class FabDetails(
     val iconSpinTrigger: Int = 0
 )
 @Composable
-fun BottomNavigationBar(currentScreen: Screen, navBarOrder: List<Screen>, onScreenSelected: (Screen) -> Unit) {
-    // val navBarOrder = listOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem) // Moved up
+fun BottomNavigationBar(
+    currentScreen: Screen,
+    navBarOrder: List<Screen>,
+    labelFor: (Screen) -> String = { it.title },
+    onScreenSelected: (Screen) -> Unit
+) {
     NavigationBar {
         navBarOrder.forEach { screen ->
             screen.iconResId?.let { // Ensure iconResId is not null before using
+                val label = labelFor(screen)
                 NavigationBarItem(
-                    icon = { Icon(painterResource(id = it), contentDescription = screen.title) },
-                    label = { Text(screen.title) },
+                    icon = { Icon(painterResource(id = it), contentDescription = label) },
+                    label = { Text(label) },
                     selected = currentScreen == screen,
                     onClick = { onScreenSelected(screen) }
                 )

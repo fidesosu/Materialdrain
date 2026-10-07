@@ -6,6 +6,7 @@
   "bucket": "",
   "path_style": true,
   "prefix": "",
+  "screens": [{"screen": "FILESYSTEM"}],
   "meta": {
     "id": "tools.senko.materialdrain.examples.truenas-s3",
     "version": 2,

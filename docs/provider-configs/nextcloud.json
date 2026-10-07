@@ -10,6 +10,7 @@
     }
   },
   "root_path": "/",
+  "screens": [{"screen": "FILESYSTEM"}],
   "meta": {
     "id": "tools.senko.materialdrain.examples.nextcloud",
     "version": 1,

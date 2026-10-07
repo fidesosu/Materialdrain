@@ -278,9 +278,10 @@
       "path": "https://pixeldrain.com/d/{path}"
     }
   },
+  "screens": [{"screen": "UPLOAD"}, {"screen": "FILES"}, {"screen": "LISTS"}, {"screen": "FILESYSTEM"}],
   "meta": {
     "id": "tools.senko.materialdrain.examples.pixeldrain",
-    "version": 5,
+    "version": 6,
     "author": "Materialdrain"
   }
 }

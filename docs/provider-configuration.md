@@ -45,7 +45,52 @@ Only `generic_rest` lets you describe a host in detail, so most of this guide is
 | --- | --- | --- |
 | `kind` | yes | `generic_rest`, `webdav`, `s3` or `smb` |
 | `name` | yes | The name shown in the app |
+| `screens` | no | Which of `UPLOAD`, `FILES`, `LISTS` and `FILESYSTEM` to show for this host, see [Screens](#screens) |
 | `meta` | no | Identity, version and update information, see [Sharing and updates](#sharing-and-updates) |
+
+### Screens
+
+The Files, Lists and Filesystem screens, and the Upload screen, are the same code for every host; `screens` is the
+list of which of them this host shows, and in what order (the tabs follow it). Leaving it out (or writing `[]`)
+isn't "show whatever the host can do" — the host shows no screens at all, with a message asking for `screens` to be
+filled in. This is deliberate: a config's author, not the app, decides what makes sense to show for their host.
+
+Each entry is an object, not just a name:
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `screen` | required | `UPLOAD`, `FILES`, `LISTS` or `FILESYSTEM` |
+| `name` | the screen's own name | Overrides the tab's label ("Files", "Lists", "Filesystem", "Upload") and the title bar, e.g. a Filesystem screen that's really one share called `"name": "Media"` |
+| `disabled_capabilities` | `[]` | Takes specific actions away from this screen alone, without touching the host's other screens or its own capabilities, see below |
+
+For example, a Filesystem screen which can't create folders or delete anything, shown as "Media":
+
+```json
+"screens": [
+  { "screen": "FILESYSTEM", "name": "Media", "disabled_capabilities": ["MKDIR", "DELETE"] }
+]
+```
+
+`disabled_capabilities` only takes away, it can't grant something the host doesn't actually support. The ones the
+app acts on today are `UPLOAD` (the upload button, and Filesystem's own one), `MKDIR` (new folder), `RENAME`
+(rename and move) and `DELETE`.
+
+Only turn on a screen the host can actually back:
+
+- `UPLOAD` is the standalone Upload screen: picking a file with no folder of its own. A `generic_rest` config with
+  an `upload` endpoint (what Pixeldrain's own config uses) uploads into the host's flat storage; `webdav`, `s3` and
+  `smb` have none of that, so it uploads into the config's root folder instead (`root_path`/`prefix`), through the
+  same browsing the Filesystem screen uses
+- `FILES` is a flat, sortable list of every file on the account — only meaningful for a `generic_rest` config with a
+  `list` endpoint (the thing Pixeldrain itself calls "my files")
+- `LISTS` is Pixeldrain's shareable lists of files — only a `generic_rest` config with `user_lists`/`list_info` etc.
+  can offer this
+- `FILESYSTEM` is the folder browser, with its own upload button that uploads into whichever folder is open. It's the
+  only screen `webdav`, `s3` and `smb` can offer besides `UPLOAD`, since none of them have a flat file list or
+  Pixeldrain-style lists
+
+The built-in Pixeldrain host (the one Materialdrain signs into directly, not the `pixeldrain.json` example) isn't a
+config at all, so `screens` doesn't apply to it; it keeps showing everything it supports, under its own names.
 
 ### `webdav`
 

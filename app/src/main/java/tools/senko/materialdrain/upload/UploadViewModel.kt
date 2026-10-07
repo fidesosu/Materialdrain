@@ -193,8 +193,18 @@ class UploadViewModel(
     private fun missingKey(): Boolean = provider().kind == ProviderKind.PIXELDRAIN && apiKey.isBlank()
 
     private suspend fun uploadFile(fileName: String, uri: Uri, onProgress: (Long, Long?) -> Unit): UploadResult {
-        val store = provider().fileStore ?: return UploadResult(false, message = "This host can't receive uploads.")
-        return when (val response = store.upload(fileName, uri, application, onProgress)) {
+        val provider = provider()
+        val store = provider.fileStore
+        val response = if (store != null) {
+            store.upload(fileName, uri, application, onProgress)
+        } else {
+            // No flat storage to upload into (WebDAV, S3, SMB): the Upload screen uploads into the host's root
+            // folder instead, through the same browse the Filesystem screen uses
+            val browse = provider.browse ?: return UploadResult(false, message = "This host can't receive uploads.")
+            val root = provider.rootPath.trim('/')
+            browse.upload(if (root.isEmpty()) fileName else "$root/$fileName", uri, application, makeParents = false, onProgress)
+        }
+        return when (response) {
             is ApiResponse.Success -> UploadResult(true, id = response.data.ref.id)
             is ApiResponse.Error -> UploadResult(false, message = response.error.message)
         }

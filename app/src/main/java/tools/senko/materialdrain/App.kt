@@ -84,6 +84,8 @@ import tools.senko.materialdrain.hosts.hostOptions
 import tools.senko.materialdrain.files.FileInfoDetailsCard
 import tools.senko.materialdrain.files.FileInfoViewModel
 import tools.senko.materialdrain.browser.BrowserMode
+import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
+import tools.senko.materialdrain.provider.api.HostScreen
 import tools.senko.materialdrain.provider.api.ProviderCapability
 import tools.senko.materialdrain.browser.BrowserScreen
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
@@ -105,6 +107,7 @@ import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.LocalVideoLoop
 import tools.senko.materialdrain.ui.VideoLoopSetting
 import tools.senko.materialdrain.ui.components.AppSnackbarHost
+import tools.senko.materialdrain.ui.components.CenteredTextMessage
 import tools.senko.materialdrain.ui.components.snackbarMotion
 import tools.senko.materialdrain.ui.components.OdometerText
 import tools.senko.materialdrain.ui.components.TransferProgress
@@ -160,11 +163,6 @@ fun MaterialdrainScreen() {
     val fileInfoInitiateDelete by derivedFrom { fileInfoUiState.initiateDeleteFile }
     val filesystemOperationMessage by derivedFrom { filesystemUiState.operationMessage }
     val filesystemOperationError by derivedFrom { filesystemUiState.operationError }
-
-    val filesystemUploadLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents(),
-        onResult = { uris: List<Uri> -> filesystemViewModel.onFilesPickedForUpload(uris, context) }
-    )
 
     // Ask for the notification permission (Android 13+) the first time a transfer runs. Transfers work without it,
     // the progress notification is just not shown.
@@ -232,18 +230,47 @@ fun MaterialdrainScreen() {
     val activeCapabilities = remember(configChanges) {
         appContainer.providerRegistry.resolve(appContainer.providerConfigStore.activeProviderId.value).capabilities
     }
-    val navBarOrder = remember(activeCapabilities) {
-        buildList {
-            add(Screen.Upload)
-            if (ProviderCapability.ENUMERATE in activeCapabilities) add(Screen.Files)
-            if (ProviderCapability.LISTS in activeCapabilities) add(Screen.Lists)
-            if (ProviderCapability.BROWSE in activeCapabilities) add(Screen.Filesystem)
+    // The built-in Pixeldrain host isn't config-driven, so it keeps today's capability-based navigation. Every other
+    // host is a config the user (or a config's author) wrote, and its own "screens" field decides what shows for it;
+    // a config which doesn't set it is unfinished, not "show everything the host might support"
+    val activeConfig = remember(configChanges) {
+        if (activeHostId == PIXELDRAIN_PROVIDER_ID) {
+            null
+        } else {
+            appContainer.providerConfigStore.providers.value.firstOrNull { it.id == activeHostId }?.config
         }
     }
+    // Each config entry in its own order, so a config can put its screens in whichever order makes sense for that
+    // host (the tabs follow it); duplicates of the same screen collapse to its first position
+    val navBarOrder = remember(activeCapabilities, activeConfig) {
+        if (activeConfig != null) {
+            activeConfig.screens.map { it.screen.toScreen() }.distinct()
+        } else {
+            buildList {
+                add(Screen.Upload)
+                if (ProviderCapability.ENUMERATE in activeCapabilities) add(Screen.Files)
+                if (ProviderCapability.LISTS in activeCapabilities) add(Screen.Lists)
+                if (ProviderCapability.BROWSE in activeCapabilities) add(Screen.Filesystem)
+            }
+        }
+    }
+    // A config with no screens turned on at all: nothing to fall back to, so the current screen shows a message
+    // instead (see the main content below) rather than bouncing to an upload screen that isn't offered either
+    val noScreensConfigured = activeConfig != null && navBarOrder.isEmpty()
+    // This screen's entry in the config, for its custom name and the capabilities it takes away (see ScreenConfig).
+    // Not config-driven (the built-in Pixeldrain, or a screen the active config doesn't mention) means nothing is
+    // taken away and the screen keeps its default name
+    val activeScreenConfigs = remember(activeConfig) {
+        activeConfig?.screens?.associateBy { it.screen.toScreen() } ?: emptyMap()
+    }
+    fun screenTitle(screen: Screen): String = activeScreenConfigs[screen]?.name?.takeIf { it.isNotBlank() } ?: screen.title
     LaunchedEffect(navBarOrder) {
-        // A tab which the new host doesn't offer falls back to the upload screen
-        if (currentScreen in setOf(Screen.Files, Screen.Lists, Screen.Filesystem) && currentScreen !in navBarOrder) {
-            currentScreen = Screen.Upload
+        // A tab the new host doesn't offer falls back to the first one it does (e.g. Upload isn't reachable on a
+        // host which only turned on Filesystem, even if Upload was the screen open before switching to it)
+        if (currentScreen in setOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem) &&
+            currentScreen !in navBarOrder && navBarOrder.isNotEmpty()
+        ) {
+            currentScreen = navBarOrder.first()
         }
     }
     var showFileDetailMenu by remember { mutableStateOf(false) }
@@ -483,19 +510,15 @@ fun MaterialdrainScreen() {
                     isExtended = true
                 ) else null
                 Screen.FileDetail -> null
-                Screen.Filesystem ->
-                    if (filesystemUiState.canWrite) FabDetails(
-                        screen = Screen.Filesystem,
-                        iconResId = R.drawable.icon_upload,
-                        text = "Upload",
-                        onClick = { if (filesystemUiState.uploadProgress == null) filesystemUploadLauncher.launch("*/*") },
-                        isExtended = true
-                    ) else null
+                // Upload is an icon in the Filesystem screen's own header now (see BrowserScreen), so it works the
+                // same whichever navigation style is on, instead of only existing as this FAB
+                Screen.Filesystem -> null
             }
         }
     }
     // Like the old bottom bar, the navigation FAB stays out of the way on detail screens
-    val showNavFab = navPrototype && currentScreen != Screen.FileDetail
+    // With one screen (or none) turned on there's nothing to navigate between, so the bar/FAB would only take up space
+    val showNavFab = navPrototype && currentScreen != Screen.FileDetail && navBarOrder.size > 1
     // The snackbar shares the row of the navigation button at an edge, so the button doesn't rise over it. Where no button
     // sits beside it (hidden on detail screens, or in the middle) it takes the full width, and in the middle the button rises over it
     val snackbarBesideFab = navPrototype && fabState == null && showNavFab && navFabPosition != NavFabPosition.CENTER
@@ -534,7 +557,7 @@ fun MaterialdrainScreen() {
                                     settingsCategory(settingsCategoryId)?.title ?: Screen.Settings.title
                                 }
                                 else -> {
-                                    currentScreen.title
+                                    screenTitle(currentScreen)
                                 }
                             }
                             // On the browse screens the host switcher is drawn over the bar instead (see below)
@@ -689,14 +712,15 @@ fun MaterialdrainScreen() {
             },
             bottomBar = {
                 AnimatedVisibility(
-                    // The FAB navigation prototype (Developer settings) replaces the bar while it's on
-                    visible = !navPrototype && currentScreen != Screen.FileDetail,
+                    // The FAB navigation prototype (Developer settings) replaces the bar while it's on; with no
+                    // screens to show there is nothing for the bar to hold either
+                    visible = !navPrototype && currentScreen != Screen.FileDetail && navBarOrder.size > 1,
                     // Above the upload button, so the button slides down behind the bar
                     modifier = Modifier.zIndex(2f),
                     enter = if (reduceMotion) fadeIn(tween(100)) else fadeIn() + expandVertically(),
                     exit = if (reduceMotion) fadeOut(tween(100)) else fadeOut() + shrinkVertically()
                 ) {
-                    BottomNavigationBar(currentScreen, navBarOrder) { selectedScreen -> // Pass navBarOrder
+                    BottomNavigationBar(currentScreen, navBarOrder, labelFor = ::screenTitle) { selectedScreen ->
                         navigateTo(selectedScreen)
                     }
                 }
@@ -845,7 +869,13 @@ fun MaterialdrainScreen() {
                         .fillMaxSize()
                         .padding(paddingValues)
                 ) {
+                    val noScreensMessage = "${activeConfig?.name ?: "This host"} has no screens turned on. " +
+                        "Add a \"screens\" field to its config (in Settings) to use it."
                     when (targetScreen) {
+                        Screen.Upload if noScreensConfigured -> CenteredTextMessage(noScreensMessage)
+                        Screen.Files if noScreensConfigured -> CenteredTextMessage(noScreensMessage)
+                        Screen.Lists if noScreensConfigured -> CenteredTextMessage(noScreensMessage)
+                        Screen.Filesystem if noScreensConfigured -> CenteredTextMessage(noScreensMessage)
                         Screen.Upload -> UploadScreenContent(
                             uploadViewModel = uploadViewModel,
                             fabHeight = fabHeightDp,
@@ -862,6 +892,7 @@ fun MaterialdrainScreen() {
                             fileInfoViewModel = fileInfoViewModel,
                             listViewModel = listViewModel,
                             appSettings = appContainer.appSettings,
+                            disabledCapabilities = activeScreenConfigs[targetScreen]?.disabledCapabilities ?: emptySet(),
                             activeKind = appContainer.providerRegistry.resolve(activeHostId).kind,
                             onSelectingChange = { selectingItems = it },
                             scrollState = when (targetScreen) {
