@@ -1,6 +1,7 @@
 package tools.senko.materialdrain.browser
 
 import android.os.Build
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -42,7 +43,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -221,18 +222,22 @@ data class SortRowAction(
 )
 
 /**
- * The sort row's actions behind one "New" button, shaped like the "Sort by" field beside it (the same height and
- * corners, moved down by the room the field keeps above itself for its floating label, so the two line up). Each
- * action is listed in its menu with its name.
+ * The sort row's actions behind one outlined "New" button, shaped and bordered like the "Sort by" field beside it (the
+ * same height and corners, moved down by the room the field keeps above itself for its floating label, so the two line
+ * up). Each action is listed in its menu with its name.
  */
 @Composable
 private fun SortRowActions(actions: List<SortRowAction>) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = Modifier.padding(top = SortFieldLabelSpace)) {
-        FilledTonalButton(
+        val enabled = actions.any { it.enabled }
+        OutlinedButton(
             onClick = { expanded = true },
-            enabled = actions.any { it.enabled },
+            enabled = enabled,
             shape = OutlinedTextFieldDefaults.shape,
+            // The field's own outline and text colours, so the two read as a pair
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (enabled) 1f else 0.38f)),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
             contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
             modifier = Modifier.height(OutlinedTextFieldDefaults.MinHeight)
         ) {
