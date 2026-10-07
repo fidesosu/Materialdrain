@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -142,7 +143,9 @@ fun SortControls(
     activeFilterQuery: String = "",
     filteredCount: Int = 0,
     totalCount: Int = 0,
-    onClearFilter: () -> Unit = {}
+    onClearFilter: () -> Unit = {},
+    /** Buttons at the end of the row, e.g. the filesystem's upload and new folder. */
+    actions: @Composable RowScope.() -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
     val currentSortName = SortOptions.find { it.second == sortField }?.first.orEmpty()
@@ -194,28 +197,34 @@ fun SortControls(
         }
 
         // Only shown while a search is narrowing the list down; the search field itself is the modal (see the
-        // magnifier at the top of the screen)
-        if (activeFilterQuery.isNotBlank()) {
-            Row(
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(16.dp))
-                Text(
-                    text = "\"$activeFilterQuery\" · $filteredCount/$totalCount",
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 6.dp).weight(1f, fill = false)
-                )
-                IconButton(onClick = onClearFilter, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Filled.Clear, contentDescription = "Clear search", modifier = Modifier.size(16.dp))
-                }
-            }
+        // magnifier at the top of the screen). The box takes the free space either way, keeping the actions at the end.
+        Box(modifier = Modifier.weight(1f)) {
+            if (activeFilterQuery.isNotBlank()) FilterChipRow(activeFilterQuery, filteredCount, totalCount, onClearFilter)
+        }
+        actions()
+    }
+}
+
+/** The active search, with how many of the items it matches and a button to clear it. */
+@Composable
+private fun FilterChipRow(activeFilterQuery: String, filteredCount: Int, totalCount: Int, onClearFilter: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+        Text(
+            text = "\"$activeFilterQuery\" · $filteredCount/$totalCount",
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 6.dp).weight(1f, fill = false)
+        )
+        IconButton(onClick = onClearFilter, modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Filled.Clear, contentDescription = "Clear search", modifier = Modifier.size(16.dp))
         }
     }
 }

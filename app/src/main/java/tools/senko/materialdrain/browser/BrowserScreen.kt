@@ -502,13 +502,7 @@ fun BrowserScreen(
                         filteredCount = fsDisplayedChildren.size,
                         totalCount = fsState.visibleChildren.size,
                         onClearFilter = { filesystemViewModel.onFilterQueryChanged("") }
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        PathBreadcrumb(
-                            pathSegments = fsState.pathSegments,
-                            onPathSegmentClick = { filesystemViewModel.navigateToPathSegment(it) },
-                            modifier = Modifier.weight(1f)
-                        )
+                    ) {
                         if (fsState.canWrite && !selectionMode) {
                             if (canUploadFs) {
                                 IconButton(
@@ -530,6 +524,10 @@ fun BrowserScreen(
                             }
                         }
                     }
+                    PathBreadcrumb(
+                        pathSegments = fsState.pathSegments,
+                        onPathSegmentClick = { filesystemViewModel.navigateToPathSegment(it) }
+                    )
                 }
                 BrowserMode.LISTS -> if (openedList != null) {
                     SortControls(

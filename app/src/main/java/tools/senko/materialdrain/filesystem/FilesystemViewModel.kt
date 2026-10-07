@@ -200,15 +200,14 @@ class FilesystemViewModel(
 
     private fun normalizePath(path: String, root: String): String = path.trim('/').ifEmpty { root }
 
-    private fun generatePathSegments(fullPath: String, root: String): List<PathSegment> {
-        if (fullPath.isEmpty()) return emptyList()
+    private fun generatePathSegments(fullPath: String, provider: StorageProvider): List<PathSegment> {
         var built = ""
         val segments = fullPath.split('/').filter { it.isNotEmpty() }.map { name ->
             built = if (built.isEmpty()) name else "$built/$name"
             PathSegment(name, built)
         }
         // A host rooted at its very top ("") has no folder name for the root, so it gets its own crumb to go back to
-        return if (root.isEmpty()) listOf(PathSegment(ROOT_SEGMENT_NAME, "")) + segments else segments
+        return if (rootPath(provider).isEmpty()) listOf(PathSegment(provider.rootName, "")) + segments else segments
     }
 
     fun fetchPathContent(path: String, fallbackToRoot: Boolean = false) {
@@ -232,7 +231,7 @@ class FilesystemViewModel(
                         it.copy(
                             isLoading = false,
                             currentPath = normalized,
-                            pathSegments = generatePathSegments(normalized, rootPath(provider)),
+                            pathSegments = generatePathSegments(normalized, provider),
                             children = sortedChildren,
                             canWrite = response.data.canWrite,
                             canDelete = response.data.canDelete,
@@ -570,7 +569,5 @@ class FilesystemViewModel(
 
     private companion object {
         const val API_KEY_MISSING = "API Key is missing. Please set it in Settings to browse the filesystem."
-        /** The breadcrumb name of a host's top, matching the title the breadcrumb shows when it is open. */
-        const val ROOT_SEGMENT_NAME = "Storage"
     }
 }

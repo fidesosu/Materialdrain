@@ -35,6 +35,10 @@ interface StorageProvider {
     val rootPath: String
         get() = ""
 
+    /** What the browser's path calls the top of the host when [rootPath] is "" ("/", or e.g. the name of an SMB share). */
+    val rootName: String
+        get() = "/"
+
     /** Lists of files, null when [ProviderCapability.LISTS] is absent. */
     val lists: ListOps?
         get() = null

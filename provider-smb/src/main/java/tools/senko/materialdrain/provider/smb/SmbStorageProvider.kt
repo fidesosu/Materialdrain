@@ -66,6 +66,8 @@ class SmbStorageProvider(
     override val rootPath: String
         get() = SmbPaths.normalize(config.rootPath)
 
+    override val rootName: String = config.share.trim('/', '\\').ifEmpty { "/" }
+
     // --- Browsing ---
 
     override val browse: BrowseOps = object : BrowseOps {
