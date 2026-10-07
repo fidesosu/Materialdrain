@@ -186,6 +186,15 @@ fun BrowserScreen(
     var showLoadingIndicator by remember { mutableStateOf(false) }
     var userRefreshing by remember { mutableStateOf(false) }
     val isLoadingNow by rememberUpdatedState(isLoading)
+    // The keys shown right before a refresh, so the list can tell whether it came back with something new. Null
+    // except while a refresh triggered below is in flight (not set on the ViewModels' own initial load)
+    var keysBeforeRefresh by remember { mutableStateOf<Set<String>?>(null) }
+    // Refreshing keeps the scroll position, same as before — unless it turns up a file which wasn't there already,
+    // in which case it's more useful at the top where the new file is than wherever the list happened to be scrolled to
+    val triggerRefresh: () -> Unit = {
+        keysBeforeRefresh = entries.mapTo(HashSet()) { it.key }
+        refresh()
+    }
     LaunchedEffect(isLoading) {
         if (isLoading) {
             delay(LOADING_INDICATOR_DELAY_MS)
@@ -224,6 +233,13 @@ fun BrowserScreen(
             val remaining = selectedKeys.filterTo(HashSet()) { it in listed }
             if (remaining.size != selectedKeys.size) selectedKeys = remaining
         }
+    }
+    // A refresh which turned up a file that wasn't shown before jumps to the top, instantly, so the new file is where
+    // it's seen; one which didn't change what's new leaves the scroll position alone
+    LaunchedEffect(entries) {
+        val before = keysBeforeRefresh ?: return@LaunchedEffect
+        keysBeforeRefresh = null
+        if (entries.any { it.key !in before }) scrollState.scrollToItem(0)
     }
 
     // Filesystem dialogs
@@ -422,7 +438,7 @@ fun BrowserScreen(
         isRefreshing = userRefreshing || showLoadingIndicator,
         onRefresh = {
             userRefreshing = true
-            refresh()
+            triggerRefresh()
         },
         state = pullRefreshState,
         modifier = Modifier.fillMaxSize()
@@ -555,7 +571,7 @@ fun BrowserScreen(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Text(errorMessage, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge)
-                        TextButton(onClick = refresh) { Text("Retry") }
+                        TextButton(onClick = triggerRefresh) { Text("Retry") }
                     }
                 }
                 entries.isEmpty() && !isLoading -> PullableFill {
