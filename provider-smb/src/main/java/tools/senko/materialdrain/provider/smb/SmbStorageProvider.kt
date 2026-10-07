@@ -286,7 +286,7 @@ class SmbStorageProvider(
     }
 
     private companion object {
-        const val BUFFER_BYTES = 64 * 1024
+        const val BUFFER_BYTES = 256 * 1024
 
         // NT status codes from the SMB protocol, as jCIFS reports them (negative as Java ints)
         val STATUS_OBJECT_NAME_NOT_FOUND = 0xC0000034.toInt()

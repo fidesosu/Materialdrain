@@ -54,6 +54,10 @@ internal class SmbClient(private val config: SmbConfig, private val credentials:
             setProperty("jcifs.smb.client.maxVersion", "SMB311")
             if (config.encrypt) setProperty("jcifs.smb.client.encryptionEnabled", "true")
             setProperty("jcifs.smb.client.responseTimeout", "30000")
+            // Larger socket buffers and large reads/writes: fewer round trips per megabyte, which matters on a VPN link
+            setProperty("jcifs.smb.client.rcv", (1024 * 1024).toString())
+            setProperty("jcifs.smb.client.snd", (1024 * 1024).toString())
+            setProperty("jcifs.smb.client.useLargeReadWrite", "true")
             setProperty("jcifs.smb.client.connTimeout", "15000")
         }
     }
