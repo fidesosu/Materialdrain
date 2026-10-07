@@ -501,29 +501,13 @@ fun BrowserScreen(
                         activeFilterQuery = fsState.filterQuery,
                         filteredCount = fsDisplayedChildren.size,
                         totalCount = fsState.visibleChildren.size,
-                        onClearFilter = { filesystemViewModel.onFilterQueryChanged("") }
-                    ) {
-                        if (fsState.canWrite && !selectionMode) {
-                            if (canUploadFs) {
-                                IconButton(
-                                    onClick = { filesystemUploadLauncher.launch("*/*") },
-                                    enabled = !fsState.isModifying && fsState.uploadProgress == null
-                                ) {
-                                    Icon(Icons.Filled.Upload, contentDescription = "Upload")
-                                }
-                            }
-                            if (canMkdirFs) {
-                                IconButton(onClick = { showNewFolderDialog = true }, enabled = !fsState.isModifying) {
-                                    Icon(Icons.Filled.CreateNewFolder, contentDescription = "New folder")
-                                }
-                            }
-                            if (fsState.canImport) {
-                                IconButton(onClick = { showImportDialog = true }, enabled = !fsState.isModifying) {
-                                    Icon(Icons.Filled.Link, contentDescription = "Import files by ID")
-                                }
-                            }
-                        }
-                    }
+                        onClearFilter = { filesystemViewModel.onFilterQueryChanged("") },
+                        actions = if (fsState.canWrite && !selectionMode) buildList {
+                            if (canUploadFs) add(SortRowAction(Icons.Filled.Upload, "Upload", enabled = !fsState.isModifying && fsState.uploadProgress == null) { filesystemUploadLauncher.launch("*/*") })
+                            if (canMkdirFs) add(SortRowAction(Icons.Filled.CreateNewFolder, "New folder", enabled = !fsState.isModifying) { showNewFolderDialog = true })
+                            if (fsState.canImport) add(SortRowAction(Icons.Filled.Link, "Import files by ID", enabled = !fsState.isModifying) { showImportDialog = true })
+                        } else emptyList()
+                    )
                     PathBreadcrumb(
                         pathSegments = fsState.pathSegments,
                         onPathSegmentClick = { filesystemViewModel.navigateToPathSegment(it) }

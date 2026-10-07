@@ -2,13 +2,15 @@ package tools.senko.materialdrain.browser
 
 import android.os.Build
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,6 +39,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -54,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
@@ -144,8 +149,8 @@ fun SortControls(
     filteredCount: Int = 0,
     totalCount: Int = 0,
     onClearFilter: () -> Unit = {},
-    /** Buttons at the end of the row, e.g. the filesystem's upload and new folder. */
-    actions: @Composable RowScope.() -> Unit = {}
+    /** Buttons at the end of the row, e.g. the filesystem's upload and new folder; grouped to match the sort field. */
+    actions: List<SortRowAction> = emptyList()
 ) {
     var expanded by remember { mutableStateOf(false) }
     val currentSortName = SortOptions.find { it.second == sortField }?.first.orEmpty()
@@ -201,9 +206,49 @@ fun SortControls(
         Box(modifier = Modifier.weight(1f)) {
             if (activeFilterQuery.isNotBlank()) FilterChipRow(activeFilterQuery, filteredCount, totalCount, onClearFilter)
         }
-        actions()
+        if (actions.isNotEmpty()) SortRowActions(actions)
     }
 }
+
+/** A button at the end of the sort row (see [SortControls]). */
+data class SortRowAction(
+    val icon: ImageVector,
+    val description: String,
+    val enabled: Boolean = true,
+    val onClick: () -> Unit
+)
+
+/**
+ * The sort row's buttons, in one outlined box shaped like the "Sort by" field beside it: the same height, corners and
+ * border, and moved down by the room the field keeps above itself for its floating label, so the two line up.
+ */
+@Composable
+private fun SortRowActions(actions: List<SortRowAction>) {
+    val shape = OutlinedTextFieldDefaults.shape
+    val borderColor = MaterialTheme.colorScheme.outline
+    Row(
+        modifier = Modifier
+            .padding(top = SortFieldLabelSpace)
+            .height(OutlinedTextFieldDefaults.MinHeight)
+            .clip(shape)
+            .border(1.dp, borderColor, shape),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        actions.forEachIndexed { index, action ->
+            if (index > 0) VerticalDivider(modifier = Modifier.fillMaxHeight(), color = borderColor)
+            IconButton(
+                onClick = action.onClick,
+                enabled = action.enabled,
+                modifier = Modifier.fillMaxHeight()
+            ) {
+                Icon(action.icon, contentDescription = action.description)
+            }
+        }
+    }
+}
+
+/** The room an outlined field with a label keeps above its border, for the label to sit on it. */
+private val SortFieldLabelSpace = 8.dp
 
 /** The active search, with how many of the items it matches and a button to clear it. */
 @Composable
