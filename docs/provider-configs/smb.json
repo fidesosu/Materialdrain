@@ -9,5 +9,12 @@
   "auth": "CREDENTIALS",
   "min_version": "SMB2",
   "encrypt": false,
-  "screens": [{"screen": "FILESYSTEM"}]
+  "screens": [
+    { "screen": "FILESYSTEM" }
+  ],
+  "meta": {
+    "id": "tools.senko.materialdrain.examples.smb",
+    "version": 1,
+    "author": "fides"
+  }
 }

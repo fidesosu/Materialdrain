@@ -44,12 +44,14 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.graphicsLayer
@@ -292,6 +294,19 @@ fun MaterialdrainScreen() {
     }
     // Remembered so the app opens where it was closed
     LaunchedEffect(currentScreen) { appContainer.appSettings.lastScreen = currentScreen }
+
+    // The search modal of the browse screens (see BrowserScreen), opened by the magnifier at the top left. Only the
+    // screens with a list of files to search have one: the lists overview is just titles
+    var showSearchModal by rememberSaveable { mutableStateOf(false) }
+    val searchAvailable = currentScreen == Screen.Files || currentScreen == Screen.Filesystem ||
+        (currentScreen == Screen.Lists && listsUiState.openedList != null)
+    LaunchedEffect(searchAvailable) { if (!searchAvailable) showSearchModal = false }
+    // The screen behind the modal is blurred (Android 12 and up, see SearchModal), easing in and out
+    val searchBlur by animateDpAsState(
+        targetValue = if (showSearchModal && Build.VERSION.SDK_INT >= 31) SEARCH_BLUR_RADIUS else 0.dp,
+        animationSpec = tween(if (reduceMotion) 100 else 250),
+        label = "searchBlur"
+    )
     // The details page reopens the file it showed; when that file can't be found, the Files screen is shown instead
     LaunchedEffect(Unit) {
         if (currentScreen == Screen.FileDetail && !fileInfoViewModel.restoreOpenedFile()) navigateTo(Screen.Files)
@@ -540,8 +555,13 @@ fun MaterialdrainScreen() {
         LocalVideoLoop provides videoLoop
     ) {
     SharedTransitionLayout {
-        // The Box lets the FAB navigation prototype (Developer settings) sit on top of the Scaffold
-        Box(modifier = Modifier.fillMaxSize()) {
+        // The Box lets the FAB navigation prototype (Developer settings) sit on top of the Scaffold. Blurred as a
+        // whole while the search modal is open, which is its own window and so stays sharp
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (searchBlur > 0.dp) Modifier.blur(searchBlur) else Modifier)
+        ) {
         Scaffold(
             topBar = {
                 Column {
@@ -613,7 +633,12 @@ fun MaterialdrainScreen() {
                                     }
                                 }
 
-                                else -> {}
+                                // Opposite the settings icon
+                                else -> if (searchAvailable) {
+                                    IconButton(onClick = { showSearchModal = true }) {
+                                        Icon(Icons.Filled.Search, contentDescription = "Search")
+                                    }
+                                }
                             }
                         },
                         actions = {
@@ -893,6 +918,9 @@ fun MaterialdrainScreen() {
                             listViewModel = listViewModel,
                             appSettings = appContainer.appSettings,
                             disabledCapabilities = activeScreenConfigs[targetScreen]?.disabledCapabilities ?: emptySet(),
+                            // Only the screen being shown, not one still animating out
+                            showSearchModal = showSearchModal && targetScreen == currentScreen,
+                            onDismissSearchModal = { showSearchModal = false },
                             activeKind = appContainer.providerRegistry.resolve(activeHostId).kind,
                             onSelectingChange = { selectingItems = it },
                             scrollState = when (targetScreen) {
@@ -1019,6 +1047,7 @@ fun MaterialdrainScreen() {
 }
 
 
+private val SEARCH_BLUR_RADIUS = 16.dp
 private const val SETTINGS_SAVE_TEXT = "Save Settings"
 private const val SETTINGS_SAVED_TEXT = "Settings saved"
 private const val SETTINGS_SAVED_DISPLAY_MILLIS = 2000L

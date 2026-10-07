@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
@@ -67,7 +66,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -266,8 +264,6 @@ fun BrowserScreen(
     // Files and list actions (delete, add to filesystem or to a list, remove from a list)
     var actionRequest by remember { mutableStateOf<FileActionRequest?>(null) }
 
-    val filterFocusRequester = remember { FocusRequester() }
-
     // The Filesystem screen's own upload button, scoped here (not a FAB) so it works the same whichever navigation
     // style is on — the classic bottom bar and the FAB navigation prototype don't always have a FAB of their own
     val filesystemUploadLauncher = rememberLauncherForActivityResult(
@@ -282,8 +278,6 @@ fun BrowserScreen(
     }
     BackHandler(enabled = openedList != null) { listViewModel.closeList() }
     BackHandler(enabled = selectionMode) { exitSelection() }
-    // Registered last, so it takes priority over the handlers above while the modal is open
-    BackHandler(enabled = showSearchModal) { onDismissSearchModal() }
 
     // What happens on tapping an entry
     val onOpen: (StorageNode) -> Unit = { node ->
@@ -417,6 +411,36 @@ fun BrowserScreen(
             onConfirm = { filesystemViewModel.confirmPendingUpload() },
             onDismiss = { filesystemViewModel.cancelPendingUpload() }
         )
+    }
+    // Search: whichever list this mode shows (the lists overview has nothing to search, App.kt offers no magnifier there).
+    // Back closes it before anything else, as a dialog takes the press itself
+    if (showSearchModal) {
+        when (mode) {
+            BrowserMode.FILESYSTEM -> SearchModal(
+                query = fsState.filterQuery,
+                onQueryChange = { filesystemViewModel.onFilterQueryChanged(it) },
+                filteredCount = fsDisplayedChildren.size,
+                totalCount = fsState.visibleChildren.size,
+                placeholder = "Search this folder",
+                onDismiss = onDismissSearchModal
+            )
+            BrowserMode.FILES -> SearchModal(
+                query = fileState.filterQuery,
+                onQueryChange = { fileInfoViewModel.onFilterQueryChanged(it) },
+                filteredCount = displayedFiles.size,
+                totalCount = fileState.userFilesList.size,
+                placeholder = "Search your files",
+                onDismiss = onDismissSearchModal
+            )
+            BrowserMode.LISTS -> if (openedList != null) SearchModal(
+                query = listState.listFilterQuery,
+                onQueryChange = { listViewModel.onListFilterQueryChanged(it) },
+                filteredCount = listDisplayedFiles.size,
+                totalCount = listState.listFiles.size,
+                placeholder = "Search ${openedList.title}",
+                onDismiss = onDismissSearchModal
+            )
+        }
     }
     FileActionDialogs(
         request = actionRequest,
