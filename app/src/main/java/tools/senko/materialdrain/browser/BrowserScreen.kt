@@ -490,10 +490,19 @@ fun BrowserScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header: the path (filesystem), the list being shown (lists), and the sorting and filter of whichever
-            // mode's list is sortable (every mode except the lists overview, which is just titles)
+            // Header: the sorting and filter of whichever mode's list is sortable (every mode except the lists overview,
+            // which is just titles), then right above the content the path (filesystem) or the list being shown (lists)
             when (mode) {
                 BrowserMode.FILESYSTEM -> {
+                    SortControls(
+                        sortField = sortField,
+                        sortAscending = sortAscending,
+                        onSortFieldSelected = { appSettings.changeSortOrder(it) },
+                        activeFilterQuery = fsState.filterQuery,
+                        filteredCount = fsDisplayedChildren.size,
+                        totalCount = fsState.visibleChildren.size,
+                        onClearFilter = { filesystemViewModel.onFilterQueryChanged("") }
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         PathBreadcrumb(
                             pathSegments = fsState.pathSegments,
@@ -521,17 +530,17 @@ fun BrowserScreen(
                             }
                         }
                     }
+                }
+                BrowserMode.LISTS -> if (openedList != null) {
                     SortControls(
                         sortField = sortField,
                         sortAscending = sortAscending,
                         onSortFieldSelected = { appSettings.changeSortOrder(it) },
-                        activeFilterQuery = fsState.filterQuery,
-                        filteredCount = fsDisplayedChildren.size,
-                        totalCount = fsState.visibleChildren.size,
-                        onClearFilter = { filesystemViewModel.onFilterQueryChanged("") }
+                        activeFilterQuery = listState.listFilterQuery,
+                        filteredCount = listDisplayedFiles.size,
+                        totalCount = listState.listFiles.size,
+                        onClearFilter = { listViewModel.onListFilterQueryChanged("") }
                     )
-                }
-                BrowserMode.LISTS -> if (openedList != null) {
                     if (!selectionMode) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
@@ -562,15 +571,6 @@ fun BrowserScreen(
                             }
                         }
                     }
-                    SortControls(
-                        sortField = sortField,
-                        sortAscending = sortAscending,
-                        onSortFieldSelected = { appSettings.changeSortOrder(it) },
-                        activeFilterQuery = listState.listFilterQuery,
-                        filteredCount = listDisplayedFiles.size,
-                        totalCount = listState.listFiles.size,
-                        onClearFilter = { listViewModel.onListFilterQueryChanged("") }
-                    )
                 }
                 BrowserMode.FILES -> SortControls(
                     sortField = sortField,
