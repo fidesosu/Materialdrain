@@ -70,6 +70,8 @@ import androidx.media3.common.util.UnstableApi
 import tools.senko.materialdrain.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 import androidx.core.content.edit
@@ -144,6 +146,20 @@ fun MaterialdrainScreen() {
     val uploadUiState by uploadViewModel.uiState.collectAsState()
     val filesystemUiState by filesystemViewModel.uiState.collectAsState()
     val listsUiState by listViewModel.uiState.collectAsState()
+    // Values which the effects and conditions of this screen use. A derived state recomposes this screen only when its own
+    // value changes, so a progress tick of a transfer doesn't recompose the whole screen (see TransferBarSlot)
+    val uploadErrorMessage by derivedFrom { uploadUiState.errorMessage }
+    val fileInfoDeleteSuccess by derivedFrom { fileInfoUiState.deleteFileSuccessMessage }
+    val fileInfoDeleteError by derivedFrom { fileInfoUiState.deleteFileErrorMessage }
+    val fileInfoOperationMessage by derivedFrom { fileInfoUiState.operationMessage }
+    val fileInfoOperationError by derivedFrom { fileInfoUiState.operationError }
+    val fileDownloadSuccess by derivedFrom { fileInfoUiState.fileDownloadSuccessMessage }
+    val fileDownloadError by derivedFrom { fileInfoUiState.fileDownloadErrorMessage }
+    val fileInfoApiKeyMissing by derivedFrom { fileInfoUiState.apiKeyMissingError }
+    val userFilesListError by derivedFrom { fileInfoUiState.userFilesListErrorMessage }
+    val fileInfoInitiateDelete by derivedFrom { fileInfoUiState.initiateDeleteFile }
+    val filesystemOperationMessage by derivedFrom { filesystemUiState.operationMessage }
+    val filesystemOperationError by derivedFrom { filesystemUiState.operationError }
 
     val filesystemUploadLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents(),
@@ -156,7 +172,10 @@ fun MaterialdrainScreen() {
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { }
     )
-    val activeTransfers by appContainer.transferRegistry.active.collectAsState()
+    // Only whether any transfer runs matters here: a progress tick must not recompose the whole screen
+    val hasActiveTransfers by remember {
+        appContainer.transferRegistry.active.map { it.isNotEmpty() }.distinctUntilChanged()
+    }.collectAsState(initial = false)
     // Reduced animations: the user's own choice, or the system has animations turned off
     val reduceAnimationsSetting by appContainer.appSettings.reduceAnimations.collectAsState()
     val reduceMotion = reduceAnimationsSetting || appContainer.appSettings.systemAnimationsDisabled()
@@ -167,8 +186,8 @@ fun MaterialdrainScreen() {
     val navMenuPreview by appContainer.appSettings.navMenuPreview.collectAsState()
     val navFabPosition by appContainer.appSettings.navFabPosition.collectAsState()
     val videoLoop = remember(loopVideos) { VideoLoopSetting(loopVideos, appContainer.appSettings::setLoopVideos) }
-    LaunchedEffect(activeTransfers.isNotEmpty()) {
-        if (activeTransfers.isNotEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+    LaunchedEffect(hasActiveTransfers) {
+        if (hasActiveTransfers && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
             val prefs = context.getSharedPreferences("pixeldrain_prefs", Context.MODE_PRIVATE)
@@ -314,15 +333,15 @@ fun MaterialdrainScreen() {
         }
     }
 
-    if (uploadUiState.errorMessage?.contains("API Key is missing") == true && currentScreen == Screen.Upload) {
-        LaunchedEffect(uploadUiState.errorMessage, currentScreen) {
+    if (uploadErrorMessage?.contains("API Key is missing") == true && currentScreen == Screen.Upload) {
+        LaunchedEffect(uploadErrorMessage, currentScreen) {
             genericDialogTitle = "API Key Required for Upload"
             genericDialogContent = "Please set your API Key in the Settings screen to upload files."
             showGenericDialog = true
         }
     }
 
-    LaunchedEffect(fileInfoUiState.deleteFileSuccessMessage) {
+    LaunchedEffect(fileInfoDeleteSuccess) {
         fileInfoUiState.deleteFileSuccessMessage?.let {
             snackbarHostState.showSnackbar(it)
             fileInfoViewModel.clearDeleteMessages()
@@ -335,7 +354,7 @@ fun MaterialdrainScreen() {
         }
     }
     // Results of actions on several files (delete, add to filesystem, create list)
-    LaunchedEffect(fileInfoUiState.operationMessage) {
+    LaunchedEffect(fileInfoOperationMessage) {
         fileInfoUiState.operationMessage?.let {
             // What was changed may be shown on other screens: the opened list, the lists overview, the filesystem
             if (listsUiState.openedList != null) listViewModel.refreshOpenedList()
@@ -345,7 +364,7 @@ fun MaterialdrainScreen() {
             fileInfoViewModel.clearOperationMessage()
         }
     }
-    LaunchedEffect(fileInfoUiState.operationError) {
+    LaunchedEffect(fileInfoOperationError) {
         fileInfoUiState.operationError?.let {
             // A partial failure may still have changed something
             if (listsUiState.openedList != null) listViewModel.refreshOpenedList()
@@ -354,26 +373,26 @@ fun MaterialdrainScreen() {
             fileInfoViewModel.clearOperationError()
         }
     }
-    LaunchedEffect(filesystemUiState.operationMessage) {
+    LaunchedEffect(filesystemOperationMessage) {
         filesystemUiState.operationMessage?.let {
             snackbarHostState.showSnackbar(it)
             filesystemViewModel.clearOperationMessage()
         }
     }
-    LaunchedEffect(filesystemUiState.operationError) {
+    LaunchedEffect(filesystemOperationError) {
         filesystemUiState.operationError?.let {
             snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Long)
             filesystemViewModel.clearOperationError()
         }
     }
-    LaunchedEffect(fileInfoUiState.deleteFileErrorMessage) {
+    LaunchedEffect(fileInfoDeleteError) {
         fileInfoUiState.deleteFileErrorMessage?.let {
             snackbarHostState.showSnackbar("Delete failed: $it", duration = SnackbarDuration.Long)
             fileInfoViewModel.clearDeleteMessages()
         }
     }
 
-    LaunchedEffect(fileInfoUiState.fileDownloadSuccessMessage) {
+    LaunchedEffect(fileDownloadSuccess) {
         fileInfoUiState.fileDownloadSuccessMessage?.let {
             val openable = fileInfoUiState.fileDownloadOpen
             val result = snackbarHostState.showSnackbar(it, actionLabel = openable?.let { "Open" }, duration = SnackbarDuration.Long)
@@ -381,17 +400,17 @@ fun MaterialdrainScreen() {
             fileInfoViewModel.clearDownloadMessages()
         }
     }
-    LaunchedEffect(fileInfoUiState.fileDownloadErrorMessage) {
+    LaunchedEffect(fileDownloadError) {
         fileInfoUiState.fileDownloadErrorMessage?.let {
             snackbarHostState.showSnackbar("Download failed: $it", duration = SnackbarDuration.Long)
             fileInfoViewModel.clearDownloadMessages()
         }
     }
 
-    if (fileInfoUiState.apiKeyMissingError && (currentScreen == Screen.Files || currentScreen == Screen.FileDetail) &&
-        !fileInfoUiState.userFilesListErrorMessage.isNullOrBlank() &&
-        !showGenericDialog && !fileInfoUiState.initiateDeleteFile) {
-        LaunchedEffect(true, currentScreen, fileInfoUiState.userFilesListErrorMessage) {
+    if (fileInfoApiKeyMissing && (currentScreen == Screen.Files || currentScreen == Screen.FileDetail) &&
+        !userFilesListError.isNullOrBlank() &&
+        !showGenericDialog && !fileInfoInitiateDelete) {
+        LaunchedEffect(true, currentScreen, userFilesListError) {
             if (fileInfoUiState.userFilesListErrorMessage!!.contains("API Key", ignoreCase = true)) {
                 genericDialogTitle = if (currentScreen == Screen.FileDetail) "API Key Required" else "API Key Required for Files"
                 genericDialogContent = fileInfoUiState.userFilesListErrorMessage!!
@@ -665,74 +684,7 @@ fun MaterialdrainScreen() {
                         }
                     }
                     }
-                    val activeTransfer: TransferProgress? = when (currentScreen) {
-                        Screen.Upload if uploadUiState.isLoading -> TransferProgress(
-                            transferredBytes = uploadUiState.uploadedBytes,
-                            totalBytes = uploadUiState.uploadTotalSizeBytes,
-                            bytesPerSecond = uploadUiState.uploadSpeedBytesPerSec,
-                            etaSeconds = uploadUiState.uploadEtaSeconds,
-                            label = uploadUiState.queuedItems.takeIf { it.isNotEmpty() }?.let { items ->
-                                "${items.count { it.status == UploadItemStatus.DONE }} / ${items.size} files"
-                            }
-                        )
-                        Screen.Filesystem if filesystemUiState.uploadProgress != null -> filesystemUiState.uploadProgress!!.let {
-                            TransferProgress(
-                                transferredBytes = it.uploadedBytes,
-                                totalBytes = it.totalBytes,
-                                bytesPerSecond = it.bytesPerSecond,
-                                etaSeconds = it.etaSeconds,
-                                label = "${it.currentIndex} / ${it.totalFiles} files"
-                            )
-                        }
-                        else -> fileInfoUiState.downloadBatch?.takeIf {
-                            currentScreen in listOf(Screen.Files, Screen.Filesystem, Screen.Lists, Screen.FileDetail)
-                        }?.let { batch ->
-                            // One bar for the whole batch: the finished files plus the bytes of the file in progress
-                            val current = fileInfoUiState.activeDownloads.values.firstOrNull {
-                                it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.PENDING
-                            }
-                            TransferProgress(
-                                transferredBytes = batch.doneBytes + (current?.downloadedBytes ?: 0L),
-                                totalBytes = batch.totalBytes,
-                                bytesPerSecond = current?.bytesPerSecond ?: 0L,
-                                etaSeconds = current?.etaSeconds,
-                                label = "${batch.doneFiles} of ${batch.totalFiles} files done"
-                            )
-                        } ?: run {
-                            val isActive = { download: tools.senko.materialdrain.files.FileDownloadState ->
-                                download.status == DownloadStatus.DOWNLOADING || download.status == DownloadStatus.PENDING
-                            }
-                            val activeDownload = when (currentScreen) {
-                                Screen.FileDetail -> fileInfoUiState.fileInfo?.key?.let { fileInfoUiState.activeDownloads[it] }?.takeIf(isActive)
-                                Screen.Files, Screen.Filesystem, Screen.Lists -> fileInfoUiState.activeDownloads.values.firstOrNull(isActive)
-                                else -> null
-                            }
-                            activeDownload?.let {
-                                val pending = it.status == DownloadStatus.PENDING
-                                TransferProgress(
-                                    transferredBytes = it.downloadedBytes,
-                                    totalBytes = if (pending) null else it.totalBytes,
-                                    bytesPerSecond = it.bytesPerSecond,
-                                    etaSeconds = it.etaSeconds,
-                                    label = when {
-                                        pending -> "Starting download…"
-                                        currentScreen != Screen.FileDetail -> it.fileName // downloads can be started from lists, name them
-                                        else -> null
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    // Keep the last value around so the bar can fade out instead of collapsing to empty content.
-                    var lastTransfer by remember { mutableStateOf<TransferProgress?>(null) }
-                    LaunchedEffect(activeTransfer) { if (activeTransfer != null) lastTransfer = activeTransfer }
-                    AnimatedVisibility(
-                        visible = activeTransfer != null,
-                        enter = fadeIn(animationSpec = tween(150)),
-                        exit = fadeOut(animationSpec = tween(150))
-                    ) {
-                        (activeTransfer ?: lastTransfer)?.let { TransferStatusBar(it) }
-                    }
+                    TransferBarSlot(currentScreen, uploadViewModel, filesystemViewModel, fileInfoViewModel)
                 }
             },
             bottomBar = {
@@ -1008,7 +960,7 @@ fun MaterialdrainScreen() {
             )
         }
 
-        if (fileInfoUiState.initiateDeleteFile) {
+        if (fileInfoInitiateDelete) {
             AlertDialog(
                 onDismissRequest = { fileInfoViewModel.cancelDeleteFile() },
                 title = { Text("Confirm Deletion") },
@@ -1047,3 +999,91 @@ fun DefaultPreviewMaterialdrainScreen() {
         MaterialdrainScreen()
     }
 }
+
+/**
+ * The progress bar under the top bar, for the transfer the current screen shows. It reads the upload and download state
+ * itself, so each progress tick redraws only this bar and not the whole screen.
+ */
+@Composable
+private fun ColumnScope.TransferBarSlot(
+    currentScreen: Screen,
+    uploadViewModel: UploadViewModel,
+    filesystemViewModel: FilesystemViewModel,
+    fileInfoViewModel: FileInfoViewModel,
+) {
+    val uploadUiState by uploadViewModel.uiState.collectAsState()
+    val filesystemUiState by filesystemViewModel.uiState.collectAsState()
+    val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
+    val activeTransfer: TransferProgress? = when (currentScreen) {
+        Screen.Upload if uploadUiState.isLoading -> TransferProgress(
+            transferredBytes = uploadUiState.uploadedBytes,
+            totalBytes = uploadUiState.uploadTotalSizeBytes,
+            bytesPerSecond = uploadUiState.uploadSpeedBytesPerSec,
+            etaSeconds = uploadUiState.uploadEtaSeconds,
+            label = uploadUiState.queuedItems.takeIf { it.isNotEmpty() }?.let { items ->
+                "${items.count { it.status == UploadItemStatus.DONE }} / ${items.size} files"
+            }
+        )
+        Screen.Filesystem if filesystemUiState.uploadProgress != null -> filesystemUiState.uploadProgress!!.let {
+            TransferProgress(
+                transferredBytes = it.uploadedBytes,
+                totalBytes = it.totalBytes,
+                bytesPerSecond = it.bytesPerSecond,
+                etaSeconds = it.etaSeconds,
+                label = "${it.currentIndex} / ${it.totalFiles} files"
+            )
+        }
+        else -> fileInfoUiState.downloadBatch?.takeIf {
+            currentScreen in listOf(Screen.Files, Screen.Filesystem, Screen.Lists, Screen.FileDetail)
+        }?.let { batch ->
+            // One bar for the whole batch: the finished files plus the bytes of the file in progress
+            val current = fileInfoUiState.activeDownloads.values.firstOrNull {
+                it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.PENDING
+            }
+            TransferProgress(
+                transferredBytes = batch.doneBytes + (current?.downloadedBytes ?: 0L),
+                totalBytes = batch.totalBytes,
+                bytesPerSecond = current?.bytesPerSecond ?: 0L,
+                etaSeconds = current?.etaSeconds,
+                label = "${batch.doneFiles} of ${batch.totalFiles} files done"
+            )
+        } ?: run {
+            val isActive = { download: tools.senko.materialdrain.files.FileDownloadState ->
+                download.status == DownloadStatus.DOWNLOADING || download.status == DownloadStatus.PENDING
+            }
+            val activeDownload = when (currentScreen) {
+                Screen.FileDetail -> fileInfoUiState.fileInfo?.key?.let { fileInfoUiState.activeDownloads[it] }?.takeIf(isActive)
+                Screen.Files, Screen.Filesystem, Screen.Lists -> fileInfoUiState.activeDownloads.values.firstOrNull(isActive)
+                else -> null
+            }
+            activeDownload?.let {
+                val pending = it.status == DownloadStatus.PENDING
+                TransferProgress(
+                    transferredBytes = it.downloadedBytes,
+                    totalBytes = if (pending) null else it.totalBytes,
+                    bytesPerSecond = it.bytesPerSecond,
+                    etaSeconds = it.etaSeconds,
+                    label = when {
+                        pending -> "Starting download…"
+                        currentScreen != Screen.FileDetail -> it.fileName // downloads can be started from lists, name them
+                        else -> null
+                    }
+                )
+            }
+        }
+    }
+    // Keep the last value around so the bar can fade out instead of collapsing to empty content.
+    var lastTransfer by remember { mutableStateOf<TransferProgress?>(null) }
+    LaunchedEffect(activeTransfer) { if (activeTransfer != null) lastTransfer = activeTransfer }
+    AnimatedVisibility(
+        visible = activeTransfer != null,
+        enter = fadeIn(animationSpec = tween(150)),
+        exit = fadeOut(animationSpec = tween(150))
+    ) {
+        (activeTransfer ?: lastTransfer)?.let { TransferStatusBar(it) }
+    }
+}
+
+/** A value computed from [calc]: a reader recomposes only when that value changes, not on every change of the state it reads. */
+@Composable
+private fun <T> derivedFrom(calc: () -> T): State<T> = remember { derivedStateOf(calc) }

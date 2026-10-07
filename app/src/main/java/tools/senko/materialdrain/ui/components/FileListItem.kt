@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -48,7 +49,6 @@ fun FileListItem(
     type: String,
     fileSize: Long? = null,
     modified: String? = null,
-    mimeType: String? = null,
     thumbnailUrl: String? = null,
     trailingContent: (@Composable () -> Unit)? = null,
     selectionMode: Boolean = false,
@@ -82,9 +82,12 @@ fun FileListItem(
                 val context = LocalContext.current
                 // Built once per URL and login: a new request on every recomposition makes Coil load the thumbnail again
                 val headers = HostRequestAuth.headersFor(thumbnailUrl)
-                val request = remember(thumbnailUrl, headers) {
+                // Decoded at the size it is shown, not at the size of the original image
+                val thumbnailPx = with(LocalDensity.current) { 56.dp.roundToPx() }
+                val request = remember(thumbnailUrl, headers, thumbnailPx) {
                     ImageRequest.Builder(context)
                         .data(thumbnailUrl)
+                        .size(thumbnailPx)
                         .crossfade(true)
                         .apply { headers.forEach { (name, value) -> addHeader(name, value) } }
                         .build()
@@ -129,10 +132,10 @@ fun FileListItem(
                 details.add("Folder")
             } else {
                 fileSize?.let { details.add(formatSize(it)) }
-                mimeType?.let { if (it.isNotBlank()) details.add(it) }
+                extensionLabel(name)?.let { details.add(it) }
             }
 
-            modified?.let { details.add("Modified: $it") }
+            modified?.let { details.add(it) }
 
             if (details.isNotEmpty()) {
                 Text(
@@ -157,3 +160,7 @@ fun FileListItem(
         }
     }
 }
+
+/** The file extension in capitals ("PDF"), for the details line. Null when the name has none or it is not a short one. */
+private fun extensionLabel(name: String): String? =
+    name.substringAfterLast('.', "").takeIf { it.isNotEmpty() && it.length <= 5 && it != name }?.uppercase()

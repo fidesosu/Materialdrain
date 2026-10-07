@@ -95,7 +95,7 @@ import tools.senko.materialdrain.ui.components.ErrorMessage
 import tools.senko.materialdrain.ui.components.FileListItem
 import tools.senko.materialdrain.ui.components.FolderPickerDialog
 import tools.senko.materialdrain.ui.components.TextInputDialog
-import tools.senko.materialdrain.util.formatApiDateTimeString
+import tools.senko.materialdrain.util.formatRelativeDateTime
 
 private const val LOADING_INDICATOR_DELAY_MS = 400L
 private const val LOADING_START_GRACE_MS = 1500L
@@ -134,11 +134,13 @@ fun BrowserScreen(
     val openedList = listState.openedList.takeIf { mode == BrowserMode.LISTS }
     val context = LocalContext.current
 
+    // The lists as folders, sorted again only when the lists change
+    val listFolders = remember(listState.lists) { listState.lists.sortedBy { it.title.lowercase() }.map { it.asFolder() } }
     // What this mode lists, and how it loads and fails
     val entries: List<StorageNode> = when (mode) {
         BrowserMode.FILESYSTEM -> fsState.visibleChildren
         BrowserMode.FILES -> displayedFiles
-        BrowserMode.LISTS -> if (openedList == null) listState.lists.sortedBy { it.title.lowercase() }.map { it.asFolder() } else listState.listFiles
+        BrowserMode.LISTS -> if (openedList == null) listFolders else listState.listFiles
     }
     val isLoading = when (mode) {
         BrowserMode.FILESYSTEM -> fsState.isLoading
@@ -200,7 +202,7 @@ fun BrowserScreen(
         selecting = true
         selectedKeys = selectedKeys + key
     }
-    val selectedEntries = entries.filter { it.key in selectedKeys }
+    val selectedEntries = remember(entries, selectedKeys) { entries.filter { it.key in selectedKeys } }
     // Entries which were deleted, moved or left the view can't stay selected
     LaunchedEffect(entries) {
         if (selectedKeys.isNotEmpty()) {
@@ -617,13 +619,12 @@ private fun BrowserEntry(
     pixeldrainLinks: Boolean
 ) {
     val folderLink = if (node.isDirectory && mode == BrowserMode.LISTS && pixeldrainLinks) "https://pixeldrain.com/l/${node.ref.id}" else null
-    val modified = remember(node.createdAt) { node.createdAt?.let { formatApiDateTimeString(it) } }
+    val modified = remember(node.createdAt) { formatRelativeDateTime(node.createdAt) }
     FileListItem(
         name = node.name,
         type = if (node.isDirectory) "dir" else "file",
         fileSize = node.size,
         modified = modified,
-        mimeType = node.mimeType,
         thumbnailUrl = thumbnailUrl,
         selectionMode = selectionMode,
         selected = selected,

@@ -7,6 +7,8 @@ import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -62,5 +64,27 @@ internal fun formatApiDateTimeString(dateTimeString: String?): String {
     } catch (e: DateTimeParseException) {
         Log.e("DateTimeFormat", "Error parsing date: $dateTimeString", e)
         dateTimeString
+    }
+}
+
+/**
+ * How long ago an API date-time was ("3 days ago"), for the lists of files. From a week on it is the date itself.
+ * Null when the date is missing or can't be read.
+ */
+internal fun formatRelativeDateTime(dateTimeString: String?, now: Instant = Instant.now()): String? {
+    if (dateTimeString.isNullOrBlank()) return null
+    val then = try {
+        LocalDateTime.parse(dateTimeString, DateTimeFormatter.ISO_DATE_TIME).atZone(ZoneId.of("UTC")).toInstant()
+    } catch (e: DateTimeParseException) {
+        return null
+    }
+    val seconds = Duration.between(then, now).seconds
+    fun ago(amount: Long, unit: String) = "$amount $unit${if (amount == 1L) "" else "s"} ago"
+    return when {
+        seconds < 60 -> "just now"
+        seconds < 3600 -> ago(seconds / 60, "min")
+        seconds < 86_400 -> ago(seconds / 3600, "hour")
+        seconds < 7 * 86_400 -> ago(seconds / 86_400, "day")
+        else -> DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withZone(ZoneId.systemDefault()).format(then)
     }
 }

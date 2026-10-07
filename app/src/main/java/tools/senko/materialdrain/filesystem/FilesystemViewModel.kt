@@ -66,9 +66,13 @@ data class FilesystemUiState(
     // The pixeldrain search index is useless to nearly everyone, hidden unless the user turns that off in the settings
     val hideSearchIndex: Boolean = true
 ) {
-    /** [children] without the entries which are hidden by the settings. */
-    val visibleChildren: List<StorageNode>
-        get() = if (hideSearchIndex) children.filterNot { it.isSearchIndex() } else children
+    /**
+     * [children] without the entries which are hidden by the settings. Computed once per state, so the screen gets the same
+     * list between recompositions (a new list each time would restart everything which depends on it).
+     */
+    val visibleChildren: List<StorageNode> by lazy {
+        if (hideSearchIndex) children.filterNot { it.isSearchIndex() } else children
+    }
 }
 
 data class PathSegment(
