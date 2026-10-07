@@ -80,6 +80,7 @@ import tools.senko.materialdrain.files.FileItemMenu
 import tools.senko.materialdrain.files.SelectionAction
 import tools.senko.materialdrain.files.SelectionActionBar
 import tools.senko.materialdrain.files.key
+import tools.senko.materialdrain.files.fileComparator
 import tools.senko.materialdrain.files.copyLinkToClipboard
 import tools.senko.materialdrain.files.shareLink
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
@@ -415,29 +416,40 @@ fun BrowserScreen(
     // Search: whichever list this mode shows (the lists overview has nothing to search, App.kt offers no magnifier there).
     // Back closes it before anything else, as a dialog takes the press itself
     if (showSearchModal) {
+        // Everything the list holds (not just what its current filter leaves), in the list's order: the modal does its
+        // own matching, and the list only takes the query once it closes
         when (mode) {
             BrowserMode.FILESYSTEM -> SearchModal(
                 query = fsState.filterQuery,
-                onQueryChange = { filesystemViewModel.onFilterQueryChanged(it) },
-                filteredCount = fsDisplayedChildren.size,
-                totalCount = fsState.visibleChildren.size,
+                onQueryCommit = { filesystemViewModel.onFilterQueryChanged(it) },
+                candidates = remember(fsState.visibleChildren, sortField, sortAscending) {
+                    fsState.visibleChildren.sortedWith(fileComparator(sortField, sortAscending, directoriesFirst = true))
+                },
+                thumbnailFor = { fileInfoViewModel.thumbnailFor(it) },
                 placeholder = "Search this folder",
+                onResultClick = onOpen,
                 onDismiss = onDismissSearchModal
             )
             BrowserMode.FILES -> SearchModal(
                 query = fileState.filterQuery,
-                onQueryChange = { fileInfoViewModel.onFilterQueryChanged(it) },
-                filteredCount = displayedFiles.size,
-                totalCount = fileState.userFilesList.size,
+                onQueryCommit = { fileInfoViewModel.onFilterQueryChanged(it) },
+                candidates = remember(fileState.userFilesList, sortField, sortAscending) {
+                    fileState.userFilesList.sortedWith(fileComparator(sortField, sortAscending))
+                },
+                thumbnailFor = { fileInfoViewModel.thumbnailFor(it) },
                 placeholder = "Search your files",
+                onResultClick = onOpen,
                 onDismiss = onDismissSearchModal
             )
             BrowserMode.LISTS -> if (openedList != null) SearchModal(
                 query = listState.listFilterQuery,
-                onQueryChange = { listViewModel.onListFilterQueryChanged(it) },
-                filteredCount = listDisplayedFiles.size,
-                totalCount = listState.listFiles.size,
+                onQueryCommit = { listViewModel.onListFilterQueryChanged(it) },
+                candidates = remember(listState.listFiles, sortField, sortAscending) {
+                    listState.listFiles.sortedWith(fileComparator(sortField, sortAscending))
+                },
+                thumbnailFor = { fileInfoViewModel.thumbnailFor(it) },
                 placeholder = "Search ${openedList.title}",
+                onResultClick = onOpen,
                 onDismiss = onDismissSearchModal
             )
         }

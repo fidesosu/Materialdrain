@@ -1,6 +1,12 @@
 package tools.senko.materialdrain.browser
 
 import android.os.Build
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -73,6 +79,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import tools.senko.materialdrain.filesystem.PathSegment
+import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.files.SortOptions
 import tools.senko.materialdrain.files.SortableField
 
@@ -288,13 +295,21 @@ private fun FilterChipRow(activeFilterQuery: String, filteredCount: Int, totalCo
     }
 }
 
+/** At most this many matches float under the search card, so they're a glance rather than a second list. */
+private const val MAX_SEARCH_RESULTS = 6
+
+/** The search card, the gap under it and the "more" note: what's left of the height after them is for the matches. */
+private val SearchChromeHeight = 140.dp
+
 /** How far the dialog window dims what's behind it while that is blurred too (see [SearchModal]); a lighter touch than the default, which would mostly hide the blur. */
 private const val BLURRED_DIM_AMOUNT = 0.25f
 
 /**
  * Searching the list a browse screen shows: a compact card near the top of the screen, opened by the magnifier in the
- * top bar (see App.kt). The list filters as the query is typed, so the search key and tapping beside the card just
- * close it; the query stays, and the chip by the sort control (see [SortControls]) shows and clears it.
+ * top bar (see App.kt). While it's open the list behind it stays as it was: the matches of what's typed float under the
+ * card as their own cards (see [SearchResultStack]), and tapping one opens it. Closing it (the search key, back, or a
+ * tap beside the card) hands the query to the list, which then filters by it; the chip by the sort control (see
+ * [SortControls]) shows and clears it.
  *
  * Its own window: the screen underneath is blurred by App.kt while this is open (Android 12 and up), and the
  * dialog's own dim is lightened to match; before Android 12 the dim is all there is.
@@ -302,14 +317,28 @@ private const val BLURRED_DIM_AMOUNT = 0.25f
 @Composable
 fun SearchModal(
     query: String,
-    onQueryChange: (String) -> Unit,
-    filteredCount: Int,
-    totalCount: Int,
+    onQueryCommit: (String) -> Unit,
+    candidates: List<StorageNode>,
+    thumbnailFor: (StorageNode) -> String?,
     placeholder: String,
+    onResultClick: (StorageNode) -> Unit,
     onDismiss: () -> Unit
 ) {
+    // The cursor starts at the end of a query that's already there, so it can just be typed on
+    var fieldValue by remember { mutableStateOf(TextFieldValue(query, selection = TextRange(query.length))) }
+    // Every way of closing hands the query over to the list, to filter it by
+    val close = {
+        onQueryCommit(fieldValue.text)
+        onDismiss()
+    }
+    // Matched the same way the list filters, in the list's own order
+    val matches = remember(candidates, fieldValue.text) {
+        val text = fieldValue.text
+        if (text.isBlank()) emptyList() else candidates.filter { it.name.contains(text, ignoreCase = true) }
+    }
+
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = close,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
@@ -317,72 +346,99 @@ fun SearchModal(
             if (Build.VERSION.SDK_INT >= 31) dialogWindow?.setDimAmount(BLURRED_DIM_AMOUNT)
         }
 
-        // The cursor starts at the end of a query that's already there, so it can just be typed on
-        var fieldValue by remember { mutableStateOf(TextFieldValue(query, selection = TextRange(query.length))) }
         val focusRequester = remember { FocusRequester() }
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-        // Fills the window so a tap beside the card closes it
-        Box(
+        // Fills the window so a tap beside the card closes it. Above the keyboard (safeDrawing includes it), so the
+        // matches are only as many as fit there
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .clickable(interactionSource = null, indication = null, onClick = onDismiss)
+                .clickable(interactionSource = null, indication = null, onClick = close)
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             contentAlignment = Alignment.TopCenter
         ) {
-            Surface(
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                tonalElevation = 6.dp,
-                shadowElevation = 6.dp,
-                modifier = Modifier
-                    .widthIn(max = 560.dp)
-                    .fillMaxWidth()
-                    // Taps on the card itself mustn't reach the dismissing box behind it
-                    .clickable(interactionSource = null, indication = null, onClick = {})
+            // Room for the card and the "more" note taken off; never more than a handful, so it stays a glance
+            val fit = ((maxHeight - SearchChromeHeight) / (SearchResultHeight + SearchResultGap)).toInt()
+                .coerceIn(1, MAX_SEARCH_RESULTS)
+            val shown = matches.take(fit)
+            Column(
+                modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column {
-                    TextField(
-                        value = fieldValue,
-                        onValueChange = {
-                            fieldValue = it
-                            onQueryChange(it.text)
-                        },
-                        placeholder = { Text(placeholder, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                        trailingIcon = {
-                            if (fieldValue.text.isNotEmpty()) {
-                                IconButton(onClick = {
-                                    fieldValue = TextFieldValue("")
-                                    onQueryChange("")
-                                }) {
-                                    Icon(Icons.Filled.Clear, contentDescription = "Clear search")
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        // Taps on the card itself mustn't reach the dismissing box behind it
+                        .clickable(interactionSource = null, indication = null, onClick = {})
+                ) {
+                    Column {
+                        TextField(
+                            value = fieldValue,
+                            onValueChange = { fieldValue = it },
+                            placeholder = { Text(placeholder, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (fieldValue.text.isNotEmpty()) {
+                                    IconButton(onClick = { fieldValue = TextFieldValue("") }) {
+                                        Icon(Icons.Filled.Clear, contentDescription = "Clear search")
+                                    }
                                 }
-                            }
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { onDismiss() }),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(focusRequester)
-                    )
-                    if (fieldValue.text.isNotBlank()) {
-                        Text(
-                            text = "Showing $filteredCount of $totalCount",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            // Under the query, lined up with its text (past the leading icon)
-                            modifier = Modifier.padding(start = 52.dp, end = 16.dp, bottom = 12.dp)
+                            },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { close() }),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(focusRequester)
                         )
+                        if (fieldValue.text.isNotBlank()) {
+                            Text(
+                                text = "Showing ${matches.size} of ${candidates.size}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                // Under the query, lined up with its text (past the leading icon)
+                                modifier = Modifier.padding(start = 52.dp, end = 16.dp, bottom = 12.dp)
+                            )
+                        }
                     }
+                }
+                SearchResultStack(
+                    results = shown,
+                    thumbnailFor = thumbnailFor,
+                    onClick = { node ->
+                        close()
+                        onResultClick(node)
+                    },
+                    modifier = Modifier.padding(top = SearchResultGap * 1.5f)
+                )
+                // The matches past what fits are counted, not listed: closing the search filters the list by them all
+                AnimatedVisibility(
+                    visible = matches.size > shown.size,
+                    enter = fadeIn() + scaleIn(initialScale = 0.8f),
+                    exit = fadeOut() + scaleOut(targetScale = 0.8f)
+                ) {
+                    Text(
+                        text = "+${matches.size - shown.size} more · search to filter the list",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(top = SearchResultGap)
+                            .clip(RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
                 }
             }
         }
