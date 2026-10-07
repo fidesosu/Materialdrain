@@ -226,19 +226,24 @@ class FileInfoViewModel(
     fun thumbnailFor(node: StorageNode): String? {
         val provider = provider()
         val thumbnail = provider.thumbnailUrl(node)
-        // Songs show their album cover, read out of the file itself (SMB shares already make theirs on the device). One
-        // without a cover keeps the app's own music tile (see FileIcon) rather than the host's generic picture
-        if (!node.isDirectory && provider.kind != ProviderKind.SMB && node.previewMimeType()?.startsWith("audio/") == true) {
+        // SMB shares make their own on the device, and only real ones: photos, video frames and album covers
+        if (provider.kind == ProviderKind.SMB) return thumbnail
+        // Songs show their album cover, read out of the file itself. One without a cover keeps the app's own music tile
+        // (see FileIcon) rather than the host's generic picture
+        if (!node.isDirectory && node.previewMimeType()?.startsWith("audio/") == true) {
             provider.rawContentUrl(node, attachment = false)?.let { raw ->
                 return AudioCovers.audioCoverUrl(raw, fallback = null, version = node.modifiedAt ?: node.createdAt)
             }
         }
         // Photos in formats the hosts' own thumbnailers often can't read (HEIC from phones, AVIF): decoded on the device
         // from the file itself, scaled to the thumbnail's size, as the preview already does
-        if (!node.isDirectory && provider.kind != ProviderKind.SMB && node.name.substringAfterLast('.', "").lowercase() in DEVICE_THUMBNAIL_EXTENSIONS) {
+        if (!node.isDirectory && node.name.substringAfterLast('.', "").lowercase() in DEVICE_THUMBNAIL_EXTENSIONS) {
             provider.rawContentUrl(node, attachment = false)?.let { return it }
         }
-        return thumbnail
+        // Only pictures and videos have a thumbnail worth showing: for everything else (text, archives, apps, unknown
+        // kinds) the hosts hand out a generic picture, and the app's own tile for the kind of file is used instead
+        val mime = node.previewMimeType().orEmpty()
+        return thumbnail.takeIf { mime.startsWith("image/") || mime.startsWith("video/") }
     }
 
     /** The content of a node itself (for previews and the full screen view), from the active host. */
