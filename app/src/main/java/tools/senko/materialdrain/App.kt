@@ -103,6 +103,7 @@ import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.LocalVideoLoop
 import tools.senko.materialdrain.ui.VideoLoopSetting
 import tools.senko.materialdrain.ui.components.AppSnackbarHost
+import tools.senko.materialdrain.ui.components.snackbarMotion
 import tools.senko.materialdrain.ui.components.OdometerText
 import tools.senko.materialdrain.ui.components.TransferProgress
 import tools.senko.materialdrain.ui.components.TransferStatusBar
@@ -475,17 +476,19 @@ fun MaterialdrainScreen() {
         }
     }
     // Like the old bottom bar, the navigation FAB stays out of the way on detail screens
-    // With the navigation button at an edge, the snackbar is beside it, so the button doesn't rise over it
-    val edgeSnackbar = navPrototype && fabState == null && navFabPosition != NavFabPosition.CENTER
+    val showNavFab = navPrototype && currentScreen != Screen.FileDetail
+    // The snackbar shares the row of the navigation button at an edge, so the button doesn't rise over it. Where no button
+    // sits beside it (hidden on detail screens, or in the middle) it takes the full width, and in the middle the button rises over it
+    val snackbarBesideFab = navPrototype && fabState == null && showNavFab && navFabPosition != NavFabPosition.CENTER
     val fabLiftTarget = (if (selectingItems) SelectionBarHeight else 0.dp) +
-        (if (!edgeSnackbar && snackbarHeightDp > 0.dp) snackbarHeightDp + 8.dp else 0.dp)
-    val fabLift by animateDpAsState(targetValue = fabLiftTarget, label = "fabLift")
+        (if (!snackbarBesideFab && snackbarHeightDp > 0.dp) snackbarHeightDp + 8.dp else 0.dp)
+    // The buttons lift with the snackbar, on the same motion as its size and the gap beside the button
+    val fabLift by animateDpAsState(targetValue = fabLiftTarget, animationSpec = snackbarMotion(reduceMotion), label = "fabLift")
     // The navigation button sits in the same corner: it rises over the upload button when both are shown
     val navLiftTarget = fabLiftTarget + (if (navPrototype && fabState != null) fabHeightDp + 16.dp else 0.dp)
-    val navLift by animateDpAsState(targetValue = navLiftTarget, label = "navLift")
+    val navLift by animateDpAsState(targetValue = navLiftTarget, animationSpec = snackbarMotion(reduceMotion), label = "navLift")
     // How far below its corner a button starts before it slides up (see NavFabMenu)
     val entryOffsetPx = with(localDensity) { 160.dp.toPx() }
-    val showNavFab = navPrototype && currentScreen != Screen.FileDetail
     val isFabVisible = showNavFab || fabState != null
 
     CompositionLocalProvider(
@@ -835,8 +838,10 @@ fun MaterialdrainScreen() {
                 // The snackbar stays at the bottom; while selecting it sits above the selection bar
                 AppSnackbarHost(
                     hostState = snackbarHostState,
-                    edgeFab = if (edgeSnackbar) navFabPosition else null,
+                    styled = navPrototype && fabState == null,
+                    edgeFab = if (snackbarBesideFab) navFabPosition else null,
                     fabSize = fabHeightDp,
+                    reduceMotion = reduceMotion,
                     modifier = Modifier
                         .zIndex(1f)
                         .offset(y = if (selectingItems) -SelectionBarHeight else 0.dp)

@@ -82,13 +82,15 @@ import tools.senko.materialdrain.ui.LocalReduceMotion
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-private val FabMargin = 16.dp
+private val FabMargin = 8.dp
 private val FabClosedCorner = 16.dp
 /** Moving between spots: a quick move with a mild ease-in and a lighter ease-out. */
 /** How far below its corner the button starts, enough to be off the screen; it slides up from there. */
 private val EntryOffset = 160.dp
 private val EntryAnimation = tween<Float>(durationMillis = 420, easing = FastOutSlowInEasing)
 private val MoveAnimation = tween<Float>(durationMillis = 300, easing = CubicBezierEasing(0.4f, 0f, 0.8f, 1f))
+/** A change of the button's size (its label growing or shrinking): it glides to its side with the size. */
+private val ResizeAnimation = tween<Float>(durationMillis = 260, easing = FastOutSlowInEasing)
 /** Minimum horizontal travel for a release to count as a swipe. */
 private val SwipeThreshold = 24.dp
 /** Measured from when the finger starts moving; releasing later than this cancels the swipe. */
@@ -183,7 +185,10 @@ fun NavFabMenu(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .offset(y = -lift)
-                .graphicsLayer { translationY = hidden * hiddenPx }
+                .graphicsLayer {
+                    translationY = hidden * hiddenPx
+                    alpha = 1f - hidden
+                }
         )
     }
 }
@@ -219,10 +224,11 @@ private fun NavFab(
     val travel = (containerWidth - fabWidth - 2 * marginPx).coerceAtLeast(0f)
     fun targetFor(p: NavFabPosition) = travel * (p.bias + 1f) / 2f
 
-    // Placement and layout changes snap to the side: a layout pass must never look like the button moving
+    // The first placement snaps to the saved side. After that a change of size glides to the side with it, so the button
+    // never jumps when its label grows or shrinks
     LaunchedEffect(travel, fabWidth) {
         if (fabWidth == 0) return@LaunchedEffect
-        offsetX.snapTo(targetFor(position))
+        if (placed) offsetX.animateTo(targetFor(position), ResizeAnimation) else offsetX.snapTo(targetFor(position))
         placed = true
     }
 
@@ -249,6 +255,8 @@ private fun NavFab(
             .windowInsetsPadding(WindowInsets.navigationBars)
             .padding(FabMargin)
             .offset { IntOffset(offsetX.value.roundToInt(), entryY.value.roundToInt()) }
+            // Fades in while it slides up from below, the same as it fades out when it leaves
+            .graphicsLayer { alpha = (1f - entryY.value / entryOffsetPx).coerceIn(0f, 1f) }
             .onSizeChanged {
                 fabWidth = it.width
                 onFabHeightChanged(with(density) { it.height.toDp() })
