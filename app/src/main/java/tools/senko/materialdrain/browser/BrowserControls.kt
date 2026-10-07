@@ -2,14 +2,13 @@ package tools.senko.materialdrain.browser
 
 import android.os.Build
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Clear
@@ -40,7 +40,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -149,7 +151,7 @@ fun SortControls(
     filteredCount: Int = 0,
     totalCount: Int = 0,
     onClearFilter: () -> Unit = {},
-    /** Buttons at the end of the row, e.g. the filesystem's upload and new folder; grouped to match the sort field. */
+    /** Actions at the end of the row, behind a "New" menu, e.g. the filesystem's upload and new folder. */
     actions: List<SortRowAction> = emptyList()
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -210,7 +212,7 @@ fun SortControls(
     }
 }
 
-/** A button at the end of the sort row (see [SortControls]). */
+/** An action in the sort row's "New" menu (see [SortControls]); [description] is its name there. */
 data class SortRowAction(
     val icon: ImageVector,
     val description: String,
@@ -219,29 +221,36 @@ data class SortRowAction(
 )
 
 /**
- * The sort row's buttons, in one outlined box shaped like the "Sort by" field beside it: the same height, corners and
- * border, and moved down by the room the field keeps above itself for its floating label, so the two line up.
+ * The sort row's actions behind one "New" button, shaped like the "Sort by" field beside it (the same height and
+ * corners, moved down by the room the field keeps above itself for its floating label, so the two line up). Each
+ * action is listed in its menu with its name.
  */
 @Composable
 private fun SortRowActions(actions: List<SortRowAction>) {
-    val shape = OutlinedTextFieldDefaults.shape
-    val borderColor = MaterialTheme.colorScheme.outline
-    Row(
-        modifier = Modifier
-            .padding(top = SortFieldLabelSpace)
-            .height(OutlinedTextFieldDefaults.MinHeight)
-            .clip(shape)
-            .border(1.dp, borderColor, shape),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        actions.forEachIndexed { index, action ->
-            if (index > 0) VerticalDivider(modifier = Modifier.fillMaxHeight(), color = borderColor)
-            IconButton(
-                onClick = action.onClick,
-                enabled = action.enabled,
-                modifier = Modifier.fillMaxHeight()
-            ) {
-                Icon(action.icon, contentDescription = action.description)
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = Modifier.padding(top = SortFieldLabelSpace)) {
+        FilledTonalButton(
+            onClick = { expanded = true },
+            enabled = actions.any { it.enabled },
+            shape = OutlinedTextFieldDefaults.shape,
+            contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+            modifier = Modifier.height(OutlinedTextFieldDefaults.MinHeight)
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+            Text("New")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            actions.forEach { action ->
+                DropdownMenuItem(
+                    text = { Text(action.description) },
+                    leadingIcon = { Icon(action.icon, contentDescription = null) },
+                    enabled = action.enabled,
+                    onClick = {
+                        expanded = false
+                        action.onClick()
+                    }
+                )
             }
         }
     }
