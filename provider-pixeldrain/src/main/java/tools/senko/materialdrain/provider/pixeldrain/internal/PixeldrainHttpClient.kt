@@ -38,26 +38,11 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.TimeUnit
+import tools.senko.materialdrain.provider.api.ProgressThrottle
 
 internal const val PIXELDRAIN_HOST = "pixeldrain.com"
 private const val TAG_HTTP = "PIXEL_HTTP"
-private const val PROGRESS_REPORT_INTERVAL_NANOS = 200_000_000L
 private const val TRANSFER_CHUNK_BYTES = 64L * 1024
-
-/** Calls [report] at most every [PROGRESS_REPORT_INTERVAL_NANOS], plus once explicitly via [finish]. */
-internal class ThrottledProgress(private val report: (Long) -> Unit) {
-    private var lastReportNanos = 0L
-
-    fun update(bytes: Long) {
-        val now = System.nanoTime()
-        if (now - lastReportNanos >= PROGRESS_REPORT_INTERVAL_NANOS) {
-            lastReportNanos = now
-            report(bytes)
-        }
-    }
-
-    fun finish(bytes: Long) = report(bytes)
-}
 
 /** Streams an InputStream straight into the OkHttp socket sink, without any intermediate channel. */
 internal class StreamingRequestBody(
@@ -71,7 +56,7 @@ internal class StreamingRequestBody(
 
     override fun writeTo(sink: BufferedSink) {
         val input = openStream() ?: throw IOException("Failed to open input stream for upload.")
-        val progress = ThrottledProgress(onProgress)
+        val progress = ProgressThrottle(onProgress)
         var sent = 0L
         input.source().use { source ->
             while (true) {
@@ -206,7 +191,7 @@ class PixeldrainHttpClient {
                     val body = response.body
                     if (response.code == 200) {
                         val totalBytesFromServer = body.contentLength().takeIf { it >= 0 }
-                        val progress = ThrottledProgress { onProgress(it, totalBytesFromServer) }
+                        val progress = ProgressThrottle { onProgress(it, totalBytesFromServer) }
                         var totalBytesCopied = 0L
                         try {
                             val sink = outputStream.sink().buffer()

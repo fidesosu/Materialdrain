@@ -16,6 +16,7 @@ import tools.senko.materialdrain.provider.api.Credentials
 import tools.senko.materialdrain.provider.api.FieldValidation
 import tools.senko.materialdrain.provider.api.FileListOps
 import tools.senko.materialdrain.provider.api.FileStoreOps
+import tools.senko.materialdrain.provider.api.ProgressThrottle
 import tools.senko.materialdrain.provider.api.ProviderCapability
 import tools.senko.materialdrain.provider.api.ProviderError
 import tools.senko.materialdrain.provider.api.ProviderKind
@@ -218,14 +219,16 @@ class SmbStorageProvider(
 
     private fun copy(source: InputStream, sink: OutputStream, onBytes: (Long) -> Unit): Long {
         val buffer = ByteArray(BUFFER_BYTES)
+        val progress = ProgressThrottle(onBytes)
         var total = 0L
         while (true) {
             val read = source.read(buffer)
             if (read < 0) break
             sink.write(buffer, 0, read)
             total += read
-            onBytes(total)
+            progress.update(total)
         }
+        progress.finish(total)
         return total
     }
 

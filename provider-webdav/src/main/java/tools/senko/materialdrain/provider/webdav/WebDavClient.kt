@@ -16,6 +16,7 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okio.BufferedSink
 import okio.buffer
+import tools.senko.materialdrain.provider.api.ProgressThrottle
 import okio.sink
 import okio.source
 import java.io.IOException
@@ -162,13 +163,15 @@ internal class WebDavClient(private val rootPath: String) {
                         val sink = outputStream.sink().buffer()
                         val source = body.source()
                         var copied = 0L
+                        val progress = ProgressThrottle { onProgress(it, total) }
                         while (true) {
                             val read = source.read(sink.buffer, 64L * 1024)
                             if (read == -1L) break
                             sink.emitCompleteSegments()
                             copied += read
-                            onProgress(copied, total)
+                            progress.update(copied)
                         }
+                        progress.finish(copied)
                         sink.flush()
                     }
                     response.code
