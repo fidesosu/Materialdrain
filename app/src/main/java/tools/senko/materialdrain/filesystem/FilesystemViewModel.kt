@@ -200,13 +200,15 @@ class FilesystemViewModel(
 
     private fun normalizePath(path: String, root: String): String = path.trim('/').ifEmpty { root }
 
-    private fun generatePathSegments(fullPath: String): List<PathSegment> {
+    private fun generatePathSegments(fullPath: String, root: String): List<PathSegment> {
         if (fullPath.isEmpty()) return emptyList()
         var built = ""
-        return fullPath.split('/').filter { it.isNotEmpty() }.map { name ->
+        val segments = fullPath.split('/').filter { it.isNotEmpty() }.map { name ->
             built = if (built.isEmpty()) name else "$built/$name"
             PathSegment(name, built)
         }
+        // A host rooted at its very top ("") has no folder name for the root, so it gets its own crumb to go back to
+        return if (root.isEmpty()) listOf(PathSegment(ROOT_SEGMENT_NAME, "")) + segments else segments
     }
 
     fun fetchPathContent(path: String, fallbackToRoot: Boolean = false) {
@@ -230,7 +232,7 @@ class FilesystemViewModel(
                         it.copy(
                             isLoading = false,
                             currentPath = normalized,
-                            pathSegments = generatePathSegments(normalized),
+                            pathSegments = generatePathSegments(normalized, rootPath(provider)),
                             children = sortedChildren,
                             canWrite = response.data.canWrite,
                             canDelete = response.data.canDelete,
@@ -266,9 +268,11 @@ class FilesystemViewModel(
 
     /** The folder above the current one, or null when the current one is the top of the host. */
     private fun parentPath(): String? {
-        val current = normalizePath(uiState.value.currentPath, rootPath(activeProvider()))
-        val parent = current.substringBeforeLast('/', "")
-        return if (parent.isEmpty() || parent == current) null else parent
+        val root = rootPath(activeProvider())
+        val current = normalizePath(uiState.value.currentPath, root)
+        if (current == root) return null
+        // A folder right under a "" root has "" as its parent: that's the root, not "no parent"
+        return current.substringBeforeLast('/', "").ifEmpty { root }.takeIf { it != current }
     }
 
     /** Whether there is a folder above the current one (false at the top of the host). */
@@ -566,5 +570,7 @@ class FilesystemViewModel(
 
     private companion object {
         const val API_KEY_MISSING = "API Key is missing. Please set it in Settings to browse the filesystem."
+        /** The breadcrumb name of a host's top, matching the title the breadcrumb shows when it is open. */
+        const val ROOT_SEGMENT_NAME = "Storage"
     }
 }
