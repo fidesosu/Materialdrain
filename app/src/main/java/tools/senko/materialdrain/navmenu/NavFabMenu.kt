@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.navmenu
 
+import android.os.Build
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -118,9 +119,13 @@ fun NavFabMenu(
     lift: Dp = 0.dp,
     /** When false the button slides down out of the screen (and is gone once it has) */
     visible: Boolean = true,
+    /** Told when the window opens and closes, so the screen behind it can be blurred (see App.kt) */
+    onOpenChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var open by rememberSaveable { mutableStateOf(false) }
+    val currentOnOpenChange by rememberUpdatedState(onOpenChange)
+    LaunchedEffect(open) { currentOnOpenChange(open) }
     var mockSelectedId by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(enabled = open) { open = false }
 
@@ -145,8 +150,10 @@ fun NavFabMenu(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    // A light dim: the window floats over the screen rather than shutting it away
-                    .background(Color.Black.copy(alpha = 0.16f))
+                    // A light dim: the window floats over the screen rather than shutting it away. Where the screen is
+                    // blurred behind it too (Android 12 and up, see App.kt), the dim is lighter still, just enough to
+                    // keep the window's edge clear against a busy screen
+                    .background(Color.Black.copy(alpha = if (Build.VERSION.SDK_INT >= 31) 0.08f else 0.16f))
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { open = false }
             )
         }

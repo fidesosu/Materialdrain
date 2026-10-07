@@ -303,11 +303,19 @@ fun MaterialdrainScreen() {
     val searchAvailable = currentScreen == Screen.Files || currentScreen == Screen.Filesystem ||
         (currentScreen == Screen.Lists && listsUiState.openedList != null)
     LaunchedEffect(searchAvailable) { if (!searchAvailable) showSearchModal = false }
-    // The screen behind the modal is blurred (Android 12 and up, see SearchModal), easing in and out
+    // Whether the navigation prototype's window is open (see NavFabMenu)
+    var navMenuOpen by remember { mutableStateOf(false) }
+    // The screen behind the search modal is blurred (Android 12 and up, see SearchModal), easing in and out
     val searchBlur by animateDpAsState(
         targetValue = if (showSearchModal && Build.VERSION.SDK_INT >= 31) SEARCH_BLUR_RADIUS else 0.dp,
         animationSpec = tween(if (reduceMotion) 100 else 250),
         label = "searchBlur"
+    )
+    // And behind the navigation window: only the screen under it, as the window is drawn in the same window as the screen
+    val navMenuBlur by animateDpAsState(
+        targetValue = if (navMenuOpen && navPrototype && Build.VERSION.SDK_INT >= 31) SEARCH_BLUR_RADIUS else 0.dp,
+        animationSpec = tween(if (reduceMotion) 100 else 250),
+        label = "navMenuBlur"
     )
     // The details page reopens the file it showed; when that file can't be found, the Files screen is shown instead
     LaunchedEffect(Unit) {
@@ -565,6 +573,8 @@ fun MaterialdrainScreen() {
                 .then(if (searchBlur > 0.dp) Modifier.blur(searchBlur) else Modifier)
         ) {
         Scaffold(
+            // Blurred behind the navigation window, which sits on top of it in this Box and so stays sharp
+            modifier = if (navMenuBlur > 0.dp) Modifier.blur(navMenuBlur) else Modifier,
             topBar = {
                 Column {
                     // The switcher is centred on the bar itself, so the icons at the edges don't move it
@@ -983,7 +993,8 @@ fun MaterialdrainScreen() {
                 onNavigate = navigateTo,
                 onFabHeightChanged = { fabHeightDp = it },
                 lift = navLift,
-                visible = showNavFab
+                visible = showNavFab,
+                onOpenChange = { navMenuOpen = it }
             )
         }
         }
