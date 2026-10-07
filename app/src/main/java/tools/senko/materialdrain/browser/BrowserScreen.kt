@@ -416,10 +416,11 @@ fun BrowserScreen(
     }
     // Search: whichever list this mode shows (the lists overview has nothing to search, App.kt offers no magnifier there).
     // Back closes it before anything else, as a dialog takes the press itself
+    // The last search of this screen, there again when the search is opened again (the list itself is never filtered)
+    var searchQuery by rememberSaveable(mode) { mutableStateOf("") }
     if (showSearchModal) {
         val resultLimit by appSettings.searchResultLimit.collectAsState()
-        // Everything the list holds (not just what its current filter leaves): the modal does its own matching and
-        // sorting, and the list only takes the query once it closes
+        // Everything the list holds: the modal does its own matching and sorting, and never changes the list itself
         when (mode) {
             BrowserMode.FILESYSTEM -> {
                 // The open folder and everything under it, looked through while the search is open (see
@@ -432,8 +433,8 @@ fun BrowserScreen(
                 val root = fsState.currentPath.trim('/')
                 val tree = treeIndex?.takeIf { it.root == root }
                 SearchModal(
-                    query = fsState.filterQuery,
-                    onQueryCommit = { filesystemViewModel.onFilterQueryChanged(it) },
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
                     candidates = tree?.nodes?.takeIf { it.isNotEmpty() } ?: fsState.visibleChildren,
                     order = remember(sortField, sortAscending) { fileComparator(sortField, sortAscending, directoriesFirst = true) },
                     resultLimit = resultLimit,
@@ -454,8 +455,8 @@ fun BrowserScreen(
                 )
             }
             BrowserMode.FILES -> SearchModal(
-                query = fileState.filterQuery,
-                onQueryCommit = { fileInfoViewModel.onFilterQueryChanged(it) },
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
                 candidates = fileState.userFilesList,
                 order = remember(sortField, sortAscending) { fileComparator(sortField, sortAscending) },
                 resultLimit = resultLimit,
@@ -465,8 +466,8 @@ fun BrowserScreen(
                 onDismiss = onDismissSearchModal
             )
             BrowserMode.LISTS -> if (openedList != null) SearchModal(
-                query = listState.listFilterQuery,
-                onQueryCommit = { listViewModel.onListFilterQueryChanged(it) },
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
                 candidates = listState.listFiles,
                 order = remember(sortField, sortAscending) { fileComparator(sortField, sortAscending) },
                 resultLimit = resultLimit,
@@ -533,10 +534,6 @@ fun BrowserScreen(
                         sortField = sortField,
                         sortAscending = sortAscending,
                         onSortFieldSelected = { appSettings.changeSortOrder(it) },
-                        activeFilterQuery = fsState.filterQuery,
-                        filteredCount = fsDisplayedChildren.size,
-                        totalCount = fsState.visibleChildren.size,
-                        onClearFilter = { filesystemViewModel.onFilterQueryChanged("") },
                         actions = if (fsState.canWrite && !selectionMode) buildList {
                             if (canUploadFs) add(SortRowAction(Icons.Filled.Upload, "Upload", enabled = !fsState.isModifying && fsState.uploadProgress == null) { filesystemUploadLauncher.launch("*/*") })
                             if (canMkdirFs) add(SortRowAction(Icons.Filled.CreateNewFolder, "New folder", enabled = !fsState.isModifying) { showNewFolderDialog = true })
@@ -552,11 +549,7 @@ fun BrowserScreen(
                     SortControls(
                         sortField = sortField,
                         sortAscending = sortAscending,
-                        onSortFieldSelected = { appSettings.changeSortOrder(it) },
-                        activeFilterQuery = listState.listFilterQuery,
-                        filteredCount = listDisplayedFiles.size,
-                        totalCount = listState.listFiles.size,
-                        onClearFilter = { listViewModel.onListFilterQueryChanged("") }
+                        onSortFieldSelected = { appSettings.changeSortOrder(it) }
                     )
                     if (!selectionMode) {
                         Row(
@@ -592,11 +585,7 @@ fun BrowserScreen(
                 BrowserMode.FILES -> SortControls(
                     sortField = sortField,
                     sortAscending = sortAscending,
-                    onSortFieldSelected = { appSettings.changeSortOrder(it) },
-                    activeFilterQuery = fileState.filterQuery,
-                    filteredCount = displayedFiles.size,
-                    totalCount = fileState.userFilesList.size,
-                    onClearFilter = { fileInfoViewModel.onFilterQueryChanged("") }
+                    onSortFieldSelected = { appSettings.changeSortOrder(it) }
                 )
             }
 

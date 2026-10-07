@@ -63,6 +63,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
@@ -140,9 +141,9 @@ fun PathBreadcrumb(
 private val SortControlWidth = 140.dp
 
 /**
- * The sort field and direction — shared by every sortable list in the app, see `AppSettings.sortField` — and, while
- * a search is active, a chip naming it with a clear button. Searching itself opens as a modal over the screen (the
- * magnifier at the top of the screen), instead of living in this row.
+ * The sort field and direction — shared by every sortable list in the app, see `AppSettings.sortField` — and the
+ * screen's actions (see [SortRowAction]). Searching opens as a modal over the screen (the magnifier at the top of the
+ * screen), instead of living in this row.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -150,10 +151,6 @@ fun SortControls(
     sortField: SortableField,
     sortAscending: Boolean,
     onSortFieldSelected: (SortableField) -> Unit,
-    activeFilterQuery: String = "",
-    filteredCount: Int = 0,
-    totalCount: Int = 0,
-    onClearFilter: () -> Unit = {},
     /** Actions at the end of the row, behind a "New" menu, e.g. the filesystem's upload and new folder. */
     actions: List<SortRowAction> = emptyList()
 ) {
@@ -203,11 +200,8 @@ fun SortControls(
             }
         }
 
-        // Only shown while a search is narrowing the list down; the search field itself is the modal (see the
-        // magnifier at the top of the screen). The box takes the free space either way, keeping the actions at the end.
-        Box(modifier = Modifier.weight(1f)) {
-            if (activeFilterQuery.isNotBlank()) FilterChipRow(activeFilterQuery, filteredCount, totalCount, onClearFilter)
-        }
+        // Keeps the actions at the end of the row
+        Spacer(Modifier.weight(1f))
         if (actions.isNotEmpty()) SortRowActions(actions)
     }
 }
@@ -277,39 +271,15 @@ private fun FloatingCardButton(
     }
 }
 
-/** The active search, with how many of the items it matches and a button to clear it. */
-@Composable
-private fun FilterChipRow(activeFilterQuery: String, filteredCount: Int, totalCount: Int, onClearFilter: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.secondaryContainer)
-            .padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(16.dp))
-        Text(
-            text = "\"$activeFilterQuery\" · $filteredCount/$totalCount",
-            style = MaterialTheme.typography.labelLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 6.dp).weight(1f, fill = false)
-        )
-        IconButton(onClick = onClearFilter, modifier = Modifier.size(28.dp)) {
-            Icon(Icons.Filled.Clear, contentDescription = "Clear search", modifier = Modifier.size(16.dp))
-        }
-    }
-}
-
 /** How far the dialog window dims what's behind it while that is blurred too (see [SearchModal]); a lighter touch than the default, which would mostly hide the blur. */
 private const val BLURRED_DIM_AMOUNT = 0.25f
 
 /**
  * Searching the list a browse screen shows: a compact card near the top of the screen, opened by the magnifier in the
  * top bar (see App.kt). While it's open the list behind it stays as it was: the matches of what's typed float under the
- * card as their own cards (see [SearchResultStack]), and tapping one opens it. Closing it (the search key, back, or a
- * tap beside the card) hands the query to the list, which then filters by it; the chip by the sort control (see
- * [SortControls]) shows and clears it.
+ * card as their own cards (see [SearchResultStack]), and tapping one opens it. The search key only puts the keyboard
+ * away; back or a tap beside the cards closes it. The list is never filtered: [onQueryChange] only lets the screen keep
+ * the query, for the next time the search is opened.
  *
  * Its own window: the screen underneath is blurred by App.kt while this is open (Android 12 and up), and the
  * dialog's own dim is lightened to match; before Android 12 the dim is all there is.
@@ -322,7 +292,7 @@ private const val BLURRED_DIM_AMOUNT = 0.25f
 @Composable
 fun SearchModal(
     query: String,
-    onQueryCommit: (String) -> Unit,
+    onQueryChange: (String) -> Unit,
     candidates: List<StorageNode>,
     order: Comparator<StorageNode>,
     resultLimit: Int,
@@ -335,11 +305,9 @@ fun SearchModal(
 ) {
     // The cursor starts at the end of a query that's already there, so it can just be typed on
     var fieldValue by remember { mutableStateOf(TextFieldValue(query, selection = TextRange(query.length))) }
-    // Closing hands the query over to the list, to filter it by
-    val close = {
-        onQueryCommit(fieldValue.text)
-        onDismiss()
-    }
+    val close = onDismiss
+    // The search key only puts the keyboard away, leaving more room for the matches; the search stays open
+    val keyboard = LocalSoftwareKeyboardController.current
     // Matched the same way the list filters, then sorted the way the list is. Off the main thread: a folder tree can
     // hold tens of thousands of files, and they keep coming in while it's being looked through
     var matches by remember { mutableStateOf(emptyList<StorageNode>()) }
@@ -394,19 +362,25 @@ fun SearchModal(
                     Column {
                         TextField(
                             value = fieldValue,
-                            onValueChange = { fieldValue = it },
+                            onValueChange = {
+                                fieldValue = it
+                                onQueryChange(it.text)
+                            },
                             placeholder = { Text(placeholder, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                             trailingIcon = {
                                 if (fieldValue.text.isNotEmpty()) {
-                                    IconButton(onClick = { fieldValue = TextFieldValue("") }) {
+                                    IconButton(onClick = {
+                                        fieldValue = TextFieldValue("")
+                                        onQueryChange("")
+                                    }) {
                                         Icon(Icons.Filled.Clear, contentDescription = "Clear search")
                                     }
                                 }
                             },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(onSearch = { close() }),
+                            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
                                 unfocusedContainerColor = Color.Transparent,
@@ -436,7 +410,6 @@ fun SearchModal(
                     results = shown,
                     thumbnailFor = thumbnailFor,
                     locationOf = locationOf,
-                    // Opening a match leaves the list as it was: the match may well be in another folder
                     onClick = { node ->
                         onDismiss()
                         onResultClick(node)
