@@ -65,6 +65,12 @@ class AppContainer private constructor(application: Application) {
 
     init {
         importBundledPixeldrainConfig(application, providerConfigStore)
+        // The image loader of the whole app, with album covers read out of songs as their thumbnails (see AudioCovers)
+        coil.Coil.setImageLoader {
+            coil.ImageLoader.Builder(application)
+                .components { add(tools.senko.materialdrain.ui.media.AudioCovers.Factory(application)) }
+                .build()
+        }
         // Thumbnails of files on SMB shares are made on this device, and kept here between runs
         tools.senko.materialdrain.provider.smb.SmbContentServer.cacheDir = java.io.File(application.cacheDir, "smb-thumbnails")
         HostRequestAuth.headersFor = { url ->

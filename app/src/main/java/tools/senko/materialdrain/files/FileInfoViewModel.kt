@@ -43,6 +43,7 @@ import tools.senko.materialdrain.provider.api.ProviderError
 import tools.senko.materialdrain.provider.api.ProviderKind
 import tools.senko.materialdrain.provider.api.ProviderLog
 import tools.senko.materialdrain.provider.api.StorageNode
+import tools.senko.materialdrain.ui.media.AudioCovers
 import tools.senko.materialdrain.provider.api.StorageProvider
 import tools.senko.materialdrain.provider.api.StorageRef
 import tools.senko.materialdrain.transfer.TransferInfo
@@ -219,7 +220,17 @@ class FileInfoViewModel(
     fun shareUrlFor(node: StorageNode): String? = provider().shareUrl(node)
 
     /** The preview image of a node, from the active host; null when it has none. */
-    fun thumbnailFor(node: StorageNode): String? = provider().thumbnailUrl(node)
+    fun thumbnailFor(node: StorageNode): String? {
+        val provider = provider()
+        val thumbnail = provider.thumbnailUrl(node)
+        // Songs show their album cover, read out of the file itself (SMB shares already make theirs on the device)
+        if (!node.isDirectory && provider.kind != ProviderKind.SMB && node.previewMimeType()?.startsWith("audio/") == true) {
+            provider.rawContentUrl(node, attachment = false)?.let { raw ->
+                return AudioCovers.audioCoverUrl(raw, fallback = thumbnail, version = node.modifiedAt ?: node.createdAt)
+            }
+        }
+        return thumbnail
+    }
 
     /** The content of a node itself (for previews and the full screen view), from the active host. */
     fun rawUrlFor(node: StorageNode): String? = provider().rawContentUrl(node, attachment = false)
