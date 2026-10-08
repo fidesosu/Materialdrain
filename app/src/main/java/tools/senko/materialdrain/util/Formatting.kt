@@ -9,13 +9,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import java.time.Duration
 import java.time.Instant
-import java.time.LocalDateTime
-import java.time.OffsetDateTime
-import java.time.ZonedDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import java.time.format.DateTimeParseException
 
 // Helper function to format size in bytes to a human-readable string
 fun formatSize(bytes: Long): String {
@@ -63,28 +59,6 @@ internal fun formatApiDateTimeString(dateTimeString: String?): String {
         return dateTimeString
     }
     return DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withZone(ZoneId.systemDefault()).format(instant)
-}
-
-/**
- * A date and time as the hosts write it: ISO 8601 with or without a zone (Pixeldrain, S3, SMB; no zone means UTC), or
- * RFC 1123 ("Mon, 01 Jan 2024 10:00:00 GMT", WebDAV). Null when it's none of those.
- */
-fun parseDateTime(text: String?): Instant? {
-    if (text.isNullOrBlank()) return null
-    val value = text.trim()
-    return try {
-        OffsetDateTime.parse(value, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toInstant()
-    } catch (_: DateTimeParseException) {
-        try {
-            LocalDateTime.parse(value, DateTimeFormatter.ISO_LOCAL_DATE_TIME).atZone(ZoneId.of("UTC")).toInstant()
-        } catch (_: DateTimeParseException) {
-            try {
-                ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant()
-            } catch (_: DateTimeParseException) {
-                null
-            }
-        }
-    }
 }
 
 /**
