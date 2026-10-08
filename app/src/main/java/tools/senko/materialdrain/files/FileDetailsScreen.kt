@@ -139,10 +139,15 @@ fun FileInfoDetailsCard(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(start = 16.dp, end = 16.dp, top = 16.dp)
+                .padding(start = 16.dp, end = 16.dp)
         ) {
             // Only the private filesystem needs the login for previews
             val previewApiKey = uiState.apiKey.takeIf { isFilesystemFile && it.isNotBlank() }
+            // A picture, video or song preview starts right under the top bar; anything else keeps some room above it
+            val mediaPreviewFirst = showPreviews && uiState.archive == null &&
+                (previewType?.startsWith("image/") == true || previewType?.startsWith("video/") == true || previewType?.startsWith("audio/") == true)
+            if (!mediaPreviewFirst) Spacer(Modifier.height(16.dp))
+            val mediaPadding = PaddingValues(bottom = 8.dp)
             if (showPreviews) {
                 // An archive shows its contents where a preview would be
                 if (uiState.archive != null) {
@@ -161,6 +166,7 @@ fun FileInfoDetailsCard(
                         apiKey = previewApiKey,
                         // This disables smooth filtering (nearest neighbor scaling), which removes the blur when scaling images.
                         filterQuality = FilterQuality.None,
+                        outerPadding = mediaPadding,
                         onFullScreenClick = {
                             fullScreenPreviewUri = rawFileApiUrl.toUri()
                             fullScreenPreviewMimeType = previewType
@@ -171,6 +177,7 @@ fun FileInfoDetailsCard(
                         thumbnailSource = actualThumbnailUrl,
                         contentDescription = "Video thumbnail for ${fileInfo.name}",
                         apiKey = previewApiKey,
+                        outerPadding = mediaPadding,
                         onFullScreenClick = {
                             fullScreenPreviewUri = rawFileApiUrl.toUri()
                             fullScreenPreviewMimeType = previewType
@@ -184,7 +191,8 @@ fun FileInfoDetailsCard(
                         artist = null,
                         album = null,
                         albumArtSource = actualThumbnailUrl,
-                        durationHintMillis = null
+                        durationHintMillis = null,
+                        outerPadding = mediaPadding
                     )
                 } else if (uiState.isLoadingTextPreview) {
                     Box(modifier = Modifier.fillMaxWidth().height(100.dp).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {

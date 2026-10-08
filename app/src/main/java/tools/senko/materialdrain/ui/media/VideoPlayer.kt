@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -93,13 +94,15 @@ fun InlineVideoPreview(
     contentDescription: String,
     apiKey: String?,
     modifier: Modifier = Modifier,
+    /** The space around the card; the file details leave none above it, so it starts right under the top bar. */
+    outerPadding: PaddingValues = PaddingValues(vertical = 8.dp),
     onFullScreenClick: () -> Unit
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
-            .padding(vertical = 8.dp),
+            .padding(outerPadding),
         shape = MediaCardShape
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

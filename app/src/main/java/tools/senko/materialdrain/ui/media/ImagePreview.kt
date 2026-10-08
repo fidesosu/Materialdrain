@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -201,6 +202,8 @@ fun InlineImagePreview(
     modifier: Modifier = Modifier,
     thumbnailSource: Any? = null,
     filterQuality: FilterQuality = FilterQuality.Low,
+    /** The space around the card; the file details leave none above it, so it starts right under the top bar. */
+    outerPadding: PaddingValues = PaddingValues(vertical = 8.dp),
     onFullScreenClick: () -> Unit
 ) {
     if (imageSource == null) return
@@ -209,7 +212,7 @@ fun InlineImagePreview(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
-            .padding(vertical = 8.dp),
+            .padding(outerPadding),
         shape = MediaCardShape
     ) {
         Box(modifier = Modifier.fillMaxSize()) {

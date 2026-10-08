@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -65,7 +66,9 @@ fun AudioPlayerPreview(
     album: String?,
     albumArtSource: Any?,
     durationHintMillis: Long?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** The space around the card; the file details leave none above it, so it starts right under the top bar. */
+    outerPadding: PaddingValues = PaddingValues(vertical = 8.dp)
 ) {
     val player = rememberManagedPlayer(audioUri, apiKey, isVideo = false, prepareNow = false)
     val state = rememberPlayerUiState(player)
@@ -83,7 +86,7 @@ fun AudioPlayerPreview(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(outerPadding),
         shape = MediaCardShape
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
