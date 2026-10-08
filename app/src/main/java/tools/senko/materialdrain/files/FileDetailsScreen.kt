@@ -6,11 +6,23 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.text.format.DateUtils
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -46,12 +58,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import tools.senko.materialdrain.provider.api.PixeldrainRichDetails
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.ui.LocalBottomInset
+import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.components.CodePreview
 import tools.senko.materialdrain.ui.components.DotScrollbar
 import tools.senko.materialdrain.ui.components.FileIcon
@@ -389,8 +403,8 @@ private val ActionShape = RoundedCornerShape(16.dp)
  * The file's actions in one row: the download button, which takes the room there is, then Share, Copy link and Delete
  * as buttons of their own icon.
  *
- * The download button goes through the download: tapped once it asks to be tapped again (a slip of the finger doesn't
- * start a download of what may be gigabytes), while it runs it shows the progress and stops the download when tapped,
+ * The download button goes through the download (see [DownloadButton]): tapped once it asks to be tapped again (a slip
+ * of the finger doesn't start a download of what may be gigabytes), while it runs it shows the progress and stops the download when tapped,
  * and once the file is saved it opens it.
  */
 @Composable
@@ -406,7 +420,6 @@ private fun ActionRow(
     onCopyLink: (String) -> Unit,
     onDelete: () -> Unit
 ) {
-    val colors = MaterialTheme.colorScheme
     var armed by remember { mutableStateOf(false) }
     LaunchedEffect(armed) {
         if (armed) {
@@ -419,54 +432,146 @@ private fun ActionRow(
     LaunchedEffect(running) { if (running) armed = false }
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        val (label, onClick) = when {
-            running -> {
-                val percent = download.progressFraction.takeIf { it > 0f }?.let { " · ${(it * 100).toInt()}%" }.orEmpty()
-                "Cancel$percent" to onCancel
-            }
-            saved != null -> "Open" to { onOpen(saved) }
-            armed -> "Tap again to download" to { armed = false; onDownload() }
-            else -> (if (download?.status == DownloadStatus.FAILED) "Retry download" else "Download") to { armed = true }
-        }
-        Surface(
-            onClick = onClick,
+        DownloadButton(
+            download = download,
+            running = running,
+            saved = saved,
+            armed = armed,
             enabled = canDownload || running || saved != null,
-            shape = ActionShape,
-            // Asking for the second tap, it stands out in the stronger colour
-            color = if (armed) colors.primary else colors.primaryContainer,
-            contentColor = if (armed) colors.onPrimary else colors.onPrimaryContainer,
-            modifier = Modifier.weight(1f).height(ActionHeight)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier
-                    .padding(horizontal = 12.dp)
-                    .graphicsLayer { alpha = if (canDownload || running || saved != null) 1f else 0.38f }
-            ) {
-                Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-                    when {
-                        running -> {
-                            val progress = download.progressFraction
-                            if (progress > 0f) {
-                                CircularProgressIndicator(progress = { progress }, modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = LocalContentColor.current)
-                            } else {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = LocalContentColor.current)
-                            }
-                        }
-                        saved != null -> Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(20.dp))
-                        else -> Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(20.dp))
-                    }
-                }
-                Spacer(Modifier.width(8.dp))
-                Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
+            onClick = when {
+                running -> onCancel
+                saved != null -> { { onOpen(saved) } }
+                armed -> { { armed = false; onDownload() } }
+                else -> { { armed = true } }
+            },
+            modifier = Modifier.weight(1f)
+        )
         if (shareUrl != null) {
             IconAction(Icons.Filled.Share, "Share the link", onClick = { onShare(shareUrl) })
             IconAction(Icons.Filled.Link, "Copy the link", onClick = { onCopyLink(shareUrl) })
         }
         if (canDelete) IconAction(Icons.Filled.Delete, "Delete", onClick = onDelete, destructive = true)
+    }
+}
+
+/** What the download button shows, each with its own label and icon (see [DownloadButton]). */
+private enum class DownloadButtonState { IDLE, FAILED, ARMED, RUNNING, SAVED }
+
+/**
+ * The download button of [ActionRow]. Its colour fades between states, and its label and icon slide from one state to the
+ * next; asked for the second tap, a bar along its bottom runs down the time left for it. A label that doesn't fit the
+ * room the row leaves gets a smaller font rather than being cut off.
+ */
+@Composable
+private fun DownloadButton(
+    download: FileDownloadState?,
+    running: Boolean,
+    saved: Uri?,
+    armed: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = MaterialTheme.colorScheme
+    val state = when {
+        running -> DownloadButtonState.RUNNING
+        saved != null -> DownloadButtonState.SAVED
+        armed -> DownloadButtonState.ARMED
+        download?.status == DownloadStatus.FAILED -> DownloadButtonState.FAILED
+        else -> DownloadButtonState.IDLE
+    }
+    // Asking for the second tap, it stands out in the stronger colour
+    val container by animateColorAsState(if (armed) colors.primary else colors.primaryContainer, label = "downloadButtonColor")
+    val content by animateColorAsState(if (armed) colors.onPrimary else colors.onPrimaryContainer, label = "downloadButtonContent")
+    // The time left for the second tap, from full to empty
+    val countdown = remember { Animatable(0f) }
+    LaunchedEffect(armed) {
+        if (armed) {
+            countdown.snapTo(1f)
+            countdown.animateTo(0f, tween(CONFIRM_WINDOW_MS.toInt(), easing = LinearEasing))
+        } else {
+            countdown.snapTo(0f)
+        }
+    }
+    val reduceMotion = LocalReduceMotion.current
+
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = ActionShape,
+        color = container,
+        contentColor = content,
+        modifier = modifier.height(ActionHeight)
+    ) {
+        Box {
+            AnimatedContent(
+                targetState = state,
+                transitionSpec = {
+                    if (reduceMotion) {
+                        fadeIn(tween(100)) togetherWith fadeOut(tween(100))
+                    } else {
+                        (slideInVertically(tween(220)) { it / 2 } + fadeIn(tween(220))) togetherWith
+                            (slideOutVertically(tween(180)) { -it / 2 } + fadeOut(tween(140)))
+                    }
+                },
+                contentAlignment = Alignment.Center,
+                label = "downloadButtonState",
+                modifier = Modifier.fillMaxSize()
+            ) { shown ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp)
+                        .graphicsLayer { alpha = if (enabled) 1f else 0.38f }
+                ) {
+                    Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                        when (shown) {
+                            DownloadButtonState.RUNNING -> {
+                                val progress = download?.progressFraction ?: 0f
+                                if (progress > 0f) {
+                                    CircularProgressIndicator(progress = { progress }, modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = LocalContentColor.current)
+                                } else {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = LocalContentColor.current)
+                                }
+                            }
+                            DownloadButtonState.SAVED -> Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(20.dp))
+                            else -> Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    val label = when (shown) {
+                        DownloadButtonState.RUNNING -> {
+                            val percent = download?.progressFraction?.takeIf { it > 0f }?.let { " · ${(it * 100).toInt()}%" }.orEmpty()
+                            "Cancel$percent"
+                        }
+                        DownloadButtonState.SAVED -> "Open"
+                        DownloadButtonState.ARMED -> "Tap again"
+                        DownloadButtonState.FAILED -> "Retry download"
+                        DownloadButtonState.IDLE -> "Download"
+                    }
+                    val style = MaterialTheme.typography.labelLarge
+                    BasicText(
+                        text = label,
+                        style = style.copy(color = LocalContentColor.current),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = style.fontSize, stepSize = 0.5.sp)
+                    )
+                }
+            }
+            // The countdown of the second tap, along the bottom edge
+            if (countdown.value > 0f) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth(countdown.value)
+                        .height(3.dp)
+                        .background(LocalContentColor.current.copy(alpha = 0.45f))
+                )
+            }
+        }
     }
 }
 
