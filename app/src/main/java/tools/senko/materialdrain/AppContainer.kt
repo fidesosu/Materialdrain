@@ -68,10 +68,13 @@ class AppContainer private constructor(application: Application) {
         importBundledPixeldrainConfig(application, providerConfigStore)
         refreshBundledPixeldrainConfig(application, providerConfigStore)
         // The image loader of the whole app, with album covers and video frames read out of the files as their thumbnails
-        // (see MediaCovers)
+        // (see MediaCovers), and GIFs and animated WebP moving wherever they're shown (see AnimatedImages)
         coil.Coil.setImageLoader {
             coil.ImageLoader.Builder(application)
-                .components { add(tools.senko.materialdrain.ui.media.MediaCovers.Factory(application)) }
+                .components {
+                    add(tools.senko.materialdrain.ui.media.MediaCovers.Factory(application))
+                    add(tools.senko.materialdrain.ui.media.AnimatedImages.Factory())
+                }
                 // The API's own client, sharing its connections and threads: thumbnails reuse the HTTP/2 connection the
                 // app already has open to the host instead of opening their own. With a read timeout of its own, which
                 // the API's client goes without for long downloads, so a stalled thumbnail gives up

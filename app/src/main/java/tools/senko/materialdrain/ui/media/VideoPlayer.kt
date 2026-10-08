@@ -21,6 +21,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -77,6 +82,7 @@ import androidx.media3.ui.PlayerView
 import coil.imageLoader
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
+import tools.senko.materialdrain.ui.LocalBlurredBackdrop
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.LocalVideoLoop
 import tools.senko.materialdrain.ui.components.AppMenu
@@ -240,6 +246,14 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        // Like a fullscreen image: with the blurred backdrop setting on, the thumbnail blurred behind the video fills
+        // what the fitted video leaves free (it shows around the video, not through it), darkened so the video and the
+        // controls stand out; with it off, the background stays black
+        if (thumbnailUrl != null && LocalBlurredBackdrop.current) {
+            BlurredBackdrop(thumbnailUrl, apiKey, context.imageLoader, Modifier.fillMaxSize())
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
+        }
+
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
@@ -338,11 +352,12 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
             modifier = Modifier.fillMaxSize()
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
+                // The preview goes under the status and navigation bars (see FullScreenPreview): the controls keep clear
                 MediaIconButton(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
                     onClick = onBack,
-                    modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
+                    modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp),
                     container = Color.Black.copy(alpha = 0.5f)
                 )
 
@@ -360,7 +375,11 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
                 Surface(
                     shape = MediaCardShape,
                     color = Color.Black.copy(alpha = 0.6f),
-                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp)
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
+                        .fillMaxWidth()
+                        .padding(12.dp)
                 ) {
                     BoxWithConstraints {
                     val shownPosition = if (scrubbing) scrubPositionMs else state.positionMs
