@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -55,8 +56,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
@@ -69,6 +74,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -208,6 +214,10 @@ fun CodePreview(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
+            val textScroll = rememberScrollState()
+            // Scrolling the text stops at its ends rather than carrying on into the page around it. Only while there's
+            // text to scroll: a short one leaves its drags to the page, as any other part of it
+            val keepScrollInside = remember(textScroll) { ScrollStopsAtEnds(textScroll) }
             SelectionContainer {
                 Text(
                     text = highlighted,
@@ -218,7 +228,8 @@ fun CodePreview(
                     softWrap = wrap,
                     modifier = Modifier
                         .heightIn(max = InlineMaxHeight)
-                        .verticalScroll(rememberScrollState())
+                        .nestedScroll(keepScrollInside)
+                        .verticalScroll(textScroll)
                         .then(if (wrap) Modifier else Modifier.horizontalScroll(rememberScrollState()))
                         .padding(12.dp)
                 )
@@ -238,6 +249,18 @@ fun CodePreview(
     }
 
     if (fullscreen) CodeFullscreen(title = title, content = whole, language = language, onDismiss = { fullscreen = false })
+}
+
+/**
+ * Keeps what's left of a vertical scroll or fling, once [state] is at its end, from reaching the scrolling page around
+ * it. Lets it all through when [state] can't scroll at all, so a short text doesn't stop the page.
+ */
+private class ScrollStopsAtEnds(private val state: ScrollState) : NestedScrollConnection {
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset =
+        if (state.maxValue > 0) Offset(0f, available.y) else Offset.Zero
+
+    override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity =
+        if (state.maxValue > 0) Velocity(0f, available.y) else Velocity.Zero
 }
 
 /**
