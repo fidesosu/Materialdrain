@@ -72,6 +72,10 @@ class AppContainer private constructor(application: Application) {
         coil.Coil.setImageLoader {
             coil.ImageLoader.Builder(application)
                 .components { add(tools.senko.materialdrain.ui.media.MediaCovers.Factory(application)) }
+                // The API's own client, sharing its connections and threads: thumbnails reuse the HTTP/2 connection the
+                // app already has open to the host instead of opening their own. With a read timeout of its own, which
+                // the API's client goes without for long downloads, so a stalled thumbnail gives up
+                .okHttpClient { okHttpClient.newBuilder().readTimeout(30, java.util.concurrent.TimeUnit.SECONDS).build() }
                 .build()
         }
         // Thumbnails of files on SMB shares are made on this device, and kept here between runs
