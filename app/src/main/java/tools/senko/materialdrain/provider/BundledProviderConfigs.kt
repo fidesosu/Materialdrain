@@ -1,7 +1,6 @@
 package tools.senko.materialdrain.provider
 
 import android.content.Context
-import tools.senko.materialdrain.provider.api.ProviderConfigCodec
 import tools.senko.materialdrain.provider.api.ProviderLog
 
 /** The example configs in docs/provider-configs are bundled as assets (see app/build.gradle.kts). */
@@ -28,15 +27,15 @@ fun importBundledPixeldrainConfig(context: Context, store: ProviderConfigStore) 
         ProviderLog.e("Config", "could not read the bundled $BUNDLED_PIXELDRAIN_FILE", e)
         return
     }
-    val config = ProviderConfigCodec.decode(text)
-    if (config == null) {
+    val source = ConfigSource.of(text)
+    if (source == null) {
         ProviderLog.e("Config", "the bundled $BUNDLED_PIXELDRAIN_FILE is not a valid provider config")
         return
     }
-    val id = store.import(config)
+    val id = store.import(source)
     store.setActive(id)
     prefs.edit().putBoolean(KEY_PIXELDRAIN_IMPORTED, true).apply()
-    ProviderLog.i("Config", "imported the bundled '${config.name}' config and made it the active host")
+    ProviderLog.i("Config", "imported the bundled '${source.config.name}' config and made it the active host")
 }
 
 /**
@@ -47,12 +46,12 @@ fun importBundledPixeldrainConfig(context: Context, store: ProviderConfigStore) 
  */
 fun refreshBundledPixeldrainConfig(context: Context, store: ProviderConfigStore) {
     val bundled = try {
-        context.assets.open(BUNDLED_PIXELDRAIN_FILE).bufferedReader().use { it.readText() }.let { ProviderConfigCodec.decode(it) }
+        context.assets.open(BUNDLED_PIXELDRAIN_FILE).bufferedReader().use { it.readText() }.let(ConfigSource::of)
     } catch (e: Exception) {
         ProviderLog.e("Config", "could not read the bundled $BUNDLED_PIXELDRAIN_FILE", e)
         null
     } ?: return
-    val bundledVersion = bundled.meta?.version ?: return
+    val bundledVersion = bundled.config.meta?.version ?: return
     store.providers.value
         .filter { it.config.meta?.id == PIXELDRAIN_CONFIG_ID && it.updateUrl == null }
         .filter { (it.config.meta?.version ?: 0) < bundledVersion }

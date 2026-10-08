@@ -120,6 +120,29 @@ object ProviderConfigCodec {
         }
     }
 
+    /**
+     * [text] as it's kept: as written, so fields the app doesn't read (notes, fields left at their defaults, fields for a
+     * newer app) stay in it, with the marker line added when it was left out, so the exported text is recognized.
+     */
+    fun normalizeText(text: String): String {
+        val trimmed = text.trim()
+        return if (trimmed.lineSequence().firstOrNull()?.trim() == PROVIDER_CONFIG_MARKER) trimmed else PROVIDER_CONFIG_MARKER + "\n" + trimmed
+    }
+
+    /** [text] without its meta's update URL, everything else kept; null when it isn't a JSON object. */
+    fun removeUpdateUrl(text: String): String? {
+        val markerLine = text.lineSequence().firstOrNull()?.trim()
+        val body = (if (markerLine == PROVIDER_CONFIG_MARKER) text.substringAfter('\n', missingDelimiterValue = "") else text).trim()
+        val obj = try {
+            json.parseToJsonElement(body).jsonObject
+        } catch (_: Exception) {
+            return null
+        }
+        val meta = obj["meta"] as? JsonObject ?: return normalizeText(text)
+        val fields = LinkedHashMap(obj).apply { put("meta", JsonObject(meta - "update_url")) }
+        return PROVIDER_CONFIG_MARKER + "\n" + json.encodeToString(JsonObject.serializer(), JsonObject(fields))
+    }
+
     /** Cheap check for a paste/import sheet: is this text even worth trying to [decode]? */
     fun looksLikeProviderConfig(text: String): Boolean {
         val trimmed = text.trim()

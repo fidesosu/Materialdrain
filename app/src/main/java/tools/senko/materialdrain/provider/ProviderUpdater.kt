@@ -7,6 +7,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.ResponseBody
 import tools.senko.materialdrain.provider.api.ConfigUpdates
+import tools.senko.materialdrain.provider.api.ProviderConfigCodec
 import tools.senko.materialdrain.provider.api.SensitiveChange
 import tools.senko.materialdrain.provider.api.UpdateCheckResult
 import java.util.concurrent.TimeUnit
@@ -50,7 +51,7 @@ class ProviderUpdater(
                 // Unchanged since the last fetch: whatever that fetch found still stands
                 if (response.code == 304) {
                     store.recordCheck(id, stored.pendingUpdate, etag = null, checkedAtMillis = now)
-                    return@withContext stored.pendingUpdate?.let { pending ->
+                    return@withContext stored.pendingUpdate?.config?.let { pending ->
                         CheckOutcome.UpdateAvailable(pending.meta?.version ?: 0, ConfigUpdates.sensitiveChanges(stored.config, pending))
                     } ?: CheckOutcome.UpToDate
                 }
@@ -66,7 +67,8 @@ class ProviderUpdater(
                         CheckOutcome.UpToDate
                     }
                     is UpdateCheckResult.Available -> {
-                        store.recordCheck(id, pendingUpdate = result.update, etag = etag, checkedAtMillis = now)
+                        val pending = ConfigSource(result.update, ProviderConfigCodec.normalizeText(text))
+                        store.recordCheck(id, pendingUpdate = pending, etag = etag, checkedAtMillis = now)
                         CheckOutcome.UpdateAvailable(result.update.meta?.version ?: 0, result.sensitiveChanges)
                     }
                     // No ETag kept for these: once the app (or the file) is fixed, the next check must re-read it
@@ -91,7 +93,7 @@ class ProviderUpdater(
     fun pendingSensitiveChanges(id: String): List<SensitiveChange> {
         val stored = store.get(id) ?: return emptyList()
         val pending = stored.pendingUpdate ?: return emptyList()
-        return ConfigUpdates.sensitiveChanges(stored.config, pending)
+        return ConfigUpdates.sensitiveChanges(stored.config, pending.config)
     }
 
     /**
@@ -101,7 +103,7 @@ class ProviderUpdater(
     fun applyPending(id: String) {
         val stored = store.get(id) ?: return
         val pending = stored.pendingUpdate ?: return
-        val clearSecret = ConfigUpdates.sensitiveChanges(stored.config, pending).any {
+        val clearSecret = ConfigUpdates.sensitiveChanges(stored.config, pending.config).any {
             it.kind == SensitiveChange.Kind.DESTINATION || it.kind == SensitiveChange.Kind.KIND
         }
         store.applyUpdate(id, pending, clearSecret)

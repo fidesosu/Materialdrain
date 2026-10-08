@@ -43,7 +43,7 @@ import tools.senko.materialdrain.provider.api.ProviderError
 import tools.senko.materialdrain.provider.api.ProviderKind
 import tools.senko.materialdrain.provider.api.ProviderLog
 import tools.senko.materialdrain.provider.api.StorageNode
-import tools.senko.materialdrain.ui.media.AudioCovers
+import tools.senko.materialdrain.ui.media.MediaCovers
 import tools.senko.materialdrain.provider.api.StorageProvider
 import tools.senko.materialdrain.provider.api.StorageRef
 import tools.senko.materialdrain.transfer.TransferInfo
@@ -232,7 +232,14 @@ class FileInfoViewModel(
         // (see FileIcon) rather than the host's generic picture
         if (!node.isDirectory && node.previewMimeType()?.startsWith("audio/") == true) {
             provider.rawContentUrl(node, attachment = false)?.let { raw ->
-                return AudioCovers.audioCoverUrl(raw, fallback = null, version = node.modifiedAt ?: node.createdAt)
+                return MediaCovers.audioCoverUrl(raw, fallback = null, version = node.modifiedAt ?: node.createdAt)
+            }
+        }
+        // Videos show a frame read out of the file itself too: a host's thumbnailer can't read every video, and gives
+        // those a generic picture instead. The host's thumbnail is kept for a video the device can't read either
+        if (!node.isDirectory && node.previewMimeType()?.startsWith("video/") == true) {
+            provider.rawContentUrl(node, attachment = false)?.let { raw ->
+                return MediaCovers.videoFrameUrl(raw, fallback = thumbnail, version = node.modifiedAt ?: node.createdAt)
             }
         }
         // Photos in formats the hosts' own thumbnailers often can't read (HEIC from phones, AVIF): decoded on the device

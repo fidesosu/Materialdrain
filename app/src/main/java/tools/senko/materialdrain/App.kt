@@ -68,6 +68,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.util.UnstableApi
 import tools.senko.materialdrain.R
 import kotlinx.coroutines.delay
@@ -96,6 +99,7 @@ import tools.senko.materialdrain.lists.ListViewModel
 import tools.senko.materialdrain.navmenu.NavFabMenu
 import tools.senko.materialdrain.navmenu.menu
 import tools.senko.materialdrain.preferences.ACCOUNT_CATEGORY_ID
+import tools.senko.materialdrain.preferences.HOSTS_CATEGORY_ID
 import tools.senko.materialdrain.preferences.AuthViewModel
 import tools.senko.materialdrain.preferences.ProviderSettingsViewModel
 import tools.senko.materialdrain.preferences.SettingsScreenContent
@@ -223,13 +227,22 @@ fun MaterialdrainScreen() {
     val configChanges by appContainer.providerConfigStore.changes.collectAsState()
     val activeHostId by appContainer.providerConfigStore.activeProviderId.collectAsState()
     val loggedInUser by sessionManager.loggedInUser.collectAsState()
-    val hostReachability by appContainer.hostHealth.states.collectAsState()
+    val hostChecks by appContainer.hostHealth.states.collectAsState()
     // The screens which show the files of the active host, and so the host switcher in the top bar
     val browseScreens = setOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem)
-    // The active host is checked whenever it changes, the others when the switcher is opened
-    LaunchedEffect(activeHostId, configChanges) {
-        appContainer.hostHealth.check(listOf(activeHostId))
+    // Every host is checked ahead of time, so the switcher knows which ones answer before it's opened: every few minutes
+    // while the app is in front (HostHealth also checks them when the network changes), and a host that was added or
+    // whose address changed right away
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                appContainer.hostHealth.checkAll()
+                delay(HOST_RECHECK_MILLIS)
+            }
+        }
     }
+    LaunchedEffect(configChanges) { appContainer.hostHealth.checkAll() }
     val activeCapabilities = remember(configChanges) {
         appContainer.providerRegistry.resolve(appContainer.providerConfigStore.activeProviderId.value).capabilities
     }
@@ -294,6 +307,18 @@ fun MaterialdrainScreen() {
     }
     // Remembered so the app opens where it was closed
     LaunchedEffect(currentScreen) { appContainer.appSettings.lastScreen = currentScreen }
+
+    // The settings of one host: the account for the built-in Pixeldrain, its card in the custom hosts for the others.
+    // Without a host, the custom hosts themselves
+    val openHostSettings: (String?) -> Unit = { id ->
+        if (id == PIXELDRAIN_PROVIDER_ID) {
+            settingsCategoryId = ACCOUNT_CATEGORY_ID
+        } else {
+            id?.let { providerSettingsViewModel.focusHost(it) }
+            settingsCategoryId = HOSTS_CATEGORY_ID
+        }
+        navigateTo(Screen.Settings)
+    }
 
     // The search modal of the browse screens (see BrowserScreen), opened by the magnifier at the top left. Only the
     // screens with a list of files to search have one: the lists overview is just titles
@@ -730,14 +755,13 @@ fun MaterialdrainScreen() {
                             HostSwitcher(
                                 hosts = hostOptions(appContainer.providerConfigStore, sessionManager, loggedInUser),
                                 activeId = activeHostId,
-                                reachability = hostReachability,
+                                checks = hostChecks,
                                 onSelect = { appContainer.providerConfigStore.setActive(it) },
-                                onManage = { navigateTo(Screen.Settings) },
-                                onOpened = {
-                                    appContainer.hostHealth.check(
-                                        hostOptions(appContainer.providerConfigStore, sessionManager, loggedInUser).map { it.id }
-                                    )
-                                }
+                                onOpenHostSettings = { openHostSettings(it) },
+                                onManage = { openHostSettings(null) },
+                                // Only hosts not checked in the last half minute: the list is normally known already
+                                onOpened = { appContainer.hostHealth.checkAll() },
+                                onRefresh = { appContainer.hostHealth.checkAll(force = true) }
                             )
                         }
                     }
@@ -1060,6 +1084,8 @@ fun MaterialdrainScreen() {
 
 
 private val SEARCH_BLUR_RADIUS = 16.dp
+/** How often the hosts are checked while the app is in front, see HostHealth. */
+private const val HOST_RECHECK_MILLIS = 3 * 60_000L
 private const val SETTINGS_SAVE_TEXT = "Save Settings"
 private const val SETTINGS_SAVED_TEXT = "Settings saved"
 private const val SETTINGS_SAVED_DISPLAY_MILLIS = 2000L

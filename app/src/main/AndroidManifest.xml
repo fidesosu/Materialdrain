@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The host switcher checks the hosts again when the network changes, and knows when the device is offline -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Transfers keep running in the background as a foreground service with a progress notification -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />

@@ -61,16 +61,17 @@ class AppContainer private constructor(application: Application) {
     /** Files another app shared with Materialdrain, waiting for the upload screen to take them. */
     val pendingShares = kotlinx.coroutines.flow.MutableStateFlow<List<android.net.Uri>>(emptyList())
 
-    /** Whether each host answers, for the dot in the host switcher. */
-    val hostHealth = HostHealth(providerRegistry, appScope)
+    /** Whether each host answers, for the host switcher. */
+    val hostHealth = HostHealth(application, providerConfigStore, appScope)
 
     init {
         importBundledPixeldrainConfig(application, providerConfigStore)
         refreshBundledPixeldrainConfig(application, providerConfigStore)
-        // The image loader of the whole app, with album covers read out of songs as their thumbnails (see AudioCovers)
+        // The image loader of the whole app, with album covers and video frames read out of the files as their thumbnails
+        // (see MediaCovers)
         coil.Coil.setImageLoader {
             coil.ImageLoader.Builder(application)
-                .components { add(tools.senko.materialdrain.ui.media.AudioCovers.Factory(application)) }
+                .components { add(tools.senko.materialdrain.ui.media.MediaCovers.Factory(application)) }
                 .build()
         }
         // Thumbnails of files on SMB shares are made on this device, and kept here between runs

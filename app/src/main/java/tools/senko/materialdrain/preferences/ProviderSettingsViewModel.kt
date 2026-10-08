@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import tools.senko.materialdrain.provider.CheckOutcome
+import tools.senko.materialdrain.provider.ConfigSource
 import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
 import tools.senko.materialdrain.provider.ProviderConfigStore
 import tools.senko.materialdrain.provider.ProviderRegistry
@@ -58,7 +59,9 @@ data class ProviderSettingsUiState(
     val signedInAs: Map<String, String> = emptyMap(),
     val signingInId: String? = null,
     val signInErrors: Map<String, String> = emptyMap(),
-    val otpPrompt: OtpPrompt? = null
+    val otpPrompt: OtpPrompt? = null,
+    /** A host to open and scroll to in the settings, e.g. from the host switcher; cleared once it's shown. */
+    val focusedHostId: String? = null
 )
 
 /** Backs the "Custom host settings" section of the Advanced settings tab. */
@@ -93,21 +96,26 @@ class ProviderSettingsViewModel(
 
     /** Decodes [text] as a provider config (magic line + JSON) and stores it. Sets an error on failure. */
     fun importConfig(text: String): Boolean {
-        val config = ProviderConfigCodec.decode(text)
-        if (config == null) {
+        val source = ConfigSource.of(text)
+        if (source == null) {
             val reason = ProviderConfigCodec.explainFailure(text) ?: "it couldn't be read"
             _uiState.update { it.copy(importError = "This isn't a usable provider config: $reason.") }
             return false
         }
         // The newly imported host is the one the Files, Lists and Filesystem screens use
-        configStore.setActive(configStore.import(config))
+        configStore.setActive(configStore.import(source))
         _uiState.update { it.copy(importError = null) }
         return true
     }
 
     fun clearImportError() = _uiState.update { it.copy(importError = null) }
 
-    fun exportConfig(id: String): String? = configStore.get(id)?.let { ProviderConfigCodec.encode(it.config) }
+    /** Opens the host's card the next time the host settings are shown. */
+    fun focusHost(id: String) = _uiState.update { it.copy(focusedHostId = id) }
+
+    fun clearFocusedHost() = _uiState.update { it.copy(focusedHostId = null) }
+
+    fun exportConfig(id: String): String? = configStore.get(id)?.text
 
 
     fun remove(id: String) {
@@ -209,12 +217,14 @@ class ProviderSettingsViewModel(
     fun cancelEdit() = _uiState.update { it.copy(editingId = null, editError = null) }
 
     fun saveEdit(id: String, text: String) {
-        val config = ProviderConfigCodec.decode(text)
-        if (config == null) {
-            _uiState.update { it.copy(editError = "Not a valid provider config: keep the first line and check the JSON.") }
+        val source = ConfigSource.of(text)
+        if (source == null) {
+            val reason = ProviderConfigCodec.explainFailure(text) ?: "it couldn't be read"
+            _uiState.update { it.copy(editError = "Not a valid provider config: $reason.") }
             return
         }
-        val outcome = configStore.saveEdit(id, config)
+        val config = source.config
+        val outcome = configStore.saveEdit(id, source)
         val stored = configStore.get(id)
         _uiState.update {
             it.copy(
@@ -265,7 +275,7 @@ class ProviderSettingsViewModel(
                     id = id,
                     hostName = stored.config.name,
                     fromVersion = stored.config.meta?.version ?: 0,
-                    toVersion = pending.meta?.version ?: 0,
+                    toVersion = pending.config.meta?.version ?: 0,
                     sensitiveChanges = changes,
                     discardsEdits = stored.isEdited
                 )

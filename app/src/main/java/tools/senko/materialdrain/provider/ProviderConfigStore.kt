@@ -31,8 +31,20 @@ private const val ACTIVE_ID_KEY = "active_provider_id"
 const val PIXELDRAIN_PROVIDER_ID = "pixeldrain-default"
 
 /**
+ * A config and the text it was read from. The text is what's saved, exported and edited, so fields the app doesn't read
+ * (notes, fields left at their defaults, fields for a newer app) are kept rather than dropped.
+ */
+data class ConfigSource(val config: ProviderConfig, val text: String) {
+    companion object {
+        /** Null when [text] isn't a config. */
+        fun of(text: String): ConfigSource? = ProviderConfigCodec.decode(text)?.let { ConfigSource(it, ProviderConfigCodec.normalizeText(text)) }
+    }
+}
+
+/**
  * One configured host.
  *
+ * @param text the config as written, see [ConfigSource]
  * @param upstream the last version that came from the config's update URL (import or update); null when the
  *   config has no update URL. Comparing it with [config] is how edits are detected.
  * @param previous the version before the last update, for "revert"
@@ -43,16 +55,18 @@ const val PIXELDRAIN_PROVIDER_ID = "pixeldrain-default"
 data class StoredProvider(
     val id: String,
     val config: ProviderConfig,
+    val text: String,
     val upstream: ProviderConfig? = null,
-    val previous: ProviderConfig? = null,
+    val previous: ConfigSource? = null,
     val autoUpdate: Boolean = false,
     val keepAutoUpdateWhenEdited: Boolean = false,
-    val pendingUpdate: ProviderConfig? = null,
+    val pendingUpdate: ConfigSource? = null,
     val etag: String? = null,
     val lastCheckedMillis: Long = 0
 ) {
     val updateUrl: String? get() = config.meta?.updateUrl
     val isEdited: Boolean get() = upstream != null && config != upstream
+    val source: ConfigSource get() = ConfigSource(config, text)
 }
 
 /** What saving an edit did, so the UI can tell the user. */
@@ -105,15 +119,16 @@ class ProviderConfigStore(context: Context) {
             } catch (_: Exception) {
                 return@mapNotNull null
             }
-            val config = ProviderConfigCodec.decode(record.config) ?: return@mapNotNull null
+            val source = ConfigSource.of(record.config) ?: return@mapNotNull null
             StoredProvider(
                 id = id,
-                config = config,
+                config = source.config,
+                text = source.text,
                 upstream = record.upstream?.let(ProviderConfigCodec::decode),
-                previous = record.previous?.let(ProviderConfigCodec::decode),
+                previous = record.previous?.let(ConfigSource::of),
                 autoUpdate = record.autoUpdate,
                 keepAutoUpdateWhenEdited = record.keepAutoUpdateWhenEdited,
-                pendingUpdate = record.pendingUpdate?.let(ProviderConfigCodec::decode),
+                pendingUpdate = record.pendingUpdate?.let(ConfigSource::of),
                 etag = record.etag,
                 lastCheckedMillis = record.lastCheckedMillis
             )
@@ -125,12 +140,13 @@ class ProviderConfigStore(context: Context) {
             p.id to json.encodeToJsonElement(
                 StoredRecord.serializer(),
                 StoredRecord(
-                    config = ProviderConfigCodec.encode(p.config),
-                    upstream = p.upstream?.let(ProviderConfigCodec::encode),
-                    previous = p.previous?.let(ProviderConfigCodec::encode),
+                    config = p.text,
+                    // Only compared with the config, never shown, so its parsed form is enough
+                    upstream = p.upstream?.let { ProviderConfigCodec.encode(it) },
+                    previous = p.previous?.text,
                     autoUpdate = p.autoUpdate,
                     keepAutoUpdateWhenEdited = p.keepAutoUpdateWhenEdited,
-                    pendingUpdate = p.pendingUpdate?.let(ProviderConfigCodec::encode),
+                    pendingUpdate = p.pendingUpdate?.text,
                     etag = p.etag,
                     lastCheckedMillis = p.lastCheckedMillis
                 )
@@ -151,18 +167,19 @@ class ProviderConfigStore(context: Context) {
      * Adds an imported config. Importing a config that is already here (same meta id and update URL) replaces
      * it instead, like a manual update, keeping its token and settings. Returns the id it's stored under.
      */
-    fun import(config: ProviderConfig): String {
+    fun import(source: ConfigSource): String {
+        val config = source.config
         val metaId = config.meta?.id
         val existing = metaId?.let { id ->
             _providers.value.firstOrNull { it.config.meta?.id == id && it.updateUrl == config.meta?.updateUrl }
         }
         val upstream = config.takeIf { it.meta?.updateUrl != null }
         if (existing != null) {
-            update(existing.id) { it.copy(config = config, upstream = upstream, previous = it.config, pendingUpdate = null) }
+            update(existing.id) { it.copy(config = config, text = source.text, upstream = upstream, previous = it.source, pendingUpdate = null) }
             return existing.id
         }
         val id = UUID.randomUUID().toString()
-        persist(_providers.value + StoredProvider(id = id, config = config, upstream = upstream))
+        persist(_providers.value + StoredProvider(id = id, config = config, text = source.text, upstream = upstream))
         return id
     }
 
@@ -170,9 +187,9 @@ class ProviderConfigStore(context: Context) {
      * Saves a hand edit. If this makes the config differ from its upstream while auto-update is on, auto-update
      * is switched off, once: if the user turns it back on, later edits leave it alone.
      */
-    fun saveEdit(id: String, config: ProviderConfig): EditOutcome {
+    fun saveEdit(id: String, source: ConfigSource): EditOutcome {
         val before = get(id) ?: return EditOutcome(nowEdited = false, autoUpdateTurnedOff = false)
-        val edited = before.copy(config = config)
+        val edited = before.copy(config = source.config, text = source.text)
         val turnOff = edited.isEdited && edited.autoUpdate && !edited.keepAutoUpdateWhenEdited
         update(id) { edited.copy(autoUpdate = if (turnOff) false else edited.autoUpdate) }
         return EditOutcome(nowEdited = edited.isEdited, autoUpdateTurnedOff = turnOff)
@@ -183,6 +200,7 @@ class ProviderConfigStore(context: Context) {
         update(id) {
             it.copy(
                 config = it.config.withMeta(it.config.meta?.copy(updateUrl = null)),
+                text = ProviderConfigCodec.removeUpdateUrl(it.text) ?: it.text,
                 upstream = null,
                 pendingUpdate = null,
                 autoUpdate = false,
@@ -198,17 +216,24 @@ class ProviderConfigStore(context: Context) {
         }
     }
 
-    fun recordCheck(id: String, pendingUpdate: ProviderConfig?, etag: String?, checkedAtMillis: Long) {
+    fun recordCheck(id: String, pendingUpdate: ConfigSource?, etag: String?, checkedAtMillis: Long) {
         update(id) { it.copy(pendingUpdate = pendingUpdate, etag = etag ?: it.etag, lastCheckedMillis = checkedAtMillis) }
     }
 
     /**
-     * Applies [newConfig] (normally [StoredProvider.pendingUpdate]); the replaced version is kept for [revert].
+     * Applies [newSource] (normally [StoredProvider.pendingUpdate]); the replaced version is kept for [revert].
      * With [clearSecret], the saved token is deleted: used when the update sends credentials somewhere new.
      */
-    fun applyUpdate(id: String, newConfig: ProviderConfig, clearSecret: Boolean) {
+    fun applyUpdate(id: String, newSource: ConfigSource, clearSecret: Boolean) {
         update(id) {
-            it.copy(config = newConfig, upstream = newConfig, previous = it.config, pendingUpdate = null, keepAutoUpdateWhenEdited = false)
+            it.copy(
+                config = newSource.config,
+                text = newSource.text,
+                upstream = newSource.config,
+                previous = it.source,
+                pendingUpdate = null,
+                keepAutoUpdateWhenEdited = false
+            )
         }
         if (clearSecret) clearCredentials(id)
     }
@@ -221,8 +246,9 @@ class ProviderConfigStore(context: Context) {
         update(id) { current ->
             val previous = current.previous ?: return@update current
             current.copy(
-                config = previous,
-                upstream = previous.takeIf { it.meta?.updateUrl != null },
+                config = previous.config,
+                text = previous.text,
+                upstream = previous.config.takeIf { it.meta?.updateUrl != null },
                 previous = null,
                 pendingUpdate = null,
                 autoUpdate = false,

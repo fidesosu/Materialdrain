@@ -4,20 +4,28 @@ import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +36,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -38,12 +47,10 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -63,6 +70,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextRange
@@ -70,14 +78,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import tools.senko.materialdrain.filesystem.PathSegment
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.files.SortOptions
 import tools.senko.materialdrain.files.SortableField
+import tools.senko.materialdrain.ui.LocalReduceMotion
 
 /** The path at the top of the filesystem: each folder is tappable, and the row scrolls to the end of it. */
 @Composable
@@ -185,14 +198,14 @@ fun SortControls(
                 }
                 Icon(directionIcon, contentDescription = directionDescription, modifier = Modifier.size(16.dp))
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            FloatingCardMenu(expanded = expanded, onDismiss = { expanded = false }, minWidth = SortControlWidth) {
                 SortOptions.forEach { (name, field) ->
                     val selected = field == sortField
-                    DropdownMenuItem(
-                        text = { Text(name) },
-                        trailingIcon = if (selected) {
-                            { Icon(directionIcon, contentDescription = directionDescription) }
-                        } else null,
+                    FloatingMenuItem(
+                        text = name,
+                        active = selected,
+                        trailingIcon = if (selected) directionIcon else null,
+                        trailingDescription = directionDescription,
                         // The menu stays open, so the effect can be seen and the direction flipped again
                         onClick = { onSortFieldSelected(field) }
                     )
@@ -225,11 +238,11 @@ private fun SortRowActions(actions: List<SortRowAction>) {
             Text("New", style = MaterialTheme.typography.labelLarge)
             Spacer(Modifier.width(4.dp))
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        FloatingCardMenu(expanded = expanded, onDismiss = { expanded = false }, alignment = Alignment.TopEnd) {
             actions.forEach { action ->
-                DropdownMenuItem(
-                    text = { Text(action.description) },
-                    leadingIcon = { Icon(action.icon, contentDescription = null) },
+                FloatingMenuItem(
+                    text = action.description,
+                    leadingIcon = action.icon,
                     enabled = action.enabled,
                     onClick = {
                         expanded = false
@@ -237,6 +250,124 @@ private fun SortRowActions(actions: List<SortRowAction>) {
                     }
                 )
             }
+        }
+    }
+}
+
+/** The space between a floating card button and its menu, and around the entries inside the menu. */
+private val MenuGap = 6.dp
+
+/** An entry's highlight: the menu's corners less the space around the entries, so the two curves run alongside. */
+internal val MenuItemShape = RoundedCornerShape(14.dp)
+
+private const val MENU_ANIMATION_MS = 200
+
+/** Taller menus scroll. */
+private val FloatingMenuMaxHeight = 480.dp
+
+/**
+ * The menu of a floating card button (see [FloatingCardButton], the host switcher), a floating card itself: the same
+ * corners and edge, opening just under the button and growing down out of it. Call it in the box which holds only the
+ * button, which is [anchorHeight] tall. It's at least [minWidth] wide, wider when the entries need it; [alignment] is the
+ * button's edge it lines up with: [Alignment.TopEnd] for a button at the end of a row, [Alignment.TopCenter] centred.
+ *
+ * It closes on a tap outside it or back, by calling [onDismiss]; choosing an entry doesn't close it, that's up to the entry.
+ */
+@Composable
+internal fun FloatingCardMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    alignment: Alignment = Alignment.TopStart,
+    anchorHeight: Dp = ControlHeight,
+    minWidth: Dp = 160.dp,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val duration = if (LocalReduceMotion.current) 0 else MENU_ANIMATION_MS
+    val below = with(LocalDensity.current) { (anchorHeight + MenuGap).roundToPx() }
+    // The popup has to stay in the composition while it closes
+    val visibleState = remember { MutableTransitionState(false) }
+    visibleState.targetState = expanded
+    if (!visibleState.currentState && !visibleState.targetState) return
+
+    Popup(
+        alignment = alignment,
+        offset = IntOffset(0, below),
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true)
+    ) {
+        AnimatedVisibility(
+            visibleState = visibleState,
+            enter = expandVertically(tween(duration, easing = FastOutSlowInEasing), expandFrom = Alignment.Top) +
+                fadeIn(tween(duration / 2)),
+            exit = shrinkVertically(tween(duration, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Top) +
+                fadeOut(tween(duration))
+        ) {
+            Surface(
+                shape = FloatingCardShape,
+                // Opaque, unlike the button: a menu over the list would be hard to read with the list showing through
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = floatingCardBorder(),
+                shadowElevation = 6.dp,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                // Leaves room for the shadow, which the popup would otherwise cut off
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .width(IntrinsicSize.Max)
+                        .widthIn(min = minWidth)
+                        .heightIn(max = FloatingMenuMaxHeight)
+                        .verticalScroll(rememberScrollState())
+                        .padding(MenuGap),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    content = content
+                )
+            }
+        }
+    }
+}
+
+/**
+ * An entry of a [FloatingCardMenu]. An [active] entry (the current choice) is in the accent colour on a tinted, rounded
+ * highlight, the same tint as [tools.senko.materialdrain.ui.components.ExpandingMenuItem]'s.
+ */
+@Composable
+internal fun FloatingMenuItem(
+    text: String,
+    onClick: () -> Unit,
+    active: Boolean = false,
+    enabled: Boolean = true,
+    leadingIcon: ImageVector? = null,
+    trailingIcon: ImageVector? = null,
+    trailingDescription: String? = null
+) {
+    val accent = MaterialTheme.colorScheme.primary
+    val color = if (active) accent else MaterialTheme.colorScheme.onSurface
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .clip(MenuItemShape)
+            .background(if (active) accent.copy(alpha = 0.16f) else Color.Transparent)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 12.dp)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.38f }
+    ) {
+        leadingIcon?.let {
+            Icon(it, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(12.dp))
+        }
+        Text(
+            text,
+            style = MaterialTheme.typography.labelLarge,
+            color = color,
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
+        )
+        trailingIcon?.let {
+            Spacer(Modifier.width(12.dp))
+            Icon(it, contentDescription = trailingDescription, tint = color, modifier = Modifier.size(18.dp))
         }
     }
 }

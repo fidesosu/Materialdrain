@@ -165,7 +165,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     ),
 
     SettingsCategory(
-        id = "advanced",
+        id = HOSTS_CATEGORY_ID,
         title = "Advanced",
         summary = "Custom host settings",
         icon = Icons.Filled.Tune,
@@ -196,6 +196,9 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
 )
 
 const val ACCOUNT_CATEGORY_ID = "account"
+
+/** The category with the custom hosts, which the host switcher opens (see ProviderHostsSection). */
+const val HOSTS_CATEGORY_ID = "advanced"
 
 fun settingsCategory(id: String?): SettingsCategory? = SettingsCatalog.firstOrNull { it.id == id }
 

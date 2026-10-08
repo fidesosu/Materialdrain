@@ -7,6 +7,40 @@ import org.junit.Test
 
 class ProviderConfigCodecTest {
 
+    private val smbWithExtras = """
+        {
+          "kind": "smb",
+          "name": "NAS",
+          "host": "nas.local",
+          "port": 445,
+          "share": "Documents",
+          "notes": "not read by the app",
+          "meta": {"id": "x.smb", "version": 1, "update_url": "https://example.com/smb.json", "author": "me"}
+        }
+    """.trimIndent()
+
+    @Test
+    fun `keeps a config's text as written, adding only the marker line`() {
+        val text = ProviderConfigCodec.normalizeText(smbWithExtras)
+        assertTrue(text.startsWith(PROVIDER_CONFIG_MARKER + "\n"))
+        assertTrue(text.endsWith(smbWithExtras))
+        // Already marked: left as it is
+        assertEquals(text, ProviderConfigCodec.normalizeText(text))
+    }
+
+    @Test
+    fun `removing the update url keeps every other field`() {
+        val text = ProviderConfigCodec.removeUpdateUrl(smbWithExtras)!!
+        assertTrue(text.startsWith(PROVIDER_CONFIG_MARKER + "\n"))
+        assertTrue("\"notes\"" in text)
+        assertTrue("\"port\": 445" in text)
+        assertTrue("\"author\": \"me\"" in text)
+        assertTrue("update_url" !in text)
+        val config = ProviderConfigCodec.decode(text) as SmbConfig
+        assertNull(config.meta?.updateUrl)
+        assertEquals("x.smb", config.meta?.id)
+    }
+
     @Test
     fun `round trips a generic rest config`() {
         val config = GenericRestConfig(

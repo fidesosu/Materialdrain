@@ -4,7 +4,11 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -234,7 +238,10 @@ private fun OtpDialog(prompt: OtpPrompt, busy: Boolean, viewModel: ProviderSetti
     )
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/** How long a host asked for from the switcher waits before it's scrolled to, see HostCard. */
+private const val FOCUS_SCROLL_DELAY_MS = 400L
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun HostCard(
     stored: StoredProvider,
@@ -242,6 +249,17 @@ private fun HostCard(
     viewModel: ProviderSettingsViewModel
 ) {
     var expanded by rememberSaveable(stored.id) { mutableStateOf(false) }
+    // Asked for from the host switcher: opened, and scrolled to once the settings page has slid in and the card has grown
+    val bringIntoView = remember { BringIntoViewRequester() }
+    val focused = uiState.focusedHostId == stored.id
+    LaunchedEffect(focused) {
+        if (focused) {
+            expanded = true
+            delay(FOCUS_SCROLL_DELAY_MS)
+            bringIntoView.bringIntoView()
+            viewModel.clearFocusedHost()
+        }
+    }
     // Capabilities don't change without an edit or an update, both already keyed into this computation
     val capabilities = remember(stored.id, stored.config) { viewModel.capabilitiesFor(stored.id) }
     // Re-read whenever the config changes: an update that moves to a new host clears the saved credentials, and
@@ -261,12 +279,12 @@ private fun HostCard(
     val busy = uiState.busyId == stored.id
     val checking = stored.id in uiState.checkingIds
     val meta = stored.config.meta
-    val pending = stored.pendingUpdate
+    val pending = stored.pendingUpdate?.config
 
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).bringIntoViewRequester(bringIntoView)
     ) {
         Column(modifier = if (reduceMotion) Modifier else Modifier.animateContentSize()) {
             // Always visible: what the host is, its state, and the two quick actions. Tapping it expands the rest.
