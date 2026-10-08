@@ -50,6 +50,9 @@ private class StreamingBody(
 
     override fun writeTo(sink: BufferedSink) {
         val input = openStream() ?: throw IOException("Failed to open input stream for upload.")
+        // A read gives at most one 8 KB segment: reporting each would be over a thousand updates a second of the
+        // screen and the notification, so they're passed on a few times a second (the last one always)
+        val progress = ProgressThrottle(onProgress)
         var sent = 0L
         input.source().use { source ->
             while (true) {
@@ -57,9 +60,10 @@ private class StreamingBody(
                 if (read == -1L) break
                 sink.emitCompleteSegments()
                 sent += read
-                onProgress(sent)
+                progress.update(sent)
             }
         }
+        progress.finish(sent)
     }
 }
 
