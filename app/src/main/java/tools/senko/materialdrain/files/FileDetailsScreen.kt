@@ -143,11 +143,11 @@ fun FileInfoDetailsCard(
         ) {
             // Only the private filesystem needs the login for previews
             val previewApiKey = uiState.apiKey.takeIf { isFilesystemFile && it.isNotBlank() }
-            // A picture, video or song preview starts right under the top bar; anything else keeps some room above it
+            // A picture, video or song preview starts just under the top bar, with a little room; anything else keeps more
             val mediaPreviewFirst = showPreviews && uiState.archive == null &&
                 (previewType?.startsWith("image/") == true || previewType?.startsWith("video/") == true || previewType?.startsWith("audio/") == true)
             if (!mediaPreviewFirst) Spacer(Modifier.height(16.dp))
-            val mediaPadding = PaddingValues(bottom = 8.dp)
+            val mediaPadding = PaddingValues(top = 8.dp, bottom = 8.dp)
             if (showPreviews) {
                 // An archive shows its contents where a preview would be
                 if (uiState.archive != null) {

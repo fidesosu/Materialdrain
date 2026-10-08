@@ -15,6 +15,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -42,7 +43,6 @@ import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Card
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -68,7 +68,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
@@ -80,9 +79,12 @@ import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.LocalVideoLoop
-import tools.senko.materialdrain.ui.components.ExpandingMenu
-import tools.senko.materialdrain.ui.components.ExpandingMenuItem
-import tools.senko.materialdrain.ui.components.ExpandingMenuPages
+import tools.senko.materialdrain.ui.components.AppMenu
+import tools.senko.materialdrain.ui.components.AppMenuDivider
+import tools.senko.materialdrain.ui.components.AppMenuItem
+import tools.senko.materialdrain.ui.components.AppMenuPages
+import tools.senko.materialdrain.ui.components.MenuEdge
+import tools.senko.materialdrain.ui.components.MenuSide
 import tools.senko.materialdrain.util.formatDurationMillis
 
 private const val CONTROLS_HIDE_DELAY_MS = 3_000L
@@ -150,11 +152,11 @@ fun InlineVideoPreview(
     }
 }
 /**
- * The settings menu of the video player, root/ Loop, Speed/ (the speeds). It has to sit in the box of the button
- * which opens it, and grows up out of that button. Choosing loop or a speed leaves the menu open.
+ * The settings menu of the video player, root/ Loop, Speed/ (the speeds). It sits in the box of the button which opens
+ * it, and grows up out of that button. Choosing loop or a speed leaves the menu open.
  */
 @Composable
-private fun VideoSettingsMenu(
+private fun BoxScope.VideoSettingsMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
     speedPageOpen: Boolean,
@@ -162,20 +164,20 @@ private fun VideoSettingsMenu(
     loopEnabled: Boolean,
     onLoopChange: (Boolean) -> Unit,
     speed: Float,
-    onSpeedChange: (Float) -> Unit,
-    buttonSize: Dp
+    onSpeedChange: (Float) -> Unit
 ) {
-    ExpandingMenu(expanded = expanded, onDismiss = onDismiss, anchorSize = buttonSize, origin = Alignment.BottomEnd) {
-        ExpandingMenuPages(
+    // The controls are at the bottom of the screen: above the button, lined up with its end
+    AppMenu(expanded = expanded, onDismiss = onDismiss, side = MenuSide.Above, edge = MenuEdge.End) {
+        AppMenuPages(
             showSecondary = speedPageOpen,
             primary = {
-                ExpandingMenuItem(
+                AppMenuItem(
                     text = "Loop",
                     active = loopEnabled,
                     leadingIcon = Icons.Filled.Repeat,
                     onClick = { onLoopChange(!loopEnabled) }
                 )
-                ExpandingMenuItem(
+                AppMenuItem(
                     text = "Speed",
                     leadingIcon = Icons.Filled.Speed,
                     trailingText = speedLabel(speed),
@@ -184,14 +186,14 @@ private fun VideoSettingsMenu(
                 )
             },
             secondary = {
-                ExpandingMenuItem(
+                AppMenuItem(
                     text = "Speed",
                     leadingIcon = Icons.AutoMirrored.Filled.ArrowBack,
                     onClick = { onSpeedPageOpenChange(false) }
                 )
-                HorizontalDivider()
+                AppMenuDivider()
                 PlaybackSpeeds.forEach { option ->
-                    ExpandingMenuItem(
+                    AppMenuItem(
                         text = speedLabel(option),
                         active = option == speed,
                         onClick = { onSpeedChange(option) }
@@ -417,8 +419,7 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
                                     loopEnabled = videoLoop.enabled,
                                     onLoopChange = { videoLoop.onChange(it); interactions++ },
                                     speed = state.speed,
-                                    onSpeedChange = { state.changeSpeed(it); interactions++ },
-                                    buttonSize = 44.dp
+                                    onSpeedChange = { state.changeSpeed(it); interactions++ }
                                 )
                             }
                         }

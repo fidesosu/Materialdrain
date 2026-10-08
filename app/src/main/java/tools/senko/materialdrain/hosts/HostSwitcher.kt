@@ -57,12 +57,6 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import tools.senko.materialdrain.auth.ApiKeySource
 import tools.senko.materialdrain.auth.SessionManager
-import tools.senko.materialdrain.browser.FloatingCardMenu
-import tools.senko.materialdrain.browser.FloatingCardShape
-import tools.senko.materialdrain.browser.FloatingMenuItem
-import tools.senko.materialdrain.browser.MenuItemShape
-import tools.senko.materialdrain.browser.floatingCardBorder
-import tools.senko.materialdrain.browser.floatingCardColor
 import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
 import tools.senko.materialdrain.provider.ProviderConfigStore
 import tools.senko.materialdrain.provider.StoredProvider
@@ -75,6 +69,14 @@ import tools.senko.materialdrain.provider.api.SmbAuthMode
 import tools.senko.materialdrain.provider.api.SmbConfig
 import tools.senko.materialdrain.provider.api.WebDavConfig
 import tools.senko.materialdrain.ui.LocalReduceMotion
+import tools.senko.materialdrain.ui.components.AppMenu
+import tools.senko.materialdrain.ui.components.AppMenuDefaults
+import tools.senko.materialdrain.ui.components.AppMenuItem
+import tools.senko.materialdrain.ui.components.FloatingCardShape
+import tools.senko.materialdrain.ui.components.MenuEdge
+import tools.senko.materialdrain.ui.components.MenuSide
+import tools.senko.materialdrain.ui.components.floatingCardBorder
+import tools.senko.materialdrain.ui.components.floatingCardColor
 
 /** Whether a host has a sign-in, shown next to its name in the switcher. */
 enum class HostStatus(val label: String) {
@@ -267,11 +269,11 @@ fun HostSwitcher(
             }
         }
 
-        FloatingCardMenu(
+        AppMenu(
             expanded = expanded,
             onDismiss = { expanded = false },
-            alignment = Alignment.TopCenter,
-            anchorHeight = SwitcherHeight,
+            side = MenuSide.Below,
+            edge = MenuEdge.Center,
             minWidth = MenuWidth
         ) {
             MenuHeader(checks.values, onRefresh)
@@ -291,7 +293,7 @@ fun HostSwitcher(
                 )
             }
             Spacer(Modifier.height(4.dp))
-            FloatingMenuItem(
+            AppMenuItem(
                 text = "Manage hosts",
                 leadingIcon = Icons.Filled.Settings,
                 onClick = {
@@ -370,7 +372,7 @@ private fun HostRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MenuItemShape)
+            .clip(AppMenuDefaults.ItemShape)
             .background(if (active) accent.copy(alpha = 0.16f) else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(start = 10.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)

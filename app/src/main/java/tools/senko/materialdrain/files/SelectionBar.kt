@@ -15,8 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +32,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.ui.LocalBottomInset
 import tools.senko.materialdrain.ui.LocalReduceMotion
+import tools.senko.materialdrain.ui.components.AppMenu
+import tools.senko.materialdrain.ui.components.AppMenuItem
 
 /** One action on the selected items. [destructive] actions are tinted red. */
 data class SelectionAction(
@@ -125,12 +125,13 @@ private fun OverflowMenu(actions: List<SelectionAction>) {
         IconButton(onClick = { expanded = true }) {
             Icon(Icons.Filled.MoreVert, contentDescription = "More actions for the selection")
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        AppMenu(expanded = expanded, onDismiss = { expanded = false }) {
             actions.forEach { action ->
-                DropdownMenuItem(
-                    text = { Text(action.label) },
-                    leadingIcon = { Icon(action.icon, contentDescription = null) },
+                AppMenuItem(
+                    text = action.label,
+                    leadingIcon = action.icon,
                     enabled = action.enabled,
+                    destructive = action.destructive,
                     onClick = {
                         expanded = false
                         action.onClick()

@@ -46,8 +46,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
-import tools.senko.materialdrain.ui.components.ExpandingMenu
-import tools.senko.materialdrain.ui.components.ExpandingMenuItem
+import tools.senko.materialdrain.ui.components.AppMenu
+import tools.senko.materialdrain.ui.components.AppMenuItem
+import tools.senko.materialdrain.ui.components.MenuEdge
 import tools.senko.materialdrain.util.formatDurationMillis
 
 /**
@@ -172,15 +173,10 @@ fun AudioPlayerPreview(
                 }
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                     MediaTextButton(speedLabel(state.speed), onClick = { speedMenuOpen = true }, container = quietContainer, contentColor = onSurface)
-                    // Grows down out of the button, the player is at the top of the screen
-                    ExpandingMenu(
-                        expanded = speedMenuOpen,
-                        onDismiss = { speedMenuOpen = false },
-                        anchorSize = 44.dp,
-                        origin = Alignment.TopEnd
-                    ) {
+                    // Lined up with the button at the end of the row; below it, or above when there's no room
+                    AppMenu(expanded = speedMenuOpen, onDismiss = { speedMenuOpen = false }, edge = MenuEdge.End, minWidth = 120.dp) {
                         PlaybackSpeeds.forEach { speed ->
-                            ExpandingMenuItem(
+                            AppMenuItem(
                                 text = speedLabel(speed),
                                 active = speed == state.speed,
                                 onClick = { state.changeSpeed(speed) }

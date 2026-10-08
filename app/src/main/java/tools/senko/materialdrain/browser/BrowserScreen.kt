@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,26 +30,20 @@ import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -68,7 +61,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -97,12 +89,15 @@ import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.settings.SEARCH_INDEX_DELETE_WARNING
 import tools.senko.materialdrain.settings.isSearchIndex
 import tools.senko.materialdrain.ui.LocalBottomInset
+import tools.senko.materialdrain.ui.components.AppMenuDivider
+import tools.senko.materialdrain.ui.components.AppMenuItem
 import tools.senko.materialdrain.ui.components.DotScrollbar
 import tools.senko.materialdrain.ui.components.CenteredTextMessage
 import tools.senko.materialdrain.ui.components.ConfirmDialog
 import tools.senko.materialdrain.ui.components.ErrorMessage
 import tools.senko.materialdrain.ui.components.FileListItem
 import tools.senko.materialdrain.ui.components.FolderPickerDialog
+import tools.senko.materialdrain.ui.components.OverflowMenuButton
 import tools.senko.materialdrain.ui.components.TextInputDialog
 import tools.senko.materialdrain.util.formatRelativeDateTime
 
@@ -812,29 +807,11 @@ private fun ListFolderMenu(
     onCopyLink: (String) -> Unit,
     onShareLink: (String) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { expanded = true }, modifier = Modifier.size(40.dp)) {
-            Icon(Icons.Filled.MoreVert, contentDescription = "More options for $title")
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text("Open") },
-                leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) },
-                onClick = { expanded = false; onOpen() }
-            )
-            if (link != null) {
-                DropdownMenuItem(
-                    text = { Text("Copy link") },
-                    leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = null) },
-                    onClick = { expanded = false; onCopyLink(link) }
-                )
-                DropdownMenuItem(
-                    text = { Text("Share link") },
-                    leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
-                    onClick = { expanded = false; onShareLink(link) }
-                )
-            }
+    OverflowMenuButton(contentDescription = "More options for $title") { close ->
+        AppMenuItem("Open", leadingIcon = Icons.AutoMirrored.Filled.OpenInNew, onClick = { close(); onOpen() })
+        if (link != null) {
+            AppMenuItem("Copy link", leadingIcon = Icons.Filled.ContentCopy, onClick = { close(); onCopyLink(link) })
+            AppMenuItem("Share link", leadingIcon = Icons.Filled.Share, onClick = { close(); onShareLink(link) })
         }
     }
 }
@@ -853,55 +830,22 @@ private fun FilesystemMenu(
     onCopyLink: (String) -> Unit,
     onShareLink: (String) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { expanded = true }, modifier = Modifier.size(40.dp)) {
-            Icon(Icons.Filled.MoreVert, contentDescription = "More options for ${node.name}")
+    OverflowMenuButton(contentDescription = "More options for ${node.name}") { close ->
+        if (!node.isDirectory) {
+            AppMenuItem("Download", leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload() })
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            if (!node.isDirectory) {
-                DropdownMenuItem(
-                    text = { Text("Download") },
-                    leadingIcon = { Icon(Icons.Filled.Download, contentDescription = null) },
-                    onClick = { expanded = false; onDownload() }
-                )
-            }
-            if (shareUrl != null) {
-                DropdownMenuItem(
-                    text = { Text("Copy link") },
-                    leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = null) },
-                    onClick = { expanded = false; onCopyLink(shareUrl) }
-                )
-                DropdownMenuItem(
-                    text = { Text("Share link") },
-                    leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
-                    onClick = { expanded = false; onShareLink(shareUrl) }
-                )
-            }
-            if (canWrite) {
-                DropdownMenuItem(
-                    text = { Text("Rename") },
-                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
-                    onClick = { expanded = false; onRename() }
-                )
-                DropdownMenuItem(
-                    text = { Text("Move") },
-                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.DriveFileMove, contentDescription = null) },
-                    onClick = { expanded = false; onMove() }
-                )
-            }
-            DropdownMenuItem(
-                text = { Text("Select") },
-                leadingIcon = { Icon(Icons.Filled.CheckBox, contentDescription = null) },
-                onClick = { expanded = false; onSelect() }
-            )
-            if (canDelete) {
-                DropdownMenuItem(
-                    text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-                    leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                    onClick = { expanded = false; onDelete() }
-                )
-            }
+        if (shareUrl != null) {
+            AppMenuItem("Copy link", leadingIcon = Icons.Filled.ContentCopy, onClick = { close(); onCopyLink(shareUrl) })
+            AppMenuItem("Share link", leadingIcon = Icons.Filled.Share, onClick = { close(); onShareLink(shareUrl) })
+        }
+        if (canWrite) {
+            AppMenuItem("Rename", leadingIcon = Icons.Filled.Edit, onClick = { close(); onRename() })
+            AppMenuItem("Move", leadingIcon = Icons.AutoMirrored.Filled.DriveFileMove, onClick = { close(); onMove() })
+        }
+        AppMenuItem("Select", leadingIcon = Icons.Filled.CheckBox, onClick = { close(); onSelect() })
+        if (canDelete) {
+            AppMenuDivider()
+            AppMenuItem("Delete", leadingIcon = Icons.Filled.Delete, destructive = true, onClick = { close(); onDelete() })
         }
     }
 }

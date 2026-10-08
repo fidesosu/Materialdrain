@@ -7,7 +7,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.activity.compose.BackHandler
@@ -19,7 +18,6 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
-import kotlin.math.roundToInt
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -27,8 +25,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -43,7 +39,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -91,7 +86,6 @@ import tools.senko.materialdrain.files.FileInfoDetailsCard
 import tools.senko.materialdrain.files.FileInfoViewModel
 import tools.senko.materialdrain.browser.BrowserMode
 import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
-import tools.senko.materialdrain.provider.api.HostScreen
 import tools.senko.materialdrain.provider.api.ProviderCapability
 import tools.senko.materialdrain.provider.api.resolveScreens
 import tools.senko.materialdrain.browser.BrowserScreen
@@ -106,7 +100,6 @@ import tools.senko.materialdrain.preferences.ProviderSettingsViewModel
 import tools.senko.materialdrain.preferences.SettingsScreenContent
 import tools.senko.materialdrain.preferences.settingsCategory
 import tools.senko.materialdrain.settings.SEARCH_INDEX_DELETE_WARNING
-import tools.senko.materialdrain.settings.SEARCH_INDEX_FILE_NAME
 import tools.senko.materialdrain.settings.isSearchIndex
 import tools.senko.materialdrain.files.key
 import tools.senko.materialdrain.ui.LocalBlurredBackdrop
@@ -115,6 +108,9 @@ import tools.senko.materialdrain.ui.LocalTextWrap
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.LocalVideoLoop
 import tools.senko.materialdrain.ui.VideoLoopSetting
+import tools.senko.materialdrain.ui.components.AppMenu
+import tools.senko.materialdrain.ui.components.AppMenuDivider
+import tools.senko.materialdrain.ui.components.AppMenuItem
 import tools.senko.materialdrain.ui.components.AppSnackbarHost
 import tools.senko.materialdrain.ui.components.CenteredTextMessage
 import tools.senko.materialdrain.ui.components.snackbarMotion
@@ -681,57 +677,57 @@ fun MaterialdrainScreen() {
                             if (currentScreen == Screen.FileDetail) {
                                 fileInfoUiState.fileInfo?.let { currentFile ->
                                     val fileUrl = fileInfoViewModel.shareUrlFor(currentFile)
-                                    IconButton(onClick = { showFileDetailMenu = true }) {
-                                        Icon(Icons.Filled.MoreVert, contentDescription = "More options")
-                                    }
-                                    DropdownMenu(
-                                        expanded = showFileDetailMenu,
-                                        onDismissRequest = { showFileDetailMenu = false }
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text("Download") },
-                                            onClick = {
-                                                fileInfoViewModel.initiateDownloadFile(currentFile)
-                                                coroutineScope.launch { snackbarHostState.showSnackbar("Download initiated for ${currentFile.name}") }
-                                                showFileDetailMenu = false
-                                            },
-                                            leadingIcon = { Icon(Icons.Filled.Download, contentDescription = "Download", modifier = Modifier.size(28.dp))}
-                                        )
-                                        if (fileUrl != null) {
-                                            DropdownMenuItem(
-                                                text = { Text("Share Link") },
-                                                onClick = {
-                                                    val sendIntent: Intent = Intent().apply {
-                                                        action = Intent.ACTION_SEND
-                                                        putExtra(Intent.EXTRA_TEXT, fileUrl)
-                                                        type = "text/plain"
-                                                    }
-                                                    context.startActivity(Intent.createChooser(sendIntent, null))
-                                                    showFileDetailMenu = false
-                                                },
-                                                leadingIcon = { Icon(Icons.Filled.Share, contentDescription = "Share Link", modifier = Modifier.size(28.dp))}
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text("Copy Link") },
-                                                onClick = {
-                                                    val clip = ClipData.newPlainText("File link", fileUrl)
-                                                    localClipboardManager.setPrimaryClip(clip)
-                                                    coroutineScope.launch { snackbarHostState.showSnackbar("Link copied to clipboard!") }
-                                                    showFileDetailMenu = false
-                                                },
-                                                leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = "Copy Link", modifier = Modifier.size(28.dp))}
-                                            )
+                                    Box {
+                                        IconButton(onClick = { showFileDetailMenu = true }) {
+                                            Icon(Icons.Filled.MoreVert, contentDescription = "More options")
                                         }
-                                        if (fileInfoViewModel.canDeleteFiles()) {
-                                            HorizontalDivider()
-                                            DropdownMenuItem(
-                                                text = { Text("Delete File", color = MaterialTheme.colorScheme.error) },
+                                        AppMenu(expanded = showFileDetailMenu, onDismiss = { showFileDetailMenu = false }) {
+                                            AppMenuItem(
+                                                text = "Download",
+                                                leadingIcon = Icons.Filled.Download,
                                                 onClick = {
-                                                    fileInfoViewModel.initiateDeleteFile(currentFile)
+                                                    fileInfoViewModel.initiateDownloadFile(currentFile)
+                                                    coroutineScope.launch { snackbarHostState.showSnackbar("Download initiated for ${currentFile.name}") }
                                                     showFileDetailMenu = false
-                                                },
-                                                leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = "Delete File", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(28.dp))}
+                                                }
                                             )
+                                            if (fileUrl != null) {
+                                                AppMenuItem(
+                                                    text = "Share link",
+                                                    leadingIcon = Icons.Filled.Share,
+                                                    onClick = {
+                                                        val sendIntent: Intent = Intent().apply {
+                                                            action = Intent.ACTION_SEND
+                                                            putExtra(Intent.EXTRA_TEXT, fileUrl)
+                                                            type = "text/plain"
+                                                        }
+                                                        context.startActivity(Intent.createChooser(sendIntent, null))
+                                                        showFileDetailMenu = false
+                                                    }
+                                                )
+                                                AppMenuItem(
+                                                    text = "Copy link",
+                                                    leadingIcon = Icons.Filled.ContentCopy,
+                                                    onClick = {
+                                                        val clip = ClipData.newPlainText("File link", fileUrl)
+                                                        localClipboardManager.setPrimaryClip(clip)
+                                                        coroutineScope.launch { snackbarHostState.showSnackbar("Link copied to clipboard!") }
+                                                        showFileDetailMenu = false
+                                                    }
+                                                )
+                                            }
+                                            if (fileInfoViewModel.canDeleteFiles()) {
+                                                AppMenuDivider()
+                                                AppMenuItem(
+                                                    text = "Delete file",
+                                                    leadingIcon = Icons.Filled.Delete,
+                                                    destructive = true,
+                                                    onClick = {
+                                                        fileInfoViewModel.initiateDeleteFile(currentFile)
+                                                        showFileDetailMenu = false
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }

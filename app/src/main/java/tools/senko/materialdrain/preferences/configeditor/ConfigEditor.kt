@@ -47,8 +47,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -86,6 +84,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import tools.senko.materialdrain.provider.api.HostScreen
 import tools.senko.materialdrain.provider.api.ProviderConfigCodec
+import tools.senko.materialdrain.ui.components.AppMenu
+import tools.senko.materialdrain.ui.components.AppMenuItem
 
 /** The two ways of editing a config: field by field, or its text. */
 private enum class EditorMode(val label: String) { FORM("Form"), JSON("JSON") }
@@ -520,15 +520,13 @@ private fun ChoiceField(spec: FieldSpec, kind: FieldKind.Choice, value: JsonElem
                 )
                 // Over the field, so a tap anywhere on it opens the list
                 Box(modifier = Modifier.matchParentSize().clip(RoundedCornerShape(4.dp)).clickable { open = true })
-                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                // As wide as the field, each choice with its help under it
+                AppMenu(expanded = open, onDismiss = { open = false }, matchAnchorWidth = true) {
                     kind.options.forEach { option ->
-                        DropdownMenuItem(
-                            text = {
-                                Column {
-                                    Text(option.label)
-                                    option.help?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                                }
-                            },
+                        AppMenuItem(
+                            text = option.label,
+                            supportingText = option.help,
+                            active = option == current,
                             onClick = {
                                 onValue(JsonPrimitive(option.value))
                                 open = false
