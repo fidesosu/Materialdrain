@@ -350,9 +350,10 @@ class FileInfoViewModel(
                 (mimeType.startsWith("application/octet-stream", ignoreCase = true) &&
                         commonTextExtensions.any { fileInfo.name.endsWith(it, ignoreCase = true) })
 
-        // An error replaces any text shown for the previous file, so the old preview can't stay on screen
+        // Not text: nothing to say about it (the details show the file's kind already), but the text of the previous file
+        // mustn't stay on screen
         if (!isLikelyTextFile) {
-            _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = "Preview not supported for this file type.") }
+            _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = null) }
             return
         }
 
