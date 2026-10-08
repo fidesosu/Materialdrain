@@ -46,6 +46,7 @@ import tools.senko.materialdrain.transfer.TransferRegistry
 import tools.senko.materialdrain.transfer.TransferSpeedTracker
 import tools.senko.materialdrain.transfer.estimateEtaSeconds
 import tools.senko.materialdrain.util.readContentUriInfo
+import tools.senko.materialdrain.settings.AppSettings
 
 // SharedPreferences constants
 private const val TAG = "PIXEL_VM_DEBUG" // Tag for Logcat
@@ -63,6 +64,8 @@ data class UploadItem(
     val name: String,
     val sizeBytes: Long?,
     val mimeType: String?,
+    /** When the file was last changed on the device, for uploading in that order (AppSettings.uploadInModifiedOrder) */
+    val lastModifiedMillis: Long? = null,
     val status: UploadItemStatus = UploadItemStatus.PENDING,
     val uploadedBytes: Long = 0L,
     val fileId: String? = null,
@@ -184,7 +187,8 @@ class UploadViewModel(
     private val registry: ProviderRegistry,
     private val configStore: ProviderConfigStore,
     private val sessionManager: SessionManager,
-    private val transfers: TransferRegistry
+    private val transfers: TransferRegistry,
+    private val appSettings: AppSettings
 ) : ViewModel() {
 
     private fun provider() = registry.resolve(configStore.activeProviderId.value)
@@ -534,7 +538,8 @@ class UploadViewModel(
             uri = uri,
             name = info.displayName ?: uri.lastPathSegment ?: "pixeldrain_upload_${System.currentTimeMillis()}",
             sizeBytes = info.sizeBytes,
-            mimeType = context.contentResolver.getType(uri)
+            mimeType = context.contentResolver.getType(uri),
+            lastModifiedMillis = info.lastModifiedMillis
         )
     }
 
@@ -613,6 +618,13 @@ class UploadViewModel(
     }
 
     private fun uploadQueuedItems() {
+        // In the order the files were last changed, oldest first (files whose date Android doesn't know go last, as
+        // they were picked), and one after another, so they reach the host in that order; otherwise several at once
+        val inModifiedOrder = appSettings.uploadInModifiedOrder.value
+        if (inModifiedOrder) {
+            _uiState.update { s -> s.copy(queuedItems = s.queuedItems.sortedBy { it.lastModifiedMillis ?: Long.MAX_VALUE }) }
+        }
+        val parallelUploads = if (inModifiedOrder) 1 else MAX_PARALLEL_UPLOADS
         val batch = _uiState.value.queuedItems.filter {
             it.status == UploadItemStatus.PENDING || it.status == UploadItemStatus.FAILED
         }
@@ -671,7 +683,7 @@ class UploadViewModel(
             var outcome = TransferOutcome.FAILED
             var outcomeMessage: String? = null
             try {
-                val semaphore = Semaphore(MAX_PARALLEL_UPLOADS)
+                val semaphore = Semaphore(parallelUploads)
                 batch.map { item ->
                     async {
                         val job = coroutineContext[Job]

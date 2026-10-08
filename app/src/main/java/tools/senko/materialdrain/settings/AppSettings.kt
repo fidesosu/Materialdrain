@@ -38,6 +38,7 @@ private const val OPENED_FILE_PATH_PREF = "opened_file_path"
 private const val OPENED_FILE_HOST_PREF = "opened_file_host"
 private const val BIOMETRIC_LOCK_PREF = "biometric_lock"
 private const val SEARCH_RESULT_LIMIT_PREF = "search_result_limit"
+private const val UPLOAD_IN_MODIFIED_ORDER_PREF = "upload_in_modified_order"
 
 /** The choices for [AppSettings.searchResultLimit]; 0 is no limit. */
 val SEARCH_RESULT_LIMITS = listOf(0, 200, 50, 20)
@@ -87,6 +88,19 @@ class AppSettings(context: Context) {
     fun setBlurredBackdrop(enabled: Boolean) {
         prefs.edit { putBoolean(BLURRED_BACKDROP_PREF, enabled) }
         _blurredBackdrop.value = enabled
+    }
+
+    private val _uploadInModifiedOrder = MutableStateFlow(prefs.getBoolean(UPLOAD_IN_MODIFIED_ORDER_PREF, false))
+    /**
+     * Uploads several files in the order they were last changed on the device, oldest first, one after another, so they
+     * reach the host (and get their upload dates) in that order. Off by default: then several go at once, which is
+     * faster.
+     */
+    val uploadInModifiedOrder: StateFlow<Boolean> = _uploadInModifiedOrder.asStateFlow()
+
+    fun setUploadInModifiedOrder(enabled: Boolean) {
+        prefs.edit { putBoolean(UPLOAD_IN_MODIFIED_ORDER_PREF, enabled) }
+        _uploadInModifiedOrder.value = enabled
     }
 
     private val _loopVideos = MutableStateFlow(prefs.getBoolean(LOOP_VIDEOS_PREF, false))

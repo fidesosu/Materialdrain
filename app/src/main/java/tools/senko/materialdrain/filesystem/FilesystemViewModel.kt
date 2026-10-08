@@ -109,7 +109,8 @@ data class PathSegment(
     val fullPath: String
 )
 
-data class FilesystemUploadItem(val uri: Uri, val name: String, val sizeBytes: Long?)
+/** @param lastModifiedMillis when the file was last changed on the device, for uploading in that order */
+data class FilesystemUploadItem(val uri: Uri, val name: String, val sizeBytes: Long?, val lastModifiedMillis: Long? = null)
 
 data class PendingFilesystemUpload(val items: List<FilesystemUploadItem>, val conflictingNames: List<String>)
 
@@ -590,8 +591,13 @@ class FilesystemViewModel(
                     FilesystemUploadItem(
                         uri = uri,
                         name = (info.displayName ?: uri.lastPathSegment ?: "upload_${System.currentTimeMillis()}").replace('/', '_'),
-                        sizeBytes = info.sizeBytes
+                        sizeBytes = info.sizeBytes,
+                        lastModifiedMillis = info.lastModifiedMillis
                     )
+                }.let { picked ->
+                    // They go one after another anyway: in the order they were last changed, oldest first, when that's
+                    // set (files whose date Android doesn't know go last, as they were picked)
+                    if (appSettings.uploadInModifiedOrder.value) picked.sortedBy { it.lastModifiedMillis ?: Long.MAX_VALUE } else picked
                 }
             }
             val existingNames = _uiState.value.children.map { it.name }.toSet()

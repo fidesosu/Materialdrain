@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.runtime.collectAsState
 import tools.senko.materialdrain.settings.SEARCH_INDEX_FILE_NAME
 import tools.senko.materialdrain.transfer.CHANNEL_TRANSFER_COMPLETE
@@ -53,6 +54,23 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                     "removed. Hiding it keeps you from deleting it by accident.",
                 isChecked = { appSettings.hideSearchIndex.collectAsState().value },
                 onCheckedChange = { appSettings.setHideSearchIndex(it) }
+            )
+        )
+    ),
+
+    SettingsCategory(
+        id = "uploads",
+        title = "Uploads",
+        summary = "The order several files are uploaded in",
+        icon = Icons.Filled.Upload,
+        items = listOf(
+            SettingsItem.Toggle(
+                title = "Upload in the order the files were changed",
+                summary = "Several files are uploaded oldest first, by when they were last changed on this device, and " +
+                    "one after another, so they arrive at the host (and get their upload dates) in that order. Slower " +
+                    "for many small files, which otherwise go a few at once.",
+                isChecked = { appSettings.uploadInModifiedOrder.collectAsState().value },
+                onCheckedChange = { appSettings.setUploadInModifiedOrder(it) }
             )
         )
     ),
