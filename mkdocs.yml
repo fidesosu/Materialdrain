@@ -1,0 +1,52 @@
+# The developer documentation, served at https://materialdrain.senko.tools/docs/ (the home page with the downloads is
+# website/). Lives in the website branch, apart from the app's code (main, dev). Built by .github/workflows/site.yml
+# into the site branch, which the server pulls (see docs/server-setup/).
+site_name: Materialdrain docs
+site_url: https://materialdrain.senko.tools/docs/
+site_description: How Materialdrain is built, where things are, and why they're done the way they are.
+repo_url: https://github.com/fidesosu/Materialdrain
+repo_name: fidesosu/Materialdrain
+edit_uri: edit/website/docs/
+
+docs_dir: docs
+# Not part of the site: the server's setup files and the build's own requirements
+exclude_docs: |
+  server-setup/
+  requirements.txt
+
+theme:
+  name: material
+  # Dark only, in the site's own palette (docs/stylesheets/extra.css, the same as website/style.css)
+  palette:
+    scheme: slate
+    primary: custom
+    accent: custom
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home: index.md
+  - Hosts:
+      - Provider configuration: provider-configuration.md
