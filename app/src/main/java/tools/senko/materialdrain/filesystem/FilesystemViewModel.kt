@@ -643,9 +643,12 @@ class FilesystemViewModel(
             var uploaded = 0
             var outcome = TransferOutcome.FAILED
             var outcomeMessage: String? = null
+            val job = coroutineContext[Job]
             try {
                 items.forEachIndexed { index, item ->
                     val response = browse.upload(joinPath(dir, item.name), item.uri, application, makeParents = false) { sent, _ ->
+                        // Called from inside the host's sending loop: a cancelled upload stops there
+                        if (job?.isActive == false) throw kotlinx.coroutines.CancellationException("The upload was cancelled")
                         val overall = completedBytes + sent
                         val speed = speedTracker.update(overall)
                         transfers.progress(transferId, overall, totalBytes, speed, estimateEtaSeconds(totalBytes, overall, speed))

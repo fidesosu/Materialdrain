@@ -19,27 +19,42 @@ The shipped examples are in [`provider-configs/`](provider-configs/):
 ## Adding a host
 
 1. Open **Settings → Advanced**, then the **Add a custom host** section.
-2. Paste the config JSON, or press one of the **Start from** buttons to get a ready one to fill in (see
-   [Templates](#templates)), and press **Import host**. The host is saved and becomes the active one, which the Files,
-   Lists and Filesystem screens then use.
+2. Press the kind of host under **New host** (see [Templates](#templates)): the config editor opens on a complete
+   config of that kind. Fill in the form and press **Add host**. Or paste a config someone shared and press **Add
+   host**, or **Review first** to look it over in the editor. The host is saved and becomes the active one, which the
+   Files, Lists and Filesystem screens then use.
 3. Enter the host's sign-in (API key, or username and password) on its card in the same section. Credentials are
    never part of a config, so configs can be shared safely.
 
-The app adds a first line `MATERIALDRAIN-PROVIDER-CONFIG-V1` when it exports a config. Importing accepts text with or
-without it.
+### The config editor
+
+A host's config opens in an editor of its own, from the pencil on its card or when adding a host. It has two views of
+the same config, and switching between them keeps what was changed:
+
+- **Form**: the config in sections (Basics, Sign-in, Endpoints, Screens, Sharing and updates), each field with what it
+  means and its default. Only the important fields and the ones already set are shown; every other field the kind
+  has is under **More options**, a tap away. REST endpoints are grouped by what they unlock (the Files tab, the
+  Filesystem tab, …), with the placeholders each can use. Fields this version of the app doesn't read are kept, and
+  shown under **Other fields**.
+- **JSON**: the config's text, as it's exported.
+
+Nothing is dropped when saving: a config saved without changes keeps its own text, and one changed in the form is
+written out again with every field it had.
+
+A config is plain JSON, both when it's exported and when it's imported, so it can be kept as a `.json` file.
 
 Removing a host just stops using it. The active host falls back to the built-in Pixeldrain, and the Pixeldrain
 sign-in in **Account** keeps working on its own.
 
 ### Templates
 
-**Start from** fills the text box with a complete config of a kind: every field the app reads for it is there, set to
-its default or to an example value, so nothing has to be looked up. Change the address (and anything else that
-differs), press **Import host**, then enter the sign-in on the host's card.
+**New host** opens the editor on a complete config of a kind: every field the app reads for it is there, set to its
+default or to an example value, so nothing has to be looked up. Change the address (and anything else that differs),
+press **Add host**, then enter the sign-in on the host's card.
 
 | Button | Kind | Starts from |
 | --- | --- | --- |
-| REST API (Pixeldrain) | `generic_rest` | `pixeldrain.json`, the config with the most endpoints, to adapt to another API |
+| REST API (from Pixeldrain) | `generic_rest` | `pixeldrain.json`, the config with the most endpoints, to adapt to another API |
 | WebDAV | `webdav` | A Nextcloud account |
 | S3 | `s3` | A MinIO bucket |
 | SMB | `smb` | A share on a NAS |

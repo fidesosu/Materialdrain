@@ -115,7 +115,9 @@ internal fun SearchResultStack(
     thumbnailFor: (StorageNode) -> String?,
     locationOf: (StorageNode) -> String?,
     onClick: (StorageNode) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Room after the last card, so it can be scrolled clear of what covers the bottom (the navigation bar, the keyboard). */
+    bottomPadding: Dp = 0.dp
 ) {
     val slots = remember { HashMap<String, ResultSlot>() }
     val leaving = remember { ArrayList<ResultSlot>() }
@@ -161,7 +163,7 @@ internal fun SearchResultStack(
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val viewportPx = constraints.maxHeight.toFloat()
         // Not clipped inside: a card shrinking away below the stack's new (smaller) height stays until it's gone
-        Box(modifier = Modifier.fillMaxWidth().verticalScroll(scroll)) {
+        Box(modifier = Modifier.fillMaxWidth().verticalScroll(scroll).padding(bottom = bottomPadding)) {
             Box(modifier = Modifier.fillMaxWidth().height(height)) {
                 if (results.isNotEmpty()) {
                     val first = ((scroll.value - marginPx) / pitchPx).toInt().coerceIn(0, results.lastIndex)

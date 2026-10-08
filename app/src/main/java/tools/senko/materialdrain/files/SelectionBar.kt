@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import tools.senko.materialdrain.ui.LocalBottomInset
 import tools.senko.materialdrain.ui.LocalReduceMotion
 
 /** One action on the selected items. [destructive] actions are tinted red. */
@@ -75,6 +76,8 @@ fun SelectionActionBar(
         ) {
             Row(
                 modifier = Modifier
+                    // Its colour goes on under the system's navigation bar, its buttons stay above it
+                    .padding(bottom = LocalBottomInset.current)
                     .height(SelectionBarHeight)
                     .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically

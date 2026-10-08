@@ -26,6 +26,7 @@ private const val PREFS_NAME = "provider_prefs"
 private const val SECURE_PREFS_NAME = "provider_secure_prefs"
 private const val CONFIGS_KEY = "configs"
 private const val ACTIVE_ID_KEY = "active_provider_id"
+private const val LEGACY_FIRST_LINE = "MATERIALDRAIN-PROVIDER-CONFIG-V1"
 
 /** Stable id of the built-in, always-available Pixeldrain provider; never stored in [ProviderConfigStore]. */
 const val PIXELDRAIN_PROVIDER_ID = "pixeldrain-default"
@@ -37,7 +38,7 @@ const val PIXELDRAIN_PROVIDER_ID = "pixeldrain-default"
 data class ConfigSource(val config: ProviderConfig, val text: String) {
     companion object {
         /** Null when [text] isn't a config. */
-        fun of(text: String): ConfigSource? = ProviderConfigCodec.decode(text)?.let { ConfigSource(it, ProviderConfigCodec.normalizeText(text)) }
+        fun of(text: String): ConfigSource? = ProviderConfigCodec.decode(text)?.let { ConfigSource(it, text.trim()) }
     }
 }
 
@@ -96,8 +97,16 @@ class ProviderConfigStore(context: Context) {
     private val cipher = KeystoreCipher(alias = "materialdrain_provider_secrets_key")
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** Set by [loadProviders] when a saved config still had the first line older versions wrote (see [withoutLegacyLine]). */
+    private var hadLegacyLine = false
+
     private val _providers = MutableStateFlow(loadProviders())
     val providers: StateFlow<List<StoredProvider>> = _providers.asStateFlow()
+
+    init {
+        // Saved again without it, once, so it's never looked for after this
+        if (hadLegacyLine) writeRecords(_providers.value)
+    }
 
     private val _activeProviderId = MutableStateFlow(prefs.getString(ACTIVE_ID_KEY, PIXELDRAIN_PROVIDER_ID) ?: PIXELDRAIN_PROVIDER_ID)
     val activeProviderId: StateFlow<String> = _activeProviderId.asStateFlow()
@@ -119,23 +128,40 @@ class ProviderConfigStore(context: Context) {
             } catch (_: Exception) {
                 return@mapNotNull null
             }
-            val source = ConfigSource.of(record.config) ?: return@mapNotNull null
+            val source = ConfigSource.of(withoutLegacyLine(record.config)) ?: return@mapNotNull null
             StoredProvider(
                 id = id,
                 config = source.config,
                 text = source.text,
-                upstream = record.upstream?.let(ProviderConfigCodec::decode),
-                previous = record.previous?.let(ConfigSource::of),
+                upstream = record.upstream?.let { ProviderConfigCodec.decode(withoutLegacyLine(it)) },
+                previous = record.previous?.let { ConfigSource.of(withoutLegacyLine(it)) },
                 autoUpdate = record.autoUpdate,
                 keepAutoUpdateWhenEdited = record.keepAutoUpdateWhenEdited,
-                pendingUpdate = record.pendingUpdate?.let(ConfigSource::of),
+                pendingUpdate = record.pendingUpdate?.let { ConfigSource.of(withoutLegacyLine(it)) },
                 etag = record.etag,
                 lastCheckedMillis = record.lastCheckedMillis
             )
         }
     }
 
+    /**
+     * [text] without the line older versions of the app put before every config they saved; the app no longer writes or
+     * reads it, configs are plain JSON. Only for configs saved by those versions, see [hadLegacyLine].
+     */
+    private fun withoutLegacyLine(text: String): String {
+        val trimmed = text.trim()
+        if (!trimmed.startsWith(LEGACY_FIRST_LINE)) return trimmed
+        hadLegacyLine = true
+        return trimmed.removePrefix(LEGACY_FIRST_LINE).trim()
+    }
+
     private fun persist(providers: List<StoredProvider>) {
+        writeRecords(providers)
+        _providers.value = providers
+        changed()
+    }
+
+    private fun writeRecords(providers: List<StoredProvider>) {
         val records = providers.associate { p ->
             p.id to json.encodeToJsonElement(
                 StoredRecord.serializer(),
@@ -153,8 +179,6 @@ class ProviderConfigStore(context: Context) {
             )
         }
         prefs.edit { putString(CONFIGS_KEY, JsonObject(records).toString()) }
-        _providers.value = providers
-        changed()
     }
 
     private fun update(id: String, change: (StoredProvider) -> StoredProvider): StoredProvider? {

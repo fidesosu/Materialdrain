@@ -80,4 +80,14 @@ class TransferRegistry(context: Context) {
     fun cancelAll() {
         cancelHandlers.values.toList().forEach { it() }
     }
+
+    /** Stops one transfer; nothing happens when it's already over. */
+    fun cancel(id: String) {
+        cancelHandlers[id]?.invoke()
+    }
+
+    /** Stops every transfer of [kind], e.g. every download. */
+    fun cancelAll(kind: TransferKind) {
+        _active.value.values.filter { it.kind == kind }.forEach { cancel(it.id) }
+    }
 }

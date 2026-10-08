@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -46,6 +48,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -165,7 +168,9 @@ fun SortControls(
     sortAscending: Boolean,
     onSortFieldSelected: (SortableField) -> Unit,
     /** Actions at the end of the row, behind a "New" menu, e.g. the filesystem's upload and new folder. */
-    actions: List<SortRowAction> = emptyList()
+    actions: List<SortRowAction> = emptyList(),
+    /** Stops the transfer shown in the bar above (a download, an upload); null while there's none. */
+    onCancelTransfer: (() -> Unit)? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
     val currentSortName = SortOptions.find { it.second == sortField }?.first.orEmpty()
@@ -181,11 +186,12 @@ fun SortControls(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Sort: a floating card with a menu. Reselecting the field already sorted on flips its direction (see
-        // AppSettings.changeSortOrder); the direction shows by the field's name and in the menu.
-        Box {
+        // AppSettings.changeSortOrder); the direction shows by the field's name and in the menu. It takes the room the
+        // other cards leave, up to its usual width, so a Cancel next to New still fits on a narrow screen
+        Box(modifier = Modifier.weight(1f)) {
             FloatingCardButton(
                 onClick = { expanded = true },
-                modifier = Modifier.width(SortControlWidth)
+                modifier = Modifier.widthIn(max = SortControlWidth).fillMaxWidth()
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -213,8 +219,21 @@ fun SortControls(
             }
         }
 
-        // Keeps the actions at the end of the row
-        Spacer(Modifier.weight(1f))
+        // At the end of the row
+        AnimatedVisibility(
+            visible = onCancelTransfer != null,
+            enter = fadeIn() + scaleIn(initialScale = 0.8f),
+            exit = fadeOut() + scaleOut(targetScale = 0.8f)
+        ) {
+            // Kept while it fades out, when there's no transfer left to cancel
+            var lastCancel by remember { mutableStateOf(onCancelTransfer) }
+            if (onCancelTransfer != null) lastCancel = onCancelTransfer
+            FloatingCardButton(onClick = { lastCancel?.invoke() }) {
+                Icon(Icons.Filled.Close, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Cancel", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error, maxLines = 1)
+            }
+        }
         if (actions.isNotEmpty()) SortRowActions(actions)
     }
 }
@@ -235,7 +254,7 @@ private fun SortRowActions(actions: List<SortRowAction>) {
         FloatingCardButton(onClick = { expanded = true }, enabled = actions.any { it.enabled }) {
             Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text("New", style = MaterialTheme.typography.labelLarge)
+            Text("New", style = MaterialTheme.typography.labelLarge, maxLines = 1)
             Spacer(Modifier.width(4.dp))
         }
         FloatingCardMenu(expanded = expanded, onDismiss = { expanded = false }, alignment = Alignment.TopEnd) {
@@ -466,14 +485,16 @@ fun SearchModal(
         val focusRequester = remember { FocusRequester() }
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-        // Fills the window so a tap beside the cards closes it. Above the keyboard (safeDrawing includes it), so the
-        // matches scroll in the space left between the search card and the keyboard
+        // Fills the window so a tap beside the cards closes it. The matches go on down to the edge of the screen, under the
+        // navigation bar and the keyboard, rather than being cut off above them: the stack adds room for those after its
+        // last card, so every match can still be scrolled into view
+        val bottomInset = with(LocalDensity.current) { WindowInsets.safeDrawing.getBottom(this).toDp() }
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .clickable(interactionSource = null, indication = null, onClick = close)
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp),
             contentAlignment = Alignment.TopCenter
         ) {
             Column(
@@ -537,6 +558,7 @@ fun SearchModal(
                         }
                     }
                 }
+                val moreMatches = matches.size > shown.size
                 SearchResultStack(
                     results = shown,
                     thumbnailFor = thumbnailFor,
@@ -545,13 +567,15 @@ fun SearchModal(
                         onDismiss()
                         onResultClick(node)
                     },
+                    // The count of more matches below keeps clear of the navigation bar itself
+                    bottomPadding = if (moreMatches) 0.dp else bottomInset + 8.dp,
                     modifier = Modifier
                         .weight(1f, fill = false)
                         .padding(top = SearchResultGap * 1.5f)
                 )
                 // Only with a limit set (in the settings): the matches past it are counted, not listed
                 AnimatedVisibility(
-                    visible = matches.size > shown.size,
+                    visible = moreMatches,
                     enter = fadeIn() + scaleIn(initialScale = 0.8f),
                     exit = fadeOut() + scaleOut(targetScale = 0.8f)
                 ) {
@@ -560,7 +584,7 @@ fun SearchModal(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
-                            .padding(top = SearchResultGap)
+                            .padding(top = SearchResultGap, bottom = bottomInset + 8.dp)
                             .clip(RoundedCornerShape(50))
                             .background(floatingCardColor())
                             .padding(horizontal = 12.dp, vertical = 6.dp)

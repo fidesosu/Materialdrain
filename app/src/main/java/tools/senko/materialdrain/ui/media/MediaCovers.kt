@@ -102,57 +102,73 @@ object MediaCovers {
 
         /** The thumbnail of the file at [src], from the disk when it was read before; null when it has none. */
         private suspend fun coverOf(src: String, version: String): ByteArray? {
-            // Songs keep the folder they always had, so the covers read before stay
-            val dir = File(context.cacheDir, if (video) "video-frames" else "audio-covers")
+            // Songs keep the folder they always had, so the covers read before stay. Videos start a new one: the first
+            // version also kept "no frame" for videos which merely failed to load once, and so never tried them again
+            val dir = File(context.cacheDir, if (video) "video-frames-2" else "audio-covers")
             val key = sha1("$src\n$version")
             val cached = File(dir, "$key.jpg")
             val none = File(dir, "$key.none")
             if (cached.isFile) return cached.readBytes()
             if (none.isFile) return null
-            val cover = permits.withPermit { if (video) readFrame(src) else readCover(src) }
+            val result = permits.withPermit { if (video) readFrame(src) else readCover(src) }
             runCatching {
                 dir.mkdirs()
-                if (cover == null) {
-                    none.createNewFile()
-                } else {
-                    // Written whole, then moved in place: a thumbnail cut short by a crash is never read back
-                    val partial = File(dir, "$key.part")
-                    partial.writeBytes(cover)
-                    partial.renameTo(cached)
+                when (result) {
+                    is Read.Found -> {
+                        // Written whole, then moved in place: a thumbnail cut short by a crash is never read back
+                        val partial = File(dir, "$key.part")
+                        partial.writeBytes(result.bytes)
+                        partial.renameTo(cached)
+                    }
+                    // Only a file that was read and has nothing is remembered as such; one that couldn't be read (the
+                    // network, the host being slow) is tried again the next time it's shown
+                    Read.Nothing -> none.createNewFile()
+                    Read.Failed -> Unit
                 }
             }
-            return cover
+            return (result as? Read.Found)?.bytes
         }
 
         /** Reads the embedded picture of [src] over the network: the media framework fetches only the ranges it needs. */
-        private fun readCover(src: String): ByteArray? = withRetriever(src) { retriever ->
+        private fun readCover(src: String): Read = withRetriever(src) { retriever ->
             retriever.embeddedPicture?.let { scaled(it) }
         }
 
         /**
          * Reads a frame of the video at [src] over the network, the nearest key frame to a tenth of the way in (see
-         * [FRAME_AT_FRACTION]): a key frame decodes on its own, so only the ranges around it are fetched.
+         * [FRAME_AT_FRACTION]): a key frame decodes on its own, so only the ranges around it are fetched. Some videos give
+         * nothing for that (a very short one, an odd index); then the key frame before it, then the very first frame.
          */
-        private fun readFrame(src: String): ByteArray? = withRetriever(src) { retriever ->
+        private fun readFrame(src: String): Read = withRetriever(src) { retriever ->
             val durationUs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.times(1000)
             val atUs = durationUs?.let { (it * FRAME_AT_FRACTION).toLong().coerceAtMost(FRAME_AT_MOST_US) } ?: 0L
             val frame = retriever.getScaledFrameAtTime(atUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, COVER_PX, COVER_PX)
-                ?: retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)?.let { scaled(it) }
+                ?: retriever.getScaledFrameAtTime(atUs, MediaMetadataRetriever.OPTION_PREVIOUS_SYNC, COVER_PX, COVER_PX)
+                ?: retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST)?.let { scaled(it) }
+                ?: runCatching { retriever.getFrameAtIndex(0) }.getOrNull()?.let { scaled(it) }
+            if (frame == null) Log.w(TAG, "no frame in $src (${durationUs?.div(1000)} ms long)")
             frame?.let { jpeg(it) }
         }
 
-        private fun withRetriever(src: String, read: (MediaMetadataRetriever) -> ByteArray?): ByteArray? {
+        private fun withRetriever(src: String, read: (MediaMetadataRetriever) -> ByteArray?): Read {
             val retriever = MediaMetadataRetriever()
             return try {
                 retriever.setDataSource(src, HostRequestAuth.headersFor(src))
-                read(retriever)
+                read(retriever)?.let { Read.Found(it) } ?: Read.Nothing
             } catch (e: Exception) {
                 Log.w(TAG, "nothing read from $src: ${e.message}")
-                null
+                Read.Failed
             } finally {
                 retriever.release()
             }
         }
+    }
+
+    /** What reading a file's thumbnail came to: one, none in the file, or the file couldn't be read. */
+    private sealed interface Read {
+        class Found(val bytes: ByteArray) : Read
+        data object Nothing : Read
+        data object Failed : Read
     }
 
     /** [bytes] scaled down to [COVER_PX] and encoded as a JPEG. */

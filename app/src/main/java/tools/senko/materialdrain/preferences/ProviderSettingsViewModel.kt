@@ -52,6 +52,9 @@ data class ProviderSettingsUiState(
     /** Result of the last update check per host, e.g. "Up to date". */
     val checkMessages: Map<String, String> = emptyMap(),
     val editingId: String? = null,
+    /** A new host being filled in, before it's added: the config's text it started from (a template, a paste). */
+    val newHostText: String? = null,
+    /** Why the config in the editor (an edit, or a new host) wasn't saved. */
     val editError: String? = null,
     val approval: UpdateApproval? = null,
     val editNotice: EditNotice? = null,
@@ -214,15 +217,29 @@ class ProviderSettingsViewModel(
 
     fun startEdit(id: String) = _uiState.update { it.copy(editingId = id, editError = null) }
 
-    fun cancelEdit() = _uiState.update { it.copy(editingId = null, editError = null) }
+    fun cancelEdit() = _uiState.update { it.copy(editingId = null, newHostText = null, editError = null) }
 
-    fun saveEdit(id: String, text: String) {
+    /** Opens the editor on a new host, starting from [text]: a template, or a pasted config. */
+    fun startNewHost(text: String) = _uiState.update { it.copy(newHostText = text, editError = null) }
+
+    /** Adds the host filled in in the editor and makes it the active one; when it isn't usable yet, says why. */
+    fun saveNewHost(text: String) {
+        val source = sourceOrError(text) ?: return
+        configStore.setActive(configStore.import(source))
+        _uiState.update { it.copy(newHostText = null, editError = null, importError = null) }
+    }
+
+    private fun sourceOrError(text: String): ConfigSource? {
         val source = ConfigSource.of(text)
         if (source == null) {
             val reason = ProviderConfigCodec.explainFailure(text) ?: "it couldn't be read"
-            _uiState.update { it.copy(editError = "Not a valid provider config: $reason.") }
-            return
+            _uiState.update { it.copy(editError = "This config can't be used yet: $reason.") }
         }
+        return source
+    }
+
+    fun saveEdit(id: String, text: String) {
+        val source = sourceOrError(text) ?: return
         val config = source.config
         val outcome = configStore.saveEdit(id, source)
         val stored = configStore.get(id)

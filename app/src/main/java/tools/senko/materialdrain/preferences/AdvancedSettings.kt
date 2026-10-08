@@ -68,6 +68,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import kotlinx.coroutines.flow.filter
 import androidx.compose.ui.unit.dp
+import tools.senko.materialdrain.preferences.configeditor.ConfigEditor
 import tools.senko.materialdrain.provider.StoredProvider
 import tools.senko.materialdrain.provider.api.ConfigUpdates
 import tools.senko.materialdrain.provider.api.GenericRestConfig
@@ -119,58 +120,78 @@ fun SettingsEnvironment.ProviderHostsSection() {
         Text("Add a custom host", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            "Paste a provider config here, as JSON (with or without the MATERIALDRAIN-PROVIDER-CONFIG-V1 first " +
-                "line this app adds when exporting one). Configs never contain passwords or tokens, so they're " +
-                "safe to share; sign-in details are entered here in the app, per host.",
+            "Pick the kind of host to fill in its details in a form, or paste a config someone shared. Configs never " +
+                "contain passwords or tokens, so they're safe to share; sign-in details are entered here in the app, per host.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(8.dp))
-        // A complete config to fill in, for each kind of host the app speaks: every field it reads is in it
-        Text("Start from", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // A complete config to fill in, for each kind of host the app speaks, opened in the editor
+        Text("New host", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         val context = LocalContext.current
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            ProviderConfigTemplates.Kind.entries.forEach { kind ->
+                AssistChip(onClick = { viewModel.startNewHost(ProviderConfigTemplates.text(kind)) }, label = { Text(kind.label) })
+            }
             AssistChip(
                 onClick = {
                     runCatching { context.assets.open("pixeldrain.json").bufferedReader().use { it.readText() } }
-                        .onSuccess { importText = it; viewModel.clearImportError() }
+                        .onSuccess { viewModel.startNewHost(it) }
                 },
-                label = { Text("REST API (Pixeldrain)") }
+                label = { Text("REST API (from Pixeldrain)") }
             )
-            ProviderConfigTemplates.Kind.entries.forEach { kind ->
-                AssistChip(
-                    onClick = {
-                        importText = ProviderConfigTemplates.text(kind)
-                        viewModel.clearImportError()
-                    },
-                    label = { Text(kind.label) }
-                )
-            }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         OutlinedTextField(
             value = importText,
             onValueChange = { importText = it; viewModel.clearImportError() },
-            label = { Text("Provider config") },
+            label = { Text("Or paste a config") },
             modifier = Modifier.fillMaxWidth(),
-            minLines = 4
+            minLines = 3
         )
         uiState.importError?.let {
             Spacer(modifier = Modifier.height(4.dp))
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
         Spacer(modifier = Modifier.height(8.dp))
-        OutlinedButton(
-            onClick = { if (viewModel.importConfig(importText)) importText = "" },
-            enabled = importText.isNotBlank(),
-            modifier = Modifier.fillMaxWidth()
-        ) { Text("Import host") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                // Moved into the editor, so the box doesn't still hold it once the host is added
+                onClick = { viewModel.startNewHost(importText); importText = "" },
+                enabled = importText.isNotBlank(),
+                modifier = Modifier.weight(1f)
+            ) { Text("Review first") }
+            Button(
+                onClick = { if (viewModel.importConfig(importText)) importText = "" },
+                enabled = importText.isNotBlank(),
+                modifier = Modifier.weight(1f)
+            ) { Text("Add host") }
+        }
     }
 
-    uiState.editingId?.let { id -> EditConfigDialog(id, uiState.editError, viewModel) }
+    uiState.editingId?.let { id ->
+        ConfigEditor(
+            title = "Edit host",
+            initialText = remember(id) { viewModel.exportConfig(id).orEmpty() },
+            saveLabel = "Save",
+            error = uiState.editError,
+            onSave = { viewModel.saveEdit(id, it) },
+            onDismiss = { viewModel.cancelEdit() }
+        )
+    }
+    uiState.newHostText?.let { text ->
+        ConfigEditor(
+            title = "New host",
+            initialText = text,
+            saveLabel = "Add host",
+            error = uiState.editError,
+            onSave = { viewModel.saveNewHost(it) },
+            onDismiss = { viewModel.cancelEdit() }
+        )
+    }
     uiState.approval?.let { UpdateApprovalDialog(it, viewModel) }
     uiState.editNotice?.let { EditNoticeDialog(it, viewModel) }
     uiState.otpPrompt?.let { OtpDialog(it, busy = uiState.signingInId == it.id, viewModel) }
@@ -530,31 +551,6 @@ private fun HostCard(
             }
         }
     }
-}
-
-@Composable
-private fun EditConfigDialog(id: String, error: String?, viewModel: ProviderSettingsViewModel) {
-    var text by rememberSaveable(id) { mutableStateOf(viewModel.exportConfig(id).orEmpty()) }
-    AlertDialog(
-        onDismissRequest = { viewModel.cancelEdit() },
-        title = { Text("Edit config") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp, max = 420.dp)
-                )
-                error?.let {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = { viewModel.saveEdit(id, text) }) { Text("Save") } },
-        dismissButton = { TextButton(onClick = { viewModel.cancelEdit() }) { Text("Cancel") } }
-    )
 }
 
 @Composable

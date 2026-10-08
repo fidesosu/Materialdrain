@@ -74,6 +74,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import tools.senko.materialdrain.files.DownloadStatus
 import tools.senko.materialdrain.files.FileActionDialogs
 import tools.senko.materialdrain.files.FileActionRequest
 import tools.senko.materialdrain.files.FileInfoViewModel
@@ -95,6 +96,7 @@ import tools.senko.materialdrain.provider.api.StorageRef
 import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.settings.SEARCH_INDEX_DELETE_WARNING
 import tools.senko.materialdrain.settings.isSearchIndex
+import tools.senko.materialdrain.ui.LocalBottomInset
 import tools.senko.materialdrain.ui.components.DotScrollbar
 import tools.senko.materialdrain.ui.components.CenteredTextMessage
 import tools.senko.materialdrain.ui.components.ConfirmDialog
@@ -530,6 +532,15 @@ fun BrowserScreen(
         state = pullRefreshState,
         modifier = Modifier.fillMaxSize()
     ) {
+        // What stops the transfer the bar above this screen shows (see App.kt's TransferBarSlot): the filesystem's upload
+        // there, else the downloads. Offered as a Cancel card next to the sorting
+        val downloading = fileState.downloadBatch != null ||
+            fileState.activeDownloads.values.any { it.status == DownloadStatus.PENDING || it.status == DownloadStatus.DOWNLOADING }
+        val cancelTransfer: (() -> Unit)? = when {
+            mode == BrowserMode.FILESYSTEM && fsState.uploadProgress != null -> { { filesystemViewModel.cancelUpload() } }
+            downloading -> { { fileInfoViewModel.cancelAllDownloads() } }
+            else -> null
+        }
         Column(modifier = Modifier.fillMaxSize()) {
             // Header: the sorting and filter of whichever mode's list is sortable (every mode except the lists overview,
             // which is just titles), then right above the content the path (filesystem) or the list being shown (lists)
@@ -543,7 +554,8 @@ fun BrowserScreen(
                             if (canUploadFs) add(SortRowAction(Icons.Filled.Upload, "Upload", enabled = !fsState.isModifying && fsState.uploadProgress == null) { filesystemUploadLauncher.launch("*/*") })
                             if (canMkdirFs) add(SortRowAction(Icons.Filled.CreateNewFolder, "New folder", enabled = !fsState.isModifying) { showNewFolderDialog = true })
                             if (fsState.canImport) add(SortRowAction(Icons.Filled.Link, "Import files by ID", enabled = !fsState.isModifying) { showImportDialog = true })
-                        } else emptyList()
+                        } else emptyList(),
+                        onCancelTransfer = cancelTransfer
                     )
                     PathBreadcrumb(
                         pathSegments = fsState.pathSegments,
@@ -554,7 +566,8 @@ fun BrowserScreen(
                     SortControls(
                         sortField = sortField,
                         sortAscending = sortAscending,
-                        onSortFieldSelected = { appSettings.changeSortOrder(it) }
+                        onSortFieldSelected = { appSettings.changeSortOrder(it) },
+                        onCancelTransfer = cancelTransfer
                     )
                     if (!selectionMode) {
                         Row(
@@ -590,7 +603,8 @@ fun BrowserScreen(
                 BrowserMode.FILES -> SortControls(
                     sortField = sortField,
                     sortAscending = sortAscending,
-                    onSortFieldSelected = { appSettings.changeSortOrder(it) }
+                    onSortFieldSelected = { appSettings.changeSortOrder(it) },
+                    onCancelTransfer = cancelTransfer
                 )
             }
 
@@ -599,19 +613,14 @@ fun BrowserScreen(
             }
             if (mode == BrowserMode.FILESYSTEM) {
                 fsState.uploadProgress?.let { progress ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Uploading ${progress.currentFileName} (${progress.currentIndex}/${progress.totalFiles})",
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        TextButton(onClick = { filesystemViewModel.cancelUpload() }) { Text("Cancel") }
-                    }
+                    // Cancelled with the Cancel card in the sort row above
+                    Text(
+                        text = "Uploading ${progress.currentFileName} (${progress.currentIndex}/${progress.totalFiles})",
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
                 }
             }
             HorizontalDivider()
@@ -642,7 +651,8 @@ fun BrowserScreen(
                     LazyColumn(
                         state = scrollState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = if (isFabVisible) fabHeight + 16.dp else 16.dp)
+                        // Past the last file: room for the upload button, or the system's navigation bar (LocalBottomInset)
+                        contentPadding = PaddingValues(bottom = (if (isFabVisible) fabHeight + 16.dp else 16.dp) + LocalBottomInset.current)
                     ) {
                         items(entries, key = { it.key }) { node ->
                             BrowserEntry(

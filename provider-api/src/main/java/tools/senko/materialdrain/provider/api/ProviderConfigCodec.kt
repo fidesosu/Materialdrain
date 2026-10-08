@@ -9,22 +9,14 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-/**
- * First line of every exported/imported provider config. Lets the app recognize its own config text (a
- * pasted clipboard blob, an imported file) at a glance, without attempting to parse it as JSON first.
- */
-const val PROVIDER_CONFIG_MARKER = "MATERIALDRAIN-PROVIDER-CONFIG-V1"
-
 private const val KIND_GENERIC_REST = "generic_rest"
 private const val KIND_WEBDAV = "webdav"
 private const val KIND_S3 = "s3"
 private const val KIND_SMB = "smb"
 
 /**
- * Encodes/decodes [ProviderConfig] as JSON, discriminated by a top-level "kind" field. [encode] always
- * writes the `MARKER\n{json}` form, so pasting an exported config back in is unmistakably recognized. A
- * hand-written config can skip the marker line and just be plain JSON, e.g. as a ".json" file that other
- * tools (editors, syntax highlighters, `jq`) can read as-is — [decode] accepts both.
+ * Encodes/decodes [ProviderConfig] as plain JSON, discriminated by a top-level "kind" field. A config is just that
+ * JSON, so it can be a ".json" file which other tools (editors, syntax highlighters, `jq`) read as it is.
  */
 object ProviderConfigCodec {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; prettyPrint = true }
@@ -49,7 +41,7 @@ object ProviderConfigCodec {
         element.jsonObject.forEach { (key, value) ->
             fields[key] = if (allFields && key == "screens" && value is JsonArray) fullScreens(value) else value
         }
-        return PROVIDER_CONFIG_MARKER + "\n" + format.encodeToString(JsonObject.serializer(), JsonObject(fields))
+        return format.encodeToString(JsonObject.serializer(), JsonObject(fields))
     }
 
     /** Screens written by name alone (see ScreenEntrySerializer), spelled out with every field instead. */
@@ -66,18 +58,7 @@ object ProviderConfigCodec {
 
     /** Returns null when [text] isn't a Materialdrain provider config (unknown kind, or malformed JSON). */
     fun decode(text: String): ProviderConfig? {
-        val markerLine = text.lineSequence().firstOrNull()?.trim()
-        val body = if (markerLine == PROVIDER_CONFIG_MARKER) text.substringAfter('\n', missingDelimiterValue = "") else text
-        return decodeBody(body.trim())
-    }
-
-    private fun decodeBody(body: String): ProviderConfig? {
-        if (body.isEmpty()) return null
-        val obj = try {
-            json.parseToJsonElement(body).jsonObject
-        } catch (_: Exception) {
-            return null
-        }
+        val obj = parseObject(text) ?: return null
         val kind = obj["kind"]?.jsonPrimitive?.content ?: return null
         return try {
             when (kind) {
@@ -92,13 +73,9 @@ object ProviderConfigCodec {
         }
     }
 
-    /**
-     * Why [text] isn't a config, for the import message: null when it is one. The first line doesn't matter, the
-     * marker is optional; what matters is the JSON after it.
-     */
+    /** Why [text] isn't a config, for the import message: null when it is one. */
     fun explainFailure(text: String): String? {
-        val markerLine = text.lineSequence().firstOrNull()?.trim()
-        val body = (if (markerLine == PROVIDER_CONFIG_MARKER) text.substringAfter('\n', missingDelimiterValue = "") else text).trim()
+        val body = text.trim()
         if (body.isEmpty()) return "the text is empty"
         val obj = try {
             json.parseToJsonElement(body).jsonObject
@@ -116,38 +93,39 @@ object ProviderConfigCodec {
             }
             null
         } catch (e: Exception) {
-            "a field doesn't fit (${e.message?.lineSequence()?.firstOrNull() ?: "unknown"})"
+            val message = e.message?.lineSequence()?.firstOrNull() ?: "unknown"
+            missingFields(message)?.let { return "it still needs ${it.joinToString(" and ") { name -> "\"$name\"" }}" }
+            "a field doesn't fit ($message)"
         }
     }
 
-    /**
-     * [text] as it's kept: as written, so fields the app doesn't read (notes, fields left at their defaults, fields for a
-     * newer app) stay in it, with the marker line added when it was left out, so the exported text is recognized.
-     */
-    fun normalizeText(text: String): String {
-        val trimmed = text.trim()
-        return if (trimmed.lineSequence().firstOrNull()?.trim() == PROVIDER_CONFIG_MARKER) trimmed else PROVIDER_CONFIG_MARKER + "\n" + trimmed
+    /** The fields a decoding error says are missing, e.g. "Field 'host' is required…"; null for any other error. */
+    private fun missingFields(message: String): List<String>? {
+        Regex("""Field '([^']+)' is required""").find(message)?.let { return listOf(it.groupValues[1]) }
+        return Regex("""Fields \[([^\]]+)] are required""").find(message)?.groupValues?.get(1)?.split(',')?.map { it.trim() }
     }
 
     /** [text] without its meta's update URL, everything else kept; null when it isn't a JSON object. */
     fun removeUpdateUrl(text: String): String? {
-        val markerLine = text.lineSequence().firstOrNull()?.trim()
-        val body = (if (markerLine == PROVIDER_CONFIG_MARKER) text.substringAfter('\n', missingDelimiterValue = "") else text).trim()
-        val obj = try {
-            json.parseToJsonElement(body).jsonObject
-        } catch (_: Exception) {
-            return null
-        }
-        val meta = obj["meta"] as? JsonObject ?: return normalizeText(text)
-        val fields = LinkedHashMap(obj).apply { put("meta", JsonObject(meta - "update_url")) }
-        return PROVIDER_CONFIG_MARKER + "\n" + json.encodeToString(JsonObject.serializer(), JsonObject(fields))
+        val obj = parseObject(text) ?: return null
+        val meta = obj["meta"] as? JsonObject ?: return text.trim()
+        return format(JsonObject(LinkedHashMap(obj).apply { put("meta", JsonObject(meta - "update_url")) }))
     }
 
-    /** Cheap check for a paste/import sheet: is this text even worth trying to [decode]? */
-    fun looksLikeProviderConfig(text: String): Boolean {
-        val trimmed = text.trim()
-        if (trimmed.lineSequence().firstOrNull()?.trim() == PROVIDER_CONFIG_MARKER) return true
-        // Plain JSON fallback: not a full parse, just enough to skip obviously-unrelated text
-        return trimmed.startsWith("{") && trimmed.contains("\"kind\"")
+    /**
+     * The JSON object of a config's [text], every field kept as written (in its order), whether the app reads it or not;
+     * null when it isn't a JSON object. For editing a config field by field.
+     */
+    fun parseObject(text: String): JsonObject? {
+        val body = text.trim()
+        if (body.isEmpty()) return null
+        return try {
+            json.parseToJsonElement(body) as? JsonObject
+        } catch (_: Exception) {
+            null
+        }
     }
+
+    /** [obj] as a config's text: the JSON, indented. */
+    fun format(obj: JsonObject): String = json.encodeToString(JsonObject.serializer(), obj)
 }

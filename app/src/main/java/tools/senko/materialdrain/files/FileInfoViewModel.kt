@@ -65,7 +65,9 @@ enum class DownloadStatus {
     PENDING,
     DOWNLOADING,
     COMPLETED,
-    FAILED
+    FAILED,
+    /** Stopped by the user; nothing was saved. */
+    CANCELLED
 }
 
 data class FileDownloadState(
@@ -127,6 +129,8 @@ data class FileInfoUiState(
     // For text preview
     val isLoadingTextPreview: Boolean = false,
     val textPreviewContent: String? = null,
+    // The whole text the preview was made from (up to the fetch limit), for the fullscreen view
+    val textPreviewFullContent: String? = null,
     val textPreviewErrorMessage: String? = null,
 
     // For user's list of files
@@ -296,7 +300,7 @@ class FileInfoViewModel(
         _uiState.update {
             it.copy(
                 isLoadingTextPreview = false,
-                textPreviewContent = null,
+                textPreviewContent = null, textPreviewFullContent = null,
                 textPreviewErrorMessage = null
             )
         }
@@ -348,29 +352,30 @@ class FileInfoViewModel(
 
         // An error replaces any text shown for the previous file, so the old preview can't stay on screen
         if (!isLikelyTextFile) {
-            _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewContent = null, textPreviewErrorMessage = "Preview not supported for this file type.") }
+            _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = "Preview not supported for this file type.") }
             return
         }
 
         val size = fileInfo.size ?: 0L
         if (size > MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES) {
-            _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewContent = null, textPreviewErrorMessage = "File is too large (${formatSize(size)}) for text preview. Max ${formatSize(MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES.toLong())}.") }
+            _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = "File is too large (${formatSize(size)}) for text preview. Max ${formatSize(MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES.toLong())}.") }
             return
         }
 
-        _uiState.update { it.copy(isLoadingTextPreview = true, textPreviewContent = null, textPreviewErrorMessage = null) }
+        _uiState.update { it.copy(isLoadingTextPreview = true, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = null) }
         viewModelScope.launch {
             val buffer = ByteArrayOutputStream()
             when (val response = downloadNodeTo(fileInfo, buffer) { _, _ -> }) {
                 is ApiResponse.Success -> {
                     val content = buffer.toString(Charsets.UTF_8.name())
-                    val truncatedContent = if (content.length > MAX_TEXT_PREVIEW_DISPLAY_LENGTH) {
-                        content.substring(0, MAX_TEXT_PREVIEW_DISPLAY_LENGTH) + "\n... (truncated)"
+                    // The preview on the page shows the start, cut at a line; the fullscreen view the whole file
+                    val start = if (content.length > MAX_TEXT_PREVIEW_DISPLAY_LENGTH) {
+                        content.substring(0, MAX_TEXT_PREVIEW_DISPLAY_LENGTH).substringBeforeLast('\n')
                     } else {
                         content
                     }
                     _uiState.update {
-                        it.copy(isLoadingTextPreview = false, textPreviewContent = truncatedContent)
+                        it.copy(isLoadingTextPreview = false, textPreviewContent = start, textPreviewFullContent = content)
                     }
                 }
                 is ApiResponse.Error -> {
@@ -717,7 +722,11 @@ class FileInfoViewModel(
                 }
 
                 val speedTracker = TransferSpeedTracker()
+                val job = coroutineContext[Job]
                 val onProgress: (Long, Long?) -> Unit = { bytesRead, totalBytes ->
+                    // Called from inside the host's copy loop, which keeps reading until the file ends unless it's
+                    // stopped: a cancelled download stops here, whatever the host's own code does with cancelling
+                    if (job?.isActive == false) throw CancellationException("The download was cancelled")
                     val progress = if (totalBytes != null && totalBytes > 0) {
                         (bytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
                     } else 0f
@@ -746,7 +755,10 @@ class FileInfoViewModel(
                     }
                 }
 
-                when (val response = downloadNodeTo(node, outputStream!!, onProgress)) {
+                val response = downloadNodeTo(node, outputStream!!, onProgress)
+                // A host which turns the stopped copy into an error of its own: it was still a cancel
+                ensureActive()
+                when (response) {
                     is ApiResponse.Success -> {
                         downloadSuccessful = true
                         val bytesCopied = response.data
@@ -786,8 +798,10 @@ class FileInfoViewModel(
                 outcomeMessage = errorMsg
                 _uiState.update { currentState ->
                     val updatedDownload = currentState.activeDownloads[key]?.copy(
-                        status = DownloadStatus.FAILED,
+                        status = if (e is CancellationException) DownloadStatus.CANCELLED else DownloadStatus.FAILED,
                         message = errorMsg,
+                        // The unfinished file is deleted (see finalizeMediaStoreEntry): another try starts a new one
+                        targetUri = null,
                         bytesPerSecond = 0L,
                         etaSeconds = null,
                         progressFraction = if (e is CancellationException) 0f else currentState.activeDownloads[key]?.progressFraction ?: 0f,
@@ -825,6 +839,12 @@ class FileInfoViewModel(
         return downloadJob
     }
 
+    /** Stops the download of [node] started on its own (not one of a batch); its unfinished file is deleted. */
+    fun cancelDownload(node: StorageNode) = transfers.cancel("download-${node.key}")
+
+    /** Stops every download, single files and batches alike. */
+    fun cancelAllDownloads() = transfers.cancelAll(TransferKind.DOWNLOAD)
+
     // --- Actions on several files at once ---
 
     /** Downloads the files one after another, several simultaneous downloads can run into the download limits. */
@@ -845,7 +865,14 @@ class FileInfoViewModel(
             try {
                 for (file in files) {
                     ensureActive()
-                    initiateDownloadFile(file, queue, batchId).join()
+                    // Its own job, not a child of the batch's: cancelling the batch has to stop it too
+                    val download = initiateDownloadFile(file, queue, batchId)
+                    try {
+                        download.join()
+                    } catch (e: CancellationException) {
+                        download.cancel()
+                        throw e
+                    }
                     if (_uiState.value.activeDownloads[file.key]?.status == DownloadStatus.COMPLETED) savedFiles++
                     // Counted once the file is over, whether it was saved or failed
                     _uiState.update { state ->

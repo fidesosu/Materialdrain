@@ -10,10 +10,9 @@ import java.io.File
 class ImportReasonTest {
 
     @Test
-    fun `the shipped pixeldrain config imports, with or without the marker line`() {
+    fun `the shipped pixeldrain config imports`() {
         val text = File("../docs/provider-configs/pixeldrain.json").readText()
         assertNull(ProviderConfigCodec.explainFailure(text))
-        assertNull(ProviderConfigCodec.explainFailure("$PROVIDER_CONFIG_MARKER\n$text"))
     }
 
     @Test
@@ -26,6 +25,12 @@ class ImportReasonTest {
     @Test
     fun `a missing kind is named`() {
         assertTrue(ProviderConfigCodec.explainFailure("{\"name\": \"x\"}")!!.contains("kind"))
+    }
+
+    @Test
+    fun `missing required fields are named plainly`() {
+        val reason = ProviderConfigCodec.explainFailure("{\"kind\": \"smb\", \"name\": \"x\", \"share\": \"Docs\"}")!!
+        assertTrue(reason, reason.startsWith("it still needs") && reason.contains("\"host\""))
     }
 
     @Test

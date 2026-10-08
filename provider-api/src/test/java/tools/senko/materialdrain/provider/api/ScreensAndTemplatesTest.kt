@@ -64,7 +64,8 @@ class ScreensAndTemplatesTest {
             assertEquals(ProviderConfigTemplates.config(kind), decoded)
             // Fields left at their defaults are written too, and the screens in full
             assertTrue(text, text.contains("\"disabled_capabilities\""))
-            assertTrue(text, text.lines()[1].trim() == "{" && text.contains("\"kind\""))
+            // Plain JSON from the first line
+            assertTrue(text, text.lines()[0].trim() == "{" && text.contains("\"kind\""))
         }
         val smb = ProviderConfigTemplates.text(ProviderConfigTemplates.Kind.SMB)
         listOf("host", "port", "share", "root_path", "domain", "auth", "min_version", "encrypt", "screens", "meta").forEach {

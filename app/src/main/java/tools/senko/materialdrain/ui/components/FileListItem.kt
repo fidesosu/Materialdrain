@@ -164,6 +164,9 @@ fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp
     }
 }
 
+/** What kind of file [name] is, in a word, e.g. "Video" or "Archive": the same kind its tile shows (see [FileIcon]). */
+fun fileKindLabel(name: String, isDirectory: Boolean): String = FileKind.of(name, isDirectory).label
+
 /** What kind of file a name is, for the colour and glyph of its tile (see [FileIcon]). */
 private enum class FileKind(val icon: ImageVector, val label: String) {
     FOLDER(Icons.Filled.Folder, "Folder"),

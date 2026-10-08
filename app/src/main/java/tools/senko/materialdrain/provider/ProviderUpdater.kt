@@ -7,7 +7,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.ResponseBody
 import tools.senko.materialdrain.provider.api.ConfigUpdates
-import tools.senko.materialdrain.provider.api.ProviderConfigCodec
 import tools.senko.materialdrain.provider.api.SensitiveChange
 import tools.senko.materialdrain.provider.api.UpdateCheckResult
 import java.util.concurrent.TimeUnit
@@ -67,7 +66,7 @@ class ProviderUpdater(
                         CheckOutcome.UpToDate
                     }
                     is UpdateCheckResult.Available -> {
-                        val pending = ConfigSource(result.update, ProviderConfigCodec.normalizeText(text))
+                        val pending = ConfigSource(result.update, text.trim())
                         store.recordCheck(id, pendingUpdate = pending, etag = etag, checkedAtMillis = now)
                         CheckOutcome.UpdateAvailable(result.update.meta?.version ?: 0, result.sensitiveChanges)
                     }

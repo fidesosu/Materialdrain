@@ -20,18 +20,9 @@ class ProviderConfigCodecTest {
     """.trimIndent()
 
     @Test
-    fun `keeps a config's text as written, adding only the marker line`() {
-        val text = ProviderConfigCodec.normalizeText(smbWithExtras)
-        assertTrue(text.startsWith(PROVIDER_CONFIG_MARKER + "\n"))
-        assertTrue(text.endsWith(smbWithExtras))
-        // Already marked: left as it is
-        assertEquals(text, ProviderConfigCodec.normalizeText(text))
-    }
-
-    @Test
     fun `removing the update url keeps every other field`() {
         val text = ProviderConfigCodec.removeUpdateUrl(smbWithExtras)!!
-        assertTrue(text.startsWith(PROVIDER_CONFIG_MARKER + "\n"))
+        assertTrue(text.startsWith("{"))
         assertTrue("\"notes\"" in text)
         assertTrue("\"port\": 445" in text)
         assertTrue("\"author\": \"me\"" in text)
@@ -58,8 +49,9 @@ class ProviderConfigCodecTest {
             )
         )
 
+        // Plain JSON, nothing before it
         val encoded = ProviderConfigCodec.encode(config)
-        assertTrue(encoded.startsWith(PROVIDER_CONFIG_MARKER + "\n"))
+        assertTrue(encoded.startsWith("{"))
 
         val decoded = ProviderConfigCodec.decode(encoded)
         assertEquals(config, decoded)
@@ -91,7 +83,7 @@ class ProviderConfigCodecTest {
     }
 
     @Test
-    fun `a hand-written config without the marker line decodes as plain json`() {
+    fun `a hand-written config decodes as plain json`() {
         val plainJson = """{"kind":"generic_rest","name":"x","base_url":"https://x","endpoints":{}}"""
         val decoded = ProviderConfigCodec.decode(plainJson) as GenericRestConfig
         assertEquals("x", decoded.name)
@@ -99,23 +91,9 @@ class ProviderConfigCodecTest {
     }
 
     @Test
-    fun `rejects text that is neither marker-prefixed nor json`() {
+    fun `rejects text that isn't json`() {
         assertNull(ProviderConfigCodec.decode("some random pasted text"))
-    }
-
-    @Test
-    fun `rejects malformed json, with or without a correct marker`() {
-        assertNull(ProviderConfigCodec.decode(PROVIDER_CONFIG_MARKER + "\nnot json at all"))
         assertNull(ProviderConfigCodec.decode("not json at all"))
-    }
-
-    @Test
-    fun `looksLikeProviderConfig accepts the marker line or plain json with a kind field`() {
-        assertTrue(ProviderConfigCodec.looksLikeProviderConfig(PROVIDER_CONFIG_MARKER + "\n{}"))
-        assertTrue(ProviderConfigCodec.looksLikeProviderConfig(PROVIDER_CONFIG_MARKER))
-        assertTrue(ProviderConfigCodec.looksLikeProviderConfig("  $PROVIDER_CONFIG_MARKER  \n{}"))
-        assertTrue(ProviderConfigCodec.looksLikeProviderConfig("""{"kind":"generic_rest"}"""))
-        assertTrue(!ProviderConfigCodec.looksLikeProviderConfig("{}"))
-        assertTrue(!ProviderConfigCodec.looksLikeProviderConfig("some random pasted text"))
+        assertNull(ProviderConfigCodec.decode(""))
     }
 }

@@ -60,6 +60,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -109,6 +110,7 @@ import tools.senko.materialdrain.settings.SEARCH_INDEX_FILE_NAME
 import tools.senko.materialdrain.settings.isSearchIndex
 import tools.senko.materialdrain.files.key
 import tools.senko.materialdrain.ui.LocalBlurredBackdrop
+import tools.senko.materialdrain.ui.LocalBottomInset
 import tools.senko.materialdrain.ui.LocalTextWrap
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.LocalVideoLoop
@@ -605,9 +607,8 @@ fun MaterialdrainScreen() {
                     CenterAlignedTopAppBar(
                         title = {
                             val titleText = when (currentScreen) {
-                                Screen.FileDetail -> {
-                                    fileInfoUiState.fileInfo?.name ?: Screen.FileDetail.title
-                                }
+                                // The name is under the preview (see FileInfoDetailsCard), not up here as well
+                                Screen.FileDetail -> ""
                                 Screen.Settings -> {
                                     settingsCategory(settingsCategoryId)?.title ?: Screen.Settings.title
                                 }
@@ -923,10 +924,24 @@ fun MaterialdrainScreen() {
                 },
                 label = "screenTransition"
             ) { targetScreen ->
+                // Without the app's bottom bar, the file screens and the details go on under the system's navigation bar
+                // (the lists add room for it after their last item, see LocalBottomInset) instead of being cut off above it.
+                // The upload and settings screens keep their buttons clear of it.
+                val bottomBarShown = !navPrototype && targetScreen != Screen.FileDetail && navBarOrder.size > 1
+                val underNavigationBar = !bottomBarShown && targetScreen in setOf(Screen.FileDetail, Screen.Files, Screen.Lists, Screen.Filesystem)
+                val layoutDirection = LocalLayoutDirection.current
+                CompositionLocalProvider(
+                    LocalBottomInset provides if (underNavigationBar) paddingValues.calculateBottomPadding() else 0.dp
+                ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(paddingValues)
+                        .padding(
+                            start = paddingValues.calculateStartPadding(layoutDirection),
+                            top = paddingValues.calculateTopPadding(),
+                            end = paddingValues.calculateEndPadding(layoutDirection),
+                            bottom = if (underNavigationBar) 0.dp else paddingValues.calculateBottomPadding()
+                        )
                 ) {
                     val noScreensMessage = "${activeConfig?.name ?: "This host"} has no screens to show: its config's " +
                         "\"screens\" list is empty, or only names screens this host can't offer. Edit the config in " +
@@ -1003,6 +1018,7 @@ fun MaterialdrainScreen() {
                             onNavigateBack = { navigateTo(previousScreen) }
                         )
                     }
+                }
                 }
             }
         }

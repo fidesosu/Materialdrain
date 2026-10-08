@@ -674,9 +674,12 @@ class UploadViewModel(
                 val semaphore = Semaphore(MAX_PARALLEL_UPLOADS)
                 batch.map { item ->
                     async {
+                        val job = coroutineContext[Job]
                         semaphore.withPermit {
                             updateItem(item.id) { it.copy(status = UploadItemStatus.UPLOADING) }
                             val response = uploadFile(item.name, item.uri) { sent, _ ->
+                                // Called from inside the host's sending loop: a cancelled upload stops there
+                                if (job?.isActive == false) throw CancellationException("The upload was cancelled")
                                 synchronized(lock) { bytesPerItem[item.id] = sent }
                                 updateItem(item.id) { it.copy(uploadedBytes = sent) }
                             }
@@ -824,7 +827,10 @@ class UploadViewModel(
             val currentFileNameForUpload = _uiState.value.selectedFileName
             var operationType = "unknown"
 
+            val job = coroutineContext[Job]
             val progressCallback: (bytesSent: Long, totalBytes: Long?) -> Unit = { bytesSent, receivedTotalBytes ->
+                // Called from inside the host's sending loop: a cancelled upload stops there
+                if (job?.isActive == false) throw CancellationException("The upload was cancelled")
                 val speed = speedTracker.update(bytesSent)
                 _uiState.update {
                     val total = receivedTotalBytes ?: it.uploadTotalSizeBytes
