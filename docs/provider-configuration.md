@@ -5,7 +5,7 @@ A config describes where a host lives, how it signs in, and which of its request
 Lists and Filesystem screens are the same for every host. A config decides which of them appear and what each one
 can do.
 
-The shipped examples are in [`provider-configs/`](provider-configs/):
+The shipped examples are in [`provider-configs/`](https://github.com/fidesosu/Materialdrain/tree/main/docs/provider-configs):
 
 | File | Kind | What it is |
 | --- | --- | --- |
