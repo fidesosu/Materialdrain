@@ -1,4 +1,0 @@
-# What the documentation site is built with (see mkdocs.yml). Pinned, so a new release can't change or break the site
-# without anyone noticing; raise the versions on purpose.
-mkdocs==1.6.1
-mkdocs-material==9.7.7

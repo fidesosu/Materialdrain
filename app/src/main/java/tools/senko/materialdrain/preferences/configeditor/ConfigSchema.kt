@@ -8,9 +8,10 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /*
  * What the config editor knows about each kind of config: its fields, how each one is edited, and what it means. The
- * meanings are the ones in docs/provider-configuration.md, kept short: one line under the field, with the default when
- * there is one. The editor works on the config's JSON itself, so a field that isn't described here is still kept, and
- * shown as it is (see ConfigEditor's "Other fields").
+ * meanings are the ones in the documentation's provider configuration page (docs/provider-configuration.md in the
+ * website branch, https://materialdrain.senko.tools/docs/provider-configuration/), kept short: one line under the
+ * field, with the default when there is one. The editor works on the config's JSON itself, so a field that isn't
+ * described here is still kept, and shown as it is (see ConfigEditor's "Other fields").
  */
 
 /** How a field is edited. */

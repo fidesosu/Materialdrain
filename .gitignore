@@ -10,5 +10,3 @@ captures/
 .cxx
 *.jks
 *.keystore
-# A built copy of the website, for copying to the server by hand (the Website workflow builds the real one)
-docs/materialdrain/

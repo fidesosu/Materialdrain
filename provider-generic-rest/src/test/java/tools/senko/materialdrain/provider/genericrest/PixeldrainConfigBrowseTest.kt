@@ -21,7 +21,7 @@ import java.io.File
 
 /**
  * The shipped docs/provider-configs/pixeldrain.json, pointed at a mock server, driving the folder browsing.
- * Responses are shaped like the examples in docs/pixeldrain_api.txt.
+ * Responses are shaped like the examples in docs/pixeldrain_api.txt (in the website branch).
  */
 class PixeldrainConfigBrowseTest {
 

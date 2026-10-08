@@ -1,3 +1,1 @@
 * text=auto
-# Copied to a Linux server as they are: Windows line endings would break the script and the unit files
-docs/server-setup/** text eol=lf

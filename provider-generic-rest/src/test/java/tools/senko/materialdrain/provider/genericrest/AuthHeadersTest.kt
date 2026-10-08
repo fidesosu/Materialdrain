@@ -73,7 +73,7 @@ class AuthHeadersTest {
 
     private val pixeldrainFields = mapOf("username" to "{username}", "password" to "{password}", "totp" to "{otp}", "app_name" to "Materialdrain")
 
-    // Pixeldrain's real response shapes (docs/pixeldrain_api.txt, POST /user/login)
+    // Pixeldrain's real response shapes (docs/pixeldrain_api.txt in the website branch, POST /user/login)
     private val pixeldrainLogin = LoginEndpoint(
         path = "/user/login",
         fields = pixeldrainFields,
