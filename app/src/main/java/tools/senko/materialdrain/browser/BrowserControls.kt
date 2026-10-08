@@ -1,6 +1,13 @@
 package tools.senko.materialdrain.browser
 
 import android.os.Build
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.animation.AnimatedVisibility
@@ -177,64 +184,113 @@ fun SortControls(
     val directionIcon = if (sortAscending) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward
     val directionDescription = if (sortAscending) "Ascending" else "Descending"
 
-    Row(
+    // Kept while Cancel shrinks away, when there's no transfer left to cancel
+    var lastCancel by remember { mutableStateOf(onCancelTransfer) }
+    if (onCancelTransfer != null) lastCancel = onCancelTransfer
+
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             // Lines up with the file rows below, which start at 16dp
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
     ) {
-        // Sort: a floating card with a menu. Reselecting the field already sorted on flips its direction (see
-        // AppSettings.changeSortOrder); the direction shows by the field's name and in the menu. It takes the room the
-        // other cards leave, up to its usual width, so a Cancel next to New still fits on a narrow screen
-        Box(modifier = Modifier.weight(1f)) {
-            FloatingCardButton(
-                onClick = { expanded = true },
-                modifier = Modifier.widthIn(max = SortControlWidth).fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Sort by",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                    Text(currentSortName, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                Icon(directionIcon, contentDescription = directionDescription, modifier = Modifier.size(16.dp))
-            }
-            FloatingCardMenu(expanded = expanded, onDismiss = { expanded = false }, minWidth = SortControlWidth) {
-                SortOptions.forEach { (name, field) ->
-                    val selected = field == sortField
-                    FloatingMenuItem(
-                        text = name,
-                        active = selected,
-                        trailingIcon = if (selected) directionIcon else null,
-                        trailingDescription = directionDescription,
-                        // The menu stays open, so the effect can be seen and the direction flipped again
-                        onClick = { onSortFieldSelected(field) }
-                    )
-                }
-            }
+        // Each card takes a share of the row as big as its share of what they all need, worked out from their own text:
+        // Sort by alone fills the row, beside New they split it by content, and a Cancel appearing during a transfer
+        // makes room for itself. On a narrow screen they all give way alike, their text ending in "…"
+        val needs = sortRowNeeds()
+        val shown = listOf(true, onCancelTransfer != null, actions.isNotEmpty())
+        val visibleNeeds = needs.filterIndexed { i, _ -> shown[i] }
+        val room = maxWidth - SortRowGap * (visibleNeeds.size - 1)
+        val scale = room / visibleNeeds.fold(0.dp) { sum, need -> sum + need }
+        val firstShown = shown.indexOf(true)
+        val sizeSpring = spring<Dp>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+        val widths = needs.mapIndexed { i, need ->
+            animateDpAsState(if (shown[i]) need * scale else 0.dp, sizeSpring, label = "sortRowWidth$i").value
         }
+        val gaps = shown.mapIndexed { i, isShown ->
+            animateDpAsState(if (isShown && i != firstShown) SortRowGap else 0.dp, sizeSpring, label = "sortRowGap$i").value
+        }
+        val cancelAlpha by animateFloatAsState(if (shown[1]) 1f else 0f, label = "sortRowCancel")
 
-        // At the end of the row
-        AnimatedVisibility(
-            visible = onCancelTransfer != null,
-            enter = fadeIn() + scaleIn(initialScale = 0.8f),
-            exit = fadeOut() + scaleOut(targetScale = 0.8f)
-        ) {
-            // Kept while it fades out, when there's no transfer left to cancel
-            var lastCancel by remember { mutableStateOf(onCancelTransfer) }
-            if (onCancelTransfer != null) lastCancel = onCancelTransfer
-            FloatingCardButton(onClick = { lastCancel?.invoke() }) {
-                Icon(Icons.Filled.Close, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Cancel", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error, maxLines = 1)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Sort: a floating card with a menu. Reselecting the field already sorted on flips its direction (see
+            // AppSettings.changeSortOrder); the direction shows by the field's name and in the menu
+            Box(modifier = Modifier.width(widths[0])) {
+                FloatingCardButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Sort by",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(currentSortName, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    Icon(directionIcon, contentDescription = directionDescription, modifier = Modifier.size(16.dp))
+                }
+                FloatingCardMenu(expanded = expanded, onDismiss = { expanded = false }, minWidth = SortControlWidth) {
+                    SortOptions.forEach { (name, field) ->
+                        val selected = field == sortField
+                        FloatingMenuItem(
+                            text = name,
+                            active = selected,
+                            trailingIcon = if (selected) directionIcon else null,
+                            trailingDescription = directionDescription,
+                            // The menu stays open, so the effect can be seen and the direction flipped again
+                            onClick = { onSortFieldSelected(field) }
+                        )
+                    }
+                }
+            }
+
+            // Stops the transfer in the bar above; there while one runs, and while it shrinks away after
+            if (shown[1] || widths[1] > 0.dp) {
+                Box(modifier = Modifier.padding(start = gaps[1]).width(widths[1]).graphicsLayer { alpha = cancelAlpha }) {
+                    FloatingCardButton(onClick = { lastCancel?.invoke() }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.Close, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "Cancel",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.error,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            if (actions.isNotEmpty() || widths[2] > 0.dp) {
+                SortRowActions(actions, modifier = Modifier.padding(start = gaps[2]).width(widths[2]))
             }
         }
-        if (actions.isNotEmpty()) SortRowActions(actions)
+    }
+}
+
+/** The space between the cards of the sort row. */
+private val SortRowGap = 8.dp
+
+/**
+ * What each card of the sort row needs to show all of itself, in the row's order: Sort by (wide enough for the longest
+ * field name, so it doesn't change size between fields), Cancel and New. From their text as it's drawn, plus their
+ * icons and padding (see [FloatingCardButton]).
+ */
+@Composable
+private fun sortRowNeeds(): List<Dp> {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val small = MaterialTheme.typography.labelSmall
+    val large = MaterialTheme.typography.labelLarge
+    return remember(measurer, density, small, large) {
+        fun textWidth(text: String, style: TextStyle): Dp = with(density) { measurer.measure(text, style, maxLines = 1).size.width.toDp() }
+        val padding = CardPadding * 2
+        val sortText = maxOf(textWidth("Sort by", small), SortOptions.maxOf { (name, _) -> textWidth(name, large) })
+        listOf(
+            padding + sortText + 8.dp + 16.dp,
+            padding + 18.dp + 6.dp + textWidth("Cancel", large),
+            padding + 18.dp + 6.dp + textWidth("New", large) + 4.dp
+        )
     }
 }
 
@@ -248,13 +304,13 @@ data class SortRowAction(
 
 /** The sort row's actions behind one "New" card, the same floating card as "Sort by" beside it; its menu names each. */
 @Composable
-private fun SortRowActions(actions: List<SortRowAction>) {
+private fun SortRowActions(actions: List<SortRowAction>, modifier: Modifier = Modifier) {
     var expanded by remember { mutableStateOf(false) }
-    Box {
-        FloatingCardButton(onClick = { expanded = true }, enabled = actions.any { it.enabled }) {
+    Box(modifier = modifier) {
+        FloatingCardButton(onClick = { expanded = true }, enabled = actions.any { it.enabled }, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text("New", style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            Text("New", style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.width(4.dp))
         }
         FloatingCardMenu(expanded = expanded, onDismiss = { expanded = false }, alignment = Alignment.TopEnd) {
@@ -394,6 +450,9 @@ internal fun FloatingMenuItem(
 /** The height of the controls above the list. */
 private val ControlHeight = 48.dp
 
+/** The space between a control's edge and its content. */
+private val CardPadding = 14.dp
+
 /** A control above the list, in the same floating card look as the search results (see [FloatingCardShape]). */
 @Composable
 private fun FloatingCardButton(
@@ -411,11 +470,13 @@ private fun FloatingCardButton(
         contentColor = MaterialTheme.colorScheme.onSurface,
         modifier = modifier.height(ControlHeight)
     ) {
+        // Centred, for a card given more room than its content needs (see SortControls)
         Row(
             modifier = Modifier
-                .padding(horizontal = 14.dp)
+                .padding(horizontal = CardPadding)
                 .graphicsLayer { alpha = if (enabled) 1f else 0.38f },
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
             content = content
         )
     }
