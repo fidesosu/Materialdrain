@@ -6,6 +6,8 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import android.system.Os
+import android.system.OsConstants
 import android.util.Log
 import java.io.File
 
@@ -34,9 +36,13 @@ fun readContentUriInfo(context: Context, uri: Uri): ContentUriInfo {
 }
 
 /**
- * When the file at [uri] was last changed, in milliseconds, or null when its provider doesn't say. Files picked through
- * the system's file picker give it as a document's last change; the gallery's give MediaStore's (in seconds); a plain
- * file has its own. Each is asked on its own: a provider that doesn't know a column may refuse the whole query.
+ * When the file at [uri] was last changed, in milliseconds, or null when nothing says. In this order:
+ * 1. the document's last change, for files picked through the system's file picker;
+ * 2. MediaStore's (in seconds), for the device's own media;
+ * 3. the file's own, from the opened file itself: for apps which share a file but don't answer either question (a
+ *    gallery, Google Photos), whatever their link looks like. Only a real file counts: a stream an app writes as it's
+ *    read (a pipe) has no date of its own.
+ * Each is asked on its own: a provider that doesn't know a column may refuse the whole query.
  */
 private fun readLastModified(context: Context, uri: Uri): Long? {
     if (uri.scheme == ContentResolver.SCHEME_FILE) {
@@ -52,5 +58,13 @@ private fun readLastModified(context: Context, uri: Uri): Long? {
     }
     queryLong(DocumentsContract.Document.COLUMN_LAST_MODIFIED)?.takeIf { it > 0 }?.let { return it }
     queryLong(MediaStore.MediaColumns.DATE_MODIFIED)?.takeIf { it > 0 }?.let { return it * 1000 }
-    return null
+    return try {
+        context.contentResolver.openFileDescriptor(uri, "r")?.use { descriptor ->
+            val stat = Os.fstat(descriptor.fileDescriptor)
+            if (OsConstants.S_ISREG(stat.st_mode)) (stat.st_mtime * 1000).takeIf { it > 0 } else null
+        }
+    } catch (e: Exception) {
+        Log.w(TAG_URI_INFO, "No last change known for $uri: ${e.message}")
+        null
+    }
 }

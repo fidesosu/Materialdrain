@@ -196,17 +196,29 @@ class UploadViewModel(
     /** Pixeldrain uploads need the login; other hosts take their own credentials. */
     private fun missingKey(): Boolean = provider().kind == ProviderKind.PIXELDRAIN && apiKey.isBlank()
 
+    /**
+     * Uploads one file. Never throws but for a cancel: a host's failure (the network gone, the host refusing) is a failed
+     * result, and a failure which comes of the upload being cancelled (the connection cut under it) is the cancel.
+     */
     private suspend fun uploadFile(fileName: String, uri: Uri, onProgress: (Long, Long?) -> Unit): UploadResult {
         val provider = provider()
         val store = provider.fileStore
-        val response = if (store != null) {
-            store.upload(fileName, uri, application, onProgress)
-        } else {
-            // No flat storage to upload into (WebDAV, S3, SMB): the Upload screen uploads into the host's root
-            // folder instead, through the same browse the Filesystem screen uses
-            val browse = provider.browse ?: return UploadResult(false, message = "This host can't receive uploads.")
-            val root = provider.rootPath.trim('/')
-            browse.upload(if (root.isEmpty()) fileName else "$root/$fileName", uri, application, makeParents = false, onProgress)
+        val response = try {
+            if (store != null) {
+                store.upload(fileName, uri, application, onProgress)
+            } else {
+                // No flat storage to upload into (WebDAV, S3, SMB): the Upload screen uploads into the host's root
+                // folder instead, through the same browse the Filesystem screen uses
+                val browse = provider.browse ?: return UploadResult(false, message = "This host can't receive uploads.")
+                val root = provider.rootPath.trim('/')
+                browse.upload(if (root.isEmpty()) fileName else "$root/$fileName", uri, application, makeParents = false, onProgress)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
+            Log.e(TAG, "Upload of $fileName failed: ${e.message}", e)
+            return UploadResult(false, message = e.message ?: "The upload failed.")
         }
         return when (response) {
             is ApiResponse.Success -> UploadResult(true, id = response.data.ref.id)
@@ -501,6 +513,9 @@ class UploadViewModel(
             else -> viewModelScope.launch {
                 val items = withContext(Dispatchers.IO) {
                     uris.map { uri -> readUploadItem(uri, context) }
+                }.let { picked ->
+                    // In the order they'll go in, from the start, so it can be seen before uploading (see uploadQueuedItems)
+                    if (appSettings.uploadInModifiedOrder.value) inModifiedOrder(picked) else picked
                 }
                 _uiState.update {
                     it.copy(
@@ -620,11 +635,11 @@ class UploadViewModel(
     private fun uploadQueuedItems() {
         // In the order the files were last changed, oldest first (files whose date Android doesn't know go last, as
         // they were picked), and one after another, so they reach the host in that order; otherwise several at once
-        val inModifiedOrder = appSettings.uploadInModifiedOrder.value
-        if (inModifiedOrder) {
-            _uiState.update { s -> s.copy(queuedItems = s.queuedItems.sortedBy { it.lastModifiedMillis ?: Long.MAX_VALUE }) }
+        val ordered = appSettings.uploadInModifiedOrder.value
+        if (ordered) {
+            _uiState.update { s -> s.copy(queuedItems = inModifiedOrder(s.queuedItems)) }
         }
-        val parallelUploads = if (inModifiedOrder) 1 else MAX_PARALLEL_UPLOADS
+        val parallelUploads = if (ordered) 1 else MAX_PARALLEL_UPLOADS
         val batch = _uiState.value.queuedItems.filter {
             it.status == UploadItemStatus.PENDING || it.status == UploadItemStatus.FAILED
         }
