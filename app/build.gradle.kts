@@ -1,8 +1,29 @@
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
+
+/*
+ * The version, made from the time of the commit being built, so it never has to be changed by hand for a release:
+ * - versionName: BASE_VERSION, then the commit's date and time in UTC, e.g. "1.4.20261009.1530". The build workflow
+ *   adds "-dev" for builds of the dev branch (VERSION_SUFFIX). Change BASE_VERSION only for a big step.
+ * - versionCode: the minutes since 2025 at that commit, so each newer commit's build installs over the one before,
+ *   stable and dev alike, and it stays far below Android's limit for over 4000 years.
+ * The commit's time rather than the build's: building the same commit again gives the same version.
+ */
+val baseVersion = "1.4"
+val commitEpochSeconds: Long = runCatching {
+    providers.exec { commandLine("git", "log", "-1", "--format=%ct") }.standardOutput.asText.get().trim().toLong()
+}.getOrElse { System.currentTimeMillis() / 1000 }
+val versionStamp: String = DateTimeFormatter.ofPattern("yyyyMMdd.HHmm").format(Instant.ofEpochSecond(commitEpochSeconds).atZone(ZoneOffset.UTC))
+val versionSuffix: String = System.getenv("VERSION_SUFFIX").orEmpty()
+val computedVersionName = "$baseVersion.$versionStamp$versionSuffix"
+val computedVersionCode: Int = ((commitEpochSeconds - 1_735_689_600L) / 60).toInt().coerceAtLeast(2)
 
 android {
     namespace = "tools.senko.materialdrain"
@@ -13,8 +34,8 @@ android {
         minSdk = 29
         //noinspection OldTargetApi
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.4"
+        versionCode = computedVersionCode
+        versionName = computedVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

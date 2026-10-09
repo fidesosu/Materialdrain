@@ -1,38 +1,44 @@
 #file: noinspection SpellCheckingInspection
-name: Android CI Build
+# Tests every change, and publishes the app:
+# - a push to main: a release build, signed with the release key, as a GitHub release of its own ("v" + its version),
+#   marked the latest. Older releases stay listed.
+# - a push to dev: the same, as the one "Development build" pre-release (tag dev-build), replaced by every push.
+# - a pull request: tests and a debug build only. It never sees the signing key.
+# The version comes from the commit's time (see app/build.gradle.kts); dev builds end in "-dev".
+# The website's download page lists these releases (website branch).
+name: Android build
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [main, dev]
     paths-ignore:
-      - 'README.md'
-      - 'docs/**'
-      - '.github/**'
-      - '**/*.md'
-      - '*.txt'
+      - "**/*.md"
+      - "*.txt"
   pull_request:
-    branches: [ main, dev ]
+    branches: [main, dev]
     paths-ignore:
-      - 'README.md'
-      - 'docs/**'
-      - '.github/**'
-      - '**/*.md'
-      - '*.txt'
+      - "**/*.md"
+      - "*.txt"
+  # A button on the Actions tab: builds (and, on main or dev, publishes) without a new commit
+  workflow_dispatch:
+
+# A newer push to the same branch replaces a build still running
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
-
+  test:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Cache Gradle packages
         uses: actions/cache@v4
@@ -40,21 +46,123 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
           restore-keys: |
             gradle-${{ runner.os }}
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - run: chmod +x gradlew
 
       - name: Run tests
         run: ./gradlew test
 
+      # A pull request gets a debug build to try, kept for a while on the run's page
       - name: Build debug APK
+        if: github.event_name == 'pull_request'
         run: ./gradlew assembleDebug
 
-      - name: Upload APK
+      - name: Upload debug APK
+        if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: materialdrain-debug-${{ github.head_ref || github.ref_name }}
+          name: materialdrain-debug-${{ github.head_ref }}
           path: app/build/outputs/apk/debug/app-debug.apk
+
+  publish:
+    needs: test
+    if: github.event_name != 'pull_request' && (github.ref_name == 'main' || github.ref_name == 'dev')
+    runs-on: ubuntu-latest
+    permissions:
+      # To create the release, and to move the dev-build tag
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-${{ runner.os }}
+
+      - run: chmod +x gradlew
+
+      # The release key, from the repository's Actions secrets, where app/build.gradle.kts looks for it
+      - name: Restore the release key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::The KEYSTORE_BASE64 secret isn't set: add the release key in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > materialdrain-release.jks
+
+      - name: Build the release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          VERSION_SUFFIX: ${{ github.ref_name == 'dev' && '-dev' || '' }}
+        run: ./gradlew assembleRelease
+
+      - name: Name the APK after its version
+        id: apk
+        run: |
+          version=$(jq -r '.elements[0].versionName' app/build/outputs/apk/release/output-metadata.json)
+          file="Materialdrain-${version}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$file"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the stable release
+        if: github.ref_name == 'main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.apk.outputs.version }}
+          FILE: ${{ steps.apk.outputs.file }}
+        run: |
+          tag="v${VERSION}"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            # The same commit built again: the same version, so its APK is replaced
+            gh release upload "$tag" "$FILE" --clobber
+          else
+            # The notes list what changed since the release before, not since the development build
+            previous=$(gh release list --exclude-pre-releases --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName // empty')
+            gh release create "$tag" "$FILE" --target "$GITHUB_SHA" --title "Materialdrain ${VERSION}" --latest \
+              --generate-notes ${previous:+--notes-start-tag "$previous"}
+          fi
+
+      - name: Publish the development build
+        if: github.ref_name == 'dev'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.apk.outputs.version }}
+          FILE: ${{ steps.apk.outputs.file }}
+        run: |
+          tag="dev-build"
+          title="Development build ${VERSION}"
+          notes="The newest build of the dev branch, from $(git log -1 --format='%h: %s'). Replaced by each push to dev; it has the newest changes, and may have bugs."
+          # The tag moves to this commit; the release keeps its place, so it's never missing while this runs
+          git tag --force "$tag" "$GITHUB_SHA"
+          git push --force origin "refs/tags/$tag"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            gh release edit "$tag" --title "$title" --notes "$notes" --prerelease
+            gh release upload "$tag" "$FILE" --clobber
+            # The APKs of the builds before it
+            gh release view "$tag" --json assets --jq '.assets[].name' | grep -vxF "$FILE" | while read -r old; do
+              gh release delete-asset "$tag" "$old" --yes
+            done
+          else
+            gh release create "$tag" "$FILE" --target "$GITHUB_SHA" --title "$title" --notes "$notes" --prerelease
+          fi
+
+      - name: Remove the release key
+        if: always()
+        run: rm -f materialdrain-release.jks
