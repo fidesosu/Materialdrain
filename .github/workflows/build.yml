@@ -6,19 +6,38 @@
 # - a pull request: tests and a debug build only. It never sees the signing key.
 # The version comes from the commit's time (see app/build.gradle.kts); dev builds end in "-dev".
 # The website's download page lists these releases (website branch).
+#
+# Only a change to what goes into the APK builds it: the app, the provider modules it's made of, the example configs
+# it bundles, and the build's own settings. Anything else (the README, this workflow) doesn't, nor do Markdown files
+# anywhere. "Run workflow" on the Actions tab builds anyway.
 name: Android build
 
 on:
   push:
     branches: [main, dev]
-    paths-ignore:
-      - "**/*.md"
-      - "*.txt"
+    paths:
+      - "app/**"
+      - "provider-*/**"
+      - "docs/provider-configs/**"
+      - "gradle/**"
+      - "*.gradle.kts"
+      - "gradle.properties"
+      - "gradlew"
+      - "gradlew.bat"
+      - "!**/*.md"
+  # The same list as for push
   pull_request:
     branches: [main, dev]
-    paths-ignore:
-      - "**/*.md"
-      - "*.txt"
+    paths:
+      - "app/**"
+      - "provider-*/**"
+      - "docs/provider-configs/**"
+      - "gradle/**"
+      - "*.gradle.kts"
+      - "gradle.properties"
+      - "gradlew"
+      - "gradlew.bat"
+      - "!**/*.md"
   # A button on the Actions tab: builds (and, on main or dev, publishes) without a new commit
   workflow_dispatch:
 
