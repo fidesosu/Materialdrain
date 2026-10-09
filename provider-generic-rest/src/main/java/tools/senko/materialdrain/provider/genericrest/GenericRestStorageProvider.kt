@@ -217,6 +217,15 @@ class GenericRestStorageProvider(
         return result
     }
 
+    /**
+     * An upload's request failing (the network gone, the file unreadable), as an error to show rather than an exception:
+     * like every other host's upload, this one only ever throws for a cancel.
+     */
+    private fun uploadFailure(e: Exception): ApiResponse.Error {
+        ProviderLog.e("Upload", "the upload failed: ${e.message}", e)
+        return ApiResponse.Error(ProviderError("network_error", e.message ?: "The host couldn't be reached."))
+    }
+
     // --- Sign-in ---
 
     override suspend fun signIn(username: String, password: String, otp: String?): SignInResult {
@@ -313,10 +322,16 @@ class GenericRestStorageProvider(
         ): ApiResponse<StorageNode> {
             val endpoint = config.endpoints[ENDPOINT_UPLOAD]
                 ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no upload endpoint configured."))
-            val result = authorized(
-                { client.executeUpload(endpoint, mapOf("filename" to fileName), it, fileName, fileUri, context, onProgress) },
-                { it?.code }
-            ) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "upload endpoint could not be resolved."))
+            val result = try {
+                authorized(
+                    { client.executeUpload(endpoint, mapOf("filename" to fileName), it, fileName, fileUri, context, onProgress) },
+                    { it?.code }
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return uploadFailure(e)
+            } ?: return ApiResponse.Error(ProviderError("bad_endpoint", "upload endpoint could not be resolved."))
             if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
             val body = parseJson(result.bodyText)
             val id = body?.let { mapField(endpoint, it, "id") }
@@ -548,10 +563,16 @@ class GenericRestStorageProvider(
             val target = path.trim('/')
             val name = target.substringAfterLast('/')
             val placeholders = mapOf("path" to target, "make_parents" to makeParentsValue(makeParents))
-            val result = authorized(
-                { client.executeUpload(endpoint, placeholders, it, name, fileUri, context, onProgress) },
-                { it?.code }
-            ) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "browse upload endpoint could not be resolved."))
+            val result = try {
+                authorized(
+                    { client.executeUpload(endpoint, placeholders, it, name, fileUri, context, onProgress) },
+                    { it?.code }
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return uploadFailure(e)
+            } ?: return ApiResponse.Error(ProviderError("bad_endpoint", "browse upload endpoint could not be resolved."))
             if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
             val body = parseJson(result.bodyText)
             return ApiResponse.Success(body?.let { nodeFrom(endpoint, it) } ?: StorageNode(ref = StorageRef(path = target), name = name, isDirectory = false))

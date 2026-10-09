@@ -19,6 +19,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -71,6 +73,14 @@ data class UploadItem(
     val fileId: String? = null,
     val errorMessage: String? = null
 )
+
+/**
+ * [items] in the order they were last changed, oldest first, so the newest goes up last and is at the top of a list
+ * ordered by upload. Files whose date isn't known go after the rest, in the order they were picked; files changed at
+ * the same moment also keep that order.
+ */
+internal fun inModifiedOrder(items: List<UploadItem>): List<UploadItem> =
+    items.sortedBy { it.lastModifiedMillis ?: Long.MAX_VALUE }
 
 data class UploadUiState(
     val isLoading: Boolean = false,
@@ -222,7 +232,11 @@ class UploadViewModel(
         }
         return when (response) {
             is ApiResponse.Success -> UploadResult(true, id = response.data.ref.id)
-            is ApiResponse.Error -> UploadResult(false, message = response.error.message)
+            is ApiResponse.Error -> {
+                // A host which reports the connection cut under a cancelled upload as an error: that's the cancel
+                currentCoroutineContext().ensureActive()
+                UploadResult(false, message = response.error.message)
+            }
         }
     }
 

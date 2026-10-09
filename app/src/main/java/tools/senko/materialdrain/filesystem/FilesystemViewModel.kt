@@ -10,6 +10,8 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
@@ -652,7 +654,7 @@ class FilesystemViewModel(
             val job = coroutineContext[Job]
             try {
                 items.forEachIndexed { index, item ->
-                    val response = browse.upload(joinPath(dir, item.name), item.uri, application, makeParents = false) { sent, _ ->
+                    val response = uploadOne(browse, joinPath(dir, item.name), item.uri) { sent ->
                         // Called from inside the host's sending loop: a cancelled upload stops there
                         if (job?.isActive == false) throw kotlinx.coroutines.CancellationException("The upload was cancelled")
                         val overall = completedBytes + sent
@@ -673,6 +675,8 @@ class FilesystemViewModel(
                         }
                     }
                     completedBytes += item.sizeBytes ?: 0L
+                    // A host which reports the connection cut under a cancelled upload as an error: that's the cancel
+                    ensureActive()
                     when (response) {
                         is ApiResponse.Success -> uploaded++
                         is ApiResponse.Error -> failures.add("${item.name}: ${describeError(response.error)}")
@@ -702,6 +706,21 @@ class FilesystemViewModel(
             }
         }
     }
+
+    /**
+     * Uploads one file to [path]. Never throws but for a cancel: a failure of the host or the network is an error result,
+     * like any the host reports itself, so it fails that file and the next ones still go.
+     */
+    private suspend fun uploadOne(browse: BrowseOps, path: String, uri: Uri, onProgress: (sent: Long) -> Unit): ApiResponse<StorageNode> =
+        try {
+            browse.upload(path, uri, application, makeParents = false) { sent, _ -> onProgress(sent) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
+            ProviderLog.e("Filesystem", "uploading to '$path' failed: ${e.message}", e)
+            ApiResponse.Error(ProviderError("upload_failed", e.message ?: "The upload failed."))
+        }
 
     private companion object {
         const val API_KEY_MISSING = "API Key is missing. Please set it in Settings to browse the filesystem."
