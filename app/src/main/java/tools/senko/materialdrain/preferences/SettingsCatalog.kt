@@ -50,10 +50,13 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         items = listOf(
             SettingsItem.Toggle(
                 title = "Hide $SEARCH_INDEX_FILE_NAME",
-                summary = "Pixeldrain uses this file itself to store the paths of your files and re-creates it when it is " +
-                    "removed. Hiding it keeps you from deleting it by accident.",
+                summary = "Pixeldrain's own index of your files",
                 isChecked = { appSettings.hideSearchIndex.collectAsState().value },
                 onCheckedChange = { appSettings.setHideSearchIndex(it) }
+            ),
+            SettingsItem.Note(
+                "Pixeldrain uses this file itself to store the paths of your files and re-creates it when it is removed. " +
+                    "Hiding it keeps you from deleting it by accident."
             )
         )
     ),
@@ -61,16 +64,19 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     SettingsCategory(
         id = "uploads",
         title = "Uploads",
-        summary = "The order several files are uploaded in",
+        summary = "The order of several files",
         icon = Icons.Filled.Upload,
         items = listOf(
             SettingsItem.Toggle(
-                title = "Upload in the order the files were changed",
-                summary = "Several files are uploaded oldest first, by when they were last changed on this device, and " +
-                    "one after another, so they arrive at the host (and get their upload dates) in that order. Slower " +
-                    "for many small files, which otherwise go a few at once.",
+                title = "Upload by last change",
+                summary = "Oldest first, one file at a time",
                 isChecked = { appSettings.uploadInModifiedOrder.collectAsState().value },
                 onCheckedChange = { appSettings.setUploadInModifiedOrder(it) }
+            ),
+            SettingsItem.Note(
+                "Several files are uploaded oldest first, by when they were last changed on this device, and one after " +
+                    "another, so they arrive at the host (and get their upload dates) in that order. Slower for many " +
+                    "small files, which otherwise go a few at once."
             )
         )
     ),
@@ -110,17 +116,17 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
             SettingsItem.Header("Kinds of notifications"),
             SettingsItem.Action(
                 title = "Transfer progress",
-                summary = "Shown while something is uploading or downloading",
+                summary = "While uploading or downloading",
                 onClick = { context -> openNotificationSettings(context, CHANNEL_TRANSFER_PROGRESS) }
             ),
             SettingsItem.Action(
                 title = "Completed transfers",
-                summary = "Shown when a transfer finished in the background",
+                summary = "When one finished in the background",
                 onClick = { context -> openNotificationSettings(context, CHANNEL_TRANSFER_COMPLETE) }
             ),
             SettingsItem.Action(
                 title = "Failed transfers",
-                summary = "Shown when a transfer failed in the background",
+                summary = "When one failed in the background",
                 onClick = { context -> openNotificationSettings(context, CHANNEL_TRANSFER_FAILED) }
             )
         )
@@ -134,17 +140,23 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         items = listOf(
             SettingsItem.Toggle(
                 title = "Blurred backdrop",
-                summary = "Shows the thumbnail of a file, blurred, behind its preview: it fills the space around a " +
-                    "fullscreen image and is there while a preview is loading.",
+                summary = "The thumbnail, blurred, behind previews",
                 isChecked = { appSettings.blurredBackdrop.collectAsState().value },
                 onCheckedChange = { appSettings.setBlurredBackdrop(it) }
             ),
+            SettingsItem.Note(
+                "The file's thumbnail, blurred, fills the space around a fullscreen image or video, and is there while a " +
+                    "preview is loading. Off, the background is black."
+            ),
             SettingsItem.Toggle(
                 title = "Wrap long lines",
-                summary = "Text previews (code, logs, configs) break long lines onto the next line. Off, the lines stay " +
-                    "as they are and can be scrolled sideways.",
+                summary = "In text previews",
                 isChecked = { appSettings.textWrap.collectAsState().value },
                 onCheckedChange = { appSettings.setTextWrap(it) }
+            ),
+            SettingsItem.Note(
+                "Text previews (code, logs, configs) break long lines onto the next line. Off, the lines stay as they are " +
+                    "and can be scrolled sideways."
             )
         )
     ),
@@ -157,12 +169,14 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         items = listOf(
             SettingsItem.Toggle(
                 title = "Reduce animations",
-                summary = "Leaves out sliding, scaling, spinning and rolling text, and scrolls without animation. " +
-                    "Screens then only fade.",
+                summary = "Screens only fade",
                 isChecked = { appSettings.reduceAnimations.collectAsState().value },
                 onCheckedChange = { appSettings.setReduceAnimations(it) }
             ),
-            SettingsItem.Note("Animations are also reduced when they are turned off in the Android settings.")
+            SettingsItem.Note(
+                "Leaves out sliding, scaling, spinning and rolling text, and scrolls without animation. Animations are " +
+                    "also reduced when they are turned off in the Android settings."
+            )
         )
     ),
 
@@ -174,10 +188,13 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         items = listOf(
             SettingsItem.Toggle(
                 title = "Lock with fingerprint or face",
-                summary = "Asks for your fingerprint, face or screen lock each time the app is opened again, after it " +
-                    "was in the background for a while. Needs a fingerprint, face or screen lock set up on this device.",
+                summary = "When the app is opened again",
                 isChecked = { appSettings.biometricLock.collectAsState().value },
                 onCheckedChange = { if (appSettings.biometricLockAvailable()) appSettings.setBiometricLock(it) }
+            ),
+            SettingsItem.Note(
+                "Asks for your fingerprint, face or screen lock each time the app is opened again, after it was in the " +
+                    "background for a while. Needs a fingerprint, face or screen lock set up on this device."
             )
         )
     ),
@@ -201,10 +218,13 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         items = listOf(
             SettingsItem.Toggle(
                 title = "FAB navigation prototype",
-                summary = "Replaces the drawer with a navigation button at the bottom. Swipe the button sideways to " +
-                    "move it left, center or right. While this is on, the Upload and Save Settings buttons are hidden.",
+                summary = "A navigation button instead of the bar",
                 isChecked = { appSettings.navPrototype.collectAsState().value },
                 onCheckedChange = { appSettings.setNavPrototype(it) }
+            ),
+            SettingsItem.Note(
+                "Replaces the bottom bar with a navigation button. Swipe the button sideways to move it left, center or " +
+                    "right. While this is on, the Upload and Save Settings buttons are hidden."
             ),
             SettingsItem.Header("Preview navigation as"),
             SettingsItem.Custom { NavMenuPreviewSection() },

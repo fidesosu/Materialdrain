@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.settings.AppSettings
@@ -97,7 +98,7 @@ private fun SettingsCategoryList(onCategoryClick: (SettingsCategory) -> Unit) {
             SettingsCatalog.forEach { category ->
                 ListItem(
                     headlineContent = { Text(category.title) },
-                    supportingContent = { Text(category.summary) },
+                    supportingContent = { OneLine(category.summary) },
                     leadingContent = { Icon(category.icon, contentDescription = null) },
                     trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
                     modifier = Modifier.clickable { onCategoryClick(category) }
@@ -130,6 +131,15 @@ private fun SettingsCategoryPage(
     }
 }
 
+/**
+ * A row's description: one line at most, so every row has the same height and its icon and switch stay centred on it.
+ * A longer explanation goes in a [SettingsItem.Note] under the row instead.
+ */
+@Composable
+private fun OneLine(text: String) {
+    Text(text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+}
+
 @Composable
 private fun SettingsItemRow(item: SettingsItem, environment: SettingsEnvironment) {
     val transparent = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -138,7 +148,7 @@ private fun SettingsItemRow(item: SettingsItem, environment: SettingsEnvironment
             val checked = with(item) { environment.isChecked() }
             ListItem(
                 headlineContent = { Text(item.title) },
-                supportingContent = item.summary?.let { summary -> { Text(summary) } },
+                supportingContent = item.summary?.let { summary -> { OneLine(summary) } },
                 leadingContent = item.icon?.let { icon -> { Icon(icon, contentDescription = null) } },
                 trailingContent = { Switch(checked = checked, onCheckedChange = null) },
                 colors = transparent,
@@ -149,7 +159,7 @@ private fun SettingsItemRow(item: SettingsItem, environment: SettingsEnvironment
             val context = LocalContext.current
             ListItem(
                 headlineContent = { Text(item.title) },
-                supportingContent = item.summary?.let { summary -> { Text(summary) } },
+                supportingContent = item.summary?.let { summary -> { OneLine(summary) } },
                 leadingContent = item.icon?.let { icon -> { Icon(icon, contentDescription = null) } },
                 colors = transparent,
                 modifier = Modifier.clickable { with(item) { environment.onClick(context) } }
