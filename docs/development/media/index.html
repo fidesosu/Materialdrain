@@ -1,0 +1,2474 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="How to use Materialdrain, how to add any host to it, and how the app is built and why.">
+      
+      
+      
+        <link rel="canonical" href="https://materialdrain.senko.tools/docs/development/media/">
+      
+      
+        <link rel="prev" href="../transfers/">
+      
+      
+        <link rel="next" href="../search-and-sorting/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Thumbnails and previews - Materialdrain docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#thumbnails-and-previews" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Materialdrain docs" class="md-header__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Materialdrain docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Thumbnails and previews
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Using the app
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../hosts/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Hosts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Materialdrain docs" class="md-nav__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Materialdrain docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the app
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using the app
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/screens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../hosts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hosts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/config-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kinds of host
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kinds of host
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/webdav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebDAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    S3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/smb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SMB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/rest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sign-in/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign-in
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sharing-and-updates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and updates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts in code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interface/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The interface
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uploads and downloads
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thumbnails and previews
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thumbnails and previews
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-image-loader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The image loader
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The image loader">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#animated-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Animated images
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-login-for-media" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The login for media
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#thumbnails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thumbnails
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Thumbnails">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#which-thumbnail-a-file-gets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which thumbnail a file gets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-each-host-gives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each host gives
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#covers-and-frames-from-the-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Covers and frames from the file
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caching
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#previews" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Previews
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Previews">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Images
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fullscreen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fullscreen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#video-and-audio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Video and audio
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#text" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Text
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#syntax-highlighting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Syntax highlighting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Archives
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#smb-files-by-address" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SMB files by address
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SMB files by address">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#thumbnails-on-the-device" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thumbnails on the device
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cleartext-only-for-127001" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cleartext, only for 127.0.0.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-a-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a server?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../search-and-sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search and sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-and-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data and security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common tasks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    This website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-image-loader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The image loader
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The image loader">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#animated-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Animated images
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-login-for-media" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The login for media
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#thumbnails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thumbnails
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Thumbnails">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#which-thumbnail-a-file-gets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which thumbnail a file gets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-each-host-gives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each host gives
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#covers-and-frames-from-the-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Covers and frames from the file
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caching
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#previews" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Previews
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Previews">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Images
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fullscreen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fullscreen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#video-and-audio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Video and audio
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#text" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Text
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#syntax-highlighting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Syntax highlighting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Archives
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#smb-files-by-address" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SMB files by address
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SMB files by address">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#thumbnails-on-the-device" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thumbnails on the device
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cleartext-only-for-127001" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cleartext, only for 127.0.0.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-a-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a server?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="thumbnails-and-previews">Thumbnails and previews<a class="headerlink" href="#thumbnails-and-previews" title="Permanent link">&para;</a></h1>
+<p>The app shows pictures in three places: the small thumbnail in a file's row, the preview on the details page, and the
+fullscreen view. Everything that shows a file works from a <strong>URL</strong>: Coil (the image loader) and ExoPlayer (the video
+and audio player) both take one. This page explains where those URLs come from, how the login reaches them, and what
+the app reads out of files itself.</p>
+<p>Paths below are under <code>app/src/main/java/tools/senko/materialdrain/</code> unless they name a <code>provider-*</code> module.</p>
+<h2 id="the-image-loader">The image loader<a class="headerlink" href="#the-image-loader" title="Permanent link">&para;</a></h2>
+<p>The app uses <strong>Coil 2.7</strong> (<code>io.coil-kt:coil-compose</code> and <code>coil-gif</code>). There's one <code>ImageLoader</code> for the whole
+process, set up in <code>AppContainer</code>'s <code>init</code> with <code>Coil.setImageLoader</code>. Every <code>AsyncImage</code> and <code>context.imageLoader</code>
+uses it.</p>
+<div class="highlight"><pre><span></span><code><span class="n">coil</span><span class="p">.</span><span class="na">Coil</span><span class="p">.</span><span class="na">setImageLoader</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">coil</span><span class="p">.</span><span class="na">ImageLoader</span><span class="p">.</span><span class="na">Builder</span><span class="p">(</span><span class="n">application</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">components</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">add</span><span class="p">(</span><span class="n">tools</span><span class="p">.</span><span class="na">senko</span><span class="p">.</span><span class="na">materialdrain</span><span class="p">.</span><span class="na">ui</span><span class="p">.</span><span class="na">media</span><span class="p">.</span><span class="na">MediaCovers</span><span class="p">.</span><span class="na">Factory</span><span class="p">(</span><span class="n">application</span><span class="p">))</span>
+<span class="w">            </span><span class="n">add</span><span class="p">(</span><span class="n">tools</span><span class="p">.</span><span class="na">senko</span><span class="p">.</span><span class="na">materialdrain</span><span class="p">.</span><span class="na">ui</span><span class="p">.</span><span class="na">media</span><span class="p">.</span><span class="na">AnimatedImages</span><span class="p">.</span><span class="na">Factory</span><span class="p">())</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="p">.</span><span class="na">okHttpClient</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">okHttpClient</span><span class="p">.</span><span class="na">newBuilder</span><span class="p">().</span><span class="na">readTimeout</span><span class="p">(</span><span class="m">30</span><span class="p">,</span><span class="w"> </span><span class="n">java</span><span class="p">.</span><span class="na">util</span><span class="p">.</span><span class="na">concurrent</span><span class="p">.</span><span class="na">TimeUnit</span><span class="p">.</span><span class="na">SECONDS</span><span class="p">).</span><span class="na">build</span><span class="p">()</span><span class="w"> </span><span class="p">}</span>
+<span class="w">        </span><span class="p">.</span><span class="na">build</span><span class="p">()</span>
+<span class="p">}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>What it adds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MediaCovers.Factory</code></td>
+<td>A <code>Fetcher</code> for <code>audiocover://</code> URLs: a song's cover or a video's frame, read from the file. See <a href="#covers-and-frames-from-the-file">Covers and frames</a></td>
+</tr>
+<tr>
+<td><code>AnimatedImages.Factory</code></td>
+<td>A <code>Decoder</code> for GIFs and animated WebP, so they move wherever they're shown</td>
+</tr>
+<tr>
+<td><code>okHttpClient</code></td>
+<td>The API's own client, so thumbnails reuse the HTTP/2 connection already open to the host. It gets a 30-second read timeout of its own: the API client has none (for long downloads), and a stalled thumbnail should give up</td>
+</tr>
+</tbody>
+</table>
+<h3 id="animated-images">Animated images<a class="headerlink" href="#animated-images" title="Permanent link">&para;</a></h3>
+<p><code>AnimatedImages</code> recognizes an animated file by its first bytes (<code>GIF87a</code>/<code>GIF89a</code>, or a WebP with a <code>VP8X</code> header
+whose animation flag is set), not by the type the host reports. Hosts often report none, or a generic one.</p>
+<p>Android's <code>ImageDecoder</code> handles nearly all of them, but turns down some slightly broken GIFs that browsers still
+play. So, for files up to 64 MB, the decoder tries in turn: <code>ImageDecoderDecoder</code>, then Coil's older <code>GifDecoder</code> (for
+GIFs), then <code>BitmapFactoryDecoder</code>, which shows the first frame as a still picture. Bigger files go to <code>ImageDecoder</code>
+alone, which streams them instead of reading them whole first.</p>
+<h3 id="the-login-for-media">The login for media<a class="headerlink" href="#the-login-for-media" title="Permanent link">&para;</a></h3>
+<p>A private file's URL only works with the host's login. Coil and ExoPlayer don't know about hosts, so the app adds the
+headers itself. <code>HostRequestAuth</code> (in <code>ui/media/MediaPlayerSupport.kt</code>) holds one function, which <code>AppContainer</code>
+points at the active host:</p>
+<div class="highlight"><pre><span></span><code><span class="n">HostRequestAuth</span><span class="p">.</span><span class="na">headersFor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">url</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w">    </span><span class="n">providerRegistry</span><span class="p">.</span><span class="na">resolve</span><span class="p">(</span><span class="n">providerConfigStore</span><span class="p">.</span><span class="na">activeProviderId</span><span class="p">.</span><span class="na">value</span><span class="p">).</span><span class="na">requestHeaders</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Every place that loads a file asks it: <code>imageRequest</code> in <code>ImagePreview.kt</code>, the thumbnail in <code>FileListItem</code>,
+<code>createMediaPlayer</code> for ExoPlayer, and <code>MediaCovers</code> for the retriever. Each host's <code>requestHeaders(url)</code> only answers
+for its own private URLs and returns nothing for any other address, so a login never goes to a site it doesn't belong
+to. See <a href="../data-and-security/#credentials-only-go-to-their-host">Data and security</a>.</p>
+<p>S3 is the exception: it needs no headers, because its file URLs are presigned (the signature is in the URL itself).</p>
+<h2 id="thumbnails">Thumbnails<a class="headerlink" href="#thumbnails" title="Permanent link">&para;</a></h2>
+<h3 id="which-thumbnail-a-file-gets">Which thumbnail a file gets<a class="headerlink" href="#which-thumbnail-a-file-gets" title="Permanent link">&para;</a></h3>
+<p>The file rows (<code>browser/BrowserScreen.kt</code>), the search results and the details page all ask
+<code>FileInfoViewModel.thumbnailFor(node)</code> which picture to show. The rules, in order:</p>
+<ol>
+<li><strong>SMB</strong>: whatever the host gives. An SMB share makes real thumbnails itself, on the device. See
+   <a href="#smb-files-by-address">SMB files by address</a>.</li>
+<li><strong>Audio</strong>: an <code>audiocover://cover</code> URL for the file's own album cover. A song without one keeps the app's music
+   tile, not the host's generic picture.</li>
+<li><strong>Video</strong>: an <code>audiocover://frame</code> URL for a frame read from the file. The host's thumbnail is the fallback, for a
+   video the device can't read either.</li>
+<li><strong>HEIC, HEIF and AVIF photos</strong>: the file itself (<code>rawContentUrl</code>). Hosts' thumbnailers often can't read these
+   formats, so the phone decodes the file and Coil scales it down to the row's size.</li>
+<li><strong>Everything else</strong>: the host's thumbnail, but <strong>only for images and videos</strong>. For text, archives, apps and
+   unknown kinds, hosts hand out a generic picture that says nothing. The app's own tile, coloured for the kind of
+   file, says more.</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="c1">// Only pictures and videos have a thumbnail worth showing: for everything else (text, archives, apps, unknown</span>
+<span class="c1">// kinds) the hosts hand out a generic picture, and the app's own tile for the kind of file is used instead</span>
+<span class="kd">val</span><span class="w"> </span><span class="nv">mime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">node</span><span class="p">.</span><span class="na">previewMimeType</span><span class="p">().</span><span class="na">orEmpty</span><span class="p">()</span>
+<span class="k">return</span><span class="w"> </span><span class="n">thumbnail</span><span class="p">.</span><span class="na">takeIf</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">mime</span><span class="p">.</span><span class="na">startsWith</span><span class="p">(</span><span class="s">"image/"</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">mime</span><span class="p">.</span><span class="na">startsWith</span><span class="p">(</span><span class="s">"video/"</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p><code>previewMimeType()</code> uses the type the host reports, unless it's missing or <code>application/octet-stream</code>; then it works
+the type out from the file extension with <code>MimeTypeMap</code>.</p>
+<p>The tile is always drawn first, and the thumbnail goes on top of it (<code>FileIcon</code> in <code>ui/components/FileListItem.kt</code>).
+There's no separate placeholder or error picture: if the thumbnail fails, the tile is simply still there.</p>
+<h3 id="what-each-host-gives">What each host gives<a class="headerlink" href="#what-each-host-gives" title="Permanent link">&para;</a></h3>
+<p>This is <code>thumbnailUrl(node)</code> of each host, before the rules above are applied:</p>
+<table>
+<thead>
+<tr>
+<th>Host</th>
+<th><code>thumbnailUrl</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pixeldrain</td>
+<td><code>/api/file/&lt;id&gt;/thumbnail</code> for a file with an id; <code>/api/filesystem/&lt;path&gt;?thumbnail</code> for a filesystem file</td>
+</tr>
+<tr>
+<td>REST API</td>
+<td>The <code>thumbnail_id</code> endpoint for a file with an id, or <code>browse_thumbnail</code> for a path. None without them</td>
+</tr>
+<tr>
+<td>WebDAV</td>
+<td>An image is its own thumbnail (the file's URL); Coil scales it down. Nothing for other files</td>
+</tr>
+<tr>
+<td>S3</td>
+<td>None</td>
+</tr>
+<tr>
+<td>SMB</td>
+<td>A <code>/thumb/</code> URL of <code>SmbContentServer</code>, for images, videos and audio</td>
+</tr>
+</tbody>
+</table>
+<h3 id="covers-and-frames-from-the-file">Covers and frames from the file<a class="headerlink" href="#covers-and-frames-from-the-file" title="Permanent link">&para;</a></h3>
+<p><code>ui/media/MediaCovers.kt</code> makes thumbnails for hosts that stream their files over HTTP(S). It builds URLs like this:</p>
+<div class="highlight"><pre><span></span><code>audiocover://cover?src=&lt;file URL&gt;&amp;v=&lt;modified date&gt;
+audiocover://frame?src=&lt;file URL&gt;&amp;fallback=&lt;host thumbnail&gt;&amp;v=&lt;modified date&gt;
+</code></pre></div>
+<p><code>v</code> is the file's modified (or created) date, so a changed file gets a new thumbnail. Coil hands these URLs to
+<code>MediaCovers.Factory</code>, whose <code>CoverFetcher</code>:</p>
+<ol>
+<li>Looks in its disk cache, keyed by the SHA-1 of the source URL and <code>v</code>. A cached <code>.jpg</code> is the thumbnail. A cached
+   <code>.none</code> means the file was read before and has nothing.</li>
+<li>Otherwise opens the file with <code>MediaMetadataRetriever.setDataSource(url, headers)</code>. The media framework fetches
+   only the byte ranges it needs, not the whole file. At most two files are read at once (a <code>Semaphore(2)</code>), because
+   each takes a decoder and several requests.</li>
+<li>For a song, takes the <code>embeddedPicture</code>. For a video, takes the key frame nearest to a tenth of the way in (past a
+   fade-in or a title card), but never more than 30 seconds in. If that gives nothing, it tries the key frame before,
+   then the very first frame.</li>
+<li>Scales the picture to 320 px on its longest side and saves it as a JPEG.</li>
+<li>With nothing to show, fetches the <code>fallback</code> (the host's thumbnail, with its login) through Coil's normal fetchers,
+   or fails so the tile stays.</li>
+</ol>
+<p>Only a file that was read and really has no picture is remembered as <code>.none</code>. A read that failed (the network, a slow
+host) is tried again next time.</p>
+<details class="note">
+<summary>Why read a frame when the host has a thumbnail?</summary>
+<p>Some hosts give a video they can't read (an unusual codec, an index at the end of the file) a generic picture of a
+film. The app can't tell that picture from a real thumbnail. Reading a frame on the device fixes most of them, and
+the host's picture is still the fallback.</p>
+</details>
+<p>Thumbnails are written as a <code>.part</code> file and then renamed, so one cut short by a crash is never read back.</p>
+<h2 id="caching">Caching<a class="headerlink" href="#caching" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Cache</th>
+<th>Where</th>
+<th>What</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Coil's memory and disk caches</td>
+<td>Coil's defaults</td>
+<td>Every image Coil loads: thumbnails and previews. The app doesn't configure them</td>
+</tr>
+<tr>
+<td>Song covers</td>
+<td><code>cacheDir/audio-covers</code></td>
+<td>Made by <code>MediaCovers</code></td>
+</tr>
+<tr>
+<td>Video frames</td>
+<td><code>cacheDir/video-frames-2</code></td>
+<td>Made by <code>MediaCovers</code>. A new folder: the first version also remembered videos that only failed to load once, and never tried them again</td>
+</tr>
+<tr>
+<td>SMB thumbnails</td>
+<td><code>cacheDir/smb-thumbnails</code></td>
+<td>Made by <code>SmbContentServer</code>, kept between runs</td>
+</tr>
+<tr>
+<td>Media streaming</td>
+<td><code>cacheDir/media_cache</code></td>
+<td><code>ExoPlayerCache</code>: a <code>SimpleCache</code> of up to 100 MB, least recently used first out</td>
+</tr>
+</tbody>
+</table>
+<p>All of them are in the app's cache folder, so Android can clear them when space runs low.</p>
+<p><code>util/ExoPlayerCache.kt</code> creates its <code>SimpleCache</code> once per process (a <code>SimpleCache</code> can't be opened twice on the same
+folder). <code>createMediaPlayer</code> wraps the OkHttp data source in a <code>CacheDataSource</code> with <code>FLAG_IGNORE_CACHE_ON_ERROR</code>, so a
+cache problem falls back to the network instead of failing playback.</p>
+<h2 id="previews">Previews<a class="headerlink" href="#previews" title="Permanent link">&para;</a></h2>
+<p>The details page (<code>files/FileDetailsScreen.kt</code>) picks one preview by the file's <code>previewMimeType()</code>:</p>
+<table>
+<thead>
+<tr>
+<th>The file is</th>
+<th>Shown with</th>
+<th>File</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>An archive (<code>zip</code>, <code>7z</code>, <code>rar</code>, <code>tar</code>, <code>tgz</code>, <code>apk</code>) on a host that can look inside</td>
+<td><code>ArchiveContents</code></td>
+<td><code>files/ArchiveContents.kt</code></td>
+</tr>
+<tr>
+<td><code>image/*</code></td>
+<td><code>InlineImagePreview</code></td>
+<td><code>ui/media/ImagePreview.kt</code></td>
+</tr>
+<tr>
+<td><code>video/*</code></td>
+<td><code>InlineVideoPreview</code>, then the fullscreen player</td>
+<td><code>ui/media/VideoPlayer.kt</code></td>
+</tr>
+<tr>
+<td><code>audio/*</code></td>
+<td><code>AudioPlayerPreview</code></td>
+<td><code>ui/media/AudioPlayer.kt</code></td>
+</tr>
+<tr>
+<td>Text</td>
+<td><code>CodePreview</code></td>
+<td><code>ui/components/CodePreview.kt</code></td>
+</tr>
+<tr>
+<td>Anything else with a thumbnail</td>
+<td>The thumbnail in a card</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="images">Images<a class="headerlink" href="#images" title="Permanent link">&para;</a></h3>
+<p><code>LayeredPreviewImage</code> shows an image in two steps. The thumbnail (small, and usually cached already) appears right
+away, blurred, as a backdrop. The full image fades in over it once it has loaded, with a thin progress bar until then.</p>
+<p>The thumbnail is always blurred, never shown as if it were the picture. Pixeldrain's thumbnails are made at a fixed
+size, so they're framed differently from the full image; blurred, they're just its colours, and nothing seems to jump
+when the full image arrives. Blurring needs Android 12; before that the backdrop is only made faint. The setting
+<strong>Blurred backdrop</strong> (<code>AppSettings.blurredBackdrop</code>) turns it off.</p>
+<h3 id="fullscreen">Fullscreen<a class="headerlink" href="#fullscreen" title="Permanent link">&para;</a></h3>
+<p><code>FullScreenMediaPreviewDialog</code> (<code>ui/media/FullScreenPreview.kt</code>) is a dialog that covers the whole screen, under the
+system bars. Images go in a <code>ZoomableBox</code>: pinch to zoom, drag to pan, double-tap to zoom in and out, tap beside the
+picture to close. The image is decoded at most 3072 px on a side (<code>maxPixels</code>), so a huge photo doesn't fill the
+memory. Videos open <code>FullscreenVideoPlayer</code>.</p>
+<p>Images use <code>FilterQuality.None</code> in the preview and fullscreen, so pixel art and zoomed-in pictures stay sharp instead
+of blurry.</p>
+<h3 id="video-and-audio">Video and audio<a class="headerlink" href="#video-and-audio" title="Permanent link">&para;</a></h3>
+<p>Both players use ExoPlayer from Media3, made by <code>createMediaPlayer</code> in <code>ui/media/MediaPlayerSupport.kt</code>:</p>
+<ul>
+<li>A remote file streams over the API's OkHttp client (one connection pool, HTTP/2), through the cache above, with the
+  host's headers from <code>HostRequestAuth</code>. A local file (on the Upload screen) is read directly.</li>
+<li>Playback starts after one second is buffered (the default waits for two and a half) and buffers up to 50 seconds
+  ahead.</li>
+<li><code>rememberManagedPlayer</code> ties the player to the composable: it pauses when the app goes to the background and is
+  released when the composable leaves.</li>
+</ul>
+<p><code>AudioPlayerPreview</code> is created with <code>prepareNow = false</code>, so nothing loads until you press play. A song you only
+glance at costs no data. The inline video preview is just the thumbnail with a play button; the player starts in
+fullscreen.</p>
+<p><code>MediaControls.kt</code> has the shared controls: <code>MediaIconButton</code>, <code>MediaTextButton</code> (e.g. the playback speed) and
+<code>MediaSeekBar</code>, which grows thicker while pressed, seeks on a tap and scrubs on a drag. The video player's settings
+menu has <strong>Loop</strong> (one choice for all videos, <code>AppSettings.loopVideos</code>) and the playback speed.</p>
+<h3 id="text">Text<a class="headerlink" href="#text" title="Permanent link">&para;</a></h3>
+<p><code>FileInfoViewModel.fetchTextFilePreviewContent</code> decides whether a file is text: a text MIME type, an extension that
+<code>SourceHighlighting.kt</code> knows, or <code>application/octet-stream</code> with an extension like <code>.log</code>, <code>.ini</code>, <code>.conf</code> or <code>.md</code>.
+Then:</p>
+<table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>Value</th>
+<th>Constant</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Largest file that's fetched</td>
+<td>1 MB</td>
+<td><code>MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES</code></td>
+</tr>
+<tr>
+<td>Shown on the details page</td>
+<td>The first 8 KB of text, cut at the last whole line</td>
+<td><code>MAX_TEXT_PREVIEW_DISPLAY_LENGTH</code></td>
+</tr>
+<tr>
+<td>Shown in fullscreen</td>
+<td>Everything fetched</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>A bigger file shows "File is too large … for text preview" instead. The whole file is downloaded into memory through
+the same <code>downloadNodeTo</code> as a normal download, so it works for every host.</p>
+<p>On the details page, <code>CodePreview</code> shows the start in a box up to 200 dp high. Its fullscreen button opens
+<code>CodeFullscreen</code>: numbered lines, wrapping or sideways scrolling (starting from the <strong>Wrap long lines</strong> setting), and a
+button to copy everything. Only the lines on screen are laid out, and the colouring is worked out off the main thread,
+so long files stay smooth.</p>
+<p>The Upload screen has its own, simpler preview (<code>InlineTextPreview</code> in <code>ui/media/TextPreview.kt</code>): the first 4096
+characters of the picked file.</p>
+<h3 id="syntax-highlighting">Syntax highlighting<a class="headerlink" href="#syntax-highlighting" title="Permanent link">&para;</a></h3>
+<p><code>files/SourceHighlighting.kt</code> is plain Kotlin, with no Android in it, so it's tested on the JVM
+(<code>SourceHighlightingTest</code>, <code>RichHighlightingTest</code>, <code>LongInputHighlightTest</code>). It has two parts:</p>
+<ul>
+<li><strong>The language list</strong>, <code>SourceLanguages.byExtension</code>: which extension is which language. This is the part to edit
+  when a file type is missing. A file whose extension isn't listed can still be recognized by a <code>#!</code> first line
+  (<code>byShebang</code>: <code>python</code>, <code>bash</code>, <code>node</code>, …).</li>
+<li><strong>The tokenizer</strong>, <code>tokenize(code, language)</code>: finds comments, strings, numbers, keywords, types, calls, keys and so
+  on. It's a plain scan, character by character with no regular expressions, so a very long input can't overflow the
+  stack. It isn't a parser: a string simply ends at its quote or at the end of its line.</li>
+</ul>
+<p><code>CodePreview.kt</code> colours the tokens with one of two sets of colours, for light and dark backgrounds. The theme's own
+colours are too few and too close together to tell a type from a call from a key.</p>
+<h3 id="archives">Archives<a class="headerlink" href="#archives" title="Permanent link">&para;</a></h3>
+<p>A file named <code>.zip</code>, <code>.7z</code>, <code>.rar</code>, <code>.tar</code>, <code>.tgz</code> or <code>.apk</code> is opened as an archive when the host has <code>ArchiveOps</code>
+(Pixeldrain, with its <code>?zip_info</code> and <code>?zip_file</code> API; a REST API config with <code>archive_info</code> and <code>archive_file</code>
+endpoints). The archive itself is never downloaded just to look inside.</p>
+<p><code>ArchiveContents</code> shows the folder you're in, its folders to open and its files to save, and a button to go up. Files
+inside can only be saved, not opened: <code>downloadArchiveEntry</code> starts an ordinary download, and <code>downloadNodeTo</code> reads
+the entry with <code>ArchiveOps.read</code>.</p>
+<h2 id="smb-files-by-address">SMB files by address<a class="headerlink" href="#smb-files-by-address" title="Permanent link">&para;</a></h2>
+<p>An SMB share has no web address for its files. But everything that shows a file in the app works from a URL: Coil
+for thumbnails and pictures, ExoPlayer for video and audio, <code>MediaMetadataRetriever</code> for covers. So the app gives
+each file an address itself, from a tiny HTTP server on the phone: <code>SmbContentServer</code> in <code>provider-smb</code>.</p>
+<h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
+<p>The server listens on <strong>127.0.0.1</strong> only, on a port Android picks (<code>ServerSocket(0, 50, 127.0.0.1)</code>). It starts the
+first time a URL is asked for. Each connection is handled on a thread from a pool.</p>
+<p>Every URL starts with a <strong>token</strong>: 16 random bytes from <code>SecureRandom</code>, made fresh each time the app starts.</p>
+<div class="highlight"><pre><span></span><code>http://127.0.0.1:&lt;port&gt;/&lt;token&gt;/raw/&lt;host id&gt;/&lt;path&gt;
+http://127.0.0.1:&lt;port&gt;/&lt;token&gt;/thumb/&lt;host id&gt;/&lt;path&gt;?v=&lt;modified date&gt;
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Request</th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Not <code>GET</code> or <code>HEAD</code></td>
+<td><code>405</code></td>
+</tr>
+<tr>
+<td>A wrong or missing token</td>
+<td><code>403</code></td>
+</tr>
+<tr>
+<td>An unknown host id</td>
+<td><code>404</code></td>
+</tr>
+<tr>
+<td><code>/raw/…</code></td>
+<td>The file, with <code>Content-Type</code>, <code>Content-Length</code> and <code>Accept-Ranges: bytes</code></td>
+</tr>
+<tr>
+<td><code>/raw/…</code> with <code>Range: bytes=…</code></td>
+<td><code>206 Partial Content</code> with <code>Content-Range</code>, or <code>416</code> for a range outside the file</td>
+</tr>
+<tr>
+<td><code>/thumb/…</code></td>
+<td>A JPEG (or a PNG when the picture has see-through parts), with <code>Cache-Control: private, max-age=86400</code></td>
+</tr>
+</tbody>
+</table>
+<p>Range requests are what make a video seekable. When you drag the seek bar, ExoPlayer asks for the bytes from that
+point on, and the server reads them with <code>SmbRandomAccessFile.seek</code> instead of everything before. Only the first range
+of a multi-range request is served; players ask for one.</p>
+<p>Each <code>SmbStorageProvider</code> registers its <code>SmbClient</code> under its host id, and its <code>thumbnailUrl</code> and <code>rawContentUrl</code>
+return these addresses.</p>
+<h3 id="thumbnails-on-the-device">Thumbnails on the device<a class="headerlink" href="#thumbnails-on-the-device" title="Permanent link">&para;</a></h3>
+<p>For <code>/thumb/</code>, the server makes a thumbnail of up to 320 px from the file on the share:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Extensions</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Image</td>
+<td><code>jpg</code>, <code>jpeg</code>, <code>png</code>, <code>webp</code>, <code>gif</code>, <code>bmp</code>, <code>heic</code>, <code>heif</code>, <code>avif</code></td>
+<td>Read whole and scaled down. Not for files over 40 MB, which would all have to come over the network</td>
+</tr>
+<tr>
+<td>Video</td>
+<td><code>mp4</code>, <code>m4v</code>, <code>mkv</code>, <code>webm</code>, <code>mov</code>, <code>3gp</code>, <code>avi</code>, <code>ts</code></td>
+<td>A frame one second in, read with <code>MediaMetadataRetriever</code> through an <code>SmbMediaDataSource</code>, which reads only the parts it needs</td>
+</tr>
+<tr>
+<td>Audio</td>
+<td><code>mp3</code>, <code>m4a</code>, <code>flac</code>, <code>ogg</code>, <code>opus</code>, <code>aac</code>, <code>wav</code></td>
+<td>The embedded cover</td>
+</tr>
+</tbody>
+</table>
+<p>Images are decoded with <code>ImageDecoder</code>, which turns them the way their EXIF data says. Some HEIC photos from phone
+cameras are refused by <code>ImageDecoder</code> but read by <code>BitmapFactory</code>, so that's tried next. At most three thumbnails are
+made at once. Each is saved in <code>cacheDir/smb-thumbnails</code> (set by <code>AppContainer</code>), keyed by the SHA-1 of the host id,
+the path and <code>v</code>. A thumbnail that can't be made is not tried again until the app restarts.</p>
+<h3 id="cleartext-only-for-127001">Cleartext, only for 127.0.0.1<a class="headerlink" href="#cleartext-only-for-127001" title="Permanent link">&para;</a></h3>
+<p>Android blocks plain <code>http://</code> by default. <code>app/src/main/res/xml/network_security_config.xml</code> allows it for exactly
+one address:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">&lt;network-security-config&gt;</span>
+<span class="w">    </span><span class="nt">&lt;domain-config</span><span class="w"> </span><span class="na">cleartextTrafficPermitted=</span><span class="s">"true"</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;domain</span><span class="w"> </span><span class="na">includeSubdomains=</span><span class="s">"false"</span><span class="nt">&gt;</span>127.0.0.1<span class="nt">&lt;/domain&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/domain-config&gt;</span>
+<span class="nt">&lt;/network-security-config&gt;</span>
+</code></pre></div>
+<p>Everything else stays HTTPS-only. Traffic to 127.0.0.1 never leaves the phone, so there's nothing to encrypt.</p>
+<h3 id="why-a-server">Why a server?<a class="headerlink" href="#why-a-server" title="Permanent link">&para;</a></h3>
+<p>The alternative would be a second code path for SMB in every place that shows a file: a Coil fetcher, an ExoPlayer
+<code>DataSource</code>, a retriever source, each with its own seeking and caching. With an address, SMB files go through
+exactly the same code as files from any other host. Coil caches them, ExoPlayer streams and seeks them, and the
+previews and the fullscreen view need no changes.</p>
+<p>Why is that safe?</p>
+<ul>
+<li><strong>Only this phone can reach it.</strong> It's bound to 127.0.0.1, not to the Wi-Fi network.</li>
+<li><strong>Only this app knows the token.</strong> Another app on the phone could find the port, but without the token every
+  request gets <code>403</code>. The token is new on every start, so an old URL stops working.</li>
+<li><strong>It only reads.</strong> <code>GET</code> and <code>HEAD</code> are the only methods; there's no way to change a file through it.</li>
+</ul>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../transfers/">Uploads and downloads</a> for <code>downloadNodeTo</code>, which text previews and archive entries also use.</li>
+<li><a href="../../hosts/smb/">SMB</a> for the SMB config fields.</li>
+<li><a href="../providers/">Hosts in code</a> for <code>thumbnailUrl</code>, <code>rawContentUrl</code> and <code>requestHeaders</code>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../transfers/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Uploads and downloads">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Uploads and downloads
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../search-and-sorting/" class="md-footer__link md-footer__link--next" aria-label="Next: Search and sorting">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Search and sorting
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

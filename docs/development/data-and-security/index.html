@@ -1,0 +1,2232 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="How to use Materialdrain, how to add any host to it, and how the app is built and why.">
+      
+      
+      
+        <link rel="canonical" href="https://materialdrain.senko.tools/docs/development/data-and-security/">
+      
+      
+        <link rel="prev" href="../search-and-sorting/">
+      
+      
+        <link rel="next" href="../common-tasks/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Data and security - Materialdrain docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#data-and-security" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Materialdrain docs" class="md-header__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Materialdrain docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Data and security
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Using the app
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../hosts/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Hosts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Materialdrain docs" class="md-nav__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Materialdrain docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the app
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using the app
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/screens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../hosts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hosts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/config-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kinds of host
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kinds of host
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/webdav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebDAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    S3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/smb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SMB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/rest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sign-in/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign-in
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sharing-and-updates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and updates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts in code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interface/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The interface
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uploads and downloads
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../media/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thumbnails and previews
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../search-and-sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search and sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data and security
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data and security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-stored-where" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is stored where
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What is stored where">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#host-configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Host configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sign-ins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sign-ins
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-pixeldrain-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Pixeldrain session
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#encryption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encryption
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backups
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#app-lock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        App lock
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#credentials-only-go-to-their-host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Credentials only go to their host
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#updates-cant-redirect-a-sign-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Updates can't redirect a sign-in
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Updates can&#39;t redirect a sign-in">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sensitive-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sensitive changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checking-and-applying" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking and applying
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network security
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common tasks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    This website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-stored-where" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is stored where
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What is stored where">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#host-configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Host configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sign-ins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sign-ins
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-pixeldrain-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Pixeldrain session
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#encryption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encryption
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backups
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#app-lock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        App lock
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#credentials-only-go-to-their-host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Credentials only go to their host
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#updates-cant-redirect-a-sign-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Updates can't redirect a sign-in
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Updates can&#39;t redirect a sign-in">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sensitive-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sensitive changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checking-and-applying" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking and applying
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network security
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="data-and-security">Data and security<a class="headerlink" href="#data-and-security" title="Permanent link">&para;</a></h1>
+<p>Materialdrain keeps very little: your settings, your host configs, and the sign-ins you typed in. This page says
+where each of them lives, how the secrets are protected, and the rules that keep a sign-in from going somewhere it
+shouldn't. For each rule, it also says why.</p>
+<p>Paths below are under <code>app/src/main/java/tools/senko/materialdrain/</code> unless they name a <code>provider-*</code> module.</p>
+<h2 id="what-is-stored-where">What is stored where<a class="headerlink" href="#what-is-stored-where" title="Permanent link">&para;</a></h2>
+<p>Everything is in plain <code>SharedPreferences</code> files, private to the app (<code>Context.MODE_PRIVATE</code>). There's no database and
+no DataStore.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Written by</th>
+<th>Holds</th>
+<th>Encrypted</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pixeldrain_prefs</code></td>
+<td><code>AppSettings</code>, <code>SessionManager</code></td>
+<td>The app's settings: sorting, the last screen and folder, the open file and list, the toggles in Settings</td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>pixeldrain_secure_prefs</code></td>
+<td><code>SessionManager</code></td>
+<td>The Pixeldrain login session's key and username, and the manually entered API key</td>
+<td>The keys, yes</td>
+</tr>
+<tr>
+<td><code>provider_prefs</code></td>
+<td><code>ProviderConfigStore</code></td>
+<td>Every host config with its update state, and which host is active</td>
+<td>No (configs hold no secrets)</td>
+</tr>
+<tr>
+<td><code>provider_secure_prefs</code></td>
+<td><code>ProviderConfigStore</code></td>
+<td>The sign-in of each host: API key, username, password, session token</td>
+<td>Yes, every value</td>
+</tr>
+</tbody>
+</table>
+<p>The file names start with "pixeldrain" because the app began as a Pixeldrain client. They're kept so existing
+installs keep their data.</p>
+<p>Caches (thumbnails, the media cache) are in the app's cache folder; see
+<a href="../media/#caching">Thumbnails and previews</a>. Downloads go to the phone's Download folder; see
+<a href="../transfers/#where-files-go">Uploads and downloads</a>.</p>
+<h3 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h3>
+<p><code>settings/AppSettings.kt</code> reads each setting once into a <code>MutableStateFlow</code> and writes it back with <code>prefs.edit { }</code>
+when it changes. The screens collect the flows, so a change shows everywhere at once. Nothing in it is secret.</p>
+<h3 id="host-configs">Host configs<a class="headerlink" href="#host-configs" title="Permanent link">&para;</a></h3>
+<p><code>provider/ProviderConfigStore.kt</code> keeps one JSON object under the key <code>configs</code>, mapping each host's id (a random
+UUID) to a record:</p>
+<table>
+<thead>
+<tr>
+<th>Record field</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config</code></td>
+<td>The config <strong>text exactly as it was written</strong></td>
+</tr>
+<tr>
+<td><code>upstream</code></td>
+<td>The last version that came from the update URL. Comparing it with the config shows whether you edited it</td>
+</tr>
+<tr>
+<td><code>previous</code></td>
+<td>The text before the last update, for <strong>Revert</strong></td>
+</tr>
+<tr>
+<td><code>pending_update</code></td>
+<td>A newer version a check found but that isn't applied yet</td>
+</tr>
+<tr>
+<td><code>auto_update</code>, <code>keep_auto_update_when_edited</code></td>
+<td>The auto-update switch, and whether an edit should leave it on</td>
+</tr>
+<tr>
+<td><code>etag</code>, <code>last_checked</code></td>
+<td>For the next update check</td>
+</tr>
+</tbody>
+</table>
+<p>The active host's id is under <code>active_provider_id</code>. The built-in Pixeldrain host (<code>pixeldrain-default</code>) is never
+stored here; it always exists.</p>
+<p><strong>Why the text, and not the parsed config?</strong> A config can have fields this version of the app doesn't read: a note, a
+field left at its default, a field for a newer version. Writing the parsed config back would drop them. Keeping the
+text means <strong>Export</strong> and <strong>Edit</strong> show the config exactly as its author wrote it. The parsed form (<code>ConfigSource</code>)
+is made from the text when it loads. See <a href="../../hosts/config-format/#how-the-app-reads-a-config">The config format</a>.</p>
+<h3 id="sign-ins">Sign-ins<a class="headerlink" href="#sign-ins" title="Permanent link">&para;</a></h3>
+<p>A config never holds a secret. The sign-in of each host is stored separately in <code>provider_secure_prefs</code>, one
+encrypted entry per value, named <code>&lt;kind&gt;_&lt;host id&gt;</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>secret</code></td>
+<td>The API key (the name is older than usernames and passwords, and kept so saved keys still load)</td>
+</tr>
+<tr>
+<td><code>username</code></td>
+<td>A username, or an S3 Access Key ID</td>
+</tr>
+<tr>
+<td><code>password</code></td>
+<td>A password, or an S3 Secret Access Key</td>
+</tr>
+<tr>
+<td><code>login_token</code></td>
+<td>The session token from a sign-in (<code>password_auth</code> with <code>"mode": "LOGIN"</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>A successful sign-in (<code>saveSignIn</code>) saves the username and the token, and <strong>deletes</strong> the password. Like any app's
+normal sign-in, only the session is kept. A password is only stored for hosts that send it with every request: a
+config with <code>"mode": "BASIC"</code> (WebDAV, usually), S3 and SMB.</p>
+<p>Removing a host (<code>remove</code>) deletes its sign-in too. Decrypted values are cached in memory (<code>credentialCache</code>) and the
+cache is cleared on every change. Without it, every visible thumbnail would decrypt them again.</p>
+<p><strong>Why keep secrets apart from configs?</strong> So a config can be exported, shared and updated without any risk of leaking
+a password, and so an update can never replace or read a sign-in.</p>
+<h3 id="the-pixeldrain-session">The Pixeldrain session<a class="headerlink" href="#the-pixeldrain-session" title="Permanent link">&para;</a></h3>
+<p><code>auth/SessionManager.kt</code> is the one place the Pixeldrain API key comes from. There are two:</p>
+<ul>
+<li><strong>The login session</strong> (<code>session_api_key_encrypted</code>), from signing in with a username and password. It wins when
+  both are there.</li>
+<li><strong>A manually entered key</strong> (<code>manual_api_key_encrypted</code>). Older versions stored it in plain text in
+  <code>pixeldrain_prefs</code>; <code>manualApiKey()</code> moves such a key into the encrypted entry once and removes the plain copy.</li>
+</ul>
+<p><code>currentApiKey()</code> returns the session's key, or else the manual one. Both are decrypted once and then kept in memory,
+since every request asks for them. Signing out (<code>clearSession</code>) forgets the session on the phone.</p>
+<h2 id="encryption">Encryption<a class="headerlink" href="#encryption" title="Permanent link">&para;</a></h2>
+<p><code>auth/KeystoreCipher.kt</code> encrypts every stored secret with <strong>AES-256-GCM</strong>, using a key that lives in the <strong>Android
+Keystore</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">KeyGenParameterSpec</span><span class="p">.</span><span class="na">Builder</span><span class="p">(</span><span class="n">alias</span><span class="p">,</span><span class="w"> </span><span class="n">KeyProperties</span><span class="p">.</span><span class="na">PURPOSE_ENCRYPT</span><span class="w"> </span><span class="n">or</span><span class="w"> </span><span class="n">KeyProperties</span><span class="p">.</span><span class="na">PURPOSE_DECRYPT</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">setBlockModes</span><span class="p">(</span><span class="n">KeyProperties</span><span class="p">.</span><span class="na">BLOCK_MODE_GCM</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">setEncryptionPaddings</span><span class="p">(</span><span class="n">KeyProperties</span><span class="p">.</span><span class="na">ENCRYPTION_PADDING_NONE</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">setKeySize</span><span class="p">(</span><span class="m">256</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">build</span><span class="p">()</span>
+</code></pre></div>
+<ul>
+<li>The key is created the first time it's needed and never leaves the Keystore. The app can ask the Keystore to
+  encrypt and decrypt, but can't read the key itself. On phones with secure hardware, the key is kept there.</li>
+<li>Each value gets a fresh random IV. It's stored as <code>base64(iv):base64(ciphertext)</code>.</li>
+<li>GCM also checks integrity: a changed value fails to decrypt instead of decrypting to something else.</li>
+<li>There are two keys: <code>materialdrain_session_key</code> for <code>SessionManager</code> and <code>materialdrain_provider_secrets_key</code> for
+  <code>ProviderConfigStore</code>.</li>
+</ul>
+<p><code>decrypt</code> returns <code>null</code> instead of throwing when a value can't be decrypted, for example after the key was lost. The
+callers then treat the value as not set: <code>SessionManager</code> discards an unreadable session, and
+<code>ProviderConfigStore.credentials</code> returns blank values. You're asked to sign in again; the app doesn't crash.</p>
+<h2 id="backups">Backups<a class="headerlink" href="#backups" title="Permanent link">&para;</a></h2>
+<p>The manifest allows Android's backup (<code>android:allowBackup="true"</code>), but <code>res/xml/backup_rules.xml</code> (Android 11 and
+older) and <code>res/xml/data_extraction_rules.xml</code> (Android 12 and later, for both cloud backup and device-to-device
+transfer) exclude all four files:</p>
+<div class="highlight"><pre><span></span><code><span class="cm">&lt;!-- The login and the provider credentials are encrypted with a Keystore key which is not part of a backup --&gt;</span>
+<span class="nt">&lt;exclude</span><span class="w"> </span><span class="na">domain=</span><span class="s">"sharedpref"</span><span class="w"> </span><span class="na">path=</span><span class="s">"pixeldrain_secure_prefs.xml"</span><span class="w"> </span><span class="nt">/&gt;</span>
+<span class="nt">&lt;exclude</span><span class="w"> </span><span class="na">domain=</span><span class="s">"sharedpref"</span><span class="w"> </span><span class="na">path=</span><span class="s">"provider_secure_prefs.xml"</span><span class="w"> </span><span class="nt">/&gt;</span>
+<span class="cm">&lt;!-- The plain copies of the settings which hold the API key and the provider config state are not backed up --&gt;</span>
+<span class="nt">&lt;exclude</span><span class="w"> </span><span class="na">domain=</span><span class="s">"sharedpref"</span><span class="w"> </span><span class="na">path=</span><span class="s">"pixeldrain_prefs.xml"</span><span class="w"> </span><span class="nt">/&gt;</span>
+<span class="nt">&lt;exclude</span><span class="w"> </span><span class="na">domain=</span><span class="s">"sharedpref"</span><span class="w"> </span><span class="na">path=</span><span class="s">"provider_prefs.xml"</span><span class="w"> </span><span class="nt">/&gt;</span>
+</code></pre></div>
+<p>Why each one:</p>
+<ul>
+<li><strong>The two secure files</strong> would be useless on another phone. The Keystore key isn't part of a backup, so the restored
+  values couldn't be decrypted. Leaving them out is clearer than restoring values that silently fail.</li>
+<li><strong><code>pixeldrain_prefs</code></strong> is where older versions kept the API key in plain text. It must not end up in a cloud backup.</li>
+<li><strong><code>provider_prefs</code></strong> holds the hosts. Restored without their sign-ins, they would only half work, and their update
+  state (<code>etag</code>, the pending update) belongs to this install.</li>
+</ul>
+<p>In practice, a backup restores nothing of the app's own data. After moving to a new phone, export your configs from
+the old one and import them again.</p>
+<h2 id="app-lock">App lock<a class="headerlink" href="#app-lock" title="Permanent link">&para;</a></h2>
+<p><strong>Settings → Security → Lock with fingerprint or face</strong> (<code>AppSettings.biometricLock</code>, off by default) puts the app
+behind Android's <code>BiometricPrompt</code>. It accepts a strong biometric or the device's screen lock
+(<code>BIOMETRIC_STRONG or DEVICE_CREDENTIAL</code>), so it works on phones without a fingerprint reader. The switch only turns
+on when the device has one of them set up (<code>biometricLockAvailable()</code>).</p>
+<p><code>auth/AppLock.kt</code> decides when to lock. <code>MainActivity</code> calls <code>onStarted()</code> and <code>onStopped()</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">fun</span><span class="w"> </span><span class="nf">onStarted</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">wasAway</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">stoppedAt</span><span class="o">?.</span><span class="na">let</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">SystemClock</span><span class="p">.</span><span class="na">elapsedRealtime</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nb">it</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">LOCK_AFTER_BACKGROUND_MS</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">?:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">settings</span><span class="p">.</span><span class="na">biometricLock</span><span class="p">.</span><span class="na">value</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">wasAway</span><span class="p">)</span><span class="w"> </span><span class="n">_locked</span><span class="p">.</span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">settings</span><span class="p">.</span><span class="na">biometricLock</span><span class="p">.</span><span class="na">value</span><span class="p">)</span><span class="w"> </span><span class="n">_locked</span><span class="p">.</span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
+<span class="p">}</span>
+</code></pre></div>
+<ul>
+<li>It locks when the app is opened, and again when it comes back after more than <strong>30 seconds</strong> in the background
+  (<code>LOCK_AFTER_BACKGROUND_MS</code>). A quick switch to another app and back doesn't ask again; that would be tiring for no
+  gain.</li>
+<li>It uses <code>elapsedRealtime</code>, which can't be changed by setting the clock.</li>
+<li><code>AppLockOverlay</code> covers the whole app while it's locked and takes every touch, so nothing underneath can be used
+  until the prompt succeeds.</li>
+<li>A file shared from another app waits in <code>pendingShares</code> until the app is unlocked. Nothing uploads while it's locked
+  (see <a href="../transfers/#files-shared-from-another-app">Uploads and downloads</a>).</li>
+</ul>
+<p>Transfers keep running while the app is locked. The lock protects what's on the screen, not the work in progress.</p>
+<h2 id="credentials-only-go-to-their-host">Credentials only go to their host<a class="headerlink" href="#credentials-only-go-to-their-host" title="Permanent link">&para;</a></h2>
+<p>A sign-in must never reach a site it doesn't belong to. These rules make sure of that.</p>
+<p><strong>Media loads.</strong> Thumbnails, previews and players load URLs that can come from anywhere: a host's API can return a
+thumbnail on a CDN, for example. They all get their headers from <code>StorageProvider.requestHeaders(url)</code> (through
+<code>HostRequestAuth</code>, see <a href="../media/#the-login-for-media">Thumbnails and previews</a>), and each host only answers for its own
+addresses:</p>
+<table>
+<thead>
+<tr>
+<th>Host</th>
+<th><code>requestHeaders</code> sends the login for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>REST API</td>
+<td>URLs that start with the config's <code>base_url</code></td>
+</tr>
+<tr>
+<td>WebDAV</td>
+<td>URLs that start with the share's base URL (with <code>{username}</code> filled in)</td>
+</tr>
+<tr>
+<td>Pixeldrain</td>
+<td>URLs under <code>https://pixeldrain.com/api/filesystem/</code>, as the <code>pd_auth_key</code> cookie</td>
+</tr>
+<tr>
+<td>S3, SMB</td>
+<td>Nothing: S3 file URLs are presigned, and SMB files are served by the app itself</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="kd">override</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">requestHeaders</span><span class="p">(</span><span class="n">url</span><span class="p">:</span><span class="w"> </span><span class="kt">String</span><span class="p">):</span><span class="w"> </span><span class="n">Map</span><span class="o">&lt;</span><span class="kt">String</span><span class="p">,</span><span class="w"> </span><span class="kt">String</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">url</span><span class="p">.</span><span class="na">startsWith</span><span class="p">(</span><span class="n">config</span><span class="p">.</span><span class="na">baseUrl</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">emptyMap</span><span class="p">()</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">header</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">resolveAuthPlan</span><span class="p">().</span><span class="na">header</span><span class="w"> </span><span class="o">?:</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">emptyMap</span><span class="p">()</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">mapOf</span><span class="p">(</span><span class="n">header</span><span class="p">.</span><span class="na">first</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">header</span><span class="p">.</span><span class="na">second</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>API requests.</strong> A REST API config's endpoints are relative paths under <code>base_url</code>, or full <code>https://</code> addresses its
+author wrote. Both get the sign-in: the config chose them. That's why an update that adds a new address is treated as
+sensitive (next section).</p>
+<p><strong><code>send_credentials: false</code>.</strong> A REST API config can turn the sign-in off completely. <code>credentialsPlan</code> then returns
+<code>AuthPlan.None</code>, for every request and every media load.</p>
+<h2 id="updates-cant-redirect-a-sign-in">Updates can't redirect a sign-in<a class="headerlink" href="#updates-cant-redirect-a-sign-in" title="Permanent link">&para;</a></h2>
+<p>A config with <code>meta.update_url</code> can update itself. The rule is simple: <strong>an update may change what requests look
+like, but never where or how the sign-in is sent without asking you first.</strong> See also
+<a href="../../hosts/sharing-and-updates/#updates-that-ask-first">Sharing and updates</a>.</p>
+<h3 id="sensitive-changes">Sensitive changes<a class="headerlink" href="#sensitive-changes" title="Permanent link">&para;</a></h3>
+<p><code>ConfigUpdates.sensitiveChanges(old, new)</code> in <code>provider-api</code> lists everything that would change where credentials go:</p>
+<table>
+<thead>
+<tr>
+<th><code>SensitiveChange.Kind</code></th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DESTINATION</code></td>
+<td>A request would go to a scheme, host or port it didn't go to before. It compares the origins of <code>base_url</code> (or the S3 <code>endpoint</code>, or <code>smb://host:port</code>), of every absolute endpoint path, and of the login and logout paths</td>
+</tr>
+<tr>
+<td><code>AUTH</code></td>
+<td>The <code>auth</code> type changed, the header name of <code>HEADER</code> changed, <code>password_auth</code> changed, or anything else in <code>auth</code></td>
+</tr>
+<tr>
+<td><code>UPDATE_SOURCE</code></td>
+<td>Future updates would come from a new update URL. Removing the URL only stops updates, so that's fine</td>
+</tr>
+<tr>
+<td><code>KIND</code></td>
+<td>The config becomes a different kind of host</td>
+</tr>
+</tbody>
+</table>
+<p>An address the code can't parse is kept whole rather than dropped, so any change to it still counts as a new
+destination.</p>
+<p><code>ConfigUpdates.evaluate</code> also refuses an update whose <code>meta.id</code> differs from the installed one ("The update URL now
+serves a different config"), and treats a remote copy with the same or a lower <code>version</code> as up to date. Versions are
+the contract: a config's author has to raise the version to publish an update.</p>
+<p><code>ConfigUpdatesTest</code> in <code>provider-api</code> covers these rules.</p>
+<h3 id="checking-and-applying">Checking and applying<a class="headerlink" href="#checking-and-applying" title="Permanent link">&para;</a></h3>
+<p><code>provider/ProviderUpdater.kt</code> fetches and applies updates:</p>
+<ul>
+<li><strong>HTTPS only.</strong> An <code>update_url</code> that doesn't start with <code>https://</code> is refused. A config that updates over plain
+  HTTP could be swapped on the way.</li>
+<li><strong>At most 256 KB.</strong> <code>readLimited</code> asks for 256 KB + 1 bytes; if they arrive, the file is too big and is refused. No
+  config is that large, and a bad server can't make the app read without end.</li>
+<li><strong>20 seconds.</strong> The whole call times out after 20 seconds.</li>
+<li><strong>ETag.</strong> The last <code>ETag</code> is sent as <code>If-None-Match</code>, so an unchanged file costs a <code>304</code> and no download.</li>
+<li><strong>Auto-update</strong> runs once when the app starts (<code>AppContainer</code> launches <code>runAutoUpdates</code>), at most once a day per
+  config. There's no background job. It only applies updates <strong>without</strong> sensitive changes; the rest wait for you.</li>
+<li><strong>A new destination clears the sign-in.</strong> When you accept an update with a <code>DESTINATION</code> or <code>KIND</code> change,
+  <code>applyPending</code> passes <code>clearSecret = true</code>, and every saved credential of that host is deleted. You type it in again
+  for the new place, so it's never sent there without you knowing.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="kd">val</span><span class="w"> </span><span class="nv">clearSecret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ConfigUpdates</span><span class="p">.</span><span class="na">sensitiveChanges</span><span class="p">(</span><span class="n">stored</span><span class="p">.</span><span class="na">config</span><span class="p">,</span><span class="w"> </span><span class="n">pending</span><span class="p">.</span><span class="na">config</span><span class="p">).</span><span class="na">any</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nb">it</span><span class="p">.</span><span class="na">kind</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">SensitiveChange</span><span class="p">.</span><span class="na">Kind</span><span class="p">.</span><span class="na">DESTINATION</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">it</span><span class="p">.</span><span class="na">kind</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">SensitiveChange</span><span class="p">.</span><span class="na">Kind</span><span class="p">.</span><span class="na">KIND</span>
+<span class="p">}</span>
+<span class="n">store</span><span class="p">.</span><span class="na">applyUpdate</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">pending</span><span class="p">,</span><span class="w"> </span><span class="n">clearSecret</span><span class="p">)</span>
+</code></pre></div>
+<p>Two more safeguards in <code>ProviderConfigStore</code>:</p>
+<ul>
+<li><strong>Editing turns auto-update off, once.</strong> If your edit makes the config differ from <code>upstream</code>, auto-update is
+  switched off, so the next check doesn't overwrite your change. If you turn it back on, later edits leave it on.</li>
+<li><strong>Revert turns auto-update off</strong>, so the next check doesn't re-apply what you just reverted.</li>
+</ul>
+<h2 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h2>
+<p>The app's diagnostic log is <code>ProviderLog</code> in <code>provider-api</code>. Every line is tagged <code>MD/&lt;category&gt;</code> (<code>Files</code>, <code>Http</code>,
+<code>Auth</code>, <code>Config</code>, …), so <code>adb logcat | grep "MD/"</code> shows just these.</p>
+<p><strong>A credential is never logged.</strong> Code logs what kind of credential is used, or its length, never its value:</p>
+<div class="highlight"><pre><span></span><code><span class="n">ProviderLog</span><span class="p">.</span><span class="na">d</span><span class="p">(</span><span class="s">"Auth"</span><span class="p">,</span><span class="w"> </span><span class="s">"</span><span class="si">${</span><span class="n">config</span><span class="p">.</span><span class="na">name</span><span class="si">}</span><span class="s">: </span><span class="si">${</span><span class="n">auth</span><span class="p">.</span><span class="na">header</span><span class="o">?.</span><span class="na">first</span><span class="w"> </span><span class="o">?:</span><span class="w"> </span><span class="s">"</span><span class="n">no</span><span class="w"> </span><span class="n">header</span><span class="s">"</span><span class="si">}</span><span class="s">, </span><span class="si">${</span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">auth</span><span class="p">.</span><span class="na">fromSession</span><span class="p">)</span><span class="w"> </span><span class="s">"</span><span class="n">session</span><span class="w"> </span><span class="n">token</span><span class="s">"</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s">"</span><span class="n">credentials</span><span class="s">"</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+</code></pre></div>
+<p>That logs the header's <em>name</em> (<code>Authorization</code>), not its value. Other examples: <code>saveApiKey</code> logs "saved the API key
+of host …", and the Upload screen logs whether the key is "Present" or "Missing". <code>ProviderLog.snippet</code> cuts a
+response body to 300 characters for an error report: enough to read the server's message, not a whole page.
+<code>KeystoreCipher</code> only logs the class name of a decryption error.</p>
+<p><strong>Why so careful?</strong> Logs end up in bug reports, in <code>adb</code> output pasted into an issue, and in other tools that read
+logcat. A token there is as good as a password.</p>
+<h2 id="network-security">Network security<a class="headerlink" href="#network-security" title="Permanent link">&para;</a></h2>
+<p><code>AndroidManifest.xml</code> points to <code>res/xml/network_security_config.xml</code>. The app targets Android 16 (SDK 36), where
+Android blocks plain <code>http://</code> by default. The config only adds one exception:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">&lt;domain-config</span><span class="w"> </span><span class="na">cleartextTrafficPermitted=</span><span class="s">"true"</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;domain</span><span class="w"> </span><span class="na">includeSubdomains=</span><span class="s">"false"</span><span class="nt">&gt;</span>127.0.0.1<span class="nt">&lt;/domain&gt;</span>
+<span class="nt">&lt;/domain-config&gt;</span>
+</code></pre></div>
+<ul>
+<li><strong>Everything goes over HTTPS.</strong> A host with an <code>http://</code> address can't be reached; Android refuses the connection
+  before anything is sent. A sign-in can't travel unencrypted by mistake.</li>
+<li><strong>127.0.0.1 is the one exception</strong>, for the app's own server that hands SMB files to the image loader and the
+  players. That traffic never leaves the phone. See <a href="../media/#smb-files-by-address">SMB files by address</a>.</li>
+<li>SMB itself doesn't use HTTP. With <code>"encrypt": true</code>, its traffic is encrypted with SMB 3 (see
+  <a href="../../hosts/smb/">SMB</a>).</li>
+</ul>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../hosts/sign-in/">Sign-in</a> for how a config describes its sign-in.</li>
+<li><a href="../../hosts/sharing-and-updates/">Sharing and updates</a> for <code>meta</code> and the update flow from the user's side.</li>
+<li><a href="../architecture/">Architecture</a> for <code>AppContainer</code>, which creates the stores.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../search-and-sorting/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Search and sorting">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Search and sorting
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../common-tasks/" class="md-footer__link md-footer__link--next" aria-label="Next: Common tasks">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Common tasks
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

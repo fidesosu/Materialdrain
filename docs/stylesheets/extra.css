@@ -1,0 +1,125 @@
+/*
+ * The documentation in the site's palette (the same as website/style.css): a dark rose. Material for MkDocs takes its
+ * colours from these variables, so only they are set here.
+ */
+:root {
+  --bg-main: #1a1617;
+  --bg-surface: #251f21;
+  --bg-soft: #362d30;
+  --border-subtle: #453a3d;
+  --border-focus: #8c6a74;
+  --accent-highlight: #eec1c8;
+  --accent-primary: #d4a5b2;
+  --accent-muted: #a3818a;
+  --accent-deep: #7f5f68;
+  --accent-glow: rgba(212, 165, 178, 0.15);
+  --text-main: #f2ecee;
+  --text-muted: #b0a2a6;
+  --text-inverse: #1a1617;
+  --link-color: #e2b2be;
+  --link-hover: #fcd7dd;
+  --blue: #6a6ca6;
+  --red: #ba465b;
+  --green: #6aa694;
+  --yellow: #e0b06b;
+
+  /* Made from the ones above: lighter tones of blue and red, which read on the dark background as text */
+  --text-faint: #85797d;
+  --blue-light: #9fa1d8;
+  --red-light: #e08a99;
+}
+
+/* The header and tabs, and what's highlighted or chosen */
+:root,
+[data-md-color-primary="custom"],
+[data-md-color-accent="custom"] {
+  --md-primary-fg-color: var(--bg-surface);
+  --md-primary-fg-color--light: var(--bg-soft);
+  --md-primary-fg-color--dark: var(--bg-main);
+  --md-primary-bg-color: var(--text-main);
+  --md-primary-bg-color--light: var(--text-muted);
+
+  --md-accent-fg-color: var(--link-hover);
+  --md-accent-fg-color--transparent: var(--accent-glow);
+  --md-accent-bg-color: var(--text-inverse);
+  --md-accent-bg-color--light: var(--text-inverse);
+}
+
+/* The page */
+[data-md-color-scheme="slate"] {
+  --md-hue: 340;
+
+  --md-default-bg-color: var(--bg-main);
+  --md-default-bg-color--light: var(--bg-surface);
+  --md-default-bg-color--lighter: var(--bg-soft);
+  --md-default-bg-color--lightest: var(--border-subtle);
+
+  --md-default-fg-color: var(--text-main);
+  --md-default-fg-color--light: var(--text-muted);
+  --md-default-fg-color--lighter: var(--text-faint);
+  --md-default-fg-color--lightest: var(--border-subtle);
+
+  --md-typeset-color: var(--text-main);
+  --md-typeset-a-color: var(--link-color);
+  --md-typeset-mark-color: rgba(224, 176, 107, 0.3);
+  --md-typeset-table-color: var(--border-subtle);
+  --md-typeset-table-color--light: var(--accent-glow);
+
+  --md-footer-bg-color: var(--bg-surface);
+  --md-footer-bg-color--dark: var(--bg-main);
+  --md-footer-fg-color: var(--text-main);
+  --md-footer-fg-color--light: var(--text-muted);
+  --md-footer-fg-color--lighter: var(--text-faint);
+
+  --md-admonition-bg-color: var(--bg-surface);
+  --md-admonition-fg-color: var(--text-main);
+
+  /* Code */
+  --md-code-bg-color: var(--bg-surface);
+  --md-code-fg-color: var(--text-main);
+  --md-code-hl-color: var(--accent-primary);
+  --md-code-hl-color--light: var(--accent-glow);
+  --md-code-hl-keyword-color: var(--accent-primary);
+  --md-code-hl-string-color: var(--green);
+  --md-code-hl-number-color: var(--yellow);
+  --md-code-hl-constant-color: var(--yellow);
+  --md-code-hl-special-color: var(--red-light);
+  --md-code-hl-function-color: var(--blue-light);
+  --md-code-hl-name-color: var(--text-main);
+  --md-code-hl-operator-color: var(--text-muted);
+  --md-code-hl-punctuation-color: var(--text-muted);
+  --md-code-hl-comment-color: var(--text-faint);
+  --md-code-hl-generic-color: var(--text-muted);
+  --md-code-hl-variable-color: var(--accent-highlight);
+}
+
+/* Links brighten when pointed at */
+.md-typeset a:hover,
+.md-typeset a:focus {
+  color: var(--link-hover);
+}
+
+/* The site's name in the header, in the accent */
+.md-header__title {
+  color: var(--accent-highlight);
+}
+
+/* Text selection */
+::selection {
+  background: var(--accent-deep);
+  color: var(--text-main);
+}
+
+/* The note boxes: a rose edge instead of Material's blue */
+.md-typeset .admonition.note,
+.md-typeset details.note {
+  border-color: var(--accent-muted);
+}
+.md-typeset .note > .admonition-title,
+.md-typeset .note > summary {
+  background-color: var(--accent-glow);
+}
+.md-typeset .note > .admonition-title::before,
+.md-typeset .note > summary::before {
+  background-color: var(--accent-primary);
+}

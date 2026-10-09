@@ -1,0 +1,1998 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="How to use Materialdrain, how to add any host to it, and how the app is built and why.">
+      
+      
+      
+        <link rel="canonical" href="https://materialdrain.senko.tools/docs/development/conventions/">
+      
+      
+        <link rel="prev" href="../common-tasks/">
+      
+      
+        <link rel="next" href="../website/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Conventions - Materialdrain docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#conventions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Materialdrain docs" class="md-header__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Materialdrain docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Conventions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Using the app
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../hosts/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Hosts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Materialdrain docs" class="md-nav__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Materialdrain docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the app
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using the app
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/screens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../hosts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hosts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/config-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kinds of host
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kinds of host
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/webdav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebDAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    S3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/smb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SMB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/rest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sign-in/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign-in
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sharing-and-updates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and updates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts in code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interface/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The interface
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uploads and downloads
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../media/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thumbnails and previews
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../search-and-sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search and sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-and-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data and security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common tasks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conventions
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#comments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Naming
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#host-operations-return-apiresponse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Host operations return ApiResponse
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cancellation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancellation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#words-in-the-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Words in the interface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-and-viewmodels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State and ViewModels
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compose
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commits
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    This website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#comments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Naming
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#host-operations-return-apiresponse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Host operations return ApiResponse
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cancellation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancellation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#words-in-the-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Words in the interface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-and-viewmodels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State and ViewModels
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compose
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commits
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="conventions">Conventions<a class="headerlink" href="#conventions" title="Permanent link">&para;</a></h1>
+<p>How the code in this repository is written, and why. None of it is enforced by a tool; it's what the code already
+does, so a change that follows it reads like the rest. When you're unsure, look at the code nearest to what you're
+changing.</p>
+<h2 id="comments">Comments<a class="headerlink" href="#comments" title="Permanent link">&para;</a></h2>
+<p>Comments explain <strong>why</strong>, and what something is <strong>for</strong>. The code already says what it does.</p>
+<div class="highlight"><pre><span></span><code><span class="cm">/**</span>
+<span class="cm"> * The date a file is listed and sorted by: when it was last modified where the host knows (SMB, WebDAV, S3, Pixeldrain's</span>
+<span class="cm"> * filesystem), else when it was uploaded (Pixeldrain's files, which never change).</span>
+<span class="cm"> */</span>
+<span class="kd">val</span><span class="w"> </span><span class="nv">StorageNode</span><span class="p">.</span><span class="na">listDate</span><span class="p">:</span><span class="w"> </span><span class="kt">String?</span><span class="w"> </span><span class="k">get</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">modifiedAt</span><span class="w"> </span><span class="o">?:</span><span class="w"> </span><span class="n">createdAt</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1">// By the moment itself, not the text: hosts write dates differently, and RFC 1123 doesn't sort as text</span>
+<span class="n">SortableField</span><span class="p">.</span><span class="na">UPLOAD_DATE</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">parseDateTime</span><span class="p">(</span><span class="n">listDate</span><span class="p">)</span><span class="o">?.</span><span class="na">toEpochMilli</span><span class="p">()</span><span class="w"> </span><span class="o">?:</span><span class="w"> </span><span class="kt">Long</span><span class="p">.</span><span class="na">MIN_VALUE</span>
+</code></pre></div>
+<ul>
+<li><strong>KDoc (<code>/** … */</code>) on anything that isn't obvious from its name</strong>: classes, interfaces, public functions, fields
+  of state. It says what the thing is for, and the reason behind a choice that looks odd.</li>
+<li><strong>Plain English, short sentences.</strong> Write for someone who doesn't know the code yet. Prefer "a cancelled upload
+  stops there" to a description of the mechanism.</li>
+<li><strong>Say why something was <em>not</em> done another way</strong>, when that's the obvious question. <code>StorageProvider</code>'s KDoc, for
+  example, explains that there's deliberately no fake folders for flat hosts, "because that would silently
+  misrepresent what the host actually supports".</li>
+<li><strong>Link with <code>[Name]</code></strong> to the class, function or parameter a comment talks about, so it stays findable when renamed.</li>
+<li><strong>Line comments (<code>//</code>)</strong> go above the line they explain, without a full stop at the end when they're one sentence.</li>
+<li>The same goes for the build files and workflows: <code>app/build.gradle.kts</code> explains why versions come from the commit
+  time, and every step in <code>.github/workflows/build.yml</code> that isn't obvious has a line saying why it's there.</li>
+</ul>
+<p>Why: most of the code's difficulty is in decisions (why a sign-in is only sent to some addresses, why an error after a
+cancel counts as the cancel), not in syntax. A comment that keeps the reason saves the next person from undoing a fix.</p>
+<h2 id="naming">Naming<a class="headerlink" href="#naming" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Pattern</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Packages</td>
+<td>By feature, under <code>tools.senko.materialdrain</code></td>
+<td><code>upload</code>, <code>files</code>, <code>filesystem</code>, <code>lists</code>, <code>preferences</code>, <code>transfer</code>, <code>ui.media</code></td>
+</tr>
+<tr>
+<td>Provider modules</td>
+<td><code>provider.&lt;kind&gt;</code></td>
+<td><code>provider.webdav</code>, <code>provider.s3</code>, <code>provider.genericrest</code></td>
+</tr>
+<tr>
+<td>ViewModels</td>
+<td><code>&lt;Feature&gt;ViewModel</code>, with a <code>&lt;Feature&gt;UiState</code></td>
+<td><code>UploadViewModel</code> and <code>UploadUiState</code></td>
+</tr>
+<tr>
+<td>Hosts</td>
+<td><code>&lt;Kind&gt;StorageProvider</code>, often with a <code>&lt;Kind&gt;Client</code> for the wire</td>
+<td><code>WebDavStorageProvider</code>, <code>S3Client</code></td>
+</tr>
+<tr>
+<td>Groups of host operations</td>
+<td><code>&lt;Something&gt;Ops</code></td>
+<td><code>FileStoreOps</code>, <code>BrowseOps</code>, <code>ArchiveOps</code></td>
+</tr>
+<tr>
+<td>Composition locals</td>
+<td><code>Local&lt;Thing&gt;</code></td>
+<td><code>LocalReduceMotion</code>, <code>LocalBottomInset</code></td>
+</tr>
+<tr>
+<td>Tests</td>
+<td><code>&lt;Thing&gt;Test</code>, test names as sentences in backticks</td>
+<td><code>fun `a different host is sensitive`()</code></td>
+</tr>
+</tbody>
+</table>
+<p>Names say what something is in the app's own words: a <strong>host</strong> (not a backend), a <strong>sign-in</strong>, a <strong>config</strong>. The code
+still calls hosts "providers" in type names, since that's what they were first called; the words the user reads say
+"host".</p>
+<p>The Kotlin style is the official one (<code>kotlin.code.style=official</code> in <code>gradle.properties</code>), which Android Studio
+formats to.</p>
+<h2 id="host-operations-return-apiresponse">Host operations return <code>ApiResponse</code><a class="headerlink" href="#host-operations-return-apiresponse" title="Permanent link">&para;</a></h2>
+<p>Every operation of a host (<code>FileStoreOps</code>, <code>BrowseOps</code>, <code>ListOps</code>, <code>ArchiveOps</code> and the others in <code>Ops.kt</code>) is a
+<code>suspend</code> function that returns an <code>ApiResponse</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">sealed</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">ApiResponse</span><span class="o">&lt;</span><span class="k">out</span><span class="w"> </span><span class="n">T</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">data</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">Success</span><span class="o">&lt;</span><span class="k">out</span><span class="w"> </span><span class="n">T</span><span class="o">&gt;</span><span class="p">(</span><span class="kd">val</span><span class="w"> </span><span class="nv">data</span><span class="p">:</span><span class="w"> </span><span class="n">T</span><span class="p">)</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">ApiResponse</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span><span class="p">()</span>
+<span class="w">    </span><span class="kd">data</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">Error</span><span class="p">(</span><span class="kd">val</span><span class="w"> </span><span class="nv">error</span><span class="p">:</span><span class="w"> </span><span class="n">ProviderError</span><span class="p">)</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">ApiResponse</span><span class="o">&lt;</span><span class="n">Nothing</span><span class="o">&gt;</span><span class="p">()</span>
+<span class="p">}</span>
+
+<span class="kd">data</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">ProviderError</span><span class="p">(</span><span class="kd">val</span><span class="w"> </span><span class="nv">code</span><span class="p">:</span><span class="w"> </span><span class="kt">String</span><span class="p">,</span><span class="w"> </span><span class="kd">val</span><span class="w"> </span><span class="nv">message</span><span class="p">:</span><span class="w"> </span><span class="kt">String</span><span class="p">,</span><span class="w"> </span><span class="kd">val</span><span class="w"> </span><span class="nv">httpStatus</span><span class="p">:</span><span class="w"> </span><span class="kt">Int?</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span>
+</code></pre></div>
+<p>A host <strong>never throws</strong> for a failure: a lost connection, a refused request or an answer it can't read all become an
+<code>ApiResponse.Error</code>, with a <code>message</code> a person can read. The one exception is coroutine cancellation, which must
+always be thrown on:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">val</span><span class="w"> </span><span class="nv">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">client</span><span class="p">.</span><span class="na">propfind</span><span class="p">(</span><span class="n">baseUrl</span><span class="p">,</span><span class="w"> </span><span class="n">normalizedPath</span><span class="p">,</span><span class="w"> </span><span class="n">depth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="n">resolveAuth</span><span class="p">())</span>
+<span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="n">e</span><span class="p">:</span><span class="w"> </span><span class="n">CancellationException</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">throw</span><span class="w"> </span><span class="n">e</span>
+<span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="n">e</span><span class="p">:</span><span class="w"> </span><span class="n">Exception</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">ApiResponse</span><span class="p">.</span><span class="na">Error</span><span class="p">(</span><span class="n">networkError</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Why: the screens show a host's failure in place (a message, a failed file in a list), and a failure of one file
+mustn't stop the others. An exception that escapes a coroutine nobody catches crashes the whole app, which is exactly
+the bug the commit "Fix the crash when an upload fails or is cancelled" fixed. Catching <code>CancellationException</code>
+separately keeps cancelling working: swallowing it would leave a cancelled job running.</p>
+<p>A host that can't do something says so with an error too, rather than pretending (see <code>downloadArchive</code>'s default,
+which answers "This host can't download several files as one archive."). And the optional groups of operations
+(<code>fileStore</code>, <code>browse</code>, <code>lists</code>…) are <code>null</code> when the host lacks the matching capability; the UI reads
+<code>capabilities</code> to decide what to show. More in <a href="../providers/">Hosts in code</a>.</p>
+<h2 id="cancellation">Cancellation<a class="headerlink" href="#cancellation" title="Permanent link">&para;</a></h2>
+<p>Transfers run in coroutines that the user can cancel at any moment, often in the middle of a host's sending loop.
+Three rules keep a cancel a cancel:</p>
+<ol>
+<li><strong>Code that calls a host catches exceptions too</strong>, for each item of a loop, and turns them into a failed result.
+   <code>UploadViewModel.uploadFile</code> and <code>FilesystemViewModel.uploadOne</code> "never throw but for a cancel", so one failed
+   file doesn't end the batch.</li>
+<li>
+<p><strong>A cancelled job stops inside the host's loop.</strong> The progress callback, which the host calls while sending,
+   throws when the job is no longer active:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">val</span><span class="w"> </span><span class="nv">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">uploadOne</span><span class="p">(</span><span class="n">browse</span><span class="p">,</span><span class="w"> </span><span class="n">joinPath</span><span class="p">(</span><span class="n">dir</span><span class="p">,</span><span class="w"> </span><span class="n">item</span><span class="p">.</span><span class="na">name</span><span class="p">),</span><span class="w"> </span><span class="n">item</span><span class="p">.</span><span class="na">uri</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">sent</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w">    </span><span class="c1">// Called from inside the host's sending loop: a cancelled upload stops there</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">job</span><span class="o">?.</span><span class="na">isActive</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">false</span><span class="p">)</span><span class="w"> </span><span class="k">throw</span><span class="w"> </span><span class="n">CancellationException</span><span class="p">(</span><span class="s">"The upload was cancelled"</span><span class="p">)</span>
+<span class="w">    </span><span class="err">…</span>
+<span class="p">}</span>
+</code></pre></div>
+</li>
+<li>
+<p><strong>An error after a cancel counts as the cancel.</strong> Cancelling cuts the connection, and some hosts report that as an
+   ordinary error (or throw an <code>IOException</code>). So after any failure, <code>ensureActive()</code> is called before the failure is
+   recorded: if the job was cancelled, it throws <code>CancellationException</code> and the cancel path runs instead.</p>
+<div class="highlight"><pre><span></span><code><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="n">e</span><span class="p">:</span><span class="w"> </span><span class="n">Exception</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">currentCoroutineContext</span><span class="p">().</span><span class="na">ensureActive</span><span class="p">()</span>
+<span class="w">    </span><span class="n">ProviderLog</span><span class="p">.</span><span class="na">e</span><span class="p">(</span><span class="s">"Filesystem"</span><span class="p">,</span><span class="w"> </span><span class="s">"uploading to '</span><span class="si">$</span><span class="n">path</span><span class="s">' failed: </span><span class="si">${</span><span class="n">e</span><span class="p">.</span><span class="na">message</span><span class="si">}</span><span class="s">"</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+<span class="w">    </span><span class="n">ApiResponse</span><span class="p">.</span><span class="na">Error</span><span class="p">(</span><span class="n">ProviderError</span><span class="p">(</span><span class="s">"upload_failed"</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="na">message</span><span class="w"> </span><span class="o">?:</span><span class="w"> </span><span class="s">"The upload failed."</span><span class="p">))</span>
+<span class="p">}</span>
+</code></pre></div>
+</li>
+</ol>
+<p>The <code>catch (e: CancellationException)</code> around the whole batch then updates the state ("Upload cancelled."), rethrows,
+and a <code>finally</code> reports the transfer's outcome. Why: without rule 3, cancelling showed "upload failed" with a
+network error, which is both wrong and alarming. More in <a href="../transfers/">Uploads and downloads</a>.</p>
+<h2 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h2>
+<p>Log through <code>ProviderLog</code> (in <code>provider-api</code>), not <code>android.util.Log</code> directly:</p>
+<div class="highlight"><pre><span></span><code><span class="n">ProviderLog</span><span class="p">.</span><span class="na">d</span><span class="p">(</span><span class="s">"Http"</span><span class="p">,</span><span class="w"> </span><span class="s">"</span><span class="si">${</span><span class="n">request</span><span class="p">.</span><span class="na">method</span><span class="si">}</span><span class="s"> </span><span class="si">${</span><span class="n">request</span><span class="p">.</span><span class="na">url</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+<span class="n">ProviderLog</span><span class="p">.</span><span class="na">e</span><span class="p">(</span><span class="s">"Config"</span><span class="p">,</span><span class="w"> </span><span class="s">"…"</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+</code></pre></div>
+<ul>
+<li>Every line is tagged <code>MD/&lt;category&gt;</code>, so <code>adb logcat | grep "MD/"</code> (or <code>tag:MD/</code> in Android Studio) shows only the app's own lines.
+  The categories in use are <code>Files</code>, <code>Lists</code>, <code>Filesystem</code>, <code>Upload</code>, <code>Http</code>, <code>Auth</code> and <code>Config</code>; reuse one before
+  making a new one.</li>
+<li><strong>Never log a credential.</strong> Log its kind or length ("api key, 40 chars"), or the name of the header it goes in, never
+  the value. The <code>Auth</code> line of the REST host logs the header's name and whether a session token is used, for example.</li>
+<li><code>ProviderLog.snippet(text)</code> gives the start of a response body (300 characters by default) for an error report:
+  enough to read the server's message, not a whole page.</li>
+</ul>
+<p>A few older files still log with <code>Log</code> and a tag of their own; move them to <code>ProviderLog</code> when you work on them.</p>
+<p>Why: one prefix makes a bug report's log easy to cut down to what matters, and a log that never holds a secret can be
+pasted into an issue without a second thought.</p>
+<h2 id="words-in-the-interface">Words in the interface<a class="headerlink" href="#words-in-the-interface" title="Permanent link">&para;</a></h2>
+<p>The text the app shows is written in Kotlin, next to the code that shows it (there are no translations, so
+<code>strings.xml</code> holds only the app's name). It follows the same style as these pages:</p>
+<ul>
+<li><strong>Plain words, no jargon.</strong> "Sign in" rather than "authenticate", "host" rather than "provider" or "backend",
+  "This host can't receive uploads." rather than an error code.</li>
+<li><strong>Sentence case</strong> for buttons, titles and labels: <strong>Check all for updates</strong>, <strong>Add a custom host</strong>, <strong>Or paste a
+  config</strong>. Some older labels are still in Title Case; fix them as you pass.</li>
+<li><strong>Say what happened and what to do.</strong> A refused sign-in reads "Not signed in. Sign in, or add an API key for this
+  host under Settings → Advanced." (<code>ProviderError.forDisplay()</code>).</li>
+<li><strong>Messages are sentences</strong>, with a full stop: "1 file was uploaded to $dir.", "Upload cancelled."</li>
+<li><strong>Name settings the way the screen does</strong>, with <strong>Settings → Advanced</strong> style paths, so the user can find them.</li>
+</ul>
+<p>Why: the app is used by people who don't know what WebDAV or a 401 is, and they shouldn't need to.</p>
+<h2 id="state-and-viewmodels">State and ViewModels<a class="headerlink" href="#state-and-viewmodels" title="Permanent link">&para;</a></h2>
+<p>Each screen's state lives in a ViewModel, as one immutable <code>…UiState</code> data class behind a <code>StateFlow</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">private</span><span class="w"> </span><span class="kd">val</span><span class="w"> </span><span class="nv">_uiState</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MutableStateFlow</span><span class="p">(</span><span class="n">UploadUiState</span><span class="p">())</span>
+<span class="kd">val</span><span class="w"> </span><span class="nv">uiState</span><span class="p">:</span><span class="w"> </span><span class="n">StateFlow</span><span class="o">&lt;</span><span class="n">UploadUiState</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_uiState</span><span class="p">.</span><span class="na">asStateFlow</span><span class="p">()</span>
+
+<span class="n">_uiState</span><span class="p">.</span><span class="na">update</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nb">it</span><span class="p">.</span><span class="na">copy</span><span class="p">(</span><span class="n">isLoading</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="n">errorMessage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<ul>
+<li>Only the ViewModel writes the state, always through <code>update { it.copy(…) }</code>, which is safe when several coroutines
+  (parallel uploads, say) change it at once.</li>
+<li>Long work runs in <code>viewModelScope</code>, so it ends with the screen's ViewModel, and anything the user can cancel keeps
+  its <code>Job</code>.</li>
+<li>The ViewModels get what they need through their constructor, from <code>ViewModelFactory</code>, which takes it from the one
+  <code>AppContainer</code>. There's no dependency-injection library: the container is small enough to read in one go.</li>
+<li>Shared, app-wide state (the hosts, the settings, the session) is also a <code>StateFlow</code>, on the object that owns it:
+  <code>ProviderConfigStore.providers</code>, <code>AppSettings.reduceAnimations</code>, <code>SessionManager.loggedInUser</code>.</li>
+</ul>
+<p>Why: one state object per screen is easy to reason about and to rebuild after the screen rotates, and a single owner
+for each piece of state means no two places can disagree about it. See <a href="../architecture/">Architecture</a>.</p>
+<h2 id="compose">Compose<a class="headerlink" href="#compose" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Screens read state with <code>collectAsState()</code></strong> and call the ViewModel's functions for anything that changes it.</li>
+<li><strong>Components take values and callbacks</strong>, not ViewModels, so they can be reused on every screen (<code>ui/components/</code>).</li>
+<li><strong>Settings that composables deep in the tree need</strong> are composition locals, provided once at the root in <code>App.kt</code>:
+  <code>LocalReduceMotion</code>, <code>LocalBlurredBackdrop</code>, <code>LocalTextWrap</code>, <code>LocalBottomInset</code>, <code>LocalVideoLoop</code> (in
+  <code>ui/LocalSettings.kt</code>). This saves passing them through every layer.</li>
+<li><strong>Respect reduced motion.</strong> Read <code>LocalReduceMotion</code> wherever something moves: when it's on, decorative motion
+  (sliding, scaling, rolling text, animated scrolling) is left out, while fades and feedback such as transfer
+  progress stay.</li>
+<li><code>remember</code> for state that only the screen needs, <code>rememberSaveable</code> for what should survive a rotation,
+  <code>LaunchedEffect</code> for work started by a change.</li>
+<li>Material 3 throughout, but a plain layout when a Material component doesn't fit. <code>FileListItem</code> explains why it's a
+  plain row and not a <code>ListItem</code>, for example.</li>
+</ul>
+<p>More in <a href="../interface/">The interface</a>.</p>
+<h2 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h2>
+<p>Tests are JUnit 4 unit tests in each module's <code>src/test/</code>, run with <code>./gradlew test</code>. They need no phone or emulator.</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@Test</span>
+<span class="kd">fun</span><span class="w"> </span><span class="nf">`same or lower version is up to date even when content differs`</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">local</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">config</span><span class="p">(</span><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="p">)</span>
+<span class="w">    </span><span class="n">assertEquals</span><span class="p">(</span><span class="n">UpdateCheckResult</span><span class="p">.</span><span class="na">UpToDate</span><span class="p">,</span><span class="w"> </span><span class="n">ConfigUpdates</span><span class="p">.</span><span class="na">evaluate</span><span class="p">(</span><span class="n">local</span><span class="p">,</span><span class="w"> </span><span class="n">remote</span><span class="p">(</span><span class="n">config</span><span class="p">(</span><span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">3</span><span class="p">,</span><span class="w"> </span><span class="n">uploadPath</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"/v2/upload"</span><span class="p">)),</span><span class="w"> </span><span class="m">1</span><span class="p">))</span>
+<span class="p">}</span>
+</code></pre></div>
+<ul>
+<li><strong>Test names are sentences</strong> in backticks, saying what should be true: <code>`a broken address sends nothing`</code>,
+  <code>`missing required fields are named plainly`</code>. A failing test then reads as the rule that was broken.</li>
+<li><strong>Small helpers with defaults</strong> build the objects under test (<code>config(version = 3)</code>, <code>node("webdav", modified = …)</code>),
+  so each test only spells out what matters to it.</li>
+<li><strong>Hosts are tested against a real HTTP server</strong>: OkHttp's <code>MockWebServer</code>, started in <code>@Before</code> and shut down in
+  <code>@After</code>. The test then checks the requests the host sent and what it made of the answers.</li>
+<li><strong>Rules that protect the user get tests</strong>: where a sign-in may be sent (<code>AccountFallbackTest</code>), which config updates
+  must ask first (<code>ConfigUpdatesTest</code>), and that every bundled example config still loads (<code>ExampleConfigsTest</code>).</li>
+<li>Suspend functions are called with <code>runBlocking</code> in tests.</li>
+</ul>
+<p>Why: the logic most worth testing (configs, requests, signing, parsing) is plain Kotlin and runs on the JVM in
+seconds, and the build workflow runs every test before publishing anything.</p>
+<h2 id="commits">Commits<a class="headerlink" href="#commits" title="Permanent link">&para;</a></h2>
+<p>A commit's subject is a plain sentence describing the change, in the imperative, without a prefix or a full stop:</p>
+<div class="highlight"><pre><span></span><code>Sort by date without reading each date over and over
+Keep the text preview's scrolling inside it
+Build the app only when something that goes into it changes
+Fix the crash when an upload fails or is cancelled, and finish ordering uploads by last change
+</code></pre></div>
+<ul>
+<li>Describe what changes <strong>for the user</strong>, where there's a user-visible change, rather than which files changed.</li>
+<li>No <code>feat:</code>/<code>fix:</code> prefixes, no ticket numbers.</li>
+<li>The body, when there is one, explains why, and what was wrong before, in the same plain style, wrapped at about 80
+  characters. Lists are fine for several changes.</li>
+</ul>
+<p>Why: the history is how people find out what changed and when, and the <code>dev-build</code> release's notes quote the subject
+of the commit it was built from, so a subject has to make sense to someone who only reads that one line.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../common-tasks/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Common tasks">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Common tasks
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../website/" class="md-footer__link md-footer__link--next" aria-label="Next: This website">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                This website
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

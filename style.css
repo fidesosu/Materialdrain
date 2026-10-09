@@ -1,0 +1,161 @@
+/* The home page's look. The same palette as the documentation (docs/stylesheets/extra.css): a dark rose. */
+:root {
+  color-scheme: dark;
+
+  /* Backgrounds */
+  --bg-main: #1a1617;
+  --bg-surface: #251f21;
+  --bg-soft: #362d30;
+
+  /* Borders */
+  --border-subtle: #453a3d;
+  --border-focus: #8c6a74;
+
+  /* Accents */
+  --accent-highlight: #eec1c8;
+  --accent-primary: #d4a5b2;
+  --accent-muted: #a3818a;
+  --accent-deep: #7f5f68;
+  --accent-glow: rgba(212, 165, 178, 0.15);
+
+  /* Typography */
+  --text-main: #f2ecee;
+  --text-muted: #b0a2a6;
+  --text-inverse: #1a1617;
+
+  /* Links */
+  --link-color: #e2b2be;
+  --link-hover: #fcd7dd;
+
+  /* Semantic colors */
+  --blue: #6a6ca6;
+  --red: #ba465b;
+  --green: #6aa694;
+  --yellow: #e0b06b;
+
+  /* Made from the ones above: a short, sharp shadow (no blur to speak of), only under a card being pointed at */
+  --shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg-main);
+  color: var(--text-main);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+::selection { background: var(--accent-deep); color: var(--text-main); }
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 72px 24px;
+}
+
+h1 {
+  font-size: 2.75rem;
+  line-height: 1.15;
+  margin: 0 0 12px;
+  color: var(--accent-highlight);
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-muted);
+  margin: 56px 0 16px;
+}
+
+.lead { font-size: 1.15rem; color: var(--text-muted); margin: 0; }
+.small { font-size: 0.9rem; color: var(--text-muted); }
+
+a { color: var(--link-color); text-underline-offset: 3px; }
+a:hover { color: var(--link-hover); }
+
+a:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 22px;
+  border-radius: 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  text-decoration: none;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.card:hover {
+  color: var(--text-main);
+  background: var(--bg-soft);
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+.card.primary {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--text-inverse);
+}
+
+.card.primary:hover {
+  background: var(--accent-highlight);
+  border-color: var(--accent-highlight);
+  color: var(--text-inverse);
+}
+
+/* A build that isn't published yet: there's nothing to download */
+.card.empty { opacity: 0.6; pointer-events: none; }
+
+.card-title { font-size: 1.15rem; font-weight: 650; }
+.card-version { font-size: 0.95rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.card-text { font-size: 0.9rem; opacity: 0.8; }
+
+h3 { font-size: 1rem; margin: 32px 0 12px; color: var(--text-main); }
+
+.versions { list-style: none; padding: 0; margin: 0 0 12px; }
+.versions li {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.versions li:last-child { border-bottom: none; }
+.versions a { font-weight: 600; font-variant-numeric: tabular-nums; }
+.version-meta { color: var(--text-muted); font-size: 0.9rem; }
+
+.links { list-style: none; padding: 0; margin: 0; }
+.links li {
+  margin: 0 0 8px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+  .card:hover, .card.primary:hover { transform: none; }
+}

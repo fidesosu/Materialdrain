@@ -1,0 +1,2309 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="How to use Materialdrain, how to add any host to it, and how the app is built and why.">
+      
+      
+      
+        <link rel="canonical" href="https://materialdrain.senko.tools/docs/development/architecture/">
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../providers/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Architecture - Materialdrain docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#architecture" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Materialdrain docs" class="md-header__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Materialdrain docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Using the app
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../hosts/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Hosts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Materialdrain docs" class="md-nav__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Materialdrain docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the app
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using the app
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/screens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../hosts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hosts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/config-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kinds of host
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kinds of host
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/webdav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebDAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    S3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/smb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SMB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/rest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sign-in/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign-in
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sharing-and-updates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and updates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The modules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The modules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-the-hosts-are-separate-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the hosts are separate modules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inside-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inside app
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-app-starts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the app starts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How the app starts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#appcontainer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AppContainer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#viewmodelfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ViewModelFactory
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hosts-at-run-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hosts at run time
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hosts at run time">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#providerconfigstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ProviderConfigStore
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#providerregistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ProviderRegistry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-kinds-of-pixeldrain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two kinds of Pixeldrain
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#providerupdater" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ProviderUpdater
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-data-flows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How data flows
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How data flows">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-typical-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A typical request
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#screens-follow-the-host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Screens follow the host
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts in code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interface/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The interface
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uploads and downloads
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../media/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thumbnails and previews
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../search-and-sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search and sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-and-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data and security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common tasks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    This website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The modules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The modules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-the-hosts-are-separate-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the hosts are separate modules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inside-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inside app
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-app-starts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the app starts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How the app starts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#appcontainer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AppContainer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#viewmodelfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ViewModelFactory
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hosts-at-run-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hosts at run time
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hosts at run time">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#providerconfigstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ProviderConfigStore
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#providerregistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ProviderRegistry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-kinds-of-pixeldrain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two kinds of Pixeldrain
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#providerupdater" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ProviderUpdater
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-data-flows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How data flows
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How data flows">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-typical-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A typical request
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#screens-follow-the-host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Screens follow the host
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h1>
+<p>Materialdrain is one Android app built from seven Gradle modules. The app module holds the screens; six library
+modules hold the hosts. This page shows how they fit together, how the app starts, and how a tap on a screen turns into
+a request and back into something on the screen.</p>
+<h2 id="the-modules">The modules<a class="headerlink" href="#the-modules" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>What it holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>app</code></td>
+<td>The activity, every screen, the ViewModels, settings, transfers, the stored host configs and their updates</td>
+</tr>
+<tr>
+<td><code>provider-api</code></td>
+<td>The contract every host implements (<code>StorageProvider</code> and its ops), the shared models, the config classes and their JSON codec. No HTTP code</td>
+</tr>
+<tr>
+<td><code>provider-pixeldrain</code></td>
+<td>The built-in Pixeldrain host, and the Pixeldrain account login. Ktor for JSON calls, OkHttp for streaming</td>
+</tr>
+<tr>
+<td><code>provider-generic-rest</code></td>
+<td><code>generic_rest</code> configs: any HTTP API described request by request. OkHttp</td>
+</tr>
+<tr>
+<td><code>provider-webdav</code></td>
+<td><code>webdav</code> configs: Nextcloud, ownCloud, TrueNAS and other WebDAV servers. OkHttp</td>
+</tr>
+<tr>
+<td><code>provider-s3</code></td>
+<td><code>s3</code> configs: any S3-compatible bucket, with its own SigV4 signer. OkHttp</td>
+</tr>
+<tr>
+<td><code>provider-smb</code></td>
+<td><code>smb</code> configs: Windows, Samba and NAS shares, through jcifs-ng</td>
+</tr>
+</tbody>
+</table>
+<p>All seven are listed in <code>settings.gradle.kts</code>. Every host module is an Android library (<code>minSdk</code> 29), since the ops
+take Android types such as <code>Uri</code> and <code>Context</code>.</p>
+<pre class="mermaid"><code>flowchart TD
+    app["app"]
+    api["provider-api"]
+    pd["provider-pixeldrain"]
+    rest["provider-generic-rest"]
+    dav["provider-webdav"]
+    s3["provider-s3"]
+    smb["provider-smb"]
+
+    app --&gt; api
+    app --&gt; pd
+    app --&gt; rest
+    app --&gt; dav
+    app --&gt; s3
+    app --&gt; smb
+    pd --&gt; api
+    rest --&gt; api
+    dav --&gt; api
+    s3 --&gt; api
+    smb --&gt; api</code></pre>
+<p>Each arrow is an <code>implementation(project(...))</code> line in the module's <code>build.gradle.kts</code>. The host modules only know
+<code>provider-api</code>, never each other.</p>
+<h3 id="why-the-hosts-are-separate-modules">Why the hosts are separate modules<a class="headerlink" href="#why-the-hosts-are-separate-modules" title="Permanent link">&para;</a></h3>
+<p>The screens and ViewModels only ever talk to the types in <code>provider-api</code>. The comment on <code>StorageProvider</code> says it
+plainly: <em>"The UI never talks to Pixeldrain/WebDAV/S3/generic-REST types directly — it goes through this interface and
+reads <code>capabilities</code> to know what it can show."</em> Keeping each host in its own module makes that a rule the build
+enforces rather than a habit:</p>
+<ul>
+<li><strong>A host can't leak into another.</strong> <code>provider-webdav</code> can't reach into <code>provider-s3</code>, because it doesn't depend on
+  it. What they share has to go through <code>provider-api</code>.</li>
+<li><strong>Each host brings only its own libraries.</strong> jcifs-ng is only in <code>provider-smb</code>. The S3 module signs
+  requests itself rather than pulling in the AWS SDK, <em>"which would drag in a large dependency graph for three HMAC
+  calls"</em> (from <code>S3Signer</code>).</li>
+<li><strong>Each host is tested on its own.</strong> The config-driven host modules (REST, WebDAV, S3, SMB) and <code>provider-api</code> have
+  their own unit tests, run on the plain JVM (the WebDAV provider uses <code>java.net.URLEncoder</code> instead of
+  <code>android.net.Uri</code> for exactly that reason).</li>
+<li><strong><code>provider-api</code> can't see the app.</strong> For example the app's <code>Screen</code> enum can't be referenced from there, so
+  <code>HostScreen.toScreen()</code> in <code>Navigation.kt</code> is the one place the two are matched up.</li>
+</ul>
+<p>The app module does depend on every host module, but it only names their classes in a few places:</p>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>provider/ProviderRegistry.kt</code></td>
+<td>Builds the right <code>StorageProvider</code> for each kind of config</td>
+</tr>
+<tr>
+<td><code>AppContainer.kt</code></td>
+<td>Creates the built-in <code>PixeldrainStorageProvider</code>, and tells <code>SmbContentServer</code> where to cache thumbnails</td>
+</tr>
+<tr>
+<td><code>auth/SessionManager.kt</code>, <code>preferences/AuthViewModel.kt</code></td>
+<td>The Pixeldrain account login, which has no equivalent on other hosts</td>
+</tr>
+</tbody>
+</table>
+<p>Everything else, from the Files screen to the transfer notifications, works the same for every host.</p>
+<h2 id="inside-app">Inside <code>app</code><a class="headerlink" href="#inside-app" title="Permanent link">&para;</a></h2>
+<p>All packages are under <code>tools.senko.materialdrain</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Package</th>
+<th>What it holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(top level)</td>
+<td><code>MainActivity</code>, <code>App.kt</code> (the Compose shell), <code>Navigation.kt</code>, <code>AppContainer</code>, <code>ViewModelFactory</code></td>
+</tr>
+<tr>
+<td><code>browser</code></td>
+<td><code>BrowserScreen</code>, the one screen behind Files, Lists and Filesystem, its controls and the search results</td>
+</tr>
+<tr>
+<td><code>files</code></td>
+<td>The Files screen's ViewModel (<code>FileInfoViewModel</code>), the file details page, file menus, sorting, archive contents, text highlighting</td>
+</tr>
+<tr>
+<td><code>filesystem</code></td>
+<td><code>FilesystemViewModel</code>: folder browsing, uploads into folders, the folder tree index for search</td>
+</tr>
+<tr>
+<td><code>upload</code></td>
+<td>The Upload screen and <code>UploadViewModel</code></td>
+</tr>
+<tr>
+<td><code>lists</code></td>
+<td><code>ListViewModel</code>: lists of files and their contents</td>
+</tr>
+<tr>
+<td><code>transfer</code></td>
+<td><code>TransferRegistry</code> (every running upload and download), the foreground <code>TransferService</code>, notifications, speed</td>
+</tr>
+<tr>
+<td><code>provider</code></td>
+<td><code>ProviderRegistry</code>, <code>ProviderConfigStore</code>, <code>ProviderUpdater</code>, the bundled Pixeldrain config, error messages</td>
+</tr>
+<tr>
+<td><code>preferences</code></td>
+<td>The settings screens and their catalog, the account login, the custom hosts (<code>AdvancedSettings.kt</code>)</td>
+</tr>
+<tr>
+<td><code>preferences/configeditor</code></td>
+<td>The config editor and <code>ConfigSchema.kt</code>, which describes every field of every kind</td>
+</tr>
+<tr>
+<td><code>settings</code></td>
+<td><code>AppSettings</code>: the app's own choices (sorting, animations, last screen, ...)</td>
+</tr>
+<tr>
+<td><code>auth</code></td>
+<td><code>SessionManager</code> (the Pixeldrain key), <code>KeystoreCipher</code>, the app lock</td>
+</tr>
+<tr>
+<td><code>hosts</code></td>
+<td>The host switcher in the top bar, and <code>HostHealth</code>, which checks whether each host answers</td>
+</tr>
+<tr>
+<td><code>navmenu</code></td>
+<td>The floating navigation menu prototype (Developer settings)</td>
+</tr>
+<tr>
+<td><code>ui/components</code></td>
+<td>Shared widgets: menus, dialogs, file rows, snackbars, the transfer status bar</td>
+</tr>
+<tr>
+<td><code>ui/media</code></td>
+<td>Previews and players: images, animated images, video, audio, text, media covers</td>
+</tr>
+<tr>
+<td><code>ui/theme</code></td>
+<td>Colours, type and the <code>MaterialdrainTheme</code></td>
+</tr>
+<tr>
+<td><code>util</code></td>
+<td>Small helpers: date parsing, formatting, content URI info, the media cache</td>
+</tr>
+</tbody>
+</table>
+<h2 id="how-the-app-starts">How the app starts<a class="headerlink" href="#how-the-app-starts" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>sequenceDiagram
+    participant A as MainActivity
+    participant S as MaterialdrainScreen (App.kt)
+    participant C as AppContainer
+    participant F as ViewModelFactory
+    A-&gt;&gt;A: splash screen, edge to edge, back handler
+    A-&gt;&gt;S: setContent { MaterialdrainTheme { ... } }
+    S-&gt;&gt;C: AppContainer.get(application)
+    C-&gt;&gt;C: create stores, registry, providers (first call only)
+    S-&gt;&gt;F: ViewModelFactory(application, container)
+    S-&gt;&gt;F: viewModel(...) for each screen
+    S-&gt;&gt;S: collect each ViewModel's uiState</code></pre>
+<p><strong><code>MainActivity</code></strong> is a <code>FragmentActivity</code> (the app lock's biometric prompt needs one). It installs the splash
+screen, adds the "press back again to exit" handler, takes files shared from other apps (<code>ACTION_SEND</code>,
+<code>ACTION_SEND_MULTIPLE</code>) into <code>AppContainer.pendingShares</code>, and sets the content: <code>MaterialdrainScreen()</code> with the
+<code>AppLockOverlay</code> on top. In <code>onStart</code> and <code>onStop</code> it tells the transfer registry and the app lock whether the app is
+in front.</p>
+<p><strong><code>App.kt</code></strong> holds <code>MaterialdrainScreen</code>, the Compose shell: the top bar, the bottom navigation, the floating button,
+the snackbars, the transfer bar, and whichever screen is current. It gets the ViewModels, collects their state, and
+decides which tabs the active host has (see <a href="#screens-follow-the-host">Screens follow the host</a>).</p>
+<p><strong><code>Navigation.kt</code></strong> has the <code>Screen</code> enum (Upload, Files, Filesystem, File Details, Lists, Settings), the bottom bar,
+and <code>HostScreen.toScreen()</code>. There is no navigation library: the current screen is a <code>rememberSaveable</code> value in
+<code>MaterialdrainScreen</code>, and <code>navigateTo</code> just changes it (remembering the screen before, for going back). The last
+screen is saved in <code>AppSettings</code>, so the app opens where it was closed.</p>
+<h3 id="appcontainer"><code>AppContainer</code><a class="headerlink" href="#appcontainer" title="Permanent link">&para;</a></h3>
+<p><code>AppContainer</code> is a manual dependency container. Its doc comment gives the reason it exists: it is <em>"shared by the
+whole process so that the ViewModels and the UI always see the same HTTP clients and the same SessionManager."</em> It is
+a process-wide singleton, made on the first <code>AppContainer.get(application)</code>.</p>
+<table>
+<thead>
+<tr>
+<th>It creates</th>
+<th>What for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sessionManager</code></td>
+<td>The Pixeldrain API key, from a login or entered by hand</td>
+</tr>
+<tr>
+<td><code>pixeldrainProvider</code></td>
+<td>The built-in Pixeldrain host. <em>"This is the one place its HTTP client is created."</em></td>
+</tr>
+<tr>
+<td><code>userApi</code></td>
+<td>Pixeldrain's account API, for the login</td>
+</tr>
+<tr>
+<td><code>transferRegistry</code>, <code>appSettings</code></td>
+<td>Running transfers; the app's own settings</td>
+</tr>
+<tr>
+<td><code>providerConfigStore</code></td>
+<td>The custom hosts, their sign-ins, and which host is active</td>
+</tr>
+<tr>
+<td><code>providerRegistry</code></td>
+<td>Turns the active host's id into a <code>StorageProvider</code></td>
+</tr>
+<tr>
+<td><code>okHttpClient</code></td>
+<td>Pixeldrain's OkHttp client, shared with the image loader and the media players so they reuse its connections</td>
+</tr>
+<tr>
+<td><code>providerUpdater</code></td>
+<td>Checks and applies updates of configs that have an <code>update_url</code></td>
+</tr>
+<tr>
+<td><code>appLock</code>, <code>pendingShares</code>, <code>hostHealth</code></td>
+<td>The app lock; files shared from other apps; whether each host answers</td>
+</tr>
+<tr>
+<td><code>transferViewModelStoreOwner</code></td>
+<td>A <code>ViewModelStore</code> tied to the process, for the ViewModels that run transfers</td>
+</tr>
+</tbody>
+</table>
+<p>Its <code>init</code> block imports the bundled Pixeldrain config on the first start (and refreshes it when the app ships a newer
+version), sets up Coil's image loader on the shared client, gives <code>SmbContentServer</code> a cache folder, installs
+<code>HostRequestAuth.headersFor</code> (so images and media get the active host's login headers), and starts
+<code>providerUpdater.runAutoUpdates()</code> in a process-wide coroutine scope.</p>
+<p>Nothing in the app uses a dependency injection library. Every object is created once, in this one class, in the
+order it's needed; something that needs an object gets it from the container, or as a constructor argument from
+<code>ViewModelFactory</code>. A few things that live outside Compose reach the container directly with <code>AppContainer.get</code>:
+<code>TransferService</code>, and the media players' data source (for the shared OkHttp client).</p>
+<h3 id="viewmodelfactory"><code>ViewModelFactory</code><a class="headerlink" href="#viewmodelfactory" title="Permanent link">&para;</a></h3>
+<p><code>ViewModelFactory(application, container)</code> builds each ViewModel by hand, passing in what it needs from the container:</p>
+<table>
+<thead>
+<tr>
+<th>ViewModel</th>
+<th>Gets</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>UploadViewModel</code>, <code>FileInfoViewModel</code>, <code>FilesystemViewModel</code></td>
+<td>application, <code>providerRegistry</code>, <code>providerConfigStore</code>, <code>sessionManager</code>, <code>transferRegistry</code>, <code>appSettings</code></td>
+</tr>
+<tr>
+<td><code>ListViewModel</code></td>
+<td><code>providerRegistry</code>, <code>providerConfigStore</code>, <code>sessionManager</code>, <code>appSettings</code></td>
+</tr>
+<tr>
+<td><code>AuthViewModel</code></td>
+<td><code>userApi</code>, <code>sessionManager</code></td>
+</tr>
+<tr>
+<td><code>ProviderSettingsViewModel</code></td>
+<td><code>providerConfigStore</code>, <code>providerRegistry</code>, <code>providerUpdater</code></td>
+</tr>
+</tbody>
+</table>
+<p>The three ViewModels that run uploads and downloads (<code>UploadViewModel</code>, <code>FileInfoViewModel</code>, <code>FilesystemViewModel</code>)
+are created in <code>transferViewModelStoreOwner</code> rather than the activity. Being tied to the process, they and their
+transfers survive the activity being closed while a transfer runs. See <a href="../transfers/">Uploads and downloads</a>.</p>
+<h2 id="hosts-at-run-time">Hosts at run time<a class="headerlink" href="#hosts-at-run-time" title="Permanent link">&para;</a></h2>
+<h3 id="providerconfigstore"><code>ProviderConfigStore</code><a class="headerlink" href="#providerconfigstore" title="Permanent link">&para;</a></h3>
+<p>The store keeps every custom host as a <code>StoredProvider</code>: an id (a random UUID), the parsed <code>ProviderConfig</code>, and the
+config's <strong>text exactly as it was written</strong>. The text is what's saved, exported and edited, so fields the app doesn't
+read are kept (see <a href="../../hosts/config-format/#how-the-app-reads-a-config">The config format</a>). Next to it are the
+update state: the last version from the update URL, the version before the last update (for <strong>Revert update</strong>),
+auto-update, a pending update, the <code>ETag</code> and the time of the last check.</p>
+<ul>
+<li>Configs are saved in the <code>provider_prefs</code> shared preferences, as JSON, never with a secret in them.</li>
+<li>Sign-ins (API key, username, password, session token) are each encrypted with <code>KeystoreCipher</code> in their own entry
+  of <code>provider_secure_prefs</code>. See <a href="../data-and-security/">Data and security</a>.</li>
+<li><code>providers: StateFlow&lt;List&lt;StoredProvider&gt;&gt;</code> and <code>activeProviderId: StateFlow&lt;String&gt;</code> are what the rest of the app
+  reads.</li>
+<li><code>changes: StateFlow&lt;Int&gt;</code> counts every change of the hosts, the active host or their sign-ins. More on it below.</li>
+</ul>
+<h3 id="providerregistry"><code>ProviderRegistry</code><a class="headerlink" href="#providerregistry" title="Permanent link">&para;</a></h3>
+<p><code>ProviderRegistry.resolve(id)</code> returns the <code>StorageProvider</code> for a host id:</p>
+<ol>
+<li>The built-in id, <code>pixeldrain-default</code>, always gives the built-in <code>PixeldrainStorageProvider</code>. It is never stored in
+   <code>ProviderConfigStore</code>.</li>
+<li>Any other id is looked up in the store, and <code>build(stored)</code> makes a provider for its kind of config.</li>
+<li>An id that isn't there (the host was removed) falls back to the built-in Pixeldrain.</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="kd">fun</span><span class="w"> </span><span class="nf">build</span><span class="p">(</span><span class="n">stored</span><span class="p">:</span><span class="w"> </span><span class="n">StoredProvider</span><span class="p">):</span><span class="w"> </span><span class="n">StorageProvider</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="k">when</span><span class="w"> </span><span class="p">(</span><span class="kd">val</span><span class="w"> </span><span class="nv">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">stored</span><span class="p">.</span><span class="na">config</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">is</span><span class="w"> </span><span class="n">GenericRestConfig</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">GenericRestStorageProvider</span><span class="p">(</span>
+<span class="w">            </span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">stored</span><span class="p">.</span><span class="na">id</span><span class="p">,</span>
+<span class="w">            </span><span class="n">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">config</span><span class="p">,</span>
+<span class="w">            </span><span class="n">credentials</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">ownOrAccountCredentials</span><span class="p">(</span><span class="n">stored</span><span class="p">.</span><span class="na">id</span><span class="p">,</span><span class="w"> </span><span class="n">config</span><span class="p">)</span><span class="w"> </span><span class="p">},</span>
+<span class="w">            </span><span class="n">onLoginToken</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">configStore</span><span class="p">.</span><span class="na">saveLoginToken</span><span class="p">(</span><span class="n">stored</span><span class="p">.</span><span class="na">id</span><span class="p">,</span><span class="w"> </span><span class="nb">it</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
+<span class="w">        </span><span class="p">)</span>
+<span class="w">        </span><span class="k">is</span><span class="w"> </span><span class="n">WebDavConfig</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">WebDavStorageProvider</span><span class="p">(</span><span class="n">stored</span><span class="p">.</span><span class="na">id</span><span class="p">,</span><span class="w"> </span><span class="n">config</span><span class="p">,</span><span class="w"> </span><span class="n">credentials</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">configStore</span><span class="p">.</span><span class="na">credentials</span><span class="p">(</span><span class="n">stored</span><span class="p">.</span><span class="na">id</span><span class="p">)</span><span class="w"> </span><span class="p">})</span>
+<span class="w">        </span><span class="k">is</span><span class="w"> </span><span class="n">S3Config</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">S3StorageProvider</span><span class="p">(</span><span class="n">stored</span><span class="p">.</span><span class="na">id</span><span class="p">,</span><span class="w"> </span><span class="n">config</span><span class="p">,</span><span class="w"> </span><span class="n">credentials</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">configStore</span><span class="p">.</span><span class="na">credentials</span><span class="p">(</span><span class="n">stored</span><span class="p">.</span><span class="na">id</span><span class="p">)</span><span class="w"> </span><span class="p">})</span>
+<span class="w">        </span><span class="k">is</span><span class="w"> </span><span class="n">SmbConfig</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">SmbStorageProvider</span><span class="p">(</span><span class="n">stored</span><span class="p">.</span><span class="na">id</span><span class="p">,</span><span class="w"> </span><span class="n">config</span><span class="p">,</span><span class="w"> </span><span class="n">credentials</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">configStore</span><span class="p">.</span><span class="na">credentials</span><span class="p">(</span><span class="n">stored</span><span class="p">.</span><span class="na">id</span><span class="p">)</span><span class="w"> </span><span class="p">})</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Credentials are passed as a function, not a value: each provider reads them on every request, so a new key applies at
+once. A <code>generic_rest</code> host with <code>account_fallback</code> and no sign-in of its own gets the Pixeldrain account's key
+instead, but only when its <code>base_url</code> is pixeldrain.com (<code>allowsAccountFallback</code>).</p>
+<p>Built providers are kept in a map and reused, since the screens ask for one per row and building one creates an HTTP
+client. The map is cleared whenever <code>configStore.changes</code> has moved on since it was filled.</p>
+<h3 id="two-kinds-of-pixeldrain">Two kinds of Pixeldrain<a class="headerlink" href="#two-kinds-of-pixeldrain" title="Permanent link">&para;</a></h3>
+<p>There are two ways the app talks to Pixeldrain, and it's worth knowing which is which:</p>
+<ul>
+<li><strong>The built-in host</strong> (<code>PixeldrainStorageProvider</code>, id <code>pixeldrain-default</code>), written in Kotlin, signed in from
+  <strong>Settings → Account</strong>. It isn't a config, so <code>screens</code> doesn't apply: its tabs follow its capabilities.</li>
+<li><strong>The bundled <code>pixeldrain.json</code> config</strong>, a <code>generic_rest</code> config like any other. <code>BundledProviderConfigs.kt</code>
+  imports it on the first start and makes it the active host. It is only offered once: a user who removes it keeps it
+  removed. Since it has no <code>update_url</code>, <code>refreshBundledPixeldrainConfig</code> brings an imported copy up to the version
+  the app ships, as an update (so <strong>Revert update</strong> still works). The file comes from <code>docs/provider-configs/</code> of the
+  app's repository, which <code>app/build.gradle.kts</code> adds as an assets folder.</li>
+</ul>
+<h3 id="providerupdater"><code>ProviderUpdater</code><a class="headerlink" href="#providerupdater" title="Permanent link">&para;</a></h3>
+<p><code>ProviderUpdater</code> fetches a config's <code>update_url</code> (https only, at most 256 KB, with <code>If-None-Match</code>), hands the text
+to <code>ConfigUpdates.evaluate</code> in <code>provider-api</code>, and records the outcome in the store. <code>runAutoUpdates()</code> runs once at
+start, for configs with auto-update on and not checked in the last 24 hours, and applies only updates with no
+sensitive changes. Applying an update that sends requests to a new address or a new kind of host clears the saved
+sign-in. The rules are on <a href="../../hosts/sharing-and-updates/">Sharing and updates</a>; the code is in
+<a href="../providers/#configupdates">Hosts in code</a>.</p>
+<h2 id="how-data-flows">How data flows<a class="headerlink" href="#how-data-flows" title="Permanent link">&para;</a></h2>
+<p>Each ViewModel keeps its state in a private <code>MutableStateFlow</code> and exposes it as a read-only <code>StateFlow</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">private</span><span class="w"> </span><span class="kd">val</span><span class="w"> </span><span class="nv">_uiState</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MutableStateFlow</span><span class="p">(</span><span class="n">UploadUiState</span><span class="p">())</span>
+<span class="kd">val</span><span class="w"> </span><span class="nv">uiState</span><span class="p">:</span><span class="w"> </span><span class="n">StateFlow</span><span class="o">&lt;</span><span class="n">UploadUiState</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_uiState</span><span class="p">.</span><span class="na">asStateFlow</span><span class="p">()</span>
+</code></pre></div>
+<p><code>MaterialdrainScreen</code> collects them with <code>collectAsState()</code> and passes the values down. Values that only drive effects
+(an error to show in a snackbar, say) are read through <code>derivedStateOf</code>, so that a transfer's progress tick doesn't
+recompose the whole shell.</p>
+<p>A ViewModel never holds on to a provider. It asks the registry for the active one each time:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">private</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">activeProvider</span><span class="p">():</span><span class="w"> </span><span class="n">StorageProvider</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">registry</span><span class="p">.</span><span class="na">resolve</span><span class="p">(</span><span class="n">configStore</span><span class="p">.</span><span class="na">activeProviderId</span><span class="p">.</span><span class="na">value</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="a-typical-request">A typical request<a class="headerlink" href="#a-typical-request" title="Permanent link">&para;</a></h3>
+<p>Opening a folder in the Filesystem screen:</p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant UI as BrowserScreen
+    participant VM as FilesystemViewModel
+    participant R as ProviderRegistry
+    participant P as StorageProvider
+    UI-&gt;&gt;VM: fetchPathContent(path)
+    VM-&gt;&gt;VM: uiState: isLoading = true
+    VM-&gt;&gt;R: resolve(activeProviderId)
+    R--&gt;&gt;VM: provider (built or reused)
+    VM-&gt;&gt;P: browse.list(path) in viewModelScope
+    alt ApiResponse.Success
+        P--&gt;&gt;VM: StorageListing
+        VM-&gt;&gt;VM: uiState: children, path, canWrite, canDelete
+    else ApiResponse.Error
+        P--&gt;&gt;VM: ProviderError
+        VM-&gt;&gt;VM: uiState: errorMessage = error.forDisplay()
+    end
+    VM--&gt;&gt;UI: uiState collected, screen recomposes</code></pre>
+<p>The ViewModel never needs a <code>try</code> around the call: a provider reports every failure as <code>ApiResponse.Error</code>, and only a
+cancellation is thrown (see <a href="../providers/#apiresponse">Hosts in code</a>). <code>ProviderError.forDisplay()</code> turns a refused
+login into a message that says what to do about it.</p>
+<h3 id="screens-follow-the-host">Screens follow the host<a class="headerlink" href="#screens-follow-the-host" title="Permanent link">&para;</a></h3>
+<p><code>ProviderConfigStore.changes</code> is a counter that goes up on every change: a host added, edited, updated or removed,
+another host made active, a key saved, a sign-in or sign-out. Several things listen to it:</p>
+<ul>
+<li><strong>The ViewModels reload.</strong> <code>FilesystemViewModel</code>, <code>FileInfoViewModel</code> and <code>ListViewModel</code> each collect
+  <code>configStore.changes.drop(1)</code> (the first value is the current one, already loaded in <code>init</code>) and start over on the
+  new active host: the Filesystem screen goes to the new host's root, the Lists screen forgets the opened list.</li>
+<li><strong>The registry rebuilds.</strong> <code>resolve</code> drops its built providers when the counter has moved, so the next request gets
+  a provider made from the new config and sign-in.</li>
+<li><strong>The tabs change.</strong> <code>MaterialdrainScreen</code> recomputes the active host's capabilities and screens with
+  <code>remember(configChanges)</code>. For a config host, the tabs are <code>resolveScreens(config.screens, capabilities)</code>. For the
+  built-in Pixeldrain they come from the capabilities: Upload always, then Files with <code>ENUMERATE</code>, Lists with <code>LISTS</code>,
+  Filesystem with <code>BROWSE</code>. A current screen the new host doesn't have falls back to its first tab.</li>
+<li><strong>Host health is checked again</strong>, so the host switcher knows which hosts answer.</li>
+</ul>
+<p>That is how a new API key, a sign-in or a switch of host shows its files without a manual refresh.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../" class="md-footer__link md-footer__link--prev" aria-label="Previous: Development">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Development
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../providers/" class="md-footer__link md-footer__link--next" aria-label="Next: Hosts in code">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Hosts in code
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

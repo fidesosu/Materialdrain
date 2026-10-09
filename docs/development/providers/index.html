@@ -1,0 +1,2679 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="How to use Materialdrain, how to add any host to it, and how the app is built and why.">
+      
+      
+      
+        <link rel="canonical" href="https://materialdrain.senko.tools/docs/development/providers/">
+      
+      
+        <link rel="prev" href="../architecture/">
+      
+      
+        <link rel="next" href="../interface/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Hosts in code - Materialdrain docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#hosts-in-code" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Materialdrain docs" class="md-header__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Materialdrain docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Hosts in code
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Using the app
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../hosts/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Hosts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Materialdrain docs" class="md-nav__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Materialdrain docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the app
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using the app
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/screens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../hosts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hosts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/config-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kinds of host
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kinds of host
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/webdav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebDAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    S3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/smb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SMB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/rest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sign-in/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign-in
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sharing-and-updates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and updates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts in code
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts in code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-contract-provider-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The contract: provider-api
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The contract: provider-api">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#storageprovider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StorageProvider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The ops
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#capabilities-and-screens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capabilities and screens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#apiresponse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ApiResponse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configs-providerconfigkt-and-providerconfigcodeckt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configs: ProviderConfig.kt and ProviderConfigCodec.kt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#providerconfigtemplates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ProviderConfigTemplates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configupdates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigUpdates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signinkt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SignIn.kt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#small-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Small helpers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-implementations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The implementations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The implementations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pixeldrain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pixeldrain
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generic-rest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generic REST
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#webdav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WebDAV
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#s3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S3
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SMB
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-new-kind-of-host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a new kind of host
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interface/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The interface
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uploads and downloads
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../media/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thumbnails and previews
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../search-and-sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search and sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-and-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data and security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common tasks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    This website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-contract-provider-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The contract: provider-api
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The contract: provider-api">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#storageprovider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StorageProvider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The ops
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#capabilities-and-screens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capabilities and screens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#apiresponse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ApiResponse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configs-providerconfigkt-and-providerconfigcodeckt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configs: ProviderConfig.kt and ProviderConfigCodec.kt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#providerconfigtemplates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ProviderConfigTemplates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configupdates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ConfigUpdates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signinkt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SignIn.kt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#small-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Small helpers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-implementations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The implementations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The implementations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pixeldrain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pixeldrain
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generic-rest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generic REST
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#webdav" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WebDAV
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#s3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S3
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SMB
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-new-kind-of-host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a new kind of host
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="hosts-in-code">Hosts in code<a class="headerlink" href="#hosts-in-code" title="Permanent link">&para;</a></h1>
+<p>Every host the app can use, from the built-in Pixeldrain to an SMB share, is a <code>StorageProvider</code>. The interface, the
+models and the config classes live in <code>provider-api</code>; each kind of host is a module of its own that implements them.
+This page walks through the contract, then each implementation, then what it takes to add a new kind of host.</p>
+<p>For how configs look to the people who write them, see <a href="../../hosts/">Hosts</a>. For where the modules sit in the
+app, see <a href="../architecture/">Architecture</a>.</p>
+<h2 id="the-contract-provider-api">The contract: <code>provider-api</code><a class="headerlink" href="#the-contract-provider-api" title="Permanent link">&para;</a></h2>
+<p>All files are in <code>provider-api/src/main/java/tools/senko/materialdrain/provider/api/</code>.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>What's in it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>StorageProvider.kt</code></td>
+<td>The <code>StorageProvider</code> interface, and the result of its connection test</td>
+</tr>
+<tr>
+<td><code>Ops.kt</code></td>
+<td>The groups of operations a host may offer: <code>FileStoreOps</code>, <code>BrowseOps</code>, <code>FileListOps</code>, <code>ListOps</code>, <code>ArchiveOps</code>, <code>AccountOps</code></td>
+</tr>
+<tr>
+<td><code>Capabilities.kt</code></td>
+<td><code>ProviderCapability</code>, <code>ProviderKind</code>, <code>HostScreen</code>, <code>ScreenConfig</code> and <code>resolveScreens</code></td>
+</tr>
+<tr>
+<td><code>Models.kt</code></td>
+<td><code>StorageRef</code>, <code>StorageNode</code>, <code>StorageListing</code>, <code>AccountInfo</code>, <code>RichDetails</code></td>
+</tr>
+<tr>
+<td><code>ApiResponse.kt</code></td>
+<td><code>ApiResponse</code> and <code>ProviderError</code></td>
+</tr>
+<tr>
+<td><code>ProviderConfig.kt</code></td>
+<td>The config classes of every kind, auth settings, <code>Credentials</code></td>
+</tr>
+<tr>
+<td><code>ProviderConfigCodec.kt</code></td>
+<td>Reading and writing configs as JSON</td>
+</tr>
+<tr>
+<td><code>ProviderConfigTemplates.kt</code></td>
+<td>The ready-to-fill config of each kind</td>
+</tr>
+<tr>
+<td><code>ConfigUpdates.kt</code></td>
+<td>Deciding what a config update means, and which of its changes need the user's approval</td>
+</tr>
+<tr>
+<td><code>SignIn.kt</code></td>
+<td><code>PasswordSignIn</code>, for hosts that sign in with a username and password</td>
+</tr>
+<tr>
+<td><code>ProgressThrottle.kt</code></td>
+<td>Limits how often a transfer reports its progress</td>
+</tr>
+<tr>
+<td><code>ZipInfo.kt</code></td>
+<td>Reads a <code>?zip_info</code> answer (the contents of an archive)</td>
+</tr>
+<tr>
+<td><code>ProviderLog.kt</code></td>
+<td>The app's diagnostic log</td>
+</tr>
+</tbody>
+</table>
+<h3 id="storageprovider"><code>StorageProvider</code><a class="headerlink" href="#storageprovider" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="kd">interface</span><span class="w"> </span><span class="nc">StorageProvider</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">id</span><span class="p">:</span><span class="w"> </span><span class="kt">String</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">displayName</span><span class="p">:</span><span class="w"> </span><span class="kt">String</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">kind</span><span class="p">:</span><span class="w"> </span><span class="n">ProviderKind</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">capabilities</span><span class="p">:</span><span class="w"> </span><span class="n">Set</span><span class="o">&lt;</span><span class="n">ProviderCapability</span><span class="o">&gt;</span>
+
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">fileStore</span><span class="p">:</span><span class="w"> </span><span class="n">FileStoreOps?</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">browse</span><span class="p">:</span><span class="w"> </span><span class="n">BrowseOps?</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">account</span><span class="p">:</span><span class="w"> </span><span class="n">AccountOps?</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">fileList</span><span class="p">:</span><span class="w"> </span><span class="n">FileListOps?</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">lists</span><span class="p">:</span><span class="w"> </span><span class="n">ListOps?</span><span class="w"> </span><span class="k">get</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">archives</span><span class="p">:</span><span class="w"> </span><span class="n">ArchiveOps?</span><span class="w"> </span><span class="k">get</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span>
+
+<span class="w">    </span><span class="kd">fun</span><span class="w"> </span><span class="nf">requestHeaders</span><span class="p">(</span><span class="n">url</span><span class="p">:</span><span class="w"> </span><span class="kt">String</span><span class="p">):</span><span class="w"> </span><span class="n">Map</span><span class="o">&lt;</span><span class="kt">String</span><span class="p">,</span><span class="w"> </span><span class="kt">String</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">emptyMap</span><span class="p">()</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">rootPath</span><span class="p">:</span><span class="w"> </span><span class="kt">String</span><span class="w"> </span><span class="k">get</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">""</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">rootName</span><span class="p">:</span><span class="w"> </span><span class="kt">String</span><span class="w"> </span><span class="k">get</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"/"</span>
+
+<span class="w">    </span><span class="kd">fun</span><span class="w"> </span><span class="nf">shareUrl</span><span class="p">(</span><span class="n">node</span><span class="p">:</span><span class="w"> </span><span class="n">StorageNode</span><span class="p">):</span><span class="w"> </span><span class="kt">String?</span>
+<span class="w">    </span><span class="kd">fun</span><span class="w"> </span><span class="nf">thumbnailUrl</span><span class="p">(</span><span class="n">node</span><span class="p">:</span><span class="w"> </span><span class="n">StorageNode</span><span class="p">):</span><span class="w"> </span><span class="kt">String?</span>
+<span class="w">    </span><span class="kd">fun</span><span class="w"> </span><span class="nf">rawContentUrl</span><span class="p">(</span><span class="n">node</span><span class="p">:</span><span class="w"> </span><span class="n">StorageNode</span><span class="p">,</span><span class="w"> </span><span class="n">attachment</span><span class="p">:</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="p">):</span><span class="w"> </span><span class="kt">String?</span>
+
+<span class="w">    </span><span class="kd">suspend</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">validate</span><span class="p">():</span><span class="w"> </span><span class="n">ProviderValidationResult</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>A provider is a set of optional parts. Each <code>...Ops</code> is null when the host can't do that, and <code>capabilities</code> says the
+same thing in a form the screens can check. There is deliberately no emulation: the interface's own comment says that
+faking folders out of a flat store <em>"would silently misrepresent what the host actually supports."</em></p>
+<table>
+<thead>
+<tr>
+<th>Member</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>requestHeaders(url)</code></td>
+<td>Headers a request for one of this host's own private URLs needs (its login), e.g. for a thumbnail. Empty for other URLs</td>
+</tr>
+<tr>
+<td><code>rootPath</code></td>
+<td>Where the folder browser starts: Pixeldrain's <code>me</code>, a config's <code>browse_root</code> or <code>root_path</code>. <code>""</code> for the top</td>
+</tr>
+<tr>
+<td><code>rootName</code></td>
+<td>What the path calls the top when <code>rootPath</code> is <code>""</code>: <code>/</code>, or an SMB share's name</td>
+</tr>
+<tr>
+<td><code>shareUrl</code></td>
+<td>A link to share a file, null without <code>SHARE_LINK</code></td>
+</tr>
+<tr>
+<td><code>thumbnailUrl</code></td>
+<td>A picture of the file for its row, null when there is none</td>
+</tr>
+<tr>
+<td><code>rawContentUrl</code></td>
+<td>The file's bytes by URL, for previews and media players. <code>attachment</code> asks for a download instead</td>
+</tr>
+<tr>
+<td><code>validate()</code></td>
+<td>The per-field check behind <strong>Test connection</strong>. Read-only probes only (<code>HEAD</code>/<code>GET</code>): testing a destructive endpoint <em>"would itself be a destructive action"</em></td>
+</tr>
+</tbody>
+</table>
+<p>Everything that shows a file works from a URL: the image loader, the video and audio players. That's why
+<code>thumbnailUrl</code> and <code>rawContentUrl</code> exist, and why SMB, which has no URLs, serves its files on the device (see
+<a href="#smb">SMB</a>). See <a href="../media/">Thumbnails and previews</a>.</p>
+<h3 id="the-ops">The ops<a class="headerlink" href="#the-ops" title="Permanent link">&para;</a></h3>
+<p><code>Ops.kt</code> splits what a host can do into groups. A host fills in the ones it has.</p>
+<table>
+<thead>
+<tr>
+<th>Interface</th>
+<th>For</th>
+<th>Operations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FileStoreOps</code></td>
+<td>A flat store of files addressed by id, like Pixeldrain's <code>/file</code> API</td>
+<td><code>upload</code>, <code>download</code>, <code>fileInfo</code>, <code>delete</code>, <code>downloadArchive</code> (default: not supported)</td>
+</tr>
+<tr>
+<td><code>BrowseOps</code></td>
+<td>Folders and paths</td>
+<td><code>list(path)</code>, <code>upload</code>, <code>download</code>, <code>createDirectory</code>, <code>rename</code>, <code>delete(path, recursive)</code>, <code>importFiles</code> (default: not supported)</td>
+</tr>
+<tr>
+<td><code>FileListOps</code></td>
+<td>One flat "everything on the account" listing</td>
+<td><code>list()</code></td>
+</tr>
+<tr>
+<td><code>ListOps</code></td>
+<td>Named lists of files (Pixeldrain's lists)</td>
+<td><code>lists</code>, <code>listContents</code>, <code>create</code>, <code>update</code>, <code>delete</code></td>
+</tr>
+<tr>
+<td><code>ArchiveOps</code></td>
+<td>Looking inside an archive on the host without downloading it</td>
+<td><code>list(archivePath, inside)</code>, <code>read(archivePath, entryPath, ...)</code></td>
+</tr>
+<tr>
+<td><code>AccountOps</code></td>
+<td>The account's name and quota</td>
+<td><code>accountInfo</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>FileListOps</code> and <code>BrowseOps</code> are kept apart on purpose. A host can upload, download and delete by id without any
+way to ask what's already there; <code>fileList</code> being null is how that's told apart from a host that lists per folder.</p>
+<p>Transfers take an <code>OutputStream</code> (downloads) or a content <code>Uri</code> and a <code>Context</code> (uploads), and an
+<code>onProgress(bytes, total)</code> callback. <code>total</code> is null when the size isn't known. See
+<a href="../transfers/">Uploads and downloads</a>.</p>
+<h3 id="capabilities-and-screens">Capabilities and screens<a class="headerlink" href="#capabilities-and-screens" title="Permanent link">&para;</a></h3>
+<p><code>ProviderCapability</code> is what a host can do:</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>UPLOAD</code>, <code>DOWNLOAD</code>, <code>DELETE</code>, <code>FILE_INFO</code></td>
+<td>The basic file operations</td>
+</tr>
+<tr>
+<td><code>BROWSE</code>, <code>MKDIR</code>, <code>RENAME</code></td>
+<td>Folders: listing them, making one, renaming and moving</td>
+</tr>
+<tr>
+<td><code>ENUMERATE</code></td>
+<td>A flat list of everything on the account (<code>FileListOps</code>). Named so it doesn't read as a typo of <code>LISTS</code></td>
+</tr>
+<tr>
+<td><code>LISTS</code></td>
+<td>Lists of files (<code>ListOps</code>)</td>
+</tr>
+<tr>
+<td><code>SHARE_LINK</code></td>
+<td><code>shareUrl</code> gives a link</td>
+</tr>
+<tr>
+<td><code>USER_QUOTA</code></td>
+<td><code>AccountOps</code></td>
+</tr>
+<tr>
+<td><code>RICH_FILE_STATS</code></td>
+<td>Extra details such as views and downloads (<code>PixeldrainRichDetails</code>)</td>
+</tr>
+<tr>
+<td><code>ARCHIVE_DOWNLOAD</code></td>
+<td>Several files as one zip (<code>FileStoreOps.downloadArchive</code>)</td>
+</tr>
+<tr>
+<td><code>ARCHIVE_BROWSE</code></td>
+<td>Looking inside archives (<code>ArchiveOps</code>)</td>
+</tr>
+<tr>
+<td><code>SEARCH</code>, <code>PERMISSIONS</code></td>
+<td>Declared, but no host claims them yet</td>
+</tr>
+</tbody>
+</table>
+<p>The UI reads these <em>"instead of guessing from which ops are non-null."</em> <code>ProviderKind</code> (<code>PIXELDRAIN</code>, <code>WEBDAV</code>, <code>S3</code>,
+<code>GENERIC_REST</code>, <code>SMB</code>) says which implementation it is; the app uses it for icons and labels, and for a few
+Pixeldrain-only paths such as the account login.</p>
+<p><strong>Screens</strong> are a separate idea: capability is what a host <em>can</em> do, a screen is what a config <em>chooses</em> to show.
+<code>HostScreen</code> has the four tabs, and each knows which capability backs it:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">fun</span><span class="w"> </span><span class="nf">isBackedBy</span><span class="p">(</span><span class="n">capabilities</span><span class="p">:</span><span class="w"> </span><span class="n">Set</span><span class="o">&lt;</span><span class="n">ProviderCapability</span><span class="o">&gt;</span><span class="p">):</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">when</span><span class="w"> </span><span class="p">(</span><span class="k">this</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">UPLOAD</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">ProviderCapability</span><span class="p">.</span><span class="na">UPLOAD</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">capabilities</span>
+<span class="w">    </span><span class="n">FILES</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">ProviderCapability</span><span class="p">.</span><span class="na">ENUMERATE</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">capabilities</span>
+<span class="w">    </span><span class="n">LISTS</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">ProviderCapability</span><span class="p">.</span><span class="na">LISTS</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">capabilities</span>
+<span class="w">    </span><span class="n">FILESYSTEM</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">ProviderCapability</span><span class="p">.</span><span class="na">BROWSE</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">capabilities</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>resolveScreens</code> turns a config's <code>screens</code> into the tabs to show:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">fun</span><span class="w"> </span><span class="nf">resolveScreens</span><span class="p">(</span><span class="n">screens</span><span class="p">:</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">ScreenConfig</span><span class="o">&gt;?</span><span class="p">,</span><span class="w"> </span><span class="n">capabilities</span><span class="p">:</span><span class="w"> </span><span class="n">Set</span><span class="o">&lt;</span><span class="n">ProviderCapability</span><span class="o">&gt;</span><span class="p">):</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">ScreenConfig</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="p">(</span><span class="n">screens</span><span class="w"> </span><span class="o">?:</span><span class="w"> </span><span class="n">HostScreen</span><span class="p">.</span><span class="na">entries</span><span class="p">.</span><span class="na">map</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">ScreenConfig</span><span class="p">(</span><span class="nb">it</span><span class="p">)</span><span class="w"> </span><span class="p">})</span>
+<span class="w">        </span><span class="p">.</span><span class="na">filter</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nb">it</span><span class="p">.</span><span class="na">screen</span><span class="p">.</span><span class="na">isBackedBy</span><span class="p">(</span><span class="n">capabilities</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
+<span class="w">        </span><span class="p">.</span><span class="na">distinctBy</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nb">it</span><span class="p">.</span><span class="na">screen</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>The config says</th>
+<th>The tabs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>screens</code> left out (<code>null</code>)</td>
+<td>Every screen the host can back, in the order Upload, Files, Lists, Filesystem</td>
+</tr>
+<tr>
+<td>A list</td>
+<td>Those, in the config's order</td>
+</tr>
+<tr>
+<td><code>[]</code></td>
+<td>None: the app says the host has no screens to show</td>
+</tr>
+<tr>
+<td>A screen the host can't back</td>
+<td>Left out, rather than shown full of errors</td>
+</tr>
+<tr>
+<td>A screen listed twice</td>
+<td>Shown once, where it's first listed</td>
+</tr>
+<tr>
+<td><code>"filesystem"</code></td>
+<td>Read as <code>FILESYSTEM</code>: <code>ScreenEntrySerializer</code> trims and upper-cases names</td>
+</tr>
+</tbody>
+</table>
+<p><code>ScreenEntrySerializer</code> also reads a bare name as <code>{"screen": ...}</code>, and writes a screen with no <code>name</code> and no
+<code>disabled_capabilities</code> back as just its name, so exported configs stay short. <code>disabledCapabilities</code> only ever takes
+away: <code>BrowserScreen</code> checks <code>UPLOAD</code>, <code>MKDIR</code>, <code>RENAME</code> and <code>DELETE</code> against it.</p>
+<p>The built-in Pixeldrain host has no config, so it doesn't go through <code>resolveScreens</code>: <code>App.kt</code> builds its tabs from
+its capabilities directly. See <a href="../architecture/#screens-follow-the-host">Screens follow the host</a>.</p>
+<h3 id="the-models">The models<a class="headerlink" href="#the-models" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>StorageRef(path, id)</code></td>
+<td>Points at a file or folder. Folder hosts navigate by <code>path</code>; flat stores hand back an <code>id</code>. <em>"A provider only ever reads the field it produced."</em></td>
+</tr>
+<tr>
+<td><code>StorageNode</code></td>
+<td>One file or folder, the same for every host: <code>ref</code>, <code>name</code>, <code>isDirectory</code>, <code>size</code>, <code>createdAt</code>, <code>modifiedAt</code>, <code>mimeType</code>, <code>richDetails</code></td>
+</tr>
+<tr>
+<td><code>StorageListing</code></td>
+<td>A folder's contents: <code>breadcrumb</code>, <code>children</code>, and whether the caller <code>canWrite</code> / <code>canDelete</code> there</td>
+</tr>
+<tr>
+<td><code>RichDetails</code></td>
+<td>A sealed interface for extra fields that don't generalise. <code>PixeldrainRichDetails</code> (views, downloads, hash, availability, ...) and <code>ArchiveEntryDetails</code> (a file inside an archive) implement it</td>
+</tr>
+<tr>
+<td><code>AccountInfo</code></td>
+<td>Username and quota</td>
+</tr>
+<tr>
+<td><code>FileList</code>, <code>FileListDetail</code></td>
+<td>A list of files, and a list with its files (in <code>Ops.kt</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><code>RichDetails</code> is sealed rather than a map of strings, so the UI matches on a concrete type instead of guessing keys.</p>
+<h3 id="apiresponse"><code>ApiResponse</code><a class="headerlink" href="#apiresponse" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="kd">data</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">ProviderError</span><span class="p">(</span><span class="kd">val</span><span class="w"> </span><span class="nv">code</span><span class="p">:</span><span class="w"> </span><span class="kt">String</span><span class="p">,</span><span class="w"> </span><span class="kd">val</span><span class="w"> </span><span class="nv">message</span><span class="p">:</span><span class="w"> </span><span class="kt">String</span><span class="p">,</span><span class="w"> </span><span class="kd">val</span><span class="w"> </span><span class="nv">httpStatus</span><span class="p">:</span><span class="w"> </span><span class="kt">Int?</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span>
+
+<span class="kd">sealed</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">ApiResponse</span><span class="o">&lt;</span><span class="k">out</span><span class="w"> </span><span class="n">T</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">data</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">Success</span><span class="o">&lt;</span><span class="k">out</span><span class="w"> </span><span class="n">T</span><span class="o">&gt;</span><span class="p">(</span><span class="kd">val</span><span class="w"> </span><span class="nv">data</span><span class="p">:</span><span class="w"> </span><span class="n">T</span><span class="p">)</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">ApiResponse</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span><span class="p">()</span>
+<span class="w">    </span><span class="kd">data</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">Error</span><span class="p">(</span><span class="kd">val</span><span class="w"> </span><span class="nv">error</span><span class="p">:</span><span class="w"> </span><span class="n">ProviderError</span><span class="p">)</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">ApiResponse</span><span class="o">&lt;</span><span class="n">Nothing</span><span class="o">&gt;</span><span class="p">()</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Every operation returns an <code>ApiResponse</code>. A provider catches what goes wrong (the network gone, a refused login, an
+answer it can't read) and returns it as an <code>Error</code>, so a ViewModel handles every outcome with one <code>when</code> and never needs
+a <code>try</code> around a call.</p>
+<p>The one thing that is thrown is cancellation. Every provider has the same pattern:</p>
+<div class="highlight"><pre><span></span><code><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="n">e</span><span class="p">:</span><span class="w"> </span><span class="n">CancellationException</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">throw</span><span class="w"> </span><span class="n">e</span>
+<span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="n">e</span><span class="p">:</span><span class="w"> </span><span class="n">Exception</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">ApiResponse</span><span class="p">.</span><span class="na">Error</span><span class="p">(</span><span class="n">networkError</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Cancelling a coroutine is how a transfer is stopped, and the HTTP clients cancel the socket call when that happens
+(<code>call.cancel()</code>). Turning the <code>CancellationException</code> into an <code>Error</code> would make a cancelled upload look like a failed
+one, and keep the coroutine running after it was told to stop. <code>UploadViewModel</code> goes one step further: a host that
+reports a cut connection as an error during a cancel is still treated as the cancel (<code>ensureActive()</code>).</p>
+<p><code>ProviderError.code</code> is a short machine name (<code>network_error</code>, <code>bad_response</code>, <code>not_supported</code>, ...); <code>message</code> is what
+the user sees. The app adds advice for a refused login with <code>ProviderError.forDisplay()</code>.</p>
+<h3 id="configs-providerconfigkt-and-providerconfigcodeckt">Configs: <code>ProviderConfig.kt</code> and <code>ProviderConfigCodec.kt</code><a class="headerlink" href="#configs-providerconfigkt-and-providerconfigcodeckt" title="Permanent link">&para;</a></h3>
+<p><code>ProviderConfig</code> is a sealed interface with one class per kind: <code>GenericRestConfig</code>, <code>WebDavConfig</code>, <code>S3Config</code> and
+<code>SmbConfig</code>. Only <code>name</code>, <code>screens</code> and <code>meta</code> are common; the rest is kind-specific. They are plain
+<code>@Serializable</code> data classes (kotlinx.serialization), with <code>@SerialName</code> for the snake_case JSON names and a Kotlin
+default for every optional field, so a config only has to write what differs.</p>
+<p>The same file has the parts every kind shares:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AuthConfig</code>, <code>AuthType</code></td>
+<td>How an API key or token is attached: <code>NONE</code>, <code>BASIC</code>, <code>BEARER</code>, <code>HEADER</code></td>
+</tr>
+<tr>
+<td><code>PasswordAuth</code>, <code>PasswordAuthMode</code>, <code>LoginEndpoint</code>, <code>OtpConfig</code></td>
+<td>Signing in with a username and password: sent each time (<code>BASIC</code>) or exchanged for a token (<code>LOGIN</code>), with an optional two-factor step</td>
+</tr>
+<tr>
+<td><code>EndpointConfig</code></td>
+<td>One request of a <code>generic_rest</code> config</td>
+</tr>
+<tr>
+<td><code>ProviderConfigMeta</code></td>
+<td><code>id</code>, <code>version</code>, <code>update_url</code>, <code>min_app_version</code>, <code>author</code></td>
+</tr>
+<tr>
+<td><code>Credentials</code></td>
+<td>What the user entered: API key, username, password, session token. <strong>Never part of a config</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Two extension functions are kept next to the classes, and both need a branch for every kind: <code>passwordAuth</code> (how this
+host takes a username and password) and <code>withMeta</code>. <code>allowsAccountFallback</code> is the one place that decides a
+<code>generic_rest</code> host may borrow the Pixeldrain account's key: only when <code>account_fallback</code> is set <em>and</em> <code>base_url</code> is
+pixeldrain.com, since <em>"the login must never be sent to another server, whatever the config says."</em></p>
+<p><code>ProviderConfigCodec</code> reads and writes the JSON. The <code>kind</code> field picks the class:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>decode(text)</code></td>
+<td>The config, or null when it isn't one (not JSON, no <code>kind</code>, an unknown <code>kind</code>, a required field missing)</td>
+</tr>
+<tr>
+<td><code>explainFailure(text)</code></td>
+<td>Why it isn't one, in words, for the import message: <em>"it still needs "host""</em></td>
+</tr>
+<tr>
+<td><code>encode(config, allFields)</code></td>
+<td>The config as text, <code>kind</code> first. With <code>allFields</code>, every field is written with its default (for templates)</td>
+</tr>
+<tr>
+<td><code>parseObject(text)</code>, <code>format(obj)</code></td>
+<td>The raw JSON object, every field kept in its order; for the config editor</td>
+</tr>
+<tr>
+<td><code>removeUpdateUrl(text)</code></td>
+<td>The text without <code>meta.update_url</code>, everything else as it was</td>
+</tr>
+</tbody>
+</table>
+<p>The codec reads with <code>ignoreUnknownKeys = true</code>, so a field the app doesn't know (a note, a field of a newer version)
+never stops a config from loading. And the app doesn't throw that field away: <code>ProviderConfigStore</code> keeps the config's
+<strong>text</strong> next to the parsed class (<code>ConfigSource</code>), and saves, exports and edits the text. The parsed class is only
+what the app reads from it. That is why <strong>Export</strong> gives back exactly what was imported.</p>
+<h3 id="providerconfigtemplates"><code>ProviderConfigTemplates</code><a class="headerlink" href="#providerconfigtemplates" title="Permanent link">&para;</a></h3>
+<p>The <strong>New host</strong> buttons start from a complete config. <code>ProviderConfigTemplates.Kind</code> lists the kinds that have one
+(<code>WEBDAV</code>, <code>S3</code>, <code>SMB</code>); <code>config(kind)</code> builds it from the config class with example values, and <code>text(kind)</code> encodes
+it with <code>allFields = true</code>. Because the template is made from the class, a field added to a kind shows up in its
+template without anyone having to remember to. <code>generic_rest</code> has no template: the app offers the bundled Pixeldrain
+config instead, which uses every endpoint there is.</p>
+<h3 id="configupdates"><code>ConfigUpdates</code><a class="headerlink" href="#configupdates" title="Permanent link">&para;</a></h3>
+<p><code>ConfigUpdates.evaluate(local, remoteText, appVersion)</code> decides what the file at an <code>update_url</code> means:</p>
+<ol>
+<li>Not a config: <code>Invalid</code>.</li>
+<li>A different <code>meta.id</code>: <code>Invalid</code>.</li>
+<li>Not a higher <code>version</code>: <code>UpToDate</code>, even if the text changed.</li>
+<li><code>min_app_version</code> above this app: <code>NeedsNewerApp</code>.</li>
+<li>Otherwise <code>Available</code>, with its <code>sensitiveChanges</code>.</li>
+</ol>
+<p><code>sensitiveChanges(old, new)</code> lists every change to where, or how, credentials are sent: another kind of host
+(<code>KIND</code>), a new scheme, host or port (<code>DESTINATION</code>), another way of attaching the login (<code>AUTH</code>), a new update source
+(<code>UPDATE_SOURCE</code>). It compares the origins of every URL a config can send credentials to (<code>originsOf</code>), which is
+another function with a branch per kind. <code>ProviderUpdater</code> in the app only applies an update on its own when this list
+is empty. See <a href="../../hosts/sharing-and-updates/">Sharing and updates</a>.</p>
+<h3 id="signinkt"><code>SignIn.kt</code><a class="headerlink" href="#signinkt" title="Permanent link">&para;</a></h3>
+<p><code>PasswordSignIn</code> is a separate interface for hosts whose sign-in starts a session (<code>PasswordAuthMode.LOGIN</code>):
+<code>signIn(username, password, otp)</code> returns a <code>SignInResult</code> (<code>Success</code> with the token, <code>OtpRequired</code>, <code>OtpRejected</code> or
+<code>Failed</code>), and <code>signOut()</code> ends the session on the host when the config says how. Only <code>GenericRestStorageProvider</code>
+implements it. The settings screen builds the host's provider and checks <code>as? PasswordSignIn</code>; the caller keeps the
+token, and the password isn't needed afterwards. See <a href="../../hosts/sign-in/">Sign-in</a>.</p>
+<h3 id="small-helpers">Small helpers<a class="headerlink" href="#small-helpers" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Helper</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ProgressThrottle</code></td>
+<td>Passes a transfer's progress on at most every fifth of a second; <code>finish</code> always reports. A fast transfer copies many chunks a second, and each report updates the screen and the notification</td>
+</tr>
+<tr>
+<td><code>ZipInfo.entriesIn(json, inside)</code></td>
+<td>Reads the entries of one folder of an archive from a <code>?zip_info</code> answer (Pixeldrain's format). Used by the Pixeldrain provider and by <code>generic_rest</code> configs with <code>archive_info</code></td>
+</tr>
+<tr>
+<td><code>ProviderLog</code></td>
+<td>Logs with the tag <code>MD/&lt;category&gt;</code> (Files, Lists, Filesystem, Http, Auth, Config, ...), so a logcat filter on <code>MD/</code> shows just the app. Never logs a credential, only its kind or length. <code>snippet</code> shortens a response body for an error report</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-implementations">The implementations<a class="headerlink" href="#the-implementations" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Module</th>
+<th>Class</th>
+<th>Client</th>
+<th>Capabilities</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Built-in Pixeldrain</td>
+<td><code>provider-pixeldrain</code></td>
+<td><code>PixeldrainStorageProvider</code></td>
+<td>OkHttp and Ktor</td>
+<td>Fixed set, below</td>
+</tr>
+<tr>
+<td><code>generic_rest</code></td>
+<td><code>provider-generic-rest</code></td>
+<td><code>GenericRestStorageProvider</code></td>
+<td>OkHttp</td>
+<td>From the endpoints the config has</td>
+</tr>
+<tr>
+<td><code>webdav</code></td>
+<td><code>provider-webdav</code></td>
+<td><code>WebDavStorageProvider</code></td>
+<td>OkHttp</td>
+<td><code>BROWSE</code>, <code>MKDIR</code>, <code>RENAME</code>, <code>UPLOAD</code>, <code>DOWNLOAD</code>, <code>DELETE</code></td>
+</tr>
+<tr>
+<td><code>s3</code></td>
+<td><code>provider-s3</code></td>
+<td><code>S3StorageProvider</code></td>
+<td>OkHttp</td>
+<td>The same, and <code>SHARE_LINK</code></td>
+</tr>
+<tr>
+<td><code>smb</code></td>
+<td><code>provider-smb</code></td>
+<td><code>SmbStorageProvider</code></td>
+<td>jcifs-ng</td>
+<td><code>BROWSE</code>, <code>MKDIR</code>, <code>RENAME</code>, <code>UPLOAD</code>, <code>DOWNLOAD</code>, <code>DELETE</code></td>
+</tr>
+</tbody>
+</table>
+<p>Every config-made provider takes its credentials as <code>credentials: () -&gt; Credentials</code> and reads them on every request,
+so a new key or password applies at once.</p>
+<h3 id="pixeldrain">Pixeldrain<a class="headerlink" href="#pixeldrain" title="Permanent link">&para;</a></h3>
+<p><code>PixeldrainStorageProvider</code> wraps three API classes in <code>internal/</code>: <code>PixeldrainCoreApi</code> (files, lists),
+<code>PixeldrainFilesystemApi</code> (the filesystem) and <code>PixeldrainUserApi</code> (the account, its files and lists, the login).
+They share one <code>PixeldrainHttpClient</code>: one OkHttp client (HTTP/2, no read or write timeout, for long transfers) and a
+Ktor client running on top of it for the JSON calls. Uploads and downloads stream straight through OkHttp. The internal
+classes have their own <code>ApiResponse</code>, which the provider maps to the <code>provider-api</code> one.</p>
+<ul>
+<li><strong>Capabilities:</strong> <code>UPLOAD</code>, <code>DOWNLOAD</code>, <code>DELETE</code>, <code>FILE_INFO</code>, <code>BROWSE</code>, <code>MKDIR</code>, <code>RENAME</code>, <code>SHARE_LINK</code>,
+  <code>RICH_FILE_STATS</code>, <code>LISTS</code>, <code>ENUMERATE</code>, <code>ARCHIVE_DOWNLOAD</code>, <code>ARCHIVE_BROWSE</code>. <code>SEARCH</code> and <code>PERMISSIONS</code> are left out
+  on purpose: the API has them, but nothing in the app calls them, <em>"so claiming the capability here would be a promise
+  the UI can't keep."</em> <code>account</code> is null.</li>
+<li><strong>Root:</strong> <code>rootPath</code> is <code>me</code>, the account's own filesystem.</li>
+<li><strong>Login on private URLs:</strong> <code>requestHeaders</code> adds the <code>pd_auth_key</code> cookie to URLs under <code>/api/filesystem/</code>.</li>
+<li>The API key comes from <code>SessionManager</code> through <code>apiKeyProvider</code>. <code>AppContainer</code> creates the one instance, and its
+  OkHttp client is shared with the image loader and the media players.</li>
+</ul>
+<h3 id="generic-rest">Generic REST<a class="headerlink" href="#generic-rest" title="Permanent link">&para;</a></h3>
+<p><code>GenericRestStorageProvider</code> turns a <code>GenericRestConfig</code> into a host with no Kotlin written for it. What it can do is
+decided by which endpoint names the config has:</p>
+<table>
+<thead>
+<tr>
+<th>Endpoints in the config</th>
+<th>Capability</th>
+<th>Ops</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>upload</code> or <code>browse_upload</code></td>
+<td><code>UPLOAD</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>download</code> or <code>browse_download</code></td>
+<td><code>DOWNLOAD</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>delete</code> or <code>browse_delete</code></td>
+<td><code>DELETE</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>file_info</code></td>
+<td><code>FILE_INFO</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>list</code></td>
+<td><code>ENUMERATE</code></td>
+<td><code>fileList</code></td>
+</tr>
+<tr>
+<td><code>browse_list</code></td>
+<td><code>BROWSE</code></td>
+<td><code>browse</code></td>
+</tr>
+<tr>
+<td><code>browse_mkdir</code></td>
+<td><code>MKDIR</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>browse_rename</code></td>
+<td><code>RENAME</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>user_lists</code></td>
+<td><code>LISTS</code></td>
+<td><code>lists</code></td>
+</tr>
+<tr>
+<td><code>user_info</code></td>
+<td><code>USER_QUOTA</code></td>
+<td><code>account</code></td>
+</tr>
+<tr>
+<td><code>download_archive</code></td>
+<td><code>ARCHIVE_DOWNLOAD</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>archive_info</code></td>
+<td><code>ARCHIVE_BROWSE</code></td>
+<td><code>archives</code> (<code>archive_file</code> reads one file)</td>
+</tr>
+<tr>
+<td><code>raw_id</code> or <code>browse_download</code></td>
+<td><code>SHARE_LINK</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><code>fileStore</code> is always there; an operation whose endpoint is missing returns an error (<code>not_configured</code>). The other
+endpoints (<code>thumbnail_id</code>, <code>browse_thumbnail</code>, <code>share_id</code>, <code>share_path</code>, <code>browse_import</code>, <code>list_info</code>, <code>list_create</code>,
+<code>list_update</code>, <code>list_delete</code>) add to what an existing part can do. The full list for config authors is on
+<a href="../../hosts/rest-api/#endpoints">REST API</a>.</p>
+<p>Its helpers, all <code>internal</code> to the module:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GenericRestClient</code></td>
+<td>Builds and sends the requests: fills <code>{placeholders}</code> into the path, query, form and JSON body, streams uploads and downloads, sends the login request, and <code>probe</code>s an address with a <code>HEAD</code> for <strong>Test connection</strong></td>
+</tr>
+<tr>
+<td><code>DotPath</code></td>
+<td>Reads <code>$.file.id</code>-style paths out of a JSON answer. Object keys only, no array indexes, on purpose: <em>"a config author writing 'which item' logic is exactly the scripting-language trap a plain field-mapping config is meant to avoid"</em></td>
+</tr>
+<tr>
+<td><code>AuthHeaders</code></td>
+<td>Decides which saved credentials a request uses (<code>AuthPlan</code>): a session from signing in, or a username and password sent as Basic, then the API key, then nothing. Also reads a sign-in answer into a <code>SignInResult</code></td>
+</tr>
+</tbody>
+</table>
+<p>A request made with a session the host no longer accepts (a <code>401</code>) drops the session, so the host shows as signed out,
+and is retried once with whatever is left. <code>requestHeaders</code> only adds the login to URLs under the config's <code>base_url</code>.
+With <code>send_credentials: false</code>, no login is sent at all.</p>
+<h3 id="webdav">WebDAV<a class="headerlink" href="#webdav" title="Permanent link">&para;</a></h3>
+<p><code>WebDavStorageProvider</code> browses under <code>root_path</code> with <code>PROPFIND</code> (<code>WebDavClient</code>, <code>WebDavXml</code> for the multistatus
+answer). It has <code>browse</code> only: <code>fileStore</code>, <code>fileList</code> and <code>account</code> are null, so the Upload screen uploads into the
+root folder through <code>browse</code>. <code>{username}</code> in <code>base_url</code> is filled in with the signed-in username, for Nextcloud-style
+per-user paths. <code>WebDavAuth</code> is a trimmed copy of the REST module's auth rules, without a sign-in request: a username
+and password as Basic (<code>password_auth</code> mode <code>BASIC</code>), or an API key attached the way <code>auth</code> says. Images are their own
+thumbnail (the image loader scales them down), and <code>requestHeaders</code> adds the login to URLs under the base URL so
+previews load.</p>
+<h3 id="s3">S3<a class="headerlink" href="#s3" title="Permanent link">&para;</a></h3>
+<p><code>S3StorageProvider</code> treats a bucket as folders the way S3 consoles do: <code>ListObjectsV2</code> with <code>delimiter=/</code>, common
+prefixes as folders. A new folder is a zero-byte marker object; a rename copies every object under the old prefix and
+deletes the old ones (S3 has no rename). <code>prefix</code> scopes every request to a part of the bucket. The username field
+holds the Access Key ID and the password field the Secret Access Key.</p>
+<p>Requests are signed by <code>S3Signer</code>, AWS Signature Version 4 written from scratch, which works the same against AWS,
+MinIO, Backblaze B2, Cloudflare R2 and TrueNAS. Streamed uploads are signed as <code>UNSIGNED-PAYLOAD</code>. <code>shareUrl</code> and
+<code>rawContentUrl</code> are presigned <code>GET</code> URLs valid for an hour. <code>thumbnailUrl</code> is null: the app makes thumbnails of
+photos, videos and songs itself, from <code>rawContentUrl</code> (see <a href="../media/">Thumbnails and previews</a>).</p>
+<h3 id="smb">SMB<a class="headerlink" href="#smb" title="Permanent link">&para;</a></h3>
+<p><code>SmbStorageProvider</code> opens a share with jcifs-ng. <code>SmbClient</code> builds the jcifs context from the config (SMB 2 or 3,
+never SMB 1; encryption raises the minimum to SMB 3) and the sign-in (<code>CREDENTIALS</code>, <code>GUEST</code> or <code>ANONYMOUS</code>). jcifs
+calls block, so every operation runs on <code>Dispatchers.IO</code> through <code>onShare</code>, which also turns exceptions into
+<code>ApiResponse.Error</code>. <code>rootName</code> is the share's name.</p>
+<p>A share has no URLs, but the rest of the app needs them for thumbnails and media. <code>SmbContentServer</code> is a small HTTP
+server on <code>127.0.0.1</code> only, started on first use, that serves <code>/&lt;token&gt;/raw/...</code> (the file, with ranges, so a video
+can seek) and <code>/&lt;token&gt;/thumb/...</code> (a thumbnail made on the device and cached). The token is a random secret made
+fresh each time the app starts, so other apps can't read shares through it. The details are on
+<a href="../media/">Thumbnails and previews</a>.</p>
+<h2 id="adding-a-new-kind-of-host">Adding a new kind of host<a class="headerlink" href="#adding-a-new-kind-of-host" title="Permanent link">&para;</a></h2>
+<p>Most of the places below are <code>when</code> expressions over the sealed <code>ProviderConfig</code> or the <code>ProviderKind</code> enum, so once
+the new config class exists, the compiler points at nearly all of them. A good way to find every spot is to search for
+an existing kind: <code>grep -rn "SmbConfig\|ProviderKind.SMB\|\"smb\"" --include=*.kt .</code></p>
+<ol>
+<li><strong>A new module.</strong> Copy <code>provider-smb/build.gradle.kts</code> (an Android library depending on <code>:provider-api</code>), add
+   <code>include(":provider-foo")</code> to <code>settings.gradle.kts</code>, and <code>implementation(project(":provider-foo"))</code> to
+   <code>app/build.gradle.kts</code>.</li>
+<li><strong>The config class</strong>, in <code>provider-api/.../ProviderConfig.kt</code>: a <code>@Serializable data class FooConfig(...) :
+   ProviderConfig</code>, with <code>name</code>, <code>screens</code> (using <code>ScreenEntrySerializer</code>, like the others) and <code>meta</code>. Then:<ul>
+<li>add a branch to <code>ProviderConfig.passwordAuth</code> and <code>withMeta</code> in the same file;</li>
+<li>add a <code>ProviderKind.FOO</code> to <code>Capabilities.kt</code>.</li>
+</ul>
+</li>
+<li><strong>The codec</strong>, in <code>ProviderConfigCodec.kt</code>: a <code>KIND_FOO</code> constant, and a branch in <code>encode</code>, <code>decode</code> and
+   <code>explainFailure</code> (including its set of known kinds).</li>
+<li><strong>Updates</strong>, in <code>ConfigUpdates.kt</code>: <code>originsOf</code> (every address the sign-in can go to, so a change of address asks
+   first), <code>authOf</code> and <code>kindName</code>.</li>
+<li><strong>The provider</strong>: <code>FooStorageProvider : StorageProvider</code> in the new module, taking <code>id</code>, the config and
+   <code>credentials: () -&gt; Credentials</code>. Set <code>capabilities</code> honestly, leave the ops it can't do null, return every failure
+   as an <code>ApiResponse.Error</code> and rethrow <code>CancellationException</code>.</li>
+<li><strong>The registry</strong>: a branch in <code>ProviderRegistry.build</code> (<code>app/.../provider/ProviderRegistry.kt</code>).</li>
+<li><strong>The config editor</strong>: a <code>fooSections</code> list in <code>app/.../preferences/configeditor/ConfigSchema.kt</code>, and a branch in
+   <code>sectionsFor</code> and <code>kindLabel</code>. <code>ConfigSchemaTest</code> fails if the template has a field the form doesn't describe.</li>
+<li><strong>The template</strong>: an entry in <code>ProviderConfigTemplates.Kind</code> and a branch in <code>config(kind)</code>. It becomes a <strong>New
+   host</strong> button in <strong>Settings → Advanced</strong> by itself.</li>
+<li><strong>The rest of the app</strong> that names each kind:<ul>
+<li><code>preferences/AdvancedSettings.kt</code>: <code>kindLabel</code>, and the host card's sign-in fields. S3 and SMB have a branch of
+  their own there (a key pair, or a username and password, and no API key); every other kind gets its fields from
+  <code>passwordAuth</code>: a sign-in form for <code>LOGIN</code>, a username and password for <code>BASIC</code>, and an API key;</li>
+<li><code>hosts/HostSwitcher.kt</code>: the icon and label for the <code>ProviderKind</code>, whether it needs a sign-in, and the address
+  shown under its name;</li>
+<li><code>hosts/HostHealth.kt</code>: <code>targetOf</code>, what to check to know whether the host answers.</li>
+</ul>
+</li>
+<li><strong>Tests</strong>: a <code>src/test</code> folder in the new module for the provider, and cases in <code>provider-api</code>'s
+    <code>ProviderConfigCodecTest</code> and <code>ScreensAndTemplatesTest</code> (decoding, defaults, the template).</li>
+<li><strong>An example config</strong> in <code>docs/provider-configs/</code> of the app's repository, if it helps: those files are bundled
+    as assets, and <code>ExampleConfigsTest</code> checks every one still loads.</li>
+<li><strong>Documentation</strong>: a page under <code>docs/hosts/</code> in the <code>website</code> branch, linked from the kinds table on
+    <a href="../../hosts/">Hosts</a> and from <code>mkdocs.yml</code>, and the new <code>kind</code> added to
+    <a href="../../hosts/config-format/">The config format</a>.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../architecture/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Architecture">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Architecture
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../interface/" class="md-footer__link md-footer__link--next" aria-label="Next: The interface">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                The interface
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

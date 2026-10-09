@@ -1,0 +1,1908 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="How to use Materialdrain, how to add any host to it, and how the app is built and why.">
+      
+      
+      
+        <link rel="canonical" href="https://materialdrain.senko.tools/docs/development/common-tasks/">
+      
+      
+        <link rel="prev" href="../data-and-security/">
+      
+      
+        <link rel="next" href="../conventions/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Common tasks - Materialdrain docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#common-tasks" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Materialdrain docs" class="md-header__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Materialdrain docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Common tasks
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Using the app
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../hosts/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Hosts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Materialdrain docs" class="md-nav__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Materialdrain docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the app
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using the app
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/screens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../hosts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hosts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/config-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kinds of host
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kinds of host
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/webdav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebDAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    S3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/smb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SMB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/rest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sign-in/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign-in
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sharing-and-updates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and updates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts in code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interface/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The interface
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uploads and downloads
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../media/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thumbnails and previews
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../search-and-sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search and sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-and-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data and security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common tasks
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common tasks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-setting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a setting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-menu-or-a-menu-item" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a menu or a menu item
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-rest-endpoint-name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a REST endpoint name
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-field-to-a-config-kind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a field to a config kind
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-file-preview-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a file preview type
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    This website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-setting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a setting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-menu-or-a-menu-item" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a menu or a menu item
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-rest-endpoint-name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a REST endpoint name
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-field-to-a-config-kind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a field to a config kind
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-file-preview-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a file preview type
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="common-tasks">Common tasks<a class="headerlink" href="#common-tasks" title="Permanent link">&para;</a></h1>
+<p>Short recipes for the changes that come up most. Each names the files and functions to touch, in order. App paths are
+under <code>app/src/main/java/tools/senko/materialdrain/</code>; the other modules say so. For the reasons behind the pieces, see
+<a href="../architecture/">Architecture</a>, <a href="../providers/">Hosts in code</a> and <a href="../interface/">The interface</a>.</p>
+<h2 id="adding-a-setting">Adding a setting<a class="headerlink" href="#adding-a-setting" title="Permanent link">&para;</a></h2>
+<p>A setting lives in <code>AppSettings</code>, is shown by the settings catalog, and reaches the screens either through a ViewModel
+or through a <code>CompositionLocal</code>.</p>
+<ol>
+<li>
+<p><strong>Store it</strong> in <code>settings/AppSettings.kt</code>. Add a preference key at the top of the file, then a private
+   <code>MutableStateFlow</code> read from the preferences with its default, a public <code>StateFlow</code> with a KDoc that says what it
+   does and what the default is, and a setter that writes both:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">private</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="kd">val</span><span class="w"> </span><span class="nv">COMPACT_ROWS_PREF</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"compact_rows"</span>
+
+<span class="kd">private</span><span class="w"> </span><span class="kd">val</span><span class="w"> </span><span class="nv">_compactRows</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MutableStateFlow</span><span class="p">(</span><span class="n">prefs</span><span class="p">.</span><span class="na">getBoolean</span><span class="p">(</span><span class="n">COMPACT_ROWS_PREF</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">))</span>
+<span class="cm">/** Shows the file lists with smaller rows. Off by default. */</span>
+<span class="kd">val</span><span class="w"> </span><span class="nv">compactRows</span><span class="p">:</span><span class="w"> </span><span class="n">StateFlow</span><span class="o">&lt;</span><span class="kt">Boolean</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_compactRows</span><span class="p">.</span><span class="na">asStateFlow</span><span class="p">()</span>
+
+<span class="kd">fun</span><span class="w"> </span><span class="nf">setCompactRows</span><span class="p">(</span><span class="n">enabled</span><span class="p">:</span><span class="w"> </span><span class="kt">Boolean</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">prefs</span><span class="p">.</span><span class="na">edit</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">putBoolean</span><span class="p">(</span><span class="n">COMPACT_ROWS_PREF</span><span class="p">,</span><span class="w"> </span><span class="n">enabled</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="n">_compactRows</span><span class="p">.</span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">enabled</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>compactRows</code> is an example name, not a real setting. An enum goes through the private <code>enumPref(key, default)</code>
+helper, as <code>sortField</code> and <code>navFabPosition</code> do.</p>
+</li>
+<li>
+<p><strong>Show it</strong> in <code>preferences/SettingsCatalog.kt</code>: add an item to the <code>items</code> of the right <code>SettingsCategory</code>. A switch
+   is a <code>SettingsItem.Toggle</code>; <code>isChecked</code> runs while composing, so it collects the flow and stays up to date:</p>
+<div class="highlight"><pre><span></span><code><span class="n">SettingsItem</span><span class="p">.</span><span class="na">Toggle</span><span class="p">(</span>
+<span class="w">    </span><span class="n">title</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"Compact rows"</span><span class="p">,</span>
+<span class="w">    </span><span class="n">summary</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"Smaller rows, so more files fit on the screen."</span><span class="p">,</span>
+<span class="w">    </span><span class="n">isChecked</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">appSettings</span><span class="p">.</span><span class="na">compactRows</span><span class="p">.</span><span class="na">collectAsState</span><span class="p">().</span><span class="na">value</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="n">onCheckedChange</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">appSettings</span><span class="p">.</span><span class="na">setCompactRows</span><span class="p">(</span><span class="nb">it</span><span class="p">)</span><span class="w"> </span><span class="p">}</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Anything that isn't a switch, an action, a note or a header is a <code>SettingsItem.Custom</code> with a
+<code>SettingsEnvironment.XSection()</code> composable in a file of its own, like <code>SearchResultLimitSection</code> in
+<code>preferences/SearchSettings.kt</code>.</p>
+</li>
+<li>
+<p><strong>A new category</strong> is a new <code>SettingsCategory(id, title, summary, icon, items)</code> in the <code>SettingsCatalog</code> list, in the
+   order it should appear. Nothing else needs to change: <code>SettingsScreen.kt</code> renders every category and item from the
+   catalog. Leave <code>hasSaveButton</code> false; only the Account's API key is saved with the button.</p>
+</li>
+<li>
+<p><strong>If an item needs something the settings don't have</strong> (another ViewModel, say), add it to <code>SettingsEnvironment</code> in
+   <code>preferences/SettingsModel.kt</code> and pass it where <code>SettingsScreenContent</code> builds the environment.</p>
+</li>
+<li>
+<p><strong>Make it reach the screen</strong>, one of two ways:</p>
+<ul>
+<li><strong>A ViewModel reads it.</strong> The ViewModels get <code>AppSettings</code> from <code>ViewModelFactory</code>; collect the flow in <code>init</code>, as
+  <code>FilesystemViewModel</code> does with <code>hideSearchIndex</code>, or <code>combine</code> it, as the sort order is.</li>
+<li><strong>A composable deep in the tree reads it.</strong> Add a <code>CompositionLocal</code> to <code>ui/LocalSettings.kt</code> with its default and
+  a KDoc. In <code>MaterialdrainScreen()</code> (<code>App.kt</code>), collect the flow
+  (<code>val compactRows by appContainer.appSettings.compactRows.collectAsState()</code>) and add
+  <code>LocalCompactRows provides compactRows</code> to the <code>CompositionLocalProvider</code>. Read it with <code>LocalCompactRows.current</code>.
+  This is how <code>LocalBlurredBackdrop</code> and <code>LocalTextWrap</code> work. A screen that already gets <code>appSettings</code> (like
+  <code>BrowserScreen</code>) can just collect the flow itself.</li>
+</ul>
+</li>
+<li>
+<p><strong>Document it</strong> in the website's <code>docs/user-guide/settings.md</code>.</p>
+</li>
+</ol>
+<h2 id="adding-a-menu-or-a-menu-item">Adding a menu or a menu item<a class="headerlink" href="#adding-a-menu-or-a-menu-item" title="Permanent link">&para;</a></h2>
+<p>Every menu is an <code>AppMenu</code> (<code>ui/components/AppMenu.kt</code>); see <a href="../interface/#appmenu">AppMenu</a> for why. Don't use
+Material's <code>DropdownMenu</code>, and don't restyle one menu on its own: change <code>AppMenuDefaults</code> and every menu follows.</p>
+<p><strong>A new ⋮ menu:</strong></p>
+<ol>
+<li>Use <code>OverflowMenuButton(contentDescription = "More options for …") { close -&gt; … }</code>.</li>
+<li>Add one <code>AppMenuItem(text, leadingIcon = …, onClick = { close(); doIt() })</code> per entry. Close first, then act.</li>
+<li>Gate entries on what the host and the screen allow (<code>if (canDelete) …</code>), as <code>FilesystemMenu</code> does with its
+   <code>canWrite</code> and <code>canDelete</code>.</li>
+<li>Put a destructive entry last, after an <code>AppMenuDivider()</code>, with <code>destructive = true</code>.</li>
+</ol>
+<p><strong>A menu on a button of your own:</strong></p>
+<ol>
+<li>Wrap the button in a <code>Box</code> that holds only the button; the menu measures that box to place itself.</li>
+<li>Keep <code>var expanded by remember { mutableStateOf(false) }</code>; the button sets it to <code>true</code>.</li>
+<li>In the same <code>Box</code>, call <code>AppMenu(expanded = expanded, onDismiss = { expanded = false }) { … }</code>.</li>
+<li>Pick <code>side</code> (<code>MenuSide.Below</code>, <code>Above</code>, <code>Auto</code>) and <code>edge</code> (<code>MenuEdge.Start</code>, <code>Center</code>, <code>End</code>, <code>Auto</code>) when the
+   defaults don't fit, and <code>matchAnchorWidth = true</code> for a menu under a wide card.</li>
+<li>For a choice that should stay visible (a sort field, a speed), mark the current one <code>active = true</code> and don't close
+   the menu in <code>onClick</code>.</li>
+<li>For a second level, wrap the entries in <code>AppMenuPages(showSecondary, primary = { … }, secondary = { … })</code>, and start
+   the secondary page with an entry going back, as <code>VideoSettingsMenu</code> in <code>ui/media/VideoPlayer.kt</code> does.</li>
+</ol>
+<p><strong>An item in an existing menu:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Menu</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A file of the Files screen or of a list</td>
+<td><code>FileItemMenu</code> in <code>files/FileActions.kt</code></td>
+</tr>
+<tr>
+<td>A file or folder of the Filesystem</td>
+<td><code>FilesystemMenu</code> in <code>browser/BrowserScreen.kt</code></td>
+</tr>
+<tr>
+<td>A list in the lists overview</td>
+<td><code>ListFolderMenu</code> in <code>browser/BrowserScreen.kt</code></td>
+</tr>
+<tr>
+<td>The file details' ⋮</td>
+<td>The <code>actions</code> of the top bar in <code>App.kt</code></td>
+</tr>
+<tr>
+<td>The selection bar</td>
+<td>A <code>SelectionAction</code> in <code>selectionActions</code> in <code>BrowserScreen</code> (the first three are icons, the rest the menu)</td>
+</tr>
+<tr>
+<td><strong>New</strong> in the sort row</td>
+<td>A <code>SortRowAction</code> in the <code>actions</code> passed to <code>SortControls</code></td>
+</tr>
+<tr>
+<td>The host switcher</td>
+<td><code>HostSwitcher</code> in <code>hosts/HostSwitcher.kt</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="adding-a-rest-endpoint-name">Adding a REST endpoint name<a class="headerlink" href="#adding-a-rest-endpoint-name" title="Permanent link">&para;</a></h2>
+<p>A <code>generic_rest</code> config's endpoints are looked up by name. A new name has to be known by the provider (which calls it),
+by the config editor (which offers it), and by the documentation.</p>
+<ol>
+<li><strong>Name it</strong> in <code>provider-generic-rest/…/GenericRestStorageProvider.kt</code>: add
+   <code>private const val ENDPOINT_FOO = "foo"</code> next to the others. Names are lowercase with underscores; most that work on
+   a path start with <code>browse_</code>.</li>
+<li>
+<p><strong>Call it</strong> where the operation is implemented. Look the endpoint up, and say so when the config has none:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">val</span><span class="w"> </span><span class="nv">endpoint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">config</span><span class="p">.</span><span class="na">endpoints</span><span class="o">[</span><span class="n">ENDPOINT_BROWSE_MKDIR</span><span class="o">]</span>
+<span class="w">    </span><span class="o">?:</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">ApiResponse</span><span class="p">.</span><span class="na">Error</span><span class="p">(</span><span class="n">ProviderError</span><span class="p">(</span><span class="s">"not_configured"</span><span class="p">,</span><span class="w"> </span><span class="s">"This host has no mkdir endpoint configured."</span><span class="p">))</span>
+<span class="kd">val</span><span class="w"> </span><span class="nv">placeholders</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mapOf</span><span class="p">(</span><span class="s">"path"</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">path</span><span class="p">.</span><span class="na">trim</span><span class="p">(</span><span class="sc">'/'</span><span class="p">),</span><span class="w"> </span><span class="s">"action"</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">makeParents</span><span class="p">)</span><span class="w"> </span><span class="s">"mkdirall"</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s">"mkdir"</span><span class="p">)</span>
+<span class="kd">val</span><span class="w"> </span><span class="nv">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">buffered</span><span class="p">(</span><span class="n">endpoint</span><span class="p">,</span><span class="w"> </span><span class="n">placeholders</span><span class="p">)</span>
+<span class="w">    </span><span class="o">?:</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">ApiResponse</span><span class="p">.</span><span class="na">Error</span><span class="p">(</span><span class="n">ProviderError</span><span class="p">(</span><span class="s">"bad_endpoint"</span><span class="p">,</span><span class="w"> </span><span class="s">"mkdir endpoint could not be resolved."</span><span class="p">))</span>
+<span class="k">return</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">result</span><span class="p">.</span><span class="na">isSuccessful</span><span class="p">)</span><span class="w"> </span><span class="n">ApiResponse</span><span class="p">.</span><span class="na">Success</span><span class="p">(</span><span class="kt">Unit</span><span class="p">)</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="n">ApiResponse</span><span class="p">.</span><span class="na">Error</span><span class="p">(</span><span class="n">statusError</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
+</code></pre></div>
+<p>Read an answer with <code>parseJson</code> and <code>nodeFrom(endpoint, item)</code>, which applies the endpoint's <code>response_map</code>.
+3. <strong>Turn on what it unlocks.</strong> When the endpoint makes the host able to do something new, add it to the <code>capabilities</code>
+   <code>buildSet</code> at the top of the class (<code>if (config.endpoints.containsKey(ENDPOINT_FOO)) add(ProviderCapability.…)</code>).
+4. <strong>If it's a new kind of action</strong>, provider-api needs it too: a value in <code>ProviderCapability</code>
+   (<code>provider-api/…/Capabilities.kt</code>), and a function in the right interface of <code>Ops.kt</code>. The other providers then
+   implement it or leave it out. See <a href="../providers/">Hosts in code</a>. The interface reads capabilities, never guesses
+   from which operations exist.
+5. <strong>Offer it in the editor</strong>: add an <code>EndpointInfo(name, area, help, placeholders)</code> to <code>KnownEndpoints</code> in
+   <code>preferences/configeditor/ConfigSchema.kt</code>, next to the endpoints of the same area. The <code>area</code> is the heading it's
+   grouped under (<code>"Files tab"</code>, <code>"Upload tab"</code>, <code>"Filesystem tab"</code>, <code>"Lists tab"</code>, <code>"Account"</code>,
+   <code>"Previews and links"</code>); a name the editor doesn't know shows under <em>Other</em>, and <strong>Add an endpoint</strong> only offers
+   known ones. A new <code>response_map</code> key the provider reads goes into <code>responseFieldSuggestions</code> in the same file.
+6. <strong>Use it in the bundled Pixeldrain config</strong>, if Pixeldrain has it: <code>docs/provider-configs/pixeldrain.json</code> (bundled
+   as an asset). Raise its <code>meta.version</code>, so <code>refreshBundledPixeldrainConfig</code> updates the copies already installed, and
+   add the name to the set in <code>ExampleConfigsTest</code> (<code>provider-api/src/test/…</code>). <code>ConfigSchemaTest</code> checks that every
+   endpoint of that config is in <code>KnownEndpoints</code>.
+7. <strong>Document it</strong> in the website's <code>docs/hosts/rest-api.md</code>, in the table of its tab, with its placeholders.</p>
+</li>
+</ol>
+<p>Nothing changes in <code>ConfigUpdates</code>: an endpoint's full <code>https://</code> address already counts as a destination when an
+update is checked.</p>
+<h2 id="adding-a-field-to-a-config-kind">Adding a field to a config kind<a class="headerlink" href="#adding-a-field-to-a-config-kind" title="Permanent link">&para;</a></h2>
+<p>A field of a WebDAV, S3, SMB or REST config is a property of its data class. The template and the codec follow from
+the class; the editor and the documentation are written by hand.</p>
+<ol>
+<li>
+<p><strong>Add the property</strong> to the data class in <code>provider-api/…/ProviderConfig.kt</code> (<code>WebDavConfig</code>, <code>S3Config</code>,
+   <code>SmbConfig</code> or <code>GenericRestConfig</code>), with a <code>@SerialName</code> in snake case and <strong>a default</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="cm">/** Encrypts the traffic on the wire. Needs SMB 3 on the host, the connection fails when it doesn't offer it. */</span>
+<span class="kd">val</span><span class="w"> </span><span class="nv">encrypt</span><span class="p">:</span><span class="w"> </span><span class="kt">Boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+</code></pre></div>
+<p>The default is what keeps every existing config readable: a field left out means the default. A field without one
+is required, and every config written before it would stop loading.
+2. <strong>The template</strong> (<code>ProviderConfigTemplates</code>) is made from the class with every field written out, so the field shows
+   up there by itself. Set an example value in <code>ProviderConfigTemplates.config(kind)</code> only if the default doesn't show
+   what the field is for.
+3. <strong>Describe it for the editor</strong>: add a <code>FieldSpec</code> to the kind's sections in
+   <code>preferences/configeditor/ConfigSchema.kt</code> (<code>webDavSections</code>, <code>s3Sections</code>, <code>smbSections</code>, <code>genericRestSections</code>).
+   Give the JSON name as <code>key</code>, a short <code>label</code>, a one-line <code>help</code>, the <code>kind</code> (<code>Text</code>, <code>Number</code>, <code>Toggle</code>, <code>Choice</code>,
+   <code>Group</code>), and the same <code>default</code> as the data class, as a <code>JsonPrimitive</code>. Set <code>common = true</code> only for fields most
+   configs need; the rest are under <strong>More options</strong>. <code>ConfigSchemaTest</code> fails until every field of every template has
+   a place in the form.
+4. <strong>Use it</strong> in the kind's provider: <code>provider-webdav</code>, <code>provider-s3</code>, <code>provider-smb</code>, or <code>GenericRestStorageProvider</code>.
+   <code>ProviderRegistry</code> (<code>provider/ProviderRegistry.kt</code>) passes the config to it.
+5. <strong>If it changes where or how the sign-in is sent</strong> (an address, a port, an auth mode), add it to
+   <code>ConfigUpdates.originsOf</code> or <code>authOf</code> in <code>provider-api/…/ConfigUpdates.kt</code>. Then an update that changes it is a
+   <code>SensitiveChange</code> and needs the user's approval. Check <code>HostHealth</code> (<code>hosts/HostHealth.kt</code>, what it checks) and
+   <code>HostSwitcher</code> (the address it shows) too, as both read each kind's address.
+6. <strong>Document it</strong> in the website's page of the kind (<code>docs/hosts/webdav.md</code>, <code>s3.md</code>, <code>smb.md</code> or <code>rest-api.md</code>),
+   and use it in an example under <code>docs/provider-configs/</code> if it helps. <code>ExampleConfigsTest</code> decodes every example.</p>
+</li>
+</ol>
+<h2 id="adding-a-file-preview-type">Adding a file preview type<a class="headerlink" href="#adding-a-file-preview-type" title="Permanent link">&para;</a></h2>
+<p>The file details choose a preview from the file's type. A new kind of preview is a composable in <code>ui/media/</code> and a
+branch in <code>FileInfoDetailsCard</code>. See <a href="../media/">Thumbnails and previews</a> for how the existing ones load.</p>
+<ol>
+<li><strong>Recognize the file.</strong> <code>StorageNode.previewMimeType()</code> (<code>files/FileInfoViewModel.kt</code>) gives the host's type, or one
+   worked out from the extension when the host's is blank or <code>application/octet-stream</code>. Match on its prefix, as the
+   image, video and audio previews do, or on the extension, as archives do (<code>isArchiveName</code>, <code>ARCHIVE_EXTENSIONS</code>).</li>
+<li><strong>Write the preview</strong> in a new file in <code>ui/media/</code>. Take the file's address from <code>fileInfoViewModel.rawUrlFor(file)</code>
+   and the <code>apiKey</code> the details pass (only filesystem files need the sign-in for a preview), and take <code>outerPadding</code>
+   like <code>InlineImagePreview</code> does. Read <code>LocalReduceMotion</code> wherever it moves and <code>LocalBlurredBackdrop</code> if it shows a
+   backdrop.</li>
+<li><strong>Load what it needs first</strong>, if anything (text, an archive's listing), in <code>FileInfoViewModel</code>: a field in
+   <code>FileInfoUiState</code>, and a load started where a file is opened, in <code>fetchFileInfo</code> (by id) and <code>setFileInfoFromNode</code>
+   (from a listing), next to <code>fetchTextFilePreviewContent</code> and <code>loadArchive</code>. Clear it when another file opens, or the
+   last file's preview stays on screen.</li>
+<li><strong>Show it</strong>: add a branch to the <code>if … else if</code> chain under <code>if (showPreviews)</code> in <code>FileInfoDetailsCard</code>
+   (<code>files/FileDetailsScreen.kt</code>), before the thumbnail fallback at the end. If it shows the file's own picture, add it
+   to <code>mediaPreviewFirst</code> and <code>previewShowsPicture</code>, so the header doesn't repeat the picture with a tile.</li>
+<li><strong>Full screen</strong>, if it has one: <code>FullScreenMediaPreviewDialog</code> (<code>ui/media/FullScreenPreview.kt</code>) handles video and
+   images; anything else shows <em>Unsupported preview type for fullscreen.</em> until it gets a branch.</li>
+<li><strong>Give it a tile</strong>, if it's a new kind of file: a <code>FileKind</code> and its extensions in <code>ui/components/FileListItem.kt</code>, so
+   the lists show its icon and colour. A text format that should be coloured goes into <code>SourceLanguages.byExtension</code>
+   in <code>files/SourceHighlighting.kt</code>, which also makes <code>isTextFile</code> show it as text.</li>
+<li><strong>Document it</strong> under <em>File details</em> in the website's <code>docs/user-guide/screens.md</code>.</li>
+</ol>
+<h2 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h2>
+<p>Diagnostics go through <code>ProviderLog</code> (<code>provider-api/…/ProviderLog.kt</code>), which every module can reach.</p>
+<ol>
+<li>
+<p>Call <code>ProviderLog.d</code>, <code>i</code>, <code>w</code> or <code>e</code> with a category and a message:</p>
+<div class="highlight"><pre><span></span><code><span class="n">ProviderLog</span><span class="p">.</span><span class="na">i</span><span class="p">(</span><span class="s">"Config"</span><span class="p">,</span><span class="w"> </span><span class="s">"imported the bundled '</span><span class="si">${</span><span class="n">source</span><span class="p">.</span><span class="na">config</span><span class="p">.</span><span class="na">name</span><span class="si">}</span><span class="s">' config and made it the active host"</span><span class="p">)</span>
+<span class="n">ProviderLog</span><span class="p">.</span><span class="na">e</span><span class="p">(</span><span class="s">"Upload"</span><span class="p">,</span><span class="w"> </span><span class="s">"the upload failed: </span><span class="si">${</span><span class="n">e</span><span class="p">.</span><span class="na">message</span><span class="si">}</span><span class="s">"</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+</code></pre></div>
+</li>
+<li>
+<p>Use an existing category where one fits: <code>Files</code>, <code>Lists</code>, <code>Filesystem</code>, <code>Http</code>, <code>Auth</code>, <code>Config</code>
+   (<code>Upload</code> is used too). Every line is tagged <code>MD/&lt;category&gt;</code>.</p>
+</li>
+<li><strong>Never log a credential.</strong> Log its length or kind ("api key, 40 chars"), not its value. <code>GenericRestStorageProvider</code>
+   logs only the header's <em>name</em> and whether it's a session.</li>
+<li>For a server's error, log the start of its answer with <code>ProviderLog.snippet(body)</code>: the first 300 characters on one
+   line, enough to read the message without a whole page.</li>
+<li>Read them with logcat, filtered on the <code>MD/</code> tags, e.g. <code>adb logcat -s MD/Http MD/Auth</code>, or in Android Studio's
+   Logcat with <code>tag:MD/</code>.</li>
+</ol>
+<p>Some app code still logs with <code>android.util.Log</code> under its own tags (<code>App</code>, <code>FilesystemViewModel</code>). New diagnostics
+should use <code>ProviderLog</code>, so they're found in one place.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../data-and-security/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Data and security">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Data and security
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../conventions/" class="md-footer__link md-footer__link--next" aria-label="Next: Conventions">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Conventions
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

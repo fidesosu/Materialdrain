@@ -1,0 +1,2416 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="How to use Materialdrain, how to add any host to it, and how the app is built and why.">
+      
+      
+      
+        <link rel="canonical" href="https://materialdrain.senko.tools/docs/development/transfers/">
+      
+      
+        <link rel="prev" href="../interface/">
+      
+      
+        <link rel="next" href="../media/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Uploads and downloads - Materialdrain docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#uploads-and-downloads" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Materialdrain docs" class="md-header__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Materialdrain docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Uploads and downloads
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Using the app
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../hosts/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Hosts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Materialdrain docs" class="md-nav__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Materialdrain docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the app
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using the app
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/screens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../hosts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hosts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/config-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kinds of host
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kinds of host
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/webdav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebDAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    S3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/smb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SMB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/rest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sign-in/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign-in
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sharing-and-updates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and updates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts in code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interface/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The interface
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uploads and downloads
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uploads and downloads
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-pieces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The pieces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The registry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-foreground-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The foreground service
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notifications
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#speed-and-progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Speed and progress
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Speed and progress">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#throttled-progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Throttled progress
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smoothed-speed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smoothed speed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uploads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Uploads
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Uploads">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#picking-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Picking files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-last-modified-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The last-modified time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#order-and-parallelism" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order and parallelism
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#files-shared-from-another-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files shared from another app
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cancelling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancelling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#errors-you-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors you see
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#downloads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Downloads
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Downloads">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#where-files-go" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where files go
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#several-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Several files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#as-a-zip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        As a zip
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#opening-a-download" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opening a download
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-upload-from-pick-to-notification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An upload, from pick to notification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../media/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thumbnails and previews
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../search-and-sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search and sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-and-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data and security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common tasks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    This website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-pieces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The pieces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The registry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-foreground-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The foreground service
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notifications
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#speed-and-progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Speed and progress
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Speed and progress">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#throttled-progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Throttled progress
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smoothed-speed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smoothed speed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uploads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Uploads
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Uploads">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#picking-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Picking files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-last-modified-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The last-modified time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#order-and-parallelism" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order and parallelism
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#files-shared-from-another-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files shared from another app
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cancelling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancelling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#errors-you-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors you see
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#downloads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Downloads
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Downloads">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#where-files-go" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where files go
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#several-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Several files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#as-a-zip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        As a zip
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#opening-a-download" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opening a download
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-upload-from-pick-to-notification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An upload, from pick to notification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="uploads-and-downloads">Uploads and downloads<a class="headerlink" href="#uploads-and-downloads" title="Permanent link">&para;</a></h1>
+<p>Every upload and download runs in a ViewModel, the same way for every host. Next to them sits a small <code>transfer</code>
+package that knows nothing about hosts: it keeps a list of what's running, keeps the app alive while something runs,
+and shows the notifications. This page goes through both halves.</p>
+<p>All paths below are under <code>app/src/main/java/tools/senko/materialdrain/</code>, except the <code>provider-*</code> modules.</p>
+<h2 id="the-pieces">The pieces<a class="headerlink" href="#the-pieces" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>File</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TransferRegistry</code></td>
+<td><code>transfer/TransferRegistry.kt</code></td>
+<td>The process-wide list of running transfers. ViewModels report to it</td>
+</tr>
+<tr>
+<td><code>TransferService</code></td>
+<td><code>transfer/TransferService.kt</code></td>
+<td>A foreground service that runs while the list isn't empty, with the progress notification</td>
+</tr>
+<tr>
+<td><code>TransferNotifier</code></td>
+<td><code>transfer/TransferNotifier.kt</code></td>
+<td>Builds the notifications and their channels</td>
+</tr>
+<tr>
+<td><code>TransferSpeedTracker</code></td>
+<td><code>transfer/TransferSpeedTracker.kt</code></td>
+<td>A smoothed speed, and with <code>estimateEtaSeconds</code> the time left</td>
+</tr>
+<tr>
+<td><code>ProgressThrottle</code></td>
+<td><code>provider-api/…/ProgressThrottle.kt</code></td>
+<td>Lets a host's copy loop report progress at most every 200 ms</td>
+</tr>
+<tr>
+<td><code>UploadViewModel</code></td>
+<td><code>upload/UploadViewModel.kt</code></td>
+<td>The Upload screen: one file, typed text, or a queue of files</td>
+</tr>
+<tr>
+<td><code>FilesystemViewModel</code></td>
+<td><code>filesystem/FilesystemViewModel.kt</code></td>
+<td>Uploads into the open folder of the Filesystem screen</td>
+</tr>
+<tr>
+<td><code>FileInfoViewModel</code></td>
+<td><code>files/FileInfoViewModel.kt</code></td>
+<td>Downloads: one file, several, or several as a zip</td>
+</tr>
+</tbody>
+</table>
+<p>The three ViewModels that run transfers don't belong to the activity. <code>App.kt</code> creates them with
+<code>AppContainer.transferViewModelStoreOwner</code>, an owner tied to the process, so closing the activity doesn't cancel the
+coroutines in their <code>viewModelScope</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// The ViewModels which own uploads/downloads outlive the activity, so transfers continue in the background</span>
+<span class="kd">val</span><span class="w"> </span><span class="nv">transferOwner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">appContainer</span><span class="p">.</span><span class="na">transferViewModelStoreOwner</span>
+<span class="kd">val</span><span class="w"> </span><span class="nv">uploadViewModel</span><span class="p">:</span><span class="w"> </span><span class="n">UploadViewModel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">viewModel</span><span class="p">(</span><span class="n">viewModelStoreOwner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">transferOwner</span><span class="p">,</span><span class="w"> </span><span class="n">factory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">viewModelFactory</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="the-registry">The registry<a class="headerlink" href="#the-registry" title="Permanent link">&para;</a></h2>
+<p><code>TransferRegistry</code> holds a <code>StateFlow&lt;Map&lt;String, TransferInfo&gt;&gt;</code>. A <code>TransferInfo</code> is an id, a kind (<code>UPLOAD</code> or
+<code>DOWNLOAD</code>), a title (a file name, or "3 files" for a batch), and the bytes, speed and time left. A ViewModel calls:</p>
+<table>
+<thead>
+<tr>
+<th>Call</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>start(info, onCancel)</code></td>
+<td>Before the work begins. It also starts <code>TransferService</code></td>
+</tr>
+<tr>
+<td><code>progress(id, …)</code></td>
+<td>From the progress callback, with the bytes so far, the speed and the time left</td>
+</tr>
+<tr>
+<td><code>finish(id, outcome, message, openUri, mimeType)</code></td>
+<td>Once, in a <code>finally</code>, with <code>COMPLETED</code>, <code>FAILED</code> or <code>CANCELLED</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>onCancel</code> is how the notification's <strong>Cancel</strong> button reaches a transfer: the registry keeps each handler and
+<code>cancelAll()</code> calls them. A handler normally just cancels the ViewModel's job.</p>
+<p><code>finish</code> shows a result notification only when the outcome isn't <code>CANCELLED</code> and the app isn't in the foreground.
+<code>MainActivity</code> sets <code>appInForeground</code> in <code>onStart</code> and <code>onStop</code>. If you're looking at the app, the screen already says
+how it went; a notification would only repeat it.</p>
+<h2 id="the-foreground-service">The foreground service<a class="headerlink" href="#the-foreground-service" title="Permanent link">&para;</a></h2>
+<p><code>TransferService</code> doesn't move any bytes. It's there for two reasons:</p>
+<ul>
+<li><strong>To keep the process alive.</strong> A background app can be killed at any time. A foreground service tells Android the
+  app is doing something the user asked for.</li>
+<li><strong>To show progress</strong> in one ongoing notification that sums up every running transfer.</li>
+</ul>
+<p>It's declared in the manifest with <code>android:foregroundServiceType="dataSync"</code>, the type Android has for moving data to
+and from a server, and the app asks for <code>FOREGROUND_SERVICE_DATA_SYNC</code>.</p>
+<p><strong>When it starts.</strong> <code>TransferRegistry.start</code> calls <code>TransferService.start</code>, which calls <code>startForegroundService</code>. Every
+such call has to be answered with <code>startForeground</code> quickly, so <code>onStartCommand</code> does that first. If Android doesn't
+allow the start (for example, from the background), the error is logged and the transfer goes on without the
+notification.</p>
+<p><strong>While it runs.</strong> It collects the registry's flow and updates the notification, then waits 500 ms
+(<code>NOTIFICATION_UPDATE_INTERVAL_MS</code>) before it takes the next value. A notification updated faster than that only costs
+battery.</p>
+<p><strong>When it stops.</strong> As soon as the registry is empty, it removes the notification and calls <code>stopSelf(latestStartId)</code>.
+Passing the id of the latest start request means a transfer that started a moment ago keeps the service running.</p>
+<p><strong>Android 15's time limit.</strong> Android 15 allows a <code>dataSync</code> service only a few hours a day. When the limit is reached,
+the system calls <code>onTimeout</code>, and the service stops itself. The transfers carry on as long as the process lives.</p>
+<h2 id="notifications">Notifications<a class="headerlink" href="#notifications" title="Permanent link">&para;</a></h2>
+<p><code>TransferNotifier.ensureChannels()</code> creates three channels in one group, "Transfers". There are three so you can tune
+each one in Android's settings: silence the progress, but keep a sound for failures.</p>
+<table>
+<thead>
+<tr>
+<th>Channel id</th>
+<th>Name</th>
+<th>Importance</th>
+<th>For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>transfer_progress</code></td>
+<td>Transfer progress</td>
+<td>Low</td>
+<td>The ongoing notification while files go up or down. Silent, no badge</td>
+</tr>
+<tr>
+<td><code>transfer_complete</code></td>
+<td>Completed transfers</td>
+<td>Default</td>
+<td>A transfer that finished while the app was in the background</td>
+</tr>
+<tr>
+<td><code>transfer_failed</code></td>
+<td>Failed transfers</td>
+<td>High</td>
+<td>A transfer that failed while the app was in the background</td>
+</tr>
+</tbody>
+</table>
+<p>The progress notification has one id (<code>PROGRESS_NOTIFICATION_ID = 1</code>) and sums up everything: "Uploading photo.jpg",
+"Downloading 3 items" or "4 transfers running", then a percentage, the sizes, the speed and the time left. It only
+shows a percentage when every transfer knows its size; otherwise the bar is indeterminate. Tapping it opens the app;
+<strong>Cancel</strong> sends <code>ACTION_CANCEL_ALL_TRANSFERS</code> to the service, which calls <code>registry.cancelAll()</code>.</p>
+<p>Result notifications each get a new id from 100 up, so they don't replace each other. A finished download's
+notification opens the file itself (<code>ACTION_VIEW</code> with the saved URI), the same as the <strong>Open</strong> button in the app.</p>
+<p>Without the <code>POST_NOTIFICATIONS</code> permission (Android 13 and later), <code>notify</code> does nothing. The foreground service
+still keeps the transfer alive; it just runs silently.</p>
+<h2 id="speed-and-progress">Speed and progress<a class="headerlink" href="#speed-and-progress" title="Permanent link">&para;</a></h2>
+<h3 id="throttled-progress">Throttled progress<a class="headerlink" href="#throttled-progress" title="Permanent link">&para;</a></h3>
+<p>A host's copy loop moves a file in small pieces: in the HTTP clients, each read gives at most one 8 KB Okio segment.
+On a fast connection, that's over a thousand pieces per second, and every progress report updates the screen state
+and the notification. <code>ProgressThrottle</code> passes on at most one report every
+200 ms, which is plenty to look smooth. <code>finish</code> always reports, so the last value is never lost.</p>
+<div class="highlight"><pre><span></span><code><span class="kd">class</span><span class="w"> </span><span class="nc">ProgressThrottle</span><span class="p">(</span><span class="kd">private</span><span class="w"> </span><span class="kd">val</span><span class="w"> </span><span class="nv">report</span><span class="p">:</span><span class="w"> </span><span class="p">(</span><span class="kt">Long</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="kt">Unit</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">lastReportNanos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">0L</span>
+
+<span class="w">    </span><span class="kd">fun</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="n">bytes</span><span class="p">:</span><span class="w"> </span><span class="kt">Long</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kd">val</span><span class="w"> </span><span class="nv">now</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">System</span><span class="p">.</span><span class="na">nanoTime</span><span class="p">()</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">now</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">lastReportNanos</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">PROGRESS_REPORT_INTERVAL_NANOS</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">lastReportNanos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">now</span>
+<span class="w">            </span><span class="n">report</span><span class="p">(</span><span class="n">bytes</span><span class="p">)</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kd">fun</span><span class="w"> </span><span class="nf">finish</span><span class="p">(</span><span class="n">bytes</span><span class="p">:</span><span class="w"> </span><span class="kt">Long</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">report</span><span class="p">(</span><span class="n">bytes</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The hosts' HTTP and SMB clients use it inside their streaming loops (for example <code>StreamingRequestBody</code> in
+<code>provider-pixeldrain</code>), so the ViewModels don't need to throttle anything themselves.</p>
+<h3 id="smoothed-speed">Smoothed speed<a class="headerlink" href="#smoothed-speed" title="Permanent link">&para;</a></h3>
+<p><code>TransferSpeedTracker.update(totalBytes)</code> takes a new sample at most every 400 ms and keeps an exponential moving
+average with a factor of 0.3. A raw bytes-per-second number jumps around too much to read. <code>estimateEtaSeconds</code> is the
+bytes left divided by that speed, or <code>null</code> when the total or the speed isn't known.</p>
+<h2 id="uploads">Uploads<a class="headerlink" href="#uploads" title="Permanent link">&para;</a></h2>
+<h3 id="picking-files">Picking files<a class="headerlink" href="#picking-files" title="Permanent link">&para;</a></h3>
+<p>There are two places to upload from:</p>
+<ul>
+<li><strong>The Upload screen</strong> (<code>UploadViewModel</code>). One file shows a preview (its text, a song's details and cover, a video
+  frame, a PDF's page count, an APK's icon). Several files make a queue of <code>UploadItem</code>s. Typed text is written to a
+  temporary file in the cache, uploaded, and deleted again. A host without flat storage (WebDAV, S3, SMB) gets the
+  upload in the top folder of the host (its <code>rootPath</code>) through <code>browse.upload</code>.</li>
+<li><strong>The Filesystem screen</strong> (<code>FilesystemViewModel.onFilesPickedForUpload</code>). Files go into the open folder. If a name
+  already exists there, the upload waits in <code>pendingUpload</code> until you confirm overwriting.</li>
+</ul>
+<p>Both read each file's name, size and last-modified time with <code>readContentUriInfo</code> (<code>util/ContentUriInfo.kt</code>), without
+opening the file. The bytes themselves are read later by the host, which streams them with
+<code>contentResolver.openInputStream(uri)</code> straight into the request.</p>
+<h3 id="the-last-modified-time">The last-modified time<a class="headerlink" href="#the-last-modified-time" title="Permanent link">&para;</a></h3>
+<p>Android has no single way to ask when a shared file was last changed. <code>readLastModified</code> tries, in order:</p>
+<ol>
+<li><code>DocumentsContract.Document.COLUMN_LAST_MODIFIED</code>, for files from the system file picker.</li>
+<li><code>MediaStore.MediaColumns.DATE_MODIFIED</code> (in seconds), for the device's own media.</li>
+<li>The opened file itself, with <code>Os.fstat</code>, for apps that share a file but answer neither question (a gallery, Google
+   Photos). Only a regular file counts: a pipe that an app writes as it's read has no date of its own.</li>
+</ol>
+<p>Each column is asked for in a query of its own, because some providers refuse a whole query when they don't know one
+of its columns. A <code>file://</code> URI reads <code>File.lastModified()</code> directly.</p>
+<h3 id="order-and-parallelism">Order and parallelism<a class="headerlink" href="#order-and-parallelism" title="Permanent link">&para;</a></h3>
+<p>The setting <strong>Settings → Uploads → Upload in the order the files were changed</strong> (<code>AppSettings.uploadInModifiedOrder</code>,
+off by default) decides how a queue goes up.</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Upload screen</th>
+<th>Filesystem screen</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Off</td>
+<td>Up to 3 files at once (<code>MAX_PARALLEL_UPLOADS</code>), in the order they were picked</td>
+<td>One after another, as picked</td>
+</tr>
+<tr>
+<td>On</td>
+<td>One at a time, oldest first</td>
+<td>One at a time, oldest first</td>
+</tr>
+</tbody>
+</table>
+<p>Why "oldest first"? Many hosts sort by upload date, newest on top. If the files go up in the order they were changed,
+one after another, the newest file arrives last and ends up on top, just as it is on the phone. Running them in
+parallel would mix up the arrival order, so the setting also turns parallelism off. That's slower for many small files,
+which is why it's off by default.</p>
+<p>The sort is in <code>inModifiedOrder</code>. Files without a known date go last, in the order they were picked:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">internal</span><span class="w"> </span><span class="kd">fun</span><span class="w"> </span><span class="nf">inModifiedOrder</span><span class="p">(</span><span class="n">items</span><span class="p">:</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">UploadItem</span><span class="o">&gt;</span><span class="p">):</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">UploadItem</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">items</span><span class="p">.</span><span class="na">sortedBy</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nb">it</span><span class="p">.</span><span class="na">lastModifiedMillis</span><span class="w"> </span><span class="o">?:</span><span class="w"> </span><span class="kt">Long</span><span class="p">.</span><span class="na">MAX_VALUE</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>The queue is sorted as soon as the files are picked, so you see the order before you press <strong>Upload</strong>. On the Upload
+screen, a <code>Semaphore(parallelUploads)</code> limits how many of the <code>async</code> uploads run at once. The whole batch is one
+transfer in the registry, so one notification shows its total.</p>
+<h3 id="files-shared-from-another-app">Files shared from another app<a class="headerlink" href="#files-shared-from-another-app" title="Permanent link">&para;</a></h3>
+<p><code>MainActivity</code> has an intent filter for <code>ACTION_SEND</code> and <code>ACTION_SEND_MULTIPLE</code> with any MIME type. <code>handleShare</code>
+takes the <code>EXTRA_STREAM</code> URIs and puts them in <code>AppContainer.pendingShares</code>. It's called from <code>onCreate</code> (only when
+<code>savedInstanceState == null</code>, so rotating the screen doesn't upload the same files again) and from <code>onNewIntent</code>, since
+the activity is <code>singleTop</code>.</p>
+<p><code>App.kt</code> watches that flow. When files are waiting and the app isn't locked, it opens the Upload screen, hands the
+files to <code>uploadViewModel.onFilesSelected</code>, and empties the flow:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// A share waits for the unlock: nothing uploads while the app is locked</span>
+<span class="n">LaunchedEffect</span><span class="p">(</span><span class="n">pendingShares</span><span class="p">,</span><span class="w"> </span><span class="n">appLocked</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">pendingShares</span><span class="p">.</span><span class="na">isNotEmpty</span><span class="p">()</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="o">!</span><span class="n">appLocked</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">navigateTo</span><span class="p">(</span><span class="n">Screen</span><span class="p">.</span><span class="na">Upload</span><span class="p">)</span>
+<span class="w">        </span><span class="n">uploadViewModel</span><span class="p">.</span><span class="na">onFilesSelected</span><span class="p">(</span><span class="n">pendingShares</span><span class="p">,</span><span class="w"> </span><span class="n">context</span><span class="p">)</span>
+<span class="w">        </span><span class="n">appContainer</span><span class="p">.</span><span class="na">pendingShares</span><span class="p">.</span><span class="na">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">emptyList</span><span class="p">()</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The shared files are queued, not uploaded right away. You still press <strong>Upload</strong>, with the active host.</p>
+<h3 id="cancelling">Cancelling<a class="headerlink" href="#cancelling" title="Permanent link">&para;</a></h3>
+<p>Cancelling has to stop a transfer that's deep inside a host's blocking copy loop, in code that doesn't know about
+coroutines. It works in three steps.</p>
+<p><strong>1. The progress callback throws.</strong> The callback runs inside the host's loop. It checks the job first:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">val</span><span class="w"> </span><span class="nv">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">uploadFile</span><span class="p">(</span><span class="n">item</span><span class="p">.</span><span class="na">name</span><span class="p">,</span><span class="w"> </span><span class="n">item</span><span class="p">.</span><span class="na">uri</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">sent</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w">    </span><span class="c1">// Called from inside the host's sending loop: a cancelled upload stops there</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">job</span><span class="o">?.</span><span class="na">isActive</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">false</span><span class="p">)</span><span class="w"> </span><span class="k">throw</span><span class="w"> </span><span class="n">CancellationException</span><span class="p">(</span><span class="s">"The upload was cancelled"</span><span class="p">)</span>
+<span class="w">    </span><span class="p">...</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>2. Every exception is caught, then the job is checked.</strong> Hosts fail in many ways: an <code>IOException</code> when the network
+drops, an exception from OkHttp or the SMB library, an error the host reports. An upload of one file must never crash
+the app or stop the rest of the queue, so <code>uploadFile</code> (and <code>uploadOne</code> in the Filesystem screen) catch every
+<code>Exception</code> and turn it into a failed result. The <code>CancellationException</code> is rethrown first, so a cancel stays a
+cancel:</p>
+<div class="highlight"><pre><span></span><code><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="n">e</span><span class="p">:</span><span class="w"> </span><span class="n">CancellationException</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">throw</span><span class="w"> </span><span class="n">e</span>
+<span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="n">e</span><span class="p">:</span><span class="w"> </span><span class="n">Exception</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">currentCoroutineContext</span><span class="p">().</span><span class="na">ensureActive</span><span class="p">()</span>
+<span class="w">    </span><span class="n">Log</span><span class="p">.</span><span class="na">e</span><span class="p">(</span><span class="n">TAG</span><span class="p">,</span><span class="w"> </span><span class="s">"Upload of </span><span class="si">$</span><span class="n">fileName</span><span class="s"> failed: </span><span class="si">${</span><span class="n">e</span><span class="p">.</span><span class="na">message</span><span class="si">}</span><span class="s">"</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">UploadResult</span><span class="p">(</span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="n">message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="na">message</span><span class="w"> </span><span class="o">?:</span><span class="w"> </span><span class="s">"The upload failed."</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>3. An error after a cancel is the cancel.</strong> When the callback throws, the host's code often doesn't pass the
+<code>CancellationException</code> on. OkHttp, for example, sees a broken request body and reports an <code>IOException</code>, or the host
+returns an <code>ApiResponse.Error</code>. So after any failure, <code>ensureActive()</code> checks the job. If it was cancelled, that throws
+a <code>CancellationException</code>, and the failure is counted as what it really is: the cancel. You never see "Upload failed:
+socket closed" after pressing <strong>Cancel</strong>.</p>
+<p>Downloads work the same way: <code>initiateDownloadFile</code> calls <code>ensureActive()</code> after <code>downloadNodeTo</code> returns.</p>
+<p>After a cancel, the Upload screen sets the files that were still uploading back to <code>PENDING</code>, so another press of
+<strong>Upload</strong> sends them. The Filesystem screen says how many files were uploaded before the cancel.</p>
+<h3 id="errors-you-see">Errors you see<a class="headerlink" href="#errors-you-see" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>How a failure shows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Upload screen, one file</td>
+<td>A dialog: "Upload Failed" with the host's message</td>
+</tr>
+<tr>
+<td>Upload screen, a queue</td>
+<td>Each failed file shows its own message. The screen says "2 of 5 uploads failed. Press Upload to retry the failed files." Only <code>PENDING</code> and <code>FAILED</code> files are sent again</td>
+</tr>
+<tr>
+<td>Filesystem screen</td>
+<td>A snackbar with one line per failed file (<code>name: reason</code>). The other files still go</td>
+</tr>
+<tr>
+<td>Pixeldrain without a key</td>
+<td>"API Key is missing. Please set it in Settings." before anything is sent</td>
+</tr>
+<tr>
+<td>In the background</td>
+<td>A notification on the <code>transfer_failed</code> channel, e.g. "2 of 5 uploads failed."</td>
+</tr>
+</tbody>
+</table>
+<h2 id="downloads">Downloads<a class="headerlink" href="#downloads" title="Permanent link">&para;</a></h2>
+<h3 id="where-files-go">Where files go<a class="headerlink" href="#where-files-go" title="Permanent link">&para;</a></h3>
+<p>Downloads are saved to the phone's <strong>Download</strong> folder through MediaStore, so the app needs no storage permission.
+<code>prepareDownloadTargetUriAndStream</code> inserts an entry into <code>MediaStore.Downloads</code> with <code>RELATIVE_PATH</code> set to
+<code>Environment.DIRECTORY_DOWNLOADS</code> and <code>IS_PENDING = 1</code>. The output stream is buffered with 256 KB
+(<code>DOWNLOAD_WRITE_BUFFER_BYTES</code>).</p>
+<p><code>IS_PENDING</code> hides the half-written file from other apps. When the download ends, <code>finalizeMediaStoreEntry</code> either
+clears the flag (success) or deletes the entry (failure or cancel). It runs in <code>withContext(NonCancellable)</code>, because a
+cancelled coroutine couldn't otherwise clean up its partial file. A failed or cancelled download leaves nothing
+behind.</p>
+<p><code>downloadNodeTo</code> picks how to read the file: from an archive entry (<code>ArchiveOps.read</code>), by id (<code>fileStore.download</code>),
+or by path (<code>browse.download</code>).</p>
+<h3 id="several-files">Several files<a class="headerlink" href="#several-files" title="Permanent link">&para;</a></h3>
+<p><code>downloadFilesSequentially</code> downloads the files one after another, never at the same time, since several simultaneous
+downloads can run into a host's download limits. The batch is one transfer with one total and one result. Each file
+is its own job (not a child of the batch's), and cancelling the batch cancels the current file too.</p>
+<h3 id="as-a-zip">As a zip<a class="headerlink" href="#as-a-zip" title="Permanent link">&para;</a></h3>
+<p><code>downloadFilesAsZip</code> asks the host for one archive instead, when it can: every file needs an id, none can be a folder,
+and the host needs <code>ProviderCapability.ARCHIVE_DOWNLOAD</code> (Pixeldrain has it). Otherwise it falls back to
+<code>downloadFilesSequentially</code>.</p>
+<p>The files are split into chunks of at most 100 (<code>MAX_FILES_PER_ZIP</code>). Each chunk becomes a stand-in <code>StorageNode</code>
+whose id is the chunk's ids joined by commas, named <code>name.zip</code> or <code>name (part 2).zip</code>. <code>downloadNodeTo</code> spots the
+comma (file ids never contain one) and calls <code>fileStore.downloadArchive</code> instead of <code>download</code>.</p>
+<h3 id="opening-a-download">Opening a download<a class="headerlink" href="#opening-a-download" title="Permanent link">&para;</a></h3>
+<p>When a download finishes, the snackbar has an <strong>Open</strong> button. <code>openDownloadedFile</code> (<code>files/OpenDownloaded.kt</code>) sends
+an <code>ACTION_VIEW</code> intent with the saved URI, the file's type and <code>FLAG_GRANT_READ_URI_PERMISSION</code>, so an APK opens the
+installer and a zip opens an archive app. If no app can open it, a toast says so.</p>
+<h2 id="an-upload-from-pick-to-notification">An upload, from pick to notification<a class="headerlink" href="#an-upload-from-pick-to-notification" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>sequenceDiagram
+    actor User
+    participant Screen as Upload screen
+    participant VM as UploadViewModel
+    participant Reg as TransferRegistry
+    participant Svc as TransferService
+    participant Host as Host (fileStore / browse)
+    participant Notif as TransferNotifier
+
+    User-&gt;&gt;Screen: Picks files (or shares them from another app)
+    Screen-&gt;&gt;VM: onFilesSelected(uris)
+    VM-&gt;&gt;VM: readContentUriInfo: name, size, last change
+    VM-&gt;&gt;VM: Sorts oldest first, if the setting is on
+    User-&gt;&gt;Screen: Presses Upload
+    Screen-&gt;&gt;VM: upload()
+    VM-&gt;&gt;Reg: start(TransferInfo, onCancel)
+    Reg-&gt;&gt;Svc: startForegroundService
+    Svc-&gt;&gt;Notif: buildProgressNotification
+    loop Each file (up to 3 at once, or 1 in order)
+        VM-&gt;&gt;Host: upload(name, uri, onProgress)
+        Host-&gt;&gt;Host: Streams the content URI into the request
+        Host--&gt;&gt;VM: onProgress (at most every 200 ms)
+        VM-&gt;&gt;Reg: progress(bytes, speed, time left)
+        Svc-&gt;&gt;Notif: updateProgressNotification (every 500 ms)
+        Host--&gt;&gt;VM: ApiResponse.Success or Error
+    end
+    VM-&gt;&gt;Reg: finish(outcome, message)
+    alt App in the background, not cancelled
+        Reg-&gt;&gt;Notif: notifyResult (complete or failed channel)
+    end
+    Reg--&gt;&gt;Svc: The list is empty
+    Svc-&gt;&gt;Svc: stopForeground, stopSelf</code></pre>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../architecture/">Architecture</a> for <code>AppContainer</code> and how the ViewModels are made.</li>
+<li><a href="../providers/">Hosts in code</a> for <code>FileStoreOps</code>, <code>BrowseOps</code> and <code>ArchiveOps</code>, which do the actual copying.</li>
+<li><a href="../media/">Thumbnails and previews</a> for what the app reads from files without downloading them.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../interface/" class="md-footer__link md-footer__link--prev" aria-label="Previous: The interface">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                The interface
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../media/" class="md-footer__link md-footer__link--next" aria-label="Next: Thumbnails and previews">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Thumbnails and previews
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
