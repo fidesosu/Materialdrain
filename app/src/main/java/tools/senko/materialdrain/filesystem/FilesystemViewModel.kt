@@ -478,7 +478,7 @@ class FilesystemViewModel(
             var succeeded = 0
             val failures = mutableListOf<String>()
             for (entry in entries) {
-                when (val response = operation(browse, entry)) {
+                when (val response = modifying { operation(browse, entry) }) {
                     is ApiResponse.Success -> succeeded++
                     is ApiResponse.Error -> failures.add("${entry.name}: ${describeError(response.error)}")
                 }
@@ -538,7 +538,7 @@ class FilesystemViewModel(
         val dir = currentDir()
         _uiState.update { it.copy(isModifying = true, operationMessage = null, operationError = null) }
         viewModelScope.launch {
-            when (val response = operation(browse)) {
+            when (val response = modifying { operation(browse) }) {
                 is ApiResponse.Success -> _uiState.update { it.copy(isModifying = false, operationMessage = "Done.") }
                 is ApiResponse.Error -> _uiState.update { it.copy(isModifying = false, operationError = describeError(response.error)) }
             }
@@ -546,6 +546,22 @@ class FilesystemViewModel(
             fetchPathContent(dir)
         }
     }
+
+    /**
+     * Runs one change on the host (delete, rename, move, new folder). Never throws but for a cancel: a failure of the host
+     * or the network is an error result, so it's reported, and in a batch the next items still go, instead of the app
+     * crashing on it.
+     */
+    private suspend fun modifying(operation: suspend () -> ApiResponse<Unit>): ApiResponse<Unit> =
+        try {
+            operation()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
+            ProviderLog.e("Filesystem", "a change failed: ${e.message}", e)
+            ApiResponse.Error(ProviderError("network_error", e.message ?: "The host couldn't be reached."))
+        }
 
     private fun notBrowsable(): ApiResponse<Unit> = ApiResponse.Error(ProviderError("not_browsable", "This host can't browse files."))
 

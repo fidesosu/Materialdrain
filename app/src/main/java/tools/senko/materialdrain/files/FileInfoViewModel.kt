@@ -583,16 +583,28 @@ class FileInfoViewModel(
         }
     }
 
-    /** Deletes a file by its id when it has one, otherwise by its path (folders are only deleted from the filesystem). */
+    /**
+     * Deletes a file by its id when it has one, otherwise by its path (folders are only deleted from the filesystem).
+     * Never throws but for a cancel: a failure of the host or the network is an error result, so it's reported (and in a
+     * batch the next files still go) instead of crashing the app.
+     */
     private suspend fun deleteNode(node: StorageNode): ApiResponse<Unit> {
         val current = provider()
         val id = node.ref.id
-        return if (id != null) {
-            val store = current.fileStore ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't delete files by id."))
-            store.delete(StorageRef(id = id))
-        } else {
-            val browse = current.browse ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't delete this file."))
-            browse.delete(node.ref.path, recursive = node.isDirectory)
+        return try {
+            if (id != null) {
+                val store = current.fileStore ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't delete files by id."))
+                store.delete(StorageRef(id = id))
+            } else {
+                val browse = current.browse ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't delete this file."))
+                browse.delete(node.ref.path, recursive = node.isDirectory)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            coroutineContext.ensureActive()
+            ProviderLog.e("Files", "deleting '${node.name}' failed: ${e.message}", e)
+            ApiResponse.Error(ProviderError("network_error", e.message ?: "The host couldn't be reached."))
         }
     }
 

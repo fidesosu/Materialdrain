@@ -126,11 +126,13 @@ class GenericRestStorageProvider(
     override val archives: ArchiveOps? = config.endpoints[ENDPOINT_ARCHIVE_INFO]?.let { infoEndpoint ->
         object : ArchiveOps {
             override suspend fun list(archivePath: String, inside: String): ApiResponse<List<StorageNode>> {
-                val result = buffered(infoEndpoint, mapOf("path" to archivePath.trim('/')))
-                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "archive_info endpoint could not be resolved."))
-                return when (val parsed = ZipInfo.entriesIn(result.bodyText, inside)) {
-                    is ApiResponse.Success -> ApiResponse.Success(parsed.data.map { it.toStorageNode(archivePath) })
-                    is ApiResponse.Error -> ApiResponse.Error(parsed.error)
+                return reaching {
+                    val result = buffered(infoEndpoint, mapOf("path" to archivePath.trim('/')))
+                        ?: return ApiResponse.Error(ProviderError("bad_endpoint", "archive_info endpoint could not be resolved."))
+                    return when (val parsed = ZipInfo.entriesIn(result.bodyText, inside)) {
+                        is ApiResponse.Success -> ApiResponse.Success(parsed.data.map { it.toStorageNode(archivePath) })
+                        is ApiResponse.Error -> ApiResponse.Error(parsed.error)
+                    }
                 }
             }
 
@@ -140,25 +142,27 @@ class GenericRestStorageProvider(
                 outputStream: java.io.OutputStream,
                 onProgress: (read: Long, total: Long?) -> Unit
             ): ApiResponse<Long> {
-                val endpoint = config.endpoints[ENDPOINT_ARCHIVE_FILE]
-                    ?: return ApiResponse.Error(ProviderError("not_supported", "This host has no archive_file endpoint configured."))
-                var totalCopied = 0L
-                val code = authorized(
-                    { auth ->
-                        client.executeDownload(
-                            endpoint,
-                            mapOf("path" to archivePath.trim('/'), "entry" to "/" + entryPath.trim('/')),
-                            auth,
-                            outputStream
-                        ) { read, total ->
-                            totalCopied = read
-                            onProgress(read, total)
-                        }
-                    },
-                    { it }
-                ) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "archive_file endpoint could not be resolved."))
-                return if (code in 200..299) ApiResponse.Success(totalCopied)
-                else ApiResponse.Error(ProviderError("download_failed_status_$code", "Download failed: HTTP $code"))
+                return reaching {
+                    val endpoint = config.endpoints[ENDPOINT_ARCHIVE_FILE]
+                        ?: return ApiResponse.Error(ProviderError("not_supported", "This host has no archive_file endpoint configured."))
+                    var totalCopied = 0L
+                    val code = authorized(
+                        { auth ->
+                            client.executeDownload(
+                                endpoint,
+                                mapOf("path" to archivePath.trim('/'), "entry" to "/" + entryPath.trim('/')),
+                                auth,
+                                outputStream
+                            ) { read, total ->
+                                totalCopied = read
+                                onProgress(read, total)
+                            }
+                        },
+                        { it }
+                    ) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "archive_file endpoint could not be resolved."))
+                    return if (code in 200..299) ApiResponse.Success(totalCopied)
+                    else ApiResponse.Error(ProviderError("download_failed_status_$code", "Download failed: HTTP $code"))
+                }
             }
         }
     }
@@ -218,6 +222,20 @@ class GenericRestStorageProvider(
     }
 
     /**
+     * Runs one operation, turning a request that fails on the way (the network gone, a connection or stream reset) into
+     * an error to show. Every operation goes through this: the client throws for those, and an exception escaping an
+     * operation would crash the app (as a delete sometimes did), since its callers only expect errors as results.
+     */
+    private inline fun <T> reaching(operation: () -> ApiResponse<T>): ApiResponse<T> = try {
+        operation()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        ProviderLog.e("Http", "a request to '${config.name}' failed: ${e.message}", e)
+        ApiResponse.Error(ProviderError("network_error", e.message ?: "The host couldn't be reached."))
+    }
+
+    /**
      * An upload's request failing (the network gone, the file unreadable), as an error to show rather than an exception:
      * like every other host's upload, this one only ever throws for a cancel.
      */
@@ -267,17 +285,19 @@ class GenericRestStorageProvider(
     override val account: AccountOps? = config.endpoints[ENDPOINT_USER_INFO]?.let { endpoint ->
         object : AccountOps {
             override suspend fun accountInfo(): ApiResponse<AccountInfo> {
-                val result = buffered(endpoint, emptyMap())
-                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "user_info endpoint could not be resolved."))
-                if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
-                val body = parseJson(result.bodyText) ?: return ApiResponse.Error(ProviderError("bad_response", "user_info response was not valid JSON."))
-                return ApiResponse.Success(
-                    AccountInfo(
-                        username = mapField(endpoint, body, "username"),
-                        quotaUsedBytes = mapField(endpoint, body, "quota_used")?.toLongOrNull(),
-                        quotaTotalBytes = mapField(endpoint, body, "quota_total")?.toLongOrNull()
+                return reaching {
+                    val result = buffered(endpoint, emptyMap())
+                        ?: return ApiResponse.Error(ProviderError("bad_endpoint", "user_info endpoint could not be resolved."))
+                    if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
+                    val body = parseJson(result.bodyText) ?: return ApiResponse.Error(ProviderError("bad_response", "user_info response was not valid JSON."))
+                    return ApiResponse.Success(
+                        AccountInfo(
+                            username = mapField(endpoint, body, "username"),
+                            quotaUsedBytes = mapField(endpoint, body, "quota_used")?.toLongOrNull(),
+                            quotaTotalBytes = mapField(endpoint, body, "quota_total")?.toLongOrNull()
+                        )
                     )
-                )
+                }
             }
         }
     }
@@ -285,30 +305,32 @@ class GenericRestStorageProvider(
     override val fileList: FileListOps? = config.endpoints[ENDPOINT_LIST]?.let { endpoint ->
         object : FileListOps {
             override suspend fun list(): ApiResponse<StorageListing> {
-                val result = buffered(endpoint, emptyMap())
-                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "list endpoint could not be resolved."))
-                if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
-                val body = parseJson(result.bodyText) ?: return badResponse("Files", "list response was not valid JSON.", result.bodyText)
-                val items = DotPath.resolveArray(body, endpoint.listPath)
-                    ?: return badResponse("Files", "list response has no array at ${endpoint.listPath ?: "its root"}.", result.bodyText)
-                return ApiResponse.Success(
-                    StorageListing(
-                        breadcrumb = emptyList(),
-                        children = items.map { item ->
-                            StorageNode(
-                                ref = StorageRef(id = mapField(endpoint, item, "id")),
-                                name = mapField(endpoint, item, "name") ?: "",
-                                isDirectory = false,
-                                size = mapField(endpoint, item, "size")?.toLongOrNull(),
-                                createdAt = mapField(endpoint, item, "created"),
-                                modifiedAt = mapField(endpoint, item, "modified"),
-                                mimeType = mapField(endpoint, item, "mime_type")
-                            )
-                        },
-                        canWrite = ProviderCapability.UPLOAD in capabilities,
-                        canDelete = ProviderCapability.DELETE in capabilities
+                return reaching {
+                    val result = buffered(endpoint, emptyMap())
+                        ?: return ApiResponse.Error(ProviderError("bad_endpoint", "list endpoint could not be resolved."))
+                    if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
+                    val body = parseJson(result.bodyText) ?: return badResponse("Files", "list response was not valid JSON.", result.bodyText)
+                    val items = DotPath.resolveArray(body, endpoint.listPath)
+                        ?: return badResponse("Files", "list response has no array at ${endpoint.listPath ?: "its root"}.", result.bodyText)
+                    return ApiResponse.Success(
+                        StorageListing(
+                            breadcrumb = emptyList(),
+                            children = items.map { item ->
+                                StorageNode(
+                                    ref = StorageRef(id = mapField(endpoint, item, "id")),
+                                    name = mapField(endpoint, item, "name") ?: "",
+                                    isDirectory = false,
+                                    size = mapField(endpoint, item, "size")?.toLongOrNull(),
+                                    createdAt = mapField(endpoint, item, "created"),
+                                    modifiedAt = mapField(endpoint, item, "modified"),
+                                    mimeType = mapField(endpoint, item, "mime_type")
+                                )
+                            },
+                            canWrite = ProviderCapability.UPLOAD in capabilities,
+                            canDelete = ProviderCapability.DELETE in capabilities
+                        )
                     )
-                )
+                }
             }
         }
     }
@@ -320,30 +342,32 @@ class GenericRestStorageProvider(
             context: Context,
             onProgress: (sent: Long, total: Long?) -> Unit
         ): ApiResponse<StorageNode> {
-            val endpoint = config.endpoints[ENDPOINT_UPLOAD]
-                ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no upload endpoint configured."))
-            val result = try {
-                authorized(
-                    { client.executeUpload(endpoint, mapOf("filename" to fileName), it, fileName, fileUri, context, onProgress) },
-                    { it?.code }
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_UPLOAD]
+                    ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no upload endpoint configured."))
+                val result = try {
+                    authorized(
+                        { client.executeUpload(endpoint, mapOf("filename" to fileName), it, fileName, fileUri, context, onProgress) },
+                        { it?.code }
+                    )
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    return uploadFailure(e)
+                } ?: return ApiResponse.Error(ProviderError("bad_endpoint", "upload endpoint could not be resolved."))
+                if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
+                val body = parseJson(result.bodyText)
+                val id = body?.let { mapField(endpoint, it, "id") }
+                return ApiResponse.Success(
+                    StorageNode(
+                        ref = StorageRef(id = id),
+                        name = body?.let { mapField(endpoint, it, "name") } ?: fileName,
+                        isDirectory = false,
+                        size = body?.let { mapField(endpoint, it, "size") }?.toLongOrNull(),
+                        mimeType = body?.let { mapField(endpoint, it, "mime_type") }
+                    )
                 )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                return uploadFailure(e)
-            } ?: return ApiResponse.Error(ProviderError("bad_endpoint", "upload endpoint could not be resolved."))
-            if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
-            val body = parseJson(result.bodyText)
-            val id = body?.let { mapField(endpoint, it, "id") }
-            return ApiResponse.Success(
-                StorageNode(
-                    ref = StorageRef(id = id),
-                    name = body?.let { mapField(endpoint, it, "name") } ?: fileName,
-                    isDirectory = false,
-                    size = body?.let { mapField(endpoint, it, "size") }?.toLongOrNull(),
-                    mimeType = body?.let { mapField(endpoint, it, "mime_type") }
-                )
-            )
+            }
         }
 
         override suspend fun download(
@@ -351,20 +375,22 @@ class GenericRestStorageProvider(
             outputStream: OutputStream,
             onProgress: (read: Long, total: Long?) -> Unit
         ): ApiResponse<Long> {
-            val endpoint = config.endpoints[ENDPOINT_DOWNLOAD]
-                ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no download endpoint configured."))
-            val id = ref.id ?: return ApiResponse.Error(ProviderError("file_id_missing", "File ID is required to download a file."))
-            var totalCopied = 0L
-            val code = authorized(
-                { auth ->
-                    client.executeDownload(endpoint, mapOf("id" to id), auth, outputStream) { read, total ->
-                        totalCopied = read
-                        onProgress(read, total)
-                    }
-                },
-                { it }
-            ) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "download endpoint could not be resolved."))
-            return if (code in 200..299) ApiResponse.Success(totalCopied) else ApiResponse.Error(ProviderError("download_failed_status_$code", "Download failed: HTTP $code"))
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_DOWNLOAD]
+                    ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no download endpoint configured."))
+                val id = ref.id ?: return ApiResponse.Error(ProviderError("file_id_missing", "File ID is required to download a file."))
+                var totalCopied = 0L
+                val code = authorized(
+                    { auth ->
+                        client.executeDownload(endpoint, mapOf("id" to id), auth, outputStream) { read, total ->
+                            totalCopied = read
+                            onProgress(read, total)
+                        }
+                    },
+                    { it }
+                ) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "download endpoint could not be resolved."))
+                return if (code in 200..299) ApiResponse.Success(totalCopied) else ApiResponse.Error(ProviderError("download_failed_status_$code", "Download failed: HTTP $code"))
+            }
         }
 
         // The download_archive endpoint takes the ids joined by commas as {ids}, e.g. "/file/{ids}"
@@ -373,48 +399,54 @@ class GenericRestStorageProvider(
             outputStream: java.io.OutputStream,
             onProgress: (read: Long, total: Long?) -> Unit
         ): ApiResponse<Long> {
-            val endpoint = config.endpoints[ENDPOINT_DOWNLOAD_ARCHIVE]
-                ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't download several files as one archive."))
-            val ids = refs.map { it.id ?: return ApiResponse.Error(ProviderError("file_id_missing", "File ID is required to download a file.")) }
-            var totalCopied = 0L
-            val code = authorized(
-                { auth ->
-                    client.executeDownload(endpoint, mapOf("ids" to ids.joinToString(",")), auth, outputStream) { read, total ->
-                        totalCopied = read
-                        onProgress(read, total)
-                    }
-                },
-                { it }
-            ) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "download_archive endpoint could not be resolved."))
-            return if (code in 200..299) ApiResponse.Success(totalCopied) else ApiResponse.Error(ProviderError("download_failed_status_$code", "Download failed: HTTP $code"))
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_DOWNLOAD_ARCHIVE]
+                    ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't download several files as one archive."))
+                val ids = refs.map { it.id ?: return ApiResponse.Error(ProviderError("file_id_missing", "File ID is required to download a file.")) }
+                var totalCopied = 0L
+                val code = authorized(
+                    { auth ->
+                        client.executeDownload(endpoint, mapOf("ids" to ids.joinToString(",")), auth, outputStream) { read, total ->
+                            totalCopied = read
+                            onProgress(read, total)
+                        }
+                    },
+                    { it }
+                ) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "download_archive endpoint could not be resolved."))
+                return if (code in 200..299) ApiResponse.Success(totalCopied) else ApiResponse.Error(ProviderError("download_failed_status_$code", "Download failed: HTTP $code"))
+            }
         }
 
         override suspend fun fileInfo(ref: StorageRef): ApiResponse<StorageNode> {
-            val endpoint = config.endpoints[ENDPOINT_FILE_INFO]
-                ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no file_info endpoint configured."))
-            val id = ref.id ?: return ApiResponse.Error(ProviderError("file_id_missing", "File ID is required."))
-            val result = buffered(endpoint, mapOf("id" to id))
-                ?: return ApiResponse.Error(ProviderError("bad_endpoint", "file_info endpoint could not be resolved."))
-            if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
-            val body = parseJson(result.bodyText) ?: return ApiResponse.Error(ProviderError("bad_response", "file_info response was not valid JSON."))
-            return ApiResponse.Success(
-                StorageNode(
-                    ref = StorageRef(id = id),
-                    name = mapField(endpoint, body, "name") ?: id,
-                    isDirectory = false,
-                    size = mapField(endpoint, body, "size")?.toLongOrNull(),
-                    mimeType = mapField(endpoint, body, "mime_type")
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_FILE_INFO]
+                    ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no file_info endpoint configured."))
+                val id = ref.id ?: return ApiResponse.Error(ProviderError("file_id_missing", "File ID is required."))
+                val result = buffered(endpoint, mapOf("id" to id))
+                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "file_info endpoint could not be resolved."))
+                if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
+                val body = parseJson(result.bodyText) ?: return ApiResponse.Error(ProviderError("bad_response", "file_info response was not valid JSON."))
+                return ApiResponse.Success(
+                    StorageNode(
+                        ref = StorageRef(id = id),
+                        name = mapField(endpoint, body, "name") ?: id,
+                        isDirectory = false,
+                        size = mapField(endpoint, body, "size")?.toLongOrNull(),
+                        mimeType = mapField(endpoint, body, "mime_type")
+                    )
                 )
-            )
+            }
         }
 
         override suspend fun delete(ref: StorageRef): ApiResponse<Unit> {
-            val endpoint = config.endpoints[ENDPOINT_DELETE]
-                ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no delete endpoint configured."))
-            val id = ref.id ?: return ApiResponse.Error(ProviderError("file_id_missing", "File ID is required."))
-            val result = buffered(endpoint, mapOf("id" to id))
-                ?: return ApiResponse.Error(ProviderError("bad_endpoint", "delete endpoint could not be resolved."))
-            return if (result.isSuccessful) ApiResponse.Success(Unit) else ApiResponse.Error(statusError(result))
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_DELETE]
+                    ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no delete endpoint configured."))
+                val id = ref.id ?: return ApiResponse.Error(ProviderError("file_id_missing", "File ID is required."))
+                val result = buffered(endpoint, mapOf("id" to id))
+                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "delete endpoint could not be resolved."))
+                return if (result.isSuccessful) ApiResponse.Success(Unit) else ApiResponse.Error(statusError(result))
+            }
         }
     }
 
@@ -535,20 +567,22 @@ class GenericRestStorageProvider(
 
     private fun browseOps(listEndpoint: EndpointConfig): BrowseOps = object : BrowseOps {
         override suspend fun list(path: String): ApiResponse<StorageListing> {
-            val result = buffered(listEndpoint, mapOf("path" to path.trim('/')))
-                ?: return ApiResponse.Error(ProviderError("bad_endpoint", "browse_list endpoint could not be resolved."))
-            if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
-            val body = parseJson(result.bodyText) ?: return badResponse("Filesystem", "browse_list response was not valid JSON.", result.bodyText)
-            val items = DotPath.resolveArray(body, listEndpoint.listPath)
-                ?: return badResponse("Filesystem", "browse_list response has no array at ${listEndpoint.listPath ?: "its root"}.", result.bodyText)
-            return ApiResponse.Success(
-                StorageListing(
-                    breadcrumb = DotPath.resolveArray(body, listEndpoint.breadcrumbPath).orEmpty().map { nodeFrom(listEndpoint, it) },
-                    children = items.map { nodeFrom(listEndpoint, it) },
-                    canWrite = listingFlag(listEndpoint, body, "can_write") ?: (ProviderCapability.UPLOAD in capabilities),
-                    canDelete = listingFlag(listEndpoint, body, "can_delete") ?: (ProviderCapability.DELETE in capabilities)
+            return reaching {
+                val result = buffered(listEndpoint, mapOf("path" to path.trim('/')))
+                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "browse_list endpoint could not be resolved."))
+                if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
+                val body = parseJson(result.bodyText) ?: return badResponse("Filesystem", "browse_list response was not valid JSON.", result.bodyText)
+                val items = DotPath.resolveArray(body, listEndpoint.listPath)
+                    ?: return badResponse("Filesystem", "browse_list response has no array at ${listEndpoint.listPath ?: "its root"}.", result.bodyText)
+                return ApiResponse.Success(
+                    StorageListing(
+                        breadcrumb = DotPath.resolveArray(body, listEndpoint.breadcrumbPath).orEmpty().map { nodeFrom(listEndpoint, it) },
+                        children = items.map { nodeFrom(listEndpoint, it) },
+                        canWrite = listingFlag(listEndpoint, body, "can_write") ?: (ProviderCapability.UPLOAD in capabilities),
+                        canDelete = listingFlag(listEndpoint, body, "can_delete") ?: (ProviderCapability.DELETE in capabilities)
+                    )
                 )
-            )
+            }
         }
 
         override suspend fun upload(
@@ -558,24 +592,26 @@ class GenericRestStorageProvider(
             makeParents: Boolean,
             onProgress: (sent: Long, total: Long?) -> Unit
         ): ApiResponse<StorageNode> {
-            val endpoint = config.endpoints[ENDPOINT_BROWSE_UPLOAD]
-                ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no browse upload endpoint configured."))
-            val target = path.trim('/')
-            val name = target.substringAfterLast('/')
-            val placeholders = mapOf("path" to target, "make_parents" to makeParentsValue(makeParents))
-            val result = try {
-                authorized(
-                    { client.executeUpload(endpoint, placeholders, it, name, fileUri, context, onProgress) },
-                    { it?.code }
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                return uploadFailure(e)
-            } ?: return ApiResponse.Error(ProviderError("bad_endpoint", "browse upload endpoint could not be resolved."))
-            if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
-            val body = parseJson(result.bodyText)
-            return ApiResponse.Success(body?.let { nodeFrom(endpoint, it) } ?: StorageNode(ref = StorageRef(path = target), name = name, isDirectory = false))
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_BROWSE_UPLOAD]
+                    ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no browse upload endpoint configured."))
+                val target = path.trim('/')
+                val name = target.substringAfterLast('/')
+                val placeholders = mapOf("path" to target, "make_parents" to makeParentsValue(makeParents))
+                val result = try {
+                    authorized(
+                        { client.executeUpload(endpoint, placeholders, it, name, fileUri, context, onProgress) },
+                        { it?.code }
+                    )
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    return uploadFailure(e)
+                } ?: return ApiResponse.Error(ProviderError("bad_endpoint", "browse upload endpoint could not be resolved."))
+                if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
+                val body = parseJson(result.bodyText)
+                return ApiResponse.Success(body?.let { nodeFrom(endpoint, it) } ?: StorageNode(ref = StorageRef(path = target), name = name, isDirectory = false))
+            }
         }
 
         override suspend fun download(
@@ -583,61 +619,71 @@ class GenericRestStorageProvider(
             outputStream: OutputStream,
             onProgress: (read: Long, total: Long?) -> Unit
         ): ApiResponse<Long> {
-            val endpoint = config.endpoints[ENDPOINT_BROWSE_DOWNLOAD]
-                ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no browse download endpoint configured."))
-            var totalCopied = 0L
-            val code = authorized(
-                { auth ->
-                    client.executeDownload(endpoint, mapOf("path" to path.trim('/')), auth, outputStream) { read, total ->
-                        totalCopied = read
-                        onProgress(read, total)
-                    }
-                },
-                { it }
-            ) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "browse download endpoint could not be resolved."))
-            return if (code in 200..299) ApiResponse.Success(totalCopied)
-            else ApiResponse.Error(ProviderError("download_failed_status_$code", "Download failed: HTTP $code"))
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_BROWSE_DOWNLOAD]
+                    ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no browse download endpoint configured."))
+                var totalCopied = 0L
+                val code = authorized(
+                    { auth ->
+                        client.executeDownload(endpoint, mapOf("path" to path.trim('/')), auth, outputStream) { read, total ->
+                            totalCopied = read
+                            onProgress(read, total)
+                        }
+                    },
+                    { it }
+                ) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "browse download endpoint could not be resolved."))
+                return if (code in 200..299) ApiResponse.Success(totalCopied)
+                else ApiResponse.Error(ProviderError("download_failed_status_$code", "Download failed: HTTP $code"))
+            }
         }
 
         override suspend fun createDirectory(path: String, makeParents: Boolean): ApiResponse<Unit> {
-            val endpoint = config.endpoints[ENDPOINT_BROWSE_MKDIR]
-                ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no mkdir endpoint configured."))
-            val placeholders = mapOf("path" to path.trim('/'), "action" to if (makeParents) "mkdirall" else "mkdir")
-            val result = buffered(endpoint, placeholders)
-                ?: return ApiResponse.Error(ProviderError("bad_endpoint", "mkdir endpoint could not be resolved."))
-            return if (result.isSuccessful) ApiResponse.Success(Unit) else ApiResponse.Error(statusError(result))
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_BROWSE_MKDIR]
+                    ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no mkdir endpoint configured."))
+                val placeholders = mapOf("path" to path.trim('/'), "action" to if (makeParents) "mkdirall" else "mkdir")
+                val result = buffered(endpoint, placeholders)
+                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "mkdir endpoint could not be resolved."))
+                return if (result.isSuccessful) ApiResponse.Success(Unit) else ApiResponse.Error(statusError(result))
+            }
         }
 
         override suspend fun rename(path: String, targetPath: String, makeParents: Boolean): ApiResponse<StorageNode> {
-            val endpoint = config.endpoints[ENDPOINT_BROWSE_RENAME]
-                ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no rename endpoint configured."))
-            val target = targetPath.trim('/')
-            val placeholders = mapOf("path" to path.trim('/'), "target" to target, "make_parents" to makeParentsValue(makeParents))
-            val result = buffered(endpoint, placeholders)
-                ?: return ApiResponse.Error(ProviderError("bad_endpoint", "rename endpoint could not be resolved."))
-            if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
-            val body = parseJson(result.bodyText)
-            return ApiResponse.Success(
-                body?.let { nodeFrom(endpoint, it) } ?: StorageNode(ref = StorageRef(path = target), name = target.substringAfterLast('/'), isDirectory = false)
-            )
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_BROWSE_RENAME]
+                    ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no rename endpoint configured."))
+                val target = targetPath.trim('/')
+                val placeholders = mapOf("path" to path.trim('/'), "target" to target, "make_parents" to makeParentsValue(makeParents))
+                val result = buffered(endpoint, placeholders)
+                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "rename endpoint could not be resolved."))
+                if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
+                val body = parseJson(result.bodyText)
+                return ApiResponse.Success(
+                    body?.let { nodeFrom(endpoint, it) } ?: StorageNode(ref = StorageRef(path = target), name = target.substringAfterLast('/'), isDirectory = false)
+                )
+            }
         }
 
         override suspend fun importFiles(path: String, fileIds: List<String>): ApiResponse<Unit> {
-            val endpoint = config.endpoints[ENDPOINT_BROWSE_IMPORT]
-                ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't import files into a folder."))
-            val placeholders = mapOf("path" to path.trim('/'), "files_json" to JsonArray(fileIds.map { JsonPrimitive(it) }).toString())
-            val result = buffered(endpoint, placeholders)
-                ?: return ApiResponse.Error(ProviderError("bad_endpoint", "import endpoint could not be resolved."))
-            return if (result.isSuccessful) ApiResponse.Success(Unit) else ApiResponse.Error(statusError(result))
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_BROWSE_IMPORT]
+                    ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't import files into a folder."))
+                val placeholders = mapOf("path" to path.trim('/'), "files_json" to JsonArray(fileIds.map { JsonPrimitive(it) }).toString())
+                val result = buffered(endpoint, placeholders)
+                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "import endpoint could not be resolved."))
+                return if (result.isSuccessful) ApiResponse.Success(Unit) else ApiResponse.Error(statusError(result))
+            }
         }
 
         override suspend fun delete(path: String, recursive: Boolean): ApiResponse<Unit> {
-            val endpoint = config.endpoints[ENDPOINT_BROWSE_DELETE]
-                ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no browse delete endpoint configured."))
-            val placeholders = mapOf("path" to path.trim('/'), "recursive" to makeParentsValue(recursive))
-            val result = buffered(endpoint, placeholders)
-                ?: return ApiResponse.Error(ProviderError("bad_endpoint", "browse delete endpoint could not be resolved."))
-            return if (result.isSuccessful) ApiResponse.Success(Unit) else ApiResponse.Error(statusError(result))
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_BROWSE_DELETE]
+                    ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no browse delete endpoint configured."))
+                val placeholders = mapOf("path" to path.trim('/'), "recursive" to makeParentsValue(recursive))
+                val result = buffered(endpoint, placeholders)
+                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "browse delete endpoint could not be resolved."))
+                return if (result.isSuccessful) ApiResponse.Success(Unit) else ApiResponse.Error(statusError(result))
+            }
         }
     }
 
@@ -651,68 +697,78 @@ class GenericRestStorageProvider(
 
     private fun listsOps(overview: EndpointConfig): ListOps = object : ListOps {
         override suspend fun lists(): ApiResponse<List<FileList>> {
-            val result = buffered(overview, emptyMap()) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "user_lists endpoint could not be resolved."))
-            if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
-            val body = parseJson(result.bodyText) ?: return badResponse("Lists", "user_lists response was not valid JSON.", result.bodyText)
-            val items = DotPath.resolveArray(body, overview.listPath)
-                ?: return badResponse("Lists", "user_lists response has no array at ${overview.listPath ?: "its root"}.", result.bodyText)
-            return ApiResponse.Success(
-                items.map { item ->
-                    FileList(
-                        id = mapField(overview, item, "id").orEmpty(),
-                        title = mapField(overview, item, "title").orEmpty(),
-                        fileCount = mapField(overview, item, "file_count")?.toIntOrNull() ?: 0,
-                        canEdit = mapField(overview, item, "can_edit")?.lowercase() == "true"
-                    )
-                }
-            )
+            return reaching {
+                val result = buffered(overview, emptyMap()) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "user_lists endpoint could not be resolved."))
+                if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
+                val body = parseJson(result.bodyText) ?: return badResponse("Lists", "user_lists response was not valid JSON.", result.bodyText)
+                val items = DotPath.resolveArray(body, overview.listPath)
+                    ?: return badResponse("Lists", "user_lists response has no array at ${overview.listPath ?: "its root"}.", result.bodyText)
+                return ApiResponse.Success(
+                    items.map { item ->
+                        FileList(
+                            id = mapField(overview, item, "id").orEmpty(),
+                            title = mapField(overview, item, "title").orEmpty(),
+                            fileCount = mapField(overview, item, "file_count")?.toIntOrNull() ?: 0,
+                            canEdit = mapField(overview, item, "can_edit")?.lowercase() == "true"
+                        )
+                    }
+                )
+            }
         }
 
         override suspend fun listContents(id: String): ApiResponse<FileListDetail> {
-            val endpoint = config.endpoints[ENDPOINT_LIST_INFO]
-                ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no list_info endpoint configured."))
-            val result = buffered(endpoint, mapOf("list_id" to id))
-                ?: return ApiResponse.Error(ProviderError("bad_endpoint", "list_info endpoint could not be resolved."))
-            if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
-            val body = parseJson(result.bodyText) ?: return badResponse("Lists", "list_info response was not valid JSON.", result.bodyText)
-            val files = DotPath.resolveArray(body, endpoint.listPath)
-                ?: return badResponse("Lists", "list_info response has no array at ${endpoint.listPath ?: "its root"}.", result.bodyText)
-            return ApiResponse.Success(
-                FileListDetail(
-                    id = id,
-                    title = endpoint.listingMap["title"]?.let { DotPath.resolveString(body, it) }.orEmpty(),
-                    canEdit = endpoint.listingMap["can_edit"]?.let { DotPath.resolveString(body, it)?.lowercase() == "true" } ?: false,
-                    files = files.map { nodeFrom(endpoint, it) }
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_LIST_INFO]
+                    ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no list_info endpoint configured."))
+                val result = buffered(endpoint, mapOf("list_id" to id))
+                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "list_info endpoint could not be resolved."))
+                if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
+                val body = parseJson(result.bodyText) ?: return badResponse("Lists", "list_info response was not valid JSON.", result.bodyText)
+                val files = DotPath.resolveArray(body, endpoint.listPath)
+                    ?: return badResponse("Lists", "list_info response has no array at ${endpoint.listPath ?: "its root"}.", result.bodyText)
+                return ApiResponse.Success(
+                    FileListDetail(
+                        id = id,
+                        title = endpoint.listingMap["title"]?.let { DotPath.resolveString(body, it) }.orEmpty(),
+                        canEdit = endpoint.listingMap["can_edit"]?.let { DotPath.resolveString(body, it)?.lowercase() == "true" } ?: false,
+                        files = files.map { nodeFrom(endpoint, it) }
+                    )
                 )
-            )
+            }
         }
 
         override suspend fun create(title: String, fileIds: List<String>): ApiResponse<String> {
-            val endpoint = config.endpoints[ENDPOINT_LIST_CREATE]
-                ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no list_create endpoint configured."))
-            val result = buffered(endpoint, listJsonPlaceholders(title, fileIds))
-                ?: return ApiResponse.Error(ProviderError("bad_endpoint", "list_create endpoint could not be resolved."))
-            if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
-            val id = parseJson(result.bodyText)?.let { mapField(endpoint, it, "id") }
-                ?: return ApiResponse.Error(ProviderError("bad_response", "The new list has no id in the response."))
-            return ApiResponse.Success(id)
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_LIST_CREATE]
+                    ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no list_create endpoint configured."))
+                val result = buffered(endpoint, listJsonPlaceholders(title, fileIds))
+                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "list_create endpoint could not be resolved."))
+                if (!result.isSuccessful) return ApiResponse.Error(statusError(result))
+                val id = parseJson(result.bodyText)?.let { mapField(endpoint, it, "id") }
+                    ?: return ApiResponse.Error(ProviderError("bad_response", "The new list has no id in the response."))
+                return ApiResponse.Success(id)
+            }
         }
 
         override suspend fun update(id: String, title: String, fileIds: List<String>): ApiResponse<Unit> {
-            val endpoint = config.endpoints[ENDPOINT_LIST_UPDATE]
-                ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no list_update endpoint configured."))
-            val placeholders = listJsonPlaceholders(title, fileIds) + ("list_id" to id)
-            val result = buffered(endpoint, placeholders)
-                ?: return ApiResponse.Error(ProviderError("bad_endpoint", "list_update endpoint could not be resolved."))
-            return if (result.isSuccessful) ApiResponse.Success(Unit) else ApiResponse.Error(statusError(result))
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_LIST_UPDATE]
+                    ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no list_update endpoint configured."))
+                val placeholders = listJsonPlaceholders(title, fileIds) + ("list_id" to id)
+                val result = buffered(endpoint, placeholders)
+                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "list_update endpoint could not be resolved."))
+                return if (result.isSuccessful) ApiResponse.Success(Unit) else ApiResponse.Error(statusError(result))
+            }
         }
 
         override suspend fun delete(id: String): ApiResponse<Unit> {
-            val endpoint = config.endpoints[ENDPOINT_LIST_DELETE]
-                ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no list_delete endpoint configured."))
-            val result = buffered(endpoint, mapOf("list_id" to id))
-                ?: return ApiResponse.Error(ProviderError("bad_endpoint", "list_delete endpoint could not be resolved."))
-            return if (result.isSuccessful) ApiResponse.Success(Unit) else ApiResponse.Error(statusError(result))
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_LIST_DELETE]
+                    ?: return ApiResponse.Error(ProviderError("not_configured", "This host has no list_delete endpoint configured."))
+                val result = buffered(endpoint, mapOf("list_id" to id))
+                    ?: return ApiResponse.Error(ProviderError("bad_endpoint", "list_delete endpoint could not be resolved."))
+                return if (result.isSuccessful) ApiResponse.Success(Unit) else ApiResponse.Error(statusError(result))
+            }
         }
     }
 
