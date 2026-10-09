@@ -1,9 +1,9 @@
-# The developer documentation, served at https://materialdrain.senko.tools/docs/ (the home page with the downloads is
+# The documentation, served at https://materialdrain.senko.tools/docs/ (the home page with the downloads is
 # website/). Lives in the website branch, apart from the app's code (main, dev). Built by .github/workflows/site.yml
 # into the site branch, which the server pulls (see docs/server-setup/).
 site_name: Materialdrain docs
 site_url: https://materialdrain.senko.tools/docs/
-site_description: How Materialdrain is built, where things are, and why they're done the way they are.
+site_description: How to use Materialdrain, how to add any host to it, and how the app is built and why.
 repo_url: https://github.com/fidesosu/Materialdrain
 repo_name: fidesosu/Materialdrain
 edit_uri: edit/website/docs/
@@ -13,6 +13,13 @@ docs_dir: docs
 exclude_docs: |
   server-setup/
   requirements.txt
+# The old single page about configs, kept so links to it still land somewhere
+not_in_nav: |
+  provider-configuration.md
+
+# A link to a heading that doesn't exist fails the (strict) build, like a link to a missing page
+validation:
+  anchors: warn
 
 theme:
   name: material
@@ -23,10 +30,16 @@ theme:
     accent: custom
   features:
     - navigation.instant
+    - navigation.tabs
     - navigation.sections
+    - navigation.indexes
     - navigation.top
+    - navigation.footer
     - search.highlight
+    - search.suggest
     - content.code.copy
+    - content.tabs.link
+    - toc.follow
 
 extra_css:
   - stylesheets/extra.css
@@ -34,12 +47,17 @@ extra_css:
 markdown_extensions:
   - admonition
   - attr_list
+  - def_list
+  - md_in_html
   - tables
   - toc:
       permalink: true
   - pymdownx.details
   - pymdownx.highlight
   - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -48,5 +66,33 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Using the app:
+      - user-guide/index.md
+      - The screens: user-guide/screens.md
+      - Settings: user-guide/settings.md
+      - Troubleshooting: user-guide/troubleshooting.md
   - Hosts:
-      - Provider configuration: provider-configuration.md
+      - hosts/index.md
+      - The config format: hosts/config-format.md
+      - Kinds of host:
+          - WebDAV: hosts/webdav.md
+          - S3: hosts/s3.md
+          - SMB: hosts/smb.md
+          - REST API: hosts/rest-api.md
+      - Sign-in: hosts/sign-in.md
+      - The config editor: hosts/editor.md
+      - Sharing and updates: hosts/sharing-and-updates.md
+      - Examples: hosts/examples.md
+      - Troubleshooting: hosts/troubleshooting.md
+  - Development:
+      - development/index.md
+      - Architecture: development/architecture.md
+      - Hosts in code: development/providers.md
+      - The interface: development/interface.md
+      - Uploads and downloads: development/transfers.md
+      - Thumbnails and previews: development/media.md
+      - Search and sorting: development/search-and-sorting.md
+      - Data and security: development/data-and-security.md
+      - Common tasks: development/common-tasks.md
+      - Conventions: development/conventions.md
+      - This website: development/website.md
