@@ -1101,8 +1101,9 @@ private fun ColumnScope.TransferBarSlot(
     fileInfoViewModel: FileInfoViewModel,
 ) {
     val uploadUiState by uploadViewModel.uiState.collectAsState()
-    val filesystemUiState by filesystemViewModel.uiState.collectAsState()
+    val filesystemUpload by filesystemViewModel.uploadProgress.collectAsState()
     val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
+    val downloads by fileInfoViewModel.downloads.collectAsState()
     val activeTransfer: TransferProgress? = when (currentScreen) {
         Screen.Upload if uploadUiState.isLoading -> TransferProgress(
             transferredBytes = uploadUiState.uploadedBytes,
@@ -1113,7 +1114,7 @@ private fun ColumnScope.TransferBarSlot(
                 "${items.count { it.status == UploadItemStatus.DONE }} / ${items.size} files"
             }
         )
-        Screen.Filesystem if filesystemUiState.uploadProgress != null -> filesystemUiState.uploadProgress!!.let {
+        Screen.Filesystem if filesystemUpload != null -> filesystemUpload!!.let {
             TransferProgress(
                 transferredBytes = it.uploadedBytes,
                 totalBytes = it.totalBytes,
@@ -1122,11 +1123,11 @@ private fun ColumnScope.TransferBarSlot(
                 label = "${it.currentIndex} / ${it.totalFiles} files"
             )
         }
-        else -> fileInfoUiState.downloadBatch?.takeIf {
+        else -> downloads.batch?.takeIf {
             currentScreen in listOf(Screen.Files, Screen.Filesystem, Screen.Lists, Screen.FileDetail)
         }?.let { batch ->
             // One bar for the whole batch: the finished files plus the bytes of the file in progress
-            val current = fileInfoUiState.activeDownloads.values.firstOrNull {
+            val current = downloads.active.values.firstOrNull {
                 it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.PENDING
             }
             TransferProgress(
@@ -1141,8 +1142,8 @@ private fun ColumnScope.TransferBarSlot(
                 download.status == DownloadStatus.DOWNLOADING || download.status == DownloadStatus.PENDING
             }
             val activeDownload = when (currentScreen) {
-                Screen.FileDetail -> fileInfoUiState.fileInfo?.key?.let { fileInfoUiState.activeDownloads[it] }?.takeIf(isActive)
-                Screen.Files, Screen.Filesystem, Screen.Lists -> fileInfoUiState.activeDownloads.values.firstOrNull(isActive)
+                Screen.FileDetail -> fileInfoUiState.fileInfo?.key?.let { downloads.active[it] }?.takeIf(isActive)
+                Screen.Files, Screen.Filesystem, Screen.Lists -> downloads.active.values.firstOrNull(isActive)
                 else -> null
             }
             activeDownload?.let {

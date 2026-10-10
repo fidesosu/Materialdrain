@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import coil.compose.AsyncImage
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import tools.senko.materialdrain.provider.api.PixeldrainRichDetails
 import tools.senko.materialdrain.provider.api.StorageNode
@@ -249,7 +250,7 @@ fun FileInfoDetailsCard(
             }
 
             Spacer(Modifier.height(12.dp))
-            val download = uiState.activeDownloads[fileInfo.key]
+            WithDownload(fileInfoViewModel.downloads, fileInfo.key) { download ->
             ActionRow(
                 download = download,
                 canDownload = rich?.canDownload != false,
@@ -268,6 +269,7 @@ fun FileInfoDetailsCard(
                 onCopyLink = { link -> copy("Link", link) },
                 onDelete = { fileInfoViewModel.initiateDeleteFile(fileInfo) }
             )
+            }
 
             if (rich != null && (rich.views != null || rich.downloads != null || rich.bandwidthUsed != null)) {
                 Spacer(Modifier.height(16.dp))
@@ -406,6 +408,16 @@ private const val CONFIRM_WINDOW_MS = 3_000L
 
 private val ActionHeight = 48.dp
 private val ActionShape = RoundedCornerShape(16.dp)
+
+/**
+ * The download of [key], read in a scope of its own: its progress ticks then redraw only [content], not the whole page
+ * (with its preview) around it.
+ */
+@Composable
+private fun WithDownload(downloads: StateFlow<DownloadsState>, key: String, content: @Composable (FileDownloadState?) -> Unit) {
+    val state by downloads.collectAsState()
+    content(state.active[key])
+}
 
 /**
  * The file's actions in one row: the download button, which takes the room there is, then Share, Copy link and Delete

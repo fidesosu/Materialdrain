@@ -74,8 +74,7 @@ data class FilesystemUiState(
     val operationMessage: String? = null,
     val operationError: String? = null,
 
-    // Uploads into the current directory
-    val uploadProgress: FilesystemUploadProgress? = null,
+    // Uploads into the current directory (their progress is FilesystemViewModel.uploadProgress)
     val pendingUpload: PendingFilesystemUpload? = null, // Waiting for the user to confirm overwriting existing files
 
     // The pixeldrain search index is useless to nearly everyone, hidden unless the user turns that off in the settings
@@ -145,6 +144,13 @@ class FilesystemViewModel(
     private val _displayedChildren = MutableStateFlow<List<StorageNode>>(emptyList())
     /** [FilesystemUiState.visibleChildren], filtered and sorted by the shared sort order. Folders always come first. */
     val displayedChildren: StateFlow<List<StorageNode>> = _displayedChildren.asStateFlow()
+
+    private val _uploadProgress = MutableStateFlow<FilesystemUploadProgress?>(null)
+    /**
+     * The upload into the current folder, null when none runs. Kept out of [uiState]: it changes with every progress tick,
+     * and the screens which only read the UI state shouldn't be redrawn for each of those.
+     */
+    val uploadProgress: StateFlow<FilesystemUploadProgress?> = _uploadProgress.asStateFlow()
 
     private var uploadJob: Job? = null
 
@@ -595,7 +601,7 @@ class FilesystemViewModel(
     // --- Uploading ---
 
     fun onFilesPickedForUpload(uris: List<Uri>, context: Context) {
-        if (uris.isEmpty() || _uiState.value.uploadProgress != null) return
+        if (uris.isEmpty() || _uploadProgress.value != null) return
         viewModelScope.launch {
             val items = withContext(Dispatchers.IO) {
                 uris.map { uri ->
@@ -641,13 +647,8 @@ class FilesystemViewModel(
         val dir = currentDir()
         val totalBytes = items.sumOf { it.sizeBytes ?: 0L }.takeIf { it > 0 && items.all { item -> item.sizeBytes != null } }
         speedTracker.reset()
-        _uiState.update {
-            it.copy(
-                operationMessage = null,
-                operationError = null,
-                uploadProgress = FilesystemUploadProgress(items.first().name, 1, items.size, 0L, totalBytes)
-            )
-        }
+        _uiState.update { it.copy(operationMessage = null, operationError = null) }
+        _uploadProgress.value = FilesystemUploadProgress(items.first().name, 1, items.size, 0L, totalBytes)
 
         val transferId = "filesystem-upload-${nextTransferNumber++}"
         transfers.start(
@@ -670,19 +671,15 @@ class FilesystemViewModel(
                         val overall = completedBytes + sent
                         val speed = speedTracker.update(overall)
                         transfers.progress(transferId, overall, totalBytes, speed, estimateEtaSeconds(totalBytes, overall, speed))
-                        _uiState.update {
-                            it.copy(
-                                uploadProgress = FilesystemUploadProgress(
-                                    currentFileName = item.name,
-                                    currentIndex = index + 1,
-                                    totalFiles = items.size,
-                                    uploadedBytes = overall,
-                                    totalBytes = totalBytes,
-                                    bytesPerSecond = speed,
-                                    etaSeconds = estimateEtaSeconds(totalBytes, overall, speed)
-                                )
-                            )
-                        }
+                        _uploadProgress.value = FilesystemUploadProgress(
+                            currentFileName = item.name,
+                            currentIndex = index + 1,
+                            totalFiles = items.size,
+                            uploadedBytes = overall,
+                            totalBytes = totalBytes,
+                            bytesPerSecond = speed,
+                            etaSeconds = estimateEtaSeconds(totalBytes, overall, speed)
+                        )
                     }
                     completedBytes += item.sizeBytes ?: 0L
                     // A host which reports the connection cut under a cancelled upload as an error: that's the cancel
@@ -698,16 +695,17 @@ class FilesystemViewModel(
                 } else {
                     outcomeMessage = "${failures.size} of ${items.size} uploads failed: ${failures.first()}"
                 }
+                _uploadProgress.value = null
                 _uiState.update {
                     it.copy(
-                        uploadProgress = null,
                         operationMessage = if (uploaded > 0) (if (uploaded == 1) "1 file uploaded." else "$uploaded files uploaded.") else null,
                         operationError = failures.takeIf { f -> f.isNotEmpty() }?.joinToString("\n")
                     )
                 }
             } catch (e: CancellationException) {
                 outcome = TransferOutcome.CANCELLED
-                _uiState.update { it.copy(uploadProgress = null, operationMessage = if (uploaded > 0) "Upload cancelled, $uploaded file(s) were uploaded." else "Upload cancelled.") }
+                _uploadProgress.value = null
+                _uiState.update { it.copy(operationMessage =if (uploaded > 0) "Upload cancelled, $uploaded file(s) were uploaded." else "Upload cancelled.") }
                 throw e
             } finally {
                 transfers.finish(transferId, outcome, outcomeMessage)

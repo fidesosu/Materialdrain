@@ -66,7 +66,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import tools.senko.materialdrain.files.DownloadStatus
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import tools.senko.materialdrain.files.FileActionDialogs
 import tools.senko.materialdrain.files.FileActionRequest
 import tools.senko.materialdrain.files.FileInfoViewModel
@@ -78,6 +79,7 @@ import tools.senko.materialdrain.files.key
 import tools.senko.materialdrain.files.fileComparator
 import tools.senko.materialdrain.files.copyLinkToClipboard
 import tools.senko.materialdrain.files.shareLink
+import tools.senko.materialdrain.filesystem.FilesystemUploadProgress
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
 import tools.senko.materialdrain.lists.ListViewModel
 import tools.senko.materialdrain.provider.api.FileList
@@ -145,6 +147,14 @@ fun BrowserScreen(
     val listDisplayedFiles by listViewModel.displayedListFiles.collectAsState()
     val openedList = listState.openedList.takeIf { mode == BrowserMode.LISTS }
     val context = LocalContext.current
+    // Only whether a transfer runs (and which file an upload is on), not each of its progress ticks: those would redraw the
+    // whole screen several times a second. The progress itself is the bar above (see App.kt's TransferBarSlot)
+    val downloading by remember(fileInfoViewModel) {
+        fileInfoViewModel.downloads.map { it.isDownloading }.distinctUntilChanged()
+    }.collectAsState(initial = fileInfoViewModel.downloads.value.isDownloading)
+    val fsUploadStatus by remember(filesystemViewModel) {
+        filesystemViewModel.uploadProgress.map { it?.statusLine() }.distinctUntilChanged()
+    }.collectAsState(initial = filesystemViewModel.uploadProgress.value?.statusLine())
 
     // The sort order: shared by every sortable list in the app (see AppSettings.sortField)
     val sortField by appSettings.sortField.collectAsState()
@@ -529,10 +539,8 @@ fun BrowserScreen(
     ) {
         // What stops the transfer the bar above this screen shows (see App.kt's TransferBarSlot): the filesystem's upload
         // there, else the downloads. Offered as a Cancel card next to the sorting
-        val downloading = fileState.downloadBatch != null ||
-            fileState.activeDownloads.values.any { it.status == DownloadStatus.PENDING || it.status == DownloadStatus.DOWNLOADING }
         val cancelTransfer: (() -> Unit)? = when {
-            mode == BrowserMode.FILESYSTEM && fsState.uploadProgress != null -> { { filesystemViewModel.cancelUpload() } }
+            mode == BrowserMode.FILESYSTEM && fsUploadStatus != null -> { { filesystemViewModel.cancelUpload() } }
             downloading -> { { fileInfoViewModel.cancelAllDownloads() } }
             else -> null
         }
@@ -546,7 +554,7 @@ fun BrowserScreen(
                         sortAscending = sortAscending,
                         onSortFieldSelected = { appSettings.changeSortOrder(it) },
                         actions = if (fsState.canWrite && !selectionMode) buildList {
-                            if (canUploadFs) add(SortRowAction(Icons.Filled.Upload, "Upload", enabled = !fsState.isModifying && fsState.uploadProgress == null) { filesystemUploadLauncher.launch("*/*") })
+                            if (canUploadFs) add(SortRowAction(Icons.Filled.Upload, "Upload", enabled = !fsState.isModifying && fsUploadStatus == null) { filesystemUploadLauncher.launch("*/*") })
                             if (canMkdirFs) add(SortRowAction(Icons.Filled.CreateNewFolder, "New folder", enabled = !fsState.isModifying) { showNewFolderDialog = true })
                             if (fsState.canImport) add(SortRowAction(Icons.Filled.Link, "Import files by ID", enabled = !fsState.isModifying) { showImportDialog = true })
                         } else emptyList(),
@@ -607,10 +615,10 @@ fun BrowserScreen(
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
             if (mode == BrowserMode.FILESYSTEM) {
-                fsState.uploadProgress?.let { progress ->
+                fsUploadStatus?.let { status ->
                     // Cancelled with the Cancel card in the sort row above
                     Text(
-                        text = "Uploading ${progress.currentFileName} (${progress.currentIndex}/${progress.totalFiles})",
+                        text = status,
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -849,3 +857,6 @@ private fun FilesystemMenu(
         }
     }
 }
+
+/** The line under the sort row while the filesystem uploads: which file it's on, of how many. */
+private fun FilesystemUploadProgress.statusLine(): String = "Uploading $currentFileName ($currentIndex/$totalFiles)"

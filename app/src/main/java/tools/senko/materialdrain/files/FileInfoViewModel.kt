@@ -91,6 +91,19 @@ data class DownloadBatch(
     val totalBytes: Long?,
     val doneBytes: Long = 0L
 )
+
+/**
+ * The downloads, by node key, and the batch they belong to (null when no batch runs). Kept out of [FileInfoUiState]: it
+ * changes with every progress tick, and the screens which only read the UI state shouldn't be redrawn for each of those.
+ */
+data class DownloadsState(
+    val active: Map<String, FileDownloadState> = emptyMap(),
+    val batch: DownloadBatch? = null
+) {
+    /** Whether a download is waiting or running. */
+    val isDownloading: Boolean
+        get() = batch != null || active.values.any { it.status == DownloadStatus.PENDING || it.status == DownloadStatus.DOWNLOADING }
+}
 // --- End Download State Management ---
 
 /** Identifies a node in the app: its file id, or its path when it has no id (the filesystem). */
@@ -152,10 +165,6 @@ data class FileInfoUiState(
     val filterQuery: String = "",
     val showFilterInput: Boolean = false,
 
-    // For multiple file downloads
-    val activeDownloads: Map<String, FileDownloadState> = emptyMap(),
-    // Several files downloaded one after another, while that batch runs; null when none is running
-    val downloadBatch: DownloadBatch? = null,
     // General messages, can be deprecated if per-file messages are sufficient
     val fileDownloadSuccessMessage: String? = null,
     // The last finished download, when it can be opened (it's saved on the device)
@@ -189,6 +198,17 @@ class FileInfoViewModel(
 
     private val _uiState = MutableStateFlow(FileInfoUiState())
     val uiState: StateFlow<FileInfoUiState> = _uiState.asStateFlow()
+
+    private val _downloads = MutableStateFlow(DownloadsState())
+    val downloads: StateFlow<DownloadsState> = _downloads.asStateFlow()
+
+    /** Changes the download of [key], when there is one. */
+    private fun updateDownload(key: String, transform: (FileDownloadState) -> FileDownloadState) {
+        _downloads.update { state ->
+            val current = state.active[key] ?: return@update state
+            state.copy(active = state.active + (key to transform(current)))
+        }
+    }
 
     private val _displayedFiles = MutableStateFlow<List<StorageNode>>(emptyList())
     val displayedFiles: StateFlow<List<StorageNode>> = _displayedFiles.asStateFlow()
@@ -549,19 +569,21 @@ class FileInfoViewModel(
         _uiState.update { it.copy(isLoadingDeleteFile = true, deleteFileErrorMessage = null, deleteFileSuccessMessage = null) }
         viewModelScope.launch {
             when (val response = deleteNode(node)) {
-                is ApiResponse.Success -> _uiState.update {
-                    val newFileInfo = if (it.fileInfo?.key == node.key) null else it.fileInfo
-                    if (newFileInfo == null) clearTextPreviewStates()
-                    it.copy(
-                        isLoadingDeleteFile = false,
-                        initiateDeleteFile = false,
-                        fileIdToDelete = null,
-                        nodeToDelete = null,
-                        deleteFileSuccessMessage = "File deleted successfully.",
-                        userFilesList = it.userFilesList.filterNot { item -> item.key == node.key },
-                        fileInfo = newFileInfo,
-                        activeDownloads = it.activeDownloads.filterNot { entry -> entry.key == node.key }
-                    )
+                is ApiResponse.Success -> {
+                    _downloads.update { it.copy(active = it.active - node.key) }
+                    _uiState.update {
+                        val newFileInfo = if (it.fileInfo?.key == node.key) null else it.fileInfo
+                        if (newFileInfo == null) clearTextPreviewStates()
+                        it.copy(
+                            isLoadingDeleteFile = false,
+                            initiateDeleteFile = false,
+                            fileIdToDelete = null,
+                            nodeToDelete = null,
+                            deleteFileSuccessMessage = "File deleted successfully.",
+                            userFilesList = it.userFilesList.filterNot { item -> item.key == node.key },
+                            fileInfo = newFileInfo
+                        )
+                    }
                 }
                 is ApiResponse.Error -> _uiState.update {
                     it.copy(
@@ -679,14 +701,14 @@ class FileInfoViewModel(
         val key = node.key
         val size = node.size ?: 0L
 
-        _uiState.update { currentState ->
+        _downloads.update { state ->
             val newDownloadState = FileDownloadState(
                 fileId = key,
                 fileName = node.name,
                 totalBytes = size,
                 status = DownloadStatus.PENDING
             )
-            currentState.copy(activeDownloads = currentState.activeDownloads + (key to newDownloadState))
+            state.copy(active = state.active + (key to newDownloadState))
         }
 
         // A file of a batch reports into the batch's transfer, see downloadFilesSequentially
@@ -700,7 +722,7 @@ class FileInfoViewModel(
             var outcomeMessage: String? = null
 
             try {
-                _uiState.value.activeDownloads[key]?.let {
+                _downloads.value.active[key]?.let {
                     targetUri = it.targetUri
                 }
                 if (targetUri == null) {
@@ -717,15 +739,7 @@ class FileInfoViewModel(
                     throw IOException("Failed to prepare or re-open download target in MediaStore.")
                 }
 
-                _uiState.update { currentState ->
-                    val updatedDownload = currentState.activeDownloads[key]?.copy(
-                        status = DownloadStatus.DOWNLOADING,
-                        targetUri = targetUri
-                    )
-                    if (updatedDownload != null) {
-                        currentState.copy(activeDownloads = currentState.activeDownloads + (key to updatedDownload))
-                    } else currentState
-                }
+                updateDownload(key) { it.copy(status = DownloadStatus.DOWNLOADING, targetUri = targetUri) }
 
                 val speedTracker = TransferSpeedTracker()
                 val job = coroutineContext[Job]
@@ -742,22 +756,18 @@ class FileInfoViewModel(
                         transfers.progress(transferId, bytesRead, totalBytes, speed, eta)
                     } else {
                         // Within a batch: the bytes of the finished files plus this one, against the whole batch
-                        val batch = _uiState.value.downloadBatch
+                        val batch = _downloads.value.batch
                         transfers.progress(transferId, (batch?.doneBytes ?: 0L) + bytesRead, batch?.totalBytes, speed, eta)
                     }
-                    _uiState.update { currentState ->
-                        val currentDownload = currentState.activeDownloads[key]
-                        val effectiveTotal = totalBytes ?: currentDownload?.totalBytes
-                        val updatedDownload = currentDownload?.copy(
+                    updateDownload(key) { currentDownload ->
+                        val effectiveTotal = totalBytes ?: currentDownload.totalBytes
+                        currentDownload.copy(
                             downloadedBytes = bytesRead,
                             progressFraction = progress,
                             totalBytes = effectiveTotal,
                             bytesPerSecond = speed,
                             etaSeconds = estimateEtaSeconds(effectiveTotal, bytesRead, speed)
                         )
-                        if (updatedDownload != null) {
-                            currentState.copy(activeDownloads = currentState.activeDownloads + (key to updatedDownload))
-                        } else currentState
                     }
                 }
 
@@ -771,8 +781,8 @@ class FileInfoViewModel(
                         val message = "File '${node.name}' downloaded (${formatSize(bytesCopied)})."
                         outcome = TransferOutcome.COMPLETED
                         outcomeMessage = message
-                        _uiState.update { currentState ->
-                            val updatedDownload = currentState.activeDownloads[key]?.copy(
+                        updateDownload(key) {
+                            it.copy(
                                 status = DownloadStatus.COMPLETED,
                                 message = message,
                                 downloadedBytes = bytesCopied,
@@ -780,8 +790,9 @@ class FileInfoViewModel(
                                 bytesPerSecond = 0L,
                                 etaSeconds = null
                             )
+                        }
+                        _uiState.update { currentState ->
                             currentState.copy(
-                                activeDownloads = if (updatedDownload != null) currentState.activeDownloads + (key to updatedDownload) else currentState.activeDownloads,
                                 fileDownloadSuccessMessage = message,
                                 fileDownloadOpen = targetUri?.let { OpenableDownload(it, node.previewMimeType() ?: "*/*") }
                             )
@@ -802,23 +813,21 @@ class FileInfoViewModel(
                     "Download error for '${node.name}': ${e.localizedMessage ?: "Unexpected error"}"
                 }
                 outcomeMessage = errorMsg
-                _uiState.update { currentState ->
-                    val updatedDownload = currentState.activeDownloads[key]?.copy(
+                val hadDownload = _downloads.value.active.containsKey(key)
+                updateDownload(key) {
+                    it.copy(
                         status = if (e is CancellationException) DownloadStatus.CANCELLED else DownloadStatus.FAILED,
                         message = errorMsg,
                         // The unfinished file is deleted (see finalizeMediaStoreEntry): another try starts a new one
                         targetUri = null,
                         bytesPerSecond = 0L,
                         etaSeconds = null,
-                        progressFraction = if (e is CancellationException) 0f else currentState.activeDownloads[key]?.progressFraction ?: 0f,
-                        downloadedBytes = if (e is CancellationException) 0L else currentState.activeDownloads[key]?.downloadedBytes ?: 0L
+                        progressFraction = if (e is CancellationException) 0f else it.progressFraction,
+                        downloadedBytes = if (e is CancellationException) 0L else it.downloadedBytes
                     )
-                    if (updatedDownload != null) {
-                        currentState.copy(
-                            activeDownloads = currentState.activeDownloads + (key to updatedDownload),
-                            fileDownloadErrorMessage = if (e !is CancellationException) errorMsg else null
-                        )
-                    } else currentState
+                }
+                if (hadDownload) {
+                    _uiState.update { it.copy(fileDownloadErrorMessage = if (e !is CancellationException) errorMsg else null) }
                 }
             } finally {
                 try {
@@ -862,7 +871,7 @@ class FileInfoViewModel(
         }
         // The total is only known when every file has a size
         val totalBytes = files.map { it.size }.takeIf { sizes -> sizes.all { it != null } }?.sumOf { it ?: 0L }
-        _uiState.update { it.copy(downloadBatch = DownloadBatch(totalFiles = files.size, totalBytes = totalBytes)) }
+        _downloads.update { it.copy(batch = DownloadBatch(totalFiles = files.size, totalBytes = totalBytes)) }
         val batchId = "download-batch-${System.nanoTime()}"
         // The whole batch is one transfer: one notification with its total, and one result when it ends
         val batchJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
@@ -879,16 +888,16 @@ class FileInfoViewModel(
                         download.cancel()
                         throw e
                     }
-                    if (_uiState.value.activeDownloads[file.key]?.status == DownloadStatus.COMPLETED) savedFiles++
+                    if (_downloads.value.active[file.key]?.status == DownloadStatus.COMPLETED) savedFiles++
                     // Counted once the file is over, whether it was saved or failed
-                    _uiState.update { state ->
-                        val batch = state.downloadBatch ?: return@update state
-                        val finishedBytes = state.activeDownloads[file.key]?.downloadedBytes ?: file.size ?: 0L
-                        state.copy(downloadBatch = batch.copy(doneFiles = batch.doneFiles + 1, doneBytes = batch.doneBytes + finishedBytes))
+                    _downloads.update { state ->
+                        val batch = state.batch ?: return@update state
+                        val finishedBytes = state.active[file.key]?.downloadedBytes ?: file.size ?: 0L
+                        state.copy(batch = batch.copy(doneFiles = batch.doneFiles + 1, doneBytes = batch.doneBytes + finishedBytes))
                     }
                 }
             } finally {
-                _uiState.update { it.copy(downloadBatch = null) }
+                _downloads.update { it.copy(batch = null) }
                 val outcome = when {
                     coroutineContext[Job]?.isCancelled == true -> TransferOutcome.CANCELLED
                     savedFiles == files.size -> TransferOutcome.COMPLETED
@@ -965,13 +974,13 @@ class FileInfoViewModel(
                     is ApiResponse.Error -> failures.add("${file.name} (${response.error.message.ifBlank { "unknown error" }})")
                 }
             }
+            _downloads.update { it.copy(active = it.active - deletedKeys) }
             _uiState.update {
                 val openedFileDeleted = it.fileInfo?.key in deletedKeys
                 it.copy(
                     isBulkOperationRunning = false,
                     userFilesList = it.userFilesList.filterNot { file -> file.key in deletedKeys },
                     fileInfo = if (openedFileDeleted) null else it.fileInfo,
-                    activeDownloads = it.activeDownloads.filterKeys { key -> key !in deletedKeys },
                     operationMessage = if (failures.isEmpty()) {
                         if (deletedKeys.size == 1) "File deleted." else "${deletedKeys.size} files deleted."
                     } else null,
