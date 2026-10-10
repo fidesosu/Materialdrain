@@ -234,6 +234,12 @@ class FileInfoViewModel(
         }
     }
 
+    // What's loading for the file details. Each is cancelled when another file is opened: a slow answer for the file
+    // opened before would otherwise land on the details of the one opened after it
+    private var fileInfoJob: Job? = null
+    private var previewJob: Job? = null
+    private var archiveJob: Job? = null
+
     private val _displayedFiles = MutableStateFlow<List<StorageNode>>(emptyList())
     val displayedFiles: StateFlow<List<StorageNode>> = _displayedFiles.asStateFlow()
 
@@ -334,6 +340,7 @@ class FileInfoViewModel(
     }
 
     private fun clearTextPreviewStates() {
+        previewJob?.cancel()
         _uiState.update {
             it.copy(
                 isLoadingTextPreview = false,
@@ -374,6 +381,7 @@ class FileInfoViewModel(
     }
 
     private fun fetchTextFilePreviewContent(fileInfo: StorageNode) {
+        previewJob?.cancel()
         val mimeType = fileInfo.previewMimeType() ?: ""
         val commonTextMimeTypes = listOf(
             "text/plain", "text/html", "text/css", "text/javascript", "text/xml", "text/csv",
@@ -402,7 +410,7 @@ class FileInfoViewModel(
         }
 
         _uiState.update { it.copy(isLoadingTextPreview = true, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = null) }
-        viewModelScope.launch {
+        previewJob = viewModelScope.launch {
             // Capped as well: a host which doesn't tell the size (or tells it wrong) mustn't fill the memory with a huge file
             val buffer = LimitedByteArrayOutputStream(MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES)
             val response = try {
@@ -455,9 +463,10 @@ class FileInfoViewModel(
             _uiState.update { it.copy(fileInfoErrorMessage = "Please enter or select a File ID.", isLoadingFileInfo = false) }
             return
         }
+        fileInfoJob?.cancel()
         _uiState.update { it.copy(isLoadingFileInfo = true, fileInfo = null, fileInfoErrorMessage = null) }
         clearTextPreviewStates()
-        viewModelScope.launch {
+        fileInfoJob = viewModelScope.launch {
             val store = provider().fileStore
             if (store == null) {
                 _uiState.update { it.copy(isLoadingFileInfo = false, fileInfoErrorMessage = "This host can't show file details by id.") }
@@ -493,8 +502,9 @@ class FileInfoViewModel(
     /** Lists the folder [inside] of the archive at [path] for the details, see FileDetailsScreen. */
     private fun loadArchive(path: String, inside: String) {
         val archives = provider().archives ?: return
+        archiveJob?.cancel()
         _uiState.update { it.copy(archive = ArchiveView(path, inside, entries = null, error = null)) }
-        viewModelScope.launch {
+        archiveJob = viewModelScope.launch {
             val result = archives.list(path, inside)
             _uiState.update { state ->
                 if (state.archive?.path != path) return@update state
@@ -521,6 +531,8 @@ class FileInfoViewModel(
     }
 
     fun setFileInfoFromNode(node: StorageNode) {
+        fileInfoJob?.cancel()
+        archiveJob?.cancel()
         if (node.isDirectory) {
             _uiState.update {
                 it.copy(
@@ -547,6 +559,8 @@ class FileInfoViewModel(
     }
 
     fun clearFileInfoDisplay() {
+        fileInfoJob?.cancel()
+        archiveJob?.cancel()
         appSettings.openedFile = null
         _uiState.update { it.copy(fileInfo = null, isLoadingFileInfo = false, archive = null) }
         clearTextPreviewStates()
