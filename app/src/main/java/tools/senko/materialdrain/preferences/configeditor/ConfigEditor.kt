@@ -5,20 +5,14 @@ package tools.senko.materialdrain.preferences.configeditor
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -119,6 +113,8 @@ import tools.senko.materialdrain.ui.components.AppMenu
 import tools.senko.materialdrain.ui.components.AppMenuItem
 import tools.senko.materialdrain.ui.components.DotScrollbar
 import tools.senko.materialdrain.ui.components.OverflowMenuButton
+import tools.senko.materialdrain.ui.components.PAGE_TRANSITION_MS
+import tools.senko.materialdrain.ui.components.pageTransition
 import tools.senko.materialdrain.ui.components.rememberCodeHighlighting
 
 /** The two ways of editing a config: field by field, or its text. */
@@ -248,8 +244,8 @@ fun ConfigEditor(
                     val reduceMotion = LocalReduceMotion.current
                     AnimatedVisibility(
                         visible = fullPage == null,
-                        enter = if (reduceMotion) EnterTransition.None else expandVertically(tween(250)) + fadeIn(tween(250)),
-                        exit = if (reduceMotion) ExitTransition.None else shrinkVertically(tween(250)) + fadeOut(tween(150))
+                        enter = if (reduceMotion) EnterTransition.None else expandVertically(tween(PAGE_TRANSITION_MS)) + fadeIn(tween(PAGE_TRANSITION_MS)),
+                        exit = if (reduceMotion) ExitTransition.None else shrinkVertically(tween(PAGE_TRANSITION_MS)) + fadeOut(tween(150))
                     ) {
                         ModeSwitch(mode) { entry ->
                             if (entry == EditorMode.JSON) {
@@ -409,16 +405,13 @@ private fun PageTransition(
     AnimatedContent(
         targetState = depth to page,
         transitionSpec = {
-            val deeper = targetState.first > initialState.first
-            val shallower = targetState.first < initialState.first
-            val transition: ContentTransform = when {
-                reduceMotion || (!deeper && !shallower) -> fadeIn(tween(150)) togetherWith fadeOut(tween(100))
-                deeper -> (slideInHorizontally(tween(250)) { it / 4 } + fadeIn(tween(250))) togetherWith
-                    (slideOutHorizontally(tween(250)) { -it / 4 } + fadeOut(tween(150)))
-                else -> (slideInHorizontally(tween(250)) { -it / 4 } + fadeIn(tween(250))) togetherWith
-                    (slideOutHorizontally(tween(250)) { it / 4 } + fadeOut(tween(150)))
+            val forward = when {
+                targetState.first > initialState.first -> true
+                targetState.first < initialState.first -> false
+                // Another section next to the first page, with two panes
+                else -> null
             }
-            transition.using(SizeTransform(clip = false) { _, _ -> snap() })
+            pageTransition(forward, reduceMotion)
         },
         label = "configPage",
         modifier = modifier.fillMaxWidth()

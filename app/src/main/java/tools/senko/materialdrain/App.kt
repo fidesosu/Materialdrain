@@ -27,7 +27,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -109,6 +108,7 @@ import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.LocalVideoLoop
 import tools.senko.materialdrain.ui.VideoLoopSetting
 import tools.senko.materialdrain.ui.components.AppMenu
+import tools.senko.materialdrain.ui.components.pageTransition
 import tools.senko.materialdrain.ui.components.AppMenuDivider
 import tools.senko.materialdrain.ui.components.AppMenuItem
 import tools.senko.materialdrain.ui.components.AppSnackbarHost
@@ -886,37 +886,15 @@ fun MaterialdrainScreen() {
                 transitionSpec = {
                     val initialIndex = navBarOrder.indexOf(initialState)
                     val targetIndex = navBarOrder.indexOf(targetState)
-
-                    val sliding = if (initialIndex != -1 && targetIndex != -1) {
-                        // Both screens are in the main navigation bar
-                        if (targetIndex > initialIndex) {
-                            (slideInVertically { height -> height } + fadeIn())
-                                .togetherWith(slideOutVertically { height -> -height } + fadeOut())
-                        } else {
-                            (slideInVertically { height -> -height } + fadeIn())
-                                .togetherWith(slideOutVertically { height -> height } + fadeOut())
-                        }
-                    } else {
-                        // Default transition for screens not in navBarOrder (e.g., FileDetail, Settings)
-                        // Or if one of them is not in navBarOrder (should ideally not happen for main nav)
-                        if (targetState.ordinal > initialState.ordinal) {
-                            (slideInVertically { height -> height } + fadeIn())
-                                .togetherWith(slideOutVertically { height -> -height } + fadeOut())
-                        } else {
-                            (slideInVertically { height -> -height } + fadeIn())
-                                .togetherWith(slideOutVertically { height -> height } + fadeOut())
-                        }
-                    }.using(
-                        SizeTransform(clip = false)
-                    )
-
-                    if (reduceMotion) {
-                        // Reduced animations: a quick crossfade instead of sliding
-                        (fadeIn(tween(100)) togetherWith fadeOut(tween(100)))
-                            .using(SizeTransform(clip = false) { _, _ -> snap() })
-                    } else {
-                        sliding
+                    val forward = when {
+                        // Between two tabs: the way they lie in the navigation bar
+                        initialIndex != -1 && targetIndex != -1 -> targetIndex > initialIndex
+                        // Into a screen that isn't a tab (a file's details, the settings) is deeper, out of one back
+                        targetIndex == -1 && initialIndex != -1 -> true
+                        initialIndex == -1 && targetIndex != -1 -> false
+                        else -> targetState.ordinal > initialState.ordinal
                     }
+                    pageTransition(forward, reduceMotion)
                 },
                 label = "screenTransition"
             ) { targetScreen ->

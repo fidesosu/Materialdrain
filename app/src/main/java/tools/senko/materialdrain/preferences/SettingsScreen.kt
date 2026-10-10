@@ -2,15 +2,6 @@ package tools.senko.materialdrain.preferences
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,6 +30,7 @@ import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import androidx.compose.foundation.layout.Box
 import tools.senko.materialdrain.ui.components.DotScrollbar
+import tools.senko.materialdrain.ui.components.pageTransition
 
 /**
  * The settings: a list of categories, each of which opens a page with its settings. What the categories and
@@ -71,17 +63,7 @@ fun SettingsScreenContent(
 
     AnimatedContent(
         targetState = settingsCategory(categoryId),
-        transitionSpec = {
-            val opening = targetState != null
-            val transition: ContentTransform = when {
-                reduceMotion -> fadeIn(tween(100)) togetherWith fadeOut(tween(100))
-                opening -> (slideInHorizontally(tween(250)) { it / 4 } + fadeIn(tween(250))) togetherWith
-                    (slideOutHorizontally(tween(250)) { -it / 4 } + fadeOut(tween(150)))
-                else -> (slideInHorizontally(tween(250)) { -it / 4 } + fadeIn(tween(250))) togetherWith
-                    (slideOutHorizontally(tween(250)) { it / 4 } + fadeOut(tween(150)))
-            }
-            transition.using(SizeTransform(clip = false) { _, _ -> snap() })
-        },
+        transitionSpec = { pageTransition(forward = targetState != null, reduceMotion = reduceMotion) },
         label = "settingsCategory",
         modifier = Modifier.fillMaxSize()
     ) { category ->
