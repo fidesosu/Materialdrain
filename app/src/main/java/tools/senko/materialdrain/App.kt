@@ -939,7 +939,7 @@ fun MaterialdrainScreen() {
                     val isSearchIndex = fileInfoUiState.nodeToDelete?.isSearchIndex() == true
                     Text(
                         if (isSearchIndex) SEARCH_INDEX_DELETE_WARNING
-                        else "Are you sure you want to delete file ID: ${fileInfoUiState.fileIdToDelete}? This action cannot be undone."
+                        else "Delete \"${fileInfoUiState.nodeToDelete?.name ?: fileInfoUiState.fileIdToDelete}\"? This can't be undone."
                     )
                 },
                 confirmButton = {
