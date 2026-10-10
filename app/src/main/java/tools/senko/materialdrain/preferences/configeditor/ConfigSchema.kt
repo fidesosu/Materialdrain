@@ -45,8 +45,10 @@ data class Suggestion(val key: String, val help: String, val value: String = "")
  *
  * @param default what the app uses while the field is left out, shown with it; null when there is none
  * @param required the config can't be used without it
- * @param common shown even while it's left out; the others are offered under "More options", so a config shows little at
- *   first but every field is a tap away
+ * @param common shown first; the others are folded under "More options" (unfolded when one of them is set), so a page
+ *   shows little at first but every field is a tap away
+ * @param canTurnOff for an object ([FieldKind.Group]) whose being there at all means something, e.g. signing in with a
+ *   password: its page starts with a switch, rather than it being there as soon as one of its fields is filled in
  * @param shownWhen only for the fields that mean something given the others in the same object, e.g. the header name of
  *   a sign-in sent in a header
  */
@@ -59,10 +61,11 @@ data class FieldSpec(
     val required: Boolean = false,
     val common: Boolean = required,
     val placeholder: String? = null,
+    val canTurnOff: Boolean = false,
     val shownWhen: (JsonObject) -> Boolean = { true }
 )
 
-/** A part of the editor's form, folded away unless [startOpen]. */
+/** A part of the editor's form: on its first page when [startOpen], otherwise a page of its own. */
 data class Section(val title: String, val summary: String, val fields: List<FieldSpec>, val startOpen: Boolean = false)
 
 /** The text of a field in [obj], e.g. a choice; null when it's left out or isn't text. */
@@ -251,6 +254,7 @@ private fun authField(webdav: Boolean) = FieldSpec(
             ),
             FieldSpec(
                 "password_auth", "Username and password", "For hosts that take a username and password, not only an API key.",
+                common = true, canTurnOff = true,
                 kind = FieldKind.Group(
                     listOf(
                         FieldSpec(
@@ -264,7 +268,7 @@ private fun authField(webdav: Boolean) = FieldSpec(
                         ),
                         FieldSpec(
                             "login", "Sign-in request", "The request that exchanges the username and password for a session.",
-                            common = true, shownWhen = { it.textOf("mode") == "LOGIN" },
+                            required = true, shownWhen = { it.textOf("mode") == "LOGIN" },
                             kind = FieldKind.Group(
                                 listOf(
                                     FieldSpec("method", "Method", "The HTTP method of the sign-in.", kind = methodChoice, default = str("POST"), common = true),
@@ -289,10 +293,11 @@ private fun authField(webdav: Boolean) = FieldSpec(
                                     FieldSpec("token", "Session in the answer", "Where the session token is in the answer.", required = true, placeholder = "$.auth_key"),
                                     FieldSpec(
                                         "otp", "Two-factor codes", "When the host asks for a code, the same sign-in is sent again with it.",
+                                        common = true, canTurnOff = true,
                                         kind = FieldKind.Group(
                                             listOf(
                                                 FieldSpec("required_when", "A code is asked for when", "", required = true, kind = conditionGroup()),
-                                                FieldSpec("rejected_when", "The code was wrong when", "", kind = conditionGroup()),
+                                                FieldSpec("rejected_when", "The code was wrong when", "", kind = conditionGroup(), common = true, canTurnOff = true),
                                                 FieldSpec("digits", "Digits", "How long a code is.", kind = FieldKind.Number, default = JsonPrimitive(6))
                                             )
                                         )
@@ -302,7 +307,8 @@ private fun authField(webdav: Boolean) = FieldSpec(
                         ),
                         FieldSpec(
                             "logout", "Sign-out request", "Ends the session on the host when signing out; without it, signing out is only on the device.",
-                            kind = FieldKind.Group(requestFields(null)), shownWhen = { it.textOf("mode") == "LOGIN" }
+                            kind = FieldKind.Group(requestFields(null)), common = true, canTurnOff = true,
+                            shownWhen = { it.textOf("mode") == "LOGIN" }
                         )
                     )
                 )

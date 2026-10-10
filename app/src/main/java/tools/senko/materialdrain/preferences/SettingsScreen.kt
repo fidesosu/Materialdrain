@@ -28,6 +28,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -65,6 +66,8 @@ fun SettingsScreenContent(
 
     val environment = SettingsEnvironment(appSettings, authViewModel, apiKeyInput, onApiKeyInputChange, providerSettingsViewModel)
     val reduceMotion = LocalReduceMotion.current
+    // Each page keeps how far it was scrolled, for when it's come back to
+    val pageStates = rememberSaveableStateHolder()
 
     AnimatedContent(
         targetState = settingsCategory(categoryId),
@@ -85,10 +88,12 @@ fun SettingsScreenContent(
         // Room after the last row for the button over the bottom of the screen (the Save button, or the navigation
         // button of the prototype): its height, the margin it keeps from the edge, and a gap above it
         val bottomRoom = if (isFabVisible) fabHeight + 32.dp else 16.dp
-        if (category == null) {
-            SettingsCategoryList(onCategoryClick = { onCategoryChange(it.id) }, bottomRoom = bottomRoom)
-        } else {
-            SettingsCategoryPage(category, environment, bottomRoom)
+        pageStates.SaveableStateProvider(category?.id ?: "categories") {
+            if (category == null) {
+                SettingsCategoryList(onCategoryClick = { onCategoryChange(it.id) }, bottomRoom = bottomRoom)
+            } else {
+                SettingsCategoryPage(category, environment, bottomRoom)
+            }
         }
     }
 }

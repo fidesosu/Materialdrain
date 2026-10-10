@@ -71,6 +71,9 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -171,6 +174,29 @@ private val DarkCodeColors = CodeColors(
 @Composable
 private fun codeColors(): CodeColors =
     if (MaterialTheme.colorScheme.surfaceContainerHighest.luminance() < 0.5f) DarkCodeColors else LightCodeColors
+
+/**
+ * Code typed in a text field, coloured as the previews colour it; only the colours change, not the text, so the cursor
+ * stays where it is. The last text and its colours are kept, as a field asks again on every change of its own.
+ */
+private class CodeHighlighting(private val language: SourceLanguage?, private val colors: CodeColors) : VisualTransformation {
+    private var last: AnnotatedString? = null
+    private var lastHighlighted: AnnotatedString? = null
+
+    override fun filter(text: AnnotatedString): TransformedText {
+        val highlighted = lastHighlighted?.takeIf { text == last } ?: highlightedCode(text.text, language, colors)
+        last = text
+        lastHighlighted = highlighted
+        return TransformedText(highlighted, OffsetMapping.Identity)
+    }
+}
+
+/** A text field's [VisualTransformation] that colours its text as code of [language], see [CodeHighlighting]. */
+@Composable
+fun rememberCodeHighlighting(language: SourceLanguage?): VisualTransformation {
+    val colors = codeColors()
+    return remember(language, colors) { CodeHighlighting(language, colors) }
+}
 
 private fun lineCount(text: String) = text.count { it == '\n' } + if (text.isEmpty() || text.endsWith('\n')) 0 else 1
 
