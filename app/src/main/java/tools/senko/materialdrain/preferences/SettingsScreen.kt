@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -81,32 +82,54 @@ fun SettingsScreenContent(
         label = "settingsCategory",
         modifier = Modifier.fillMaxSize()
     ) { category ->
+        // Room after the last row for the button over the bottom of the screen (the Save button, or the navigation
+        // button of the prototype): its height, the margin it keeps from the edge, and a gap above it
+        val bottomRoom = if (isFabVisible) fabHeight + 32.dp else 16.dp
         if (category == null) {
-            SettingsCategoryList(onCategoryClick = { onCategoryChange(it.id) })
+            SettingsCategoryList(onCategoryClick = { onCategoryChange(it.id) }, bottomRoom = bottomRoom)
         } else {
-            SettingsCategoryPage(category, environment, fabHeight, isFabVisible)
+            SettingsCategoryPage(category, environment, bottomRoom)
         }
     }
 }
 
-/** The list of categories: the standard Material list, an icon, a title and a summary per row. */
+/**
+ * The list of categories, in sections (see [SettingsGroup]): under each section's title, the standard Material list, an
+ * icon, a title and a summary per row.
+ */
 @Composable
-private fun SettingsCategoryList(onCategoryClick: (SettingsCategory) -> Unit) {
+private fun SettingsCategoryList(onCategoryClick: (SettingsCategory) -> Unit, bottomRoom: Dp) {
     val scrollState = rememberScrollState()
+    // In the order of the sections; within one, in the order of the catalog
+    val sections = remember { SettingsCatalog.groupBy { it.group }.toSortedMap(compareBy { it.ordinal }) }
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState)) {
-            SettingsCatalog.forEach { category ->
-                ListItem(
-                    headlineContent = { Text(category.title) },
-                    supportingContent = { OneLine(category.summary) },
-                    leadingContent = { Icon(category.icon, contentDescription = null) },
-                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-                    modifier = Modifier.clickable { onCategoryClick(category) }
-                )
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(bottom = bottomRoom)) {
+            sections.forEach { (group, categories) ->
+                SectionTitle(group.title)
+                categories.forEach { category ->
+                    ListItem(
+                        headlineContent = { Text(category.title) },
+                        supportingContent = { OneLine(category.summary) },
+                        leadingContent = { Icon(category.icon, contentDescription = null) },
+                        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                        modifier = Modifier.clickable { onCategoryClick(category) }
+                    )
+                }
             }
         }
         DotScrollbar(state = scrollState)
     }
+}
+
+/** The title of a group of rows: of a section of the categories, or a [SettingsItem.Header] on a page. */
+@Composable
+private fun SectionTitle(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp)
+    )
 }
 
 /** One category: every item of the catalog rendered according to its kind. */
@@ -114,8 +137,7 @@ private fun SettingsCategoryList(onCategoryClick: (SettingsCategory) -> Unit) {
 private fun SettingsCategoryPage(
     category: SettingsCategory,
     environment: SettingsEnvironment,
-    fabHeight: Dp,
-    isFabVisible: Boolean
+    bottomRoom: Dp
 ) {
     val scrollState = rememberScrollState()
     Box(modifier = Modifier.fillMaxSize()) {
@@ -123,7 +145,7 @@ private fun SettingsCategoryPage(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(bottom = if (isFabVisible) fabHeight + 16.dp else 16.dp)
+                .padding(bottom = bottomRoom)
         ) {
             category.items.forEach { item -> SettingsItemRow(item, environment) }
         }
@@ -171,12 +193,7 @@ private fun SettingsItemRow(item: SettingsItem, environment: SettingsEnvironment
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
         )
-        is SettingsItem.Header -> Text(
-            text = item.title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp)
-        )
+        is SettingsItem.Header -> SectionTitle(item.title)
         is SettingsItem.Custom -> Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
             with(item) { environment.content() }
         }

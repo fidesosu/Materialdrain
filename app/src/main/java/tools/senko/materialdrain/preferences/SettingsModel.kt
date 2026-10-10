@@ -47,8 +47,17 @@ sealed interface SettingsItem {
     class Custom(val content: @Composable SettingsEnvironment.() -> Unit) : SettingsItem
 }
 
+/** The sections of the list of categories, in the order they're shown, each under its [title]. */
+enum class SettingsGroup(val title: String) {
+    ACCOUNT("Account and hosts"),
+    FILES("Files"),
+    VIEWING("Viewing"),
+    APP("App"),
+    OTHER("Other")
+}
+
 /**
- * A page of the settings which is opened from the list of categories.
+ * A page of the settings which is opened from the list of categories, where it's shown in the section of its [group].
  *
  * @param hasSaveButton the settings of this category are saved with the Save button (the FAB) instead of at once
  */
@@ -57,6 +66,7 @@ class SettingsCategory(
     val title: String,
     val summary: String,
     val icon: ImageVector,
+    val group: SettingsGroup,
     val items: List<SettingsItem>,
     val hasSaveButton: Boolean = false
 )

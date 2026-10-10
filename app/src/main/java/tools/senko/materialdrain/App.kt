@@ -941,7 +941,7 @@ fun MaterialdrainScreen() {
                 ) {
                     val noScreensMessage = "${activeConfig?.name ?: "This host"} has no screens to show: its config's " +
                         "\"screens\" list is empty, or only names screens this host can't offer. Edit the config in " +
-                        "Settings → Advanced, or remove \"screens\" to show everything the host can do."
+                        "Settings → Hosts, or remove \"screens\" to show everything the host can do."
                     when (targetScreen) {
                         Screen.Upload if noScreensConfigured -> CenteredTextMessage(noScreensMessage)
                         Screen.Files if noScreensConfigured -> CenteredTextMessage(noScreensMessage)

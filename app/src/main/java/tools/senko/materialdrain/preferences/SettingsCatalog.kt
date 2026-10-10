@@ -5,15 +5,20 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Accessibility
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.runtime.collectAsState
 import tools.senko.materialdrain.settings.SEARCH_INDEX_FILE_NAME
@@ -33,6 +38,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         title = "Account",
         summary = "Login and API key",
         icon = Icons.Filled.AccountCircle,
+        group = SettingsGroup.ACCOUNT,
         hasSaveButton = true, // the API key is saved with the button
         items = listOf(
             SettingsItem.Header("Account login"),
@@ -47,6 +53,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         title = "Filesystem",
         summary = "What is shown in your filesystem",
         icon = Icons.Filled.Folder,
+        group = SettingsGroup.FILES,
         items = listOf(
             SettingsItem.Toggle(
                 title = "Hide $SEARCH_INDEX_FILE_NAME",
@@ -66,6 +73,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         title = "Uploads",
         summary = "The order of several files",
         icon = Icons.Filled.Upload,
+        group = SettingsGroup.FILES,
         items = listOf(
             SettingsItem.Toggle(
                 title = "Upload by last change",
@@ -86,6 +94,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         title = "Search",
         summary = "How many results are shown",
         icon = Icons.Filled.Search,
+        group = SettingsGroup.FILES,
         items = listOf(
             SettingsItem.Note(
                 "Searching the filesystem looks through the open folder and every folder inside it, so a big tree can " +
@@ -102,6 +111,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         title = "Notifications",
         summary = "Progress of uploads and downloads",
         icon = Icons.Filled.Notifications,
+        group = SettingsGroup.APP,
         items = listOf(
             SettingsItem.Note(
                 "Uploads and downloads keep running while the app is in the background and show their progress in a " +
@@ -137,6 +147,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         title = "Previews",
         summary = "Images and videos",
         icon = Icons.Filled.Image,
+        group = SettingsGroup.VIEWING,
         items = listOf(
             SettingsItem.Toggle(
                 title = "Blurred backdrop",
@@ -166,6 +177,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         title = "Accessibility",
         summary = "Animations",
         icon = Icons.Filled.Accessibility,
+        group = SettingsGroup.VIEWING,
         items = listOf(
             SettingsItem.Toggle(
                 title = "Reduce animations",
@@ -185,6 +197,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         title = "Security",
         summary = "Locking the app",
         icon = Icons.Filled.Lock,
+        group = SettingsGroup.APP,
         items = listOf(
             SettingsItem.Toggle(
                 title = "Lock with fingerprint or face",
@@ -201,11 +214,12 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
 
     SettingsCategory(
         id = HOSTS_CATEGORY_ID,
-        title = "Advanced",
-        summary = "Custom host settings",
-        icon = Icons.Filled.Tune,
+        title = "Hosts",
+        summary = "Custom hosts and their configs",
+        icon = Icons.Filled.Dns,
+        group = SettingsGroup.ACCOUNT,
         items = listOf(
-            SettingsItem.Header("Custom host settings"),
+            SettingsItem.Header("Custom hosts"),
             SettingsItem.Custom { ProviderHostsSection() }
         )
     ),
@@ -215,6 +229,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         title = "Developer",
         summary = "Prototypes and previews",
         icon = Icons.Filled.Code,
+        group = SettingsGroup.OTHER,
         items = listOf(
             SettingsItem.Toggle(
                 title = "FAB navigation prototype",
@@ -230,8 +245,59 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
             SettingsItem.Custom { NavMenuPreviewSection() },
             SettingsItem.Note("Mock providers only show how their menu looks, their items don't open anything.")
         )
+    ),
+
+    SettingsCategory(
+        id = "about",
+        title = "About",
+        summary = "Version and links",
+        icon = Icons.Filled.Info,
+        group = SettingsGroup.OTHER,
+        items = listOf(
+            SettingsItem.Custom { AboutSection() },
+            SettingsItem.Header("Links"),
+            SettingsItem.Action(
+                title = "Website",
+                summary = "Downloads of every version",
+                icon = Icons.Filled.Language,
+                onClick = { context -> openLink(context, "https://materialdrain.senko.tools") }
+            ),
+            SettingsItem.Action(
+                title = "Documentation",
+                summary = "How the app works, and adding hosts",
+                icon = Icons.AutoMirrored.Filled.MenuBook,
+                onClick = { context -> openLink(context, "https://materialdrain.senko.tools/docs/") }
+            ),
+            SettingsItem.Action(
+                title = "Changes",
+                summary = "What each release changed",
+                icon = Icons.Filled.NewReleases,
+                onClick = { context -> openLink(context, "https://github.com/fidesosu/Materialdrain/releases") }
+            ),
+            SettingsItem.Action(
+                title = "Source code",
+                summary = "On GitHub",
+                icon = Icons.Filled.Code,
+                onClick = { context -> openLink(context, "https://github.com/fidesosu/Materialdrain") }
+            ),
+            SettingsItem.Action(
+                title = "Report a problem",
+                summary = "Opens a new issue on GitHub",
+                icon = Icons.Filled.BugReport,
+                onClick = { context -> openLink(context, "https://github.com/fidesosu/Materialdrain/issues/new") }
+            )
+        )
     )
 )
+
+/** Opens [url] in the browser; nothing happens when the device has none. */
+private fun openLink(context: Context, url: String) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (_: ActivityNotFoundException) {
+        // No browser on this device
+    }
+}
 
 const val ACCOUNT_CATEGORY_ID = "account"
 

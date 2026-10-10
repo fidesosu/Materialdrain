@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import tools.senko.materialdrain.ui.LocalBottomInset
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -117,6 +118,9 @@ private fun BoxScope.DotScrollbarStrip(
     val grabPx = with(density) { 12.dp.toPx() }
     val minLinePx = with(density) { MinLineLength.toPx() }
     val maxLinePx = with(density) { MaxLineLength.toPx() }
+    // A list which goes on under the system's navigation bar (LocalBottomInset): the dot stops above the bar, though the
+    // list itself, and so the scrolling it stands for, is measured whole
+    val bottomInsetPx = with(density) { LocalBottomInset.current.toPx() }
     val touchSlop = LocalViewConfiguration.current.touchSlop
     val color = MaterialTheme.colorScheme.primary
     val scope = rememberCoroutineScope()
@@ -137,7 +141,7 @@ private fun BoxScope.DotScrollbarStrip(
     val stretch by animateFloatAsState(targetValue = if (stretched) 1f else 0f, label = "dotStretch")
 
     fun geometry(viewportPx: Float): DotGeometry? {
-        val track = (viewportPx - 2 * marginPx).coerceAtLeast(0f)
+        val track = (viewportPx - 2 * marginPx - bottomInsetPx).coerceAtLeast(0f)
         val m = metrics(viewportPx)
         if (!m.scrollable || track <= 0f) return null
         // The stretched line is the visible share of the content, kept between a short and a modest length so it never
@@ -206,7 +210,7 @@ private fun BoxScope.DotScrollbarStrip(
                             dragSteps++
                             val now = geometry(viewportPx) ?: continue
                             // The dot follows the finger at its stretched length, so the movement is measured against that
-                            val movable = viewportPx - 2 * marginPx - now.stretchedLength
+                            val movable = viewportPx - 2 * marginPx - bottomInsetPx - now.stretchedLength
                             if (dy == 0f || movable <= 0f) continue
                             // Per pixel of the dot the content moves as far as it is longer than the view, so the dot stays under the finger
                             val contentPerPx = (metrics(viewportPx).contentPx - viewportPx) / movable
