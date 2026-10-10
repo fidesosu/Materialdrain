@@ -178,6 +178,10 @@ class FilesystemViewModel(
             // Choosing another host as the active one re-roots the screen on it
             configStore.changes.drop(1).collect { loadActiveProviderAndRoot() }
         }
+        // A login, a logout or a saved API key: the folders are listed again with it
+        viewModelScope.launch {
+            sessionManager.apiKey.drop(1).collect { loadActiveProviderAndRoot() }
+        }
         // Files deleted or added to a folder from another screen: the folder shown may have changed
         viewModelScope.launch {
             contentChanges.changes.collect { refreshCurrentPath() }
@@ -238,10 +242,6 @@ class FilesystemViewModel(
     }
 
     /** Called after the API key changed (settings saved, logged in or out). */
-    fun updateApiKey() {
-        loadActiveProviderAndRoot()
-    }
-
     private fun normalizePath(path: String, root: String): String = path.trim('/').ifEmpty { root }
 
     private fun generatePathSegments(fullPath: String, provider: StorageProvider): List<PathSegment> {

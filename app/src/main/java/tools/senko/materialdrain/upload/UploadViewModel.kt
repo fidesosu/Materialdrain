@@ -213,7 +213,7 @@ class UploadViewModel(
     private fun provider() = registry.resolve(configStore.activeProviderId.value)
 
     /** Pixeldrain uploads need the login; other hosts take their own credentials. */
-    private fun missingKey(): Boolean = provider().kind == ProviderKind.PIXELDRAIN && apiKey.isBlank()
+    private fun missingKey(): Boolean = provider().kind == ProviderKind.PIXELDRAIN && sessionManager.apiKey.value.isBlank()
 
     /**
      * Uploads one file. Never throws but for a cancel: a host's failure (the network gone, the host refusing) is a failed
@@ -262,20 +262,16 @@ class UploadViewModel(
     private val _uiState = MutableStateFlow(UploadUiState())
     val uiState: StateFlow<UploadUiState> = _uiState.asStateFlow()
 
-    private var apiKey: String = ""
     private var uploadJob: Job? = null
     private val speedTracker = TransferSpeedTracker()
     private var nextItemId = 0
     private var nextTransferNumber = 0
 
     init {
-        Log.d(TAG, "ViewModel initialized")
-        loadApiKey()
-    }
-
-    private fun loadApiKey() {
-        apiKey = sessionManager.currentApiKey()
-        Log.d(TAG, "API Key loaded: ${if (apiKey.isNotBlank()) "Present" else "Missing"}")
+        // A key set after an upload was refused for the lack of one: the refusal no longer applies
+        viewModelScope.launch {
+            sessionManager.apiKey.collect { key -> if (key.isNotBlank()) clearApiKeyError() }
+        }
     }
 
     fun onFileSelected(uri: Uri?, context: Context) {
@@ -645,12 +641,6 @@ class UploadViewModel(
         _uiState.update { it.copy(apiKeyMissing = false) }
     }
 
-    fun updateApiKey(newApiKey: String) {
-        apiKey = newApiKey
-        if (newApiKey.isNotBlank()) {
-            clearApiKeyError()
-        }
-    }
 
     fun clearUploadResult() {
         _uiState.update { it.copy(uploadResult = null, errorMessage = null, isLoading = false, uploadedBytes = 0L) }

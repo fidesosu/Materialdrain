@@ -3,12 +3,10 @@ package tools.senko.materialdrain.preferences
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import tools.senko.materialdrain.provider.pixeldrain.internal.ApiResponse
@@ -40,9 +38,12 @@ class AuthViewModel(
     )
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    private val _apiKeyChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    /** Emits whenever the active API key changed because of a login or logout. */
-    val apiKeyChanged: SharedFlow<Unit> = _apiKeyChanged.asSharedFlow()
+    init {
+        // A saved API key changes where the key comes from (see ApiKeySource); a login or logout says so itself below
+        viewModelScope.launch {
+            sessionManager.apiKey.drop(1).collect { refreshSource() }
+        }
+    }
 
     /** Username/password login, or e-mail login when [password] is empty. */
     fun login(username: String, password: String, totp: String) {
@@ -81,7 +82,6 @@ class AuthViewModel(
                                 infoMessage = "Logged in as ${username.trim()}."
                             )
                         }
-                        _apiKeyChanged.tryEmit(Unit)
                     }
                     LoginResult.LoginLinkSent -> _uiState.update {
                         it.copy(isBusy = false, loginLinkSent = true, infoMessage = "A login link was sent to your e-mail address. Paste it below to finish logging in.")
@@ -112,12 +112,11 @@ class AuthViewModel(
                     infoMessage = if (serverResult is ApiResponse.Error) "Logged out on this device, the server could not end the session." else "Logged out."
                 )
             }
-            _apiKeyChanged.tryEmit(Unit)
         }
     }
 
-    /** Called when the manually entered API key was saved, so that the source shown in the UI is current. */
-    fun refreshSource() {
+    /** Keeps the source shown in the UI current. */
+    private fun refreshSource() {
         _uiState.update { it.copy(activeSource = sessionManager.activeSource(), loggedInUser = sessionManager.loggedInUser.value) }
     }
 

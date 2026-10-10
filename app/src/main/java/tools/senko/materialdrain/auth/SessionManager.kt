@@ -60,8 +60,9 @@ class SessionManager(context: Context) {
         val key = when {
             encrypted != null -> cipher.decrypt(encrypted).orEmpty()
             // A key saved before it was encrypted: moved over once, and the plain copy is removed
-            else -> prefs.getString(API_KEY_PREF, "").orEmpty().also { legacy ->
-                if (legacy.isNotBlank()) saveManualApiKey(legacy)
+            // (written here rather than with saveManualApiKey, which this runs before: it's read while this is constructed)
+            else -> prefs.getString(API_KEY_PREF, "").orEmpty().trim().also { legacy ->
+                if (legacy.isNotEmpty()) securePrefs.edit().putString(MANUAL_KEY_PREF, cipher.encrypt(legacy)).apply()
                 prefs.edit().remove(API_KEY_PREF).apply()
             }
         }
@@ -74,10 +75,18 @@ class SessionManager(context: Context) {
         if (trimmed.isEmpty()) securePrefs.edit().remove(MANUAL_KEY_PREF).apply()
         else securePrefs.edit().putString(MANUAL_KEY_PREF, cipher.encrypt(trimmed)).apply()
         manualKey = trimmed
+        _apiKey.value = currentApiKey()
     }
 
     /** The API key which authenticated requests should use right now, blank when not signed in. */
     fun currentApiKey(): String = sessionApiKey ?: manualApiKey()
+
+    private val _apiKey = MutableStateFlow(currentApiKey())
+    /**
+     * [currentApiKey], as it changes with a login, a logout or a saved key. The ViewModels which use the key watch it
+     * themselves, so whatever changes the key doesn't have to tell each of them.
+     */
+    val apiKey: StateFlow<String> = _apiKey.asStateFlow()
 
     fun activeSource(): ApiKeySource = when {
         sessionApiKey != null -> ApiKeySource.LOGIN
@@ -92,6 +101,7 @@ class SessionManager(context: Context) {
             .apply()
         sessionApiKey = session.authKey
         _loggedInUser.value = username
+        _apiKey.value = currentApiKey()
     }
 
     /** Forgets the login session on this device (does not contact the server). */
@@ -99,5 +109,6 @@ class SessionManager(context: Context) {
         securePrefs.edit().clear().apply()
         sessionApiKey = null
         _loggedInUser.value = null
+        _apiKey.value = currentApiKey()
     }
 }

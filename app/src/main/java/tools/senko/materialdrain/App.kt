@@ -190,15 +190,6 @@ fun MaterialdrainScreen() {
         }
     }
 
-    // A login or logout changes the API key which every ViewModel uses
-    LaunchedEffect(authViewModel) {
-        authViewModel.apiKeyChanged.collect {
-            uploadViewModel.updateApiKey(sessionManager.currentApiKey())
-            fileInfoViewModel.loadApiKey()
-            filesystemViewModel.updateApiKey()
-            listViewModel.loadApiKey()
-        }
-    }
     val coroutineScope = rememberCoroutineScope()
     val localClipboardManager = LocalContext.current.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
@@ -480,12 +471,8 @@ fun MaterialdrainScreen() {
                     reserveTextWidthFor = listOf(SETTINGS_SAVE_TEXT, SETTINGS_SAVED_TEXT),
                     iconSpinTrigger = settingsSaveCount,
                     onClick = {
+                        // The ViewModels which use the key watch it themselves (see SessionManager.apiKey)
                         sessionManager.saveManualApiKey(apiKeyInput)
-                        uploadViewModel.updateApiKey(sessionManager.currentApiKey())
-                        fileInfoViewModel.loadApiKey()
-                        filesystemViewModel.updateApiKey() // Update FilesystemViewModel with new API key
-                        listViewModel.loadApiKey()
-                        authViewModel.refreshSource()
                         settingsSaveCount++
                     },
                     isExtended = true

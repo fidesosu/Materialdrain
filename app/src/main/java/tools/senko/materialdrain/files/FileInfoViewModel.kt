@@ -255,6 +255,10 @@ class FileInfoViewModel(
         viewModelScope.launch {
             configStore.changes.drop(1).collect { onActiveProviderChanged() }
         }
+        // A login, a logout or a saved API key
+        viewModelScope.launch {
+            sessionManager.apiKey.drop(1).collect { loadApiKey() }
+        }
 
         // Recomputes displayedFiles whenever the list, the shared sorting, or the filter changes
         viewModelScope.launch {
@@ -332,7 +336,7 @@ class FileInfoViewModel(
         loadApiKey()
     }
 
-    fun loadApiKey() {
+    private fun loadApiKey() {
         val key = apiKeyForUi()
         _uiState.update { it.copy(apiKey = key) }
         if (needsKeyButMissing()) {

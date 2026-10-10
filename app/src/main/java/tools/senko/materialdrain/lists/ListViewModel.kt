@@ -69,6 +69,11 @@ class ListViewModel(
             }
         }
 
+        // A login, a logout or a saved API key
+        viewModelScope.launch {
+            sessionManager.apiKey.drop(1).collect { loadApiKey() }
+        }
+
         // Files added to a list, a list created, a file deleted elsewhere: the lists and the opened one may show them
         viewModelScope.launch {
             contentChanges.changes.collect {
@@ -109,7 +114,7 @@ class ListViewModel(
         return provider.kind == ProviderKind.PIXELDRAIN && sessionManager.currentApiKey().isBlank()
     }
 
-    fun loadApiKey() {
+    private fun loadApiKey() {
         if (needsKeyButMissing()) {
             _uiState.update { it.copy(apiKeyMissingError = true, errorMessage = "API Key is missing. Please set it in Settings.", lists = emptyList()) }
         } else {
