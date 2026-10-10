@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.provider.s3
 
+import tools.senko.materialdrain.provider.api.ErrorCodes
 import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.CancellationException
@@ -252,7 +253,7 @@ class S3StorageProvider(
 
             if (isFolder) {
                 val realChildren = probeParsed.objects.any { it.key != "$key/" } || probeParsed.commonPrefixes.isNotEmpty()
-                if (!recursive && realChildren) return ApiResponse.Error(ProviderError("directory_not_empty", "The folder is not empty."))
+                if (!recursive && realChildren) return ApiResponse.Error(ProviderError(ErrorCodes.DIRECTORY_NOT_EMPTY, "The folder is not empty."))
                 val keys = try {
                     collectKeysUnder("$key/", accessKeyId, secretAccessKey)
                 } catch (e: CancellationException) {
@@ -373,7 +374,7 @@ class S3StorageProvider(
     private fun statusError(result: S3Result): ProviderError =
         ProviderError(code = "http_${result.code}", message = "Request failed: ${S3Xml.parseErrorMessage(result.bodyText) ?: "HTTP ${result.code}"}", httpStatus = result.code)
 
-    private fun networkError(e: Exception): ProviderError = ProviderError("network_error", e.message ?: "Couldn't reach the server.")
+    private fun networkError(e: Exception): ProviderError = ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: "Couldn't reach the server.")
 
     private fun badEndpoint(): ProviderError = ProviderError("bad_endpoint", "The endpoint/bucket address couldn't be resolved.")
 

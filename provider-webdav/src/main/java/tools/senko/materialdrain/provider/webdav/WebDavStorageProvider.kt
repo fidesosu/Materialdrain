@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.provider.webdav
 
+import tools.senko.materialdrain.provider.api.ErrorCodes
 import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.CancellationException
@@ -143,7 +144,7 @@ class WebDavStorageProvider(
             } ?: return ApiResponse.Error(badEndpoint())
             return when {
                 result.isSuccessful -> ApiResponse.Success(Unit)
-                result.code == 405 -> ApiResponse.Error(ProviderError("already_exists", "A folder with this name already exists."))
+                result.code == 405 -> ApiResponse.Error(ProviderError(ErrorCodes.ALREADY_EXISTS, "A folder with this name already exists."))
                 else -> ApiResponse.Error(statusError(result))
             }
         }
@@ -177,7 +178,7 @@ class WebDavStorageProvider(
                 // so this never blocks deleting a file).
                 val listing = list(path)
                 if (listing is ApiResponse.Success && listing.data.children.isNotEmpty()) {
-                    return ApiResponse.Error(ProviderError("directory_not_empty", "The folder is not empty."))
+                    return ApiResponse.Error(ProviderError(ErrorCodes.DIRECTORY_NOT_EMPTY, "The folder is not empty."))
                 }
             }
             val result = try {
@@ -310,7 +311,7 @@ class WebDavStorageProvider(
     private fun statusError(result: WebDavResult): ProviderError =
         ProviderError(code = "http_${result.code}", message = "Request failed: HTTP ${result.code}", httpStatus = result.code)
 
-    private fun networkError(e: Exception): ProviderError = ProviderError("network_error", e.message ?: "Couldn't reach the server.")
+    private fun networkError(e: Exception): ProviderError = ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: "Couldn't reach the server.")
 
     private fun badEndpoint(): ProviderError = ProviderError("bad_endpoint", "The base URL couldn't be resolved.")
 }

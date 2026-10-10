@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.provider.api
 
+import tools.senko.materialdrain.provider.api.ErrorCodes
 import android.content.Context
 import android.net.Uri
 import java.io.OutputStream
@@ -35,7 +36,7 @@ interface FileStoreOps {
         refs: List<StorageRef>,
         outputStream: OutputStream,
         onProgress: (read: Long, total: Long?) -> Unit
-    ): ApiResponse<Long> = ApiResponse.Error(ProviderError("not_supported", "This host can't download several files as one archive."))
+    ): ApiResponse<Long> = ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't download several files as one archive."))
 }
 
 /**
@@ -80,7 +81,7 @@ interface BrowseOps {
 
     /** Copies the files with [fileIds] (from the account's own file list) into the folder [path]. */
     suspend fun importFiles(path: String, fileIds: List<String>): ApiResponse<Unit> =
-        ApiResponse.Error(ProviderError("not_supported", "This host can't import files into a folder."))
+        ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't import files into a folder."))
 }
 
 /** Account/quota info. Present when [ProviderCapability.USER_QUOTA] is. */

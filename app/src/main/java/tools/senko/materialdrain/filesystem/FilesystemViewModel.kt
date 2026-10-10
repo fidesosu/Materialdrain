@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.filesystem
 
+import tools.senko.materialdrain.provider.api.ErrorCodes
 import android.app.Application
 import android.content.Context
 import android.net.Uri
@@ -565,7 +566,7 @@ class FilesystemViewModel(
         } catch (e: Exception) {
             currentCoroutineContext().ensureActive()
             ProviderLog.e("Filesystem", "a change failed: ${e.message}", e)
-            ApiResponse.Error(ProviderError("network_error", e.message ?: "The host couldn't be reached."))
+            ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: "The host couldn't be reached."))
         }
 
     private fun notBrowsable(): ApiResponse<Unit> = ApiResponse.Error(ProviderError("not_browsable", "This host can't browse files."))
@@ -582,12 +583,12 @@ class FilesystemViewModel(
     private fun describeError(error: ProviderError): String {
         val hint = when (error.code) {
             "node_already_exists" -> "An item with this name already exists."
-            "directory_not_empty" -> "The folder is not empty."
+            ErrorCodes.DIRECTORY_NOT_EMPTY -> "The folder is not empty."
             "permission_denied" -> "You don't have permission to do this here."
             "path_not_found" -> "The path does not exist (anymore)."
             "cannot_modify_root_dir" -> "The root folder can't be modified."
             "circular_dependency" -> "A folder can't be moved into itself."
-            "authentication_required" -> "Authentication is required. Check your login or API key in Settings."
+            ErrorCodes.AUTHENTICATION_REQUIRED -> "Authentication is required. Check your login or API key in Settings."
             "user_out_of_space" -> "Your account has run out of storage space."
             "list_file_not_found" -> "One of the file IDs does not exist."
             else -> null

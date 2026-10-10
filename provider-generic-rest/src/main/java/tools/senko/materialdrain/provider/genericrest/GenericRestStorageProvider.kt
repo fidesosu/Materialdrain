@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.provider.genericrest
 
+import tools.senko.materialdrain.provider.api.ErrorCodes
 import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.CancellationException
@@ -144,7 +145,7 @@ class GenericRestStorageProvider(
             ): ApiResponse<Long> {
                 return reaching {
                     val endpoint = config.endpoints[ENDPOINT_ARCHIVE_FILE]
-                        ?: return ApiResponse.Error(ProviderError("not_supported", "This host has no archive_file endpoint configured."))
+                        ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host has no archive_file endpoint configured."))
                     var totalCopied = 0L
                     val code = authorized(
                         { auth ->
@@ -232,7 +233,7 @@ class GenericRestStorageProvider(
         throw e
     } catch (e: Exception) {
         ProviderLog.e("Http", "a request to '${config.name}' failed: ${e.message}", e)
-        ApiResponse.Error(ProviderError("network_error", e.message ?: "The host couldn't be reached."))
+        ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: "The host couldn't be reached."))
     }
 
     /**
@@ -241,7 +242,7 @@ class GenericRestStorageProvider(
      */
     private fun uploadFailure(e: Exception): ApiResponse.Error {
         ProviderLog.e("Upload", "the upload failed: ${e.message}", e)
-        return ApiResponse.Error(ProviderError("network_error", e.message ?: "The host couldn't be reached."))
+        return ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: "The host couldn't be reached."))
     }
 
     // --- Sign-in ---
@@ -401,7 +402,7 @@ class GenericRestStorageProvider(
         ): ApiResponse<Long> {
             return reaching {
                 val endpoint = config.endpoints[ENDPOINT_DOWNLOAD_ARCHIVE]
-                    ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't download several files as one archive."))
+                    ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't download several files as one archive."))
                 val ids = refs.map { it.id ?: return ApiResponse.Error(ProviderError("file_id_missing", "File ID is required to download a file.")) }
                 var totalCopied = 0L
                 val code = authorized(
@@ -667,7 +668,7 @@ class GenericRestStorageProvider(
         override suspend fun importFiles(path: String, fileIds: List<String>): ApiResponse<Unit> {
             return reaching {
                 val endpoint = config.endpoints[ENDPOINT_BROWSE_IMPORT]
-                    ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't import files into a folder."))
+                    ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't import files into a folder."))
                 val placeholders = mapOf("path" to path.trim('/'), "files_json" to JsonArray(fileIds.map { JsonPrimitive(it) }).toString())
                 val result = buffered(endpoint, placeholders)
                     ?: return ApiResponse.Error(ProviderError("bad_endpoint", "import endpoint could not be resolved."))

@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.provider.smb
 
+import tools.senko.materialdrain.provider.api.ErrorCodes
 import android.content.Context
 import android.net.Uri
 import tools.senko.materialdrain.provider.api.queryContentSize
@@ -122,7 +123,7 @@ class SmbStorageProvider(
             val folder = SmbPaths.normalize(path)
             if (folder.isEmpty()) return@onShare ApiResponse.Error(ProviderError("invalid_path", "A folder needs a name."))
             val dir = client.file(folder, directory = true)
-            if (dir.exists()) return@onShare ApiResponse.Error(ProviderError("already_exists", "A folder with this name already exists."))
+            if (dir.exists()) return@onShare ApiResponse.Error(ProviderError(ErrorCodes.ALREADY_EXISTS, "A folder with this name already exists."))
             if (makeParents) dir.mkdirs() else dir.mkdir()
             ApiResponse.Success(Unit)
         }
@@ -135,7 +136,7 @@ class SmbStorageProvider(
             if (!from.exists()) return@onShare ApiResponse.Error(notFound())
             if (makeParents) client.file(SmbPaths.parentOf(target), directory = true).mkdirs()
             val to = client.file(target, directory = from.isDirectory)
-            if (to.exists()) return@onShare ApiResponse.Error(ProviderError("already_exists", "An item with this name already exists."))
+            if (to.exists()) return@onShare ApiResponse.Error(ProviderError(ErrorCodes.ALREADY_EXISTS, "An item with this name already exists."))
             from.renameTo(to)
             ApiResponse.Success(StorageNode(ref = StorageRef(path = target), name = SmbPaths.nameOf(target), isDirectory = from.isDirectory))
         }
@@ -147,7 +148,7 @@ class SmbStorageProvider(
             val item = client.file(target, directory = false).let { if (it.isDirectory) client.file(target, directory = true) else it }
             if (!item.exists()) return@onShare ApiResponse.Error(notFound())
             if (item.isDirectory && !recursive && item.listFiles().isNotEmpty()) {
-                return@onShare ApiResponse.Error(ProviderError("directory_not_empty", "The folder is not empty."))
+                return@onShare ApiResponse.Error(ProviderError(ErrorCodes.DIRECTORY_NOT_EMPTY, "The folder is not empty."))
             }
             deleteTree(target, item)
             ApiResponse.Success(Unit)
@@ -262,31 +263,31 @@ class SmbStorageProvider(
         }
     }
 
-    private fun notFound(): ProviderError = ProviderError("not_found", "This item isn't on the share any more.")
+    private fun notFound(): ProviderError = ProviderError(ErrorCodes.NOT_FOUND, "This item isn't on the share any more.")
 
     /** Turns a failure of the share into a message the app can show. The sign-in and the protocol errors are named. */
     private fun failure(e: Exception): ProviderError = when (e) {
         is SmbAuthException -> when (e.ntStatus) {
-            STATUS_ACCESS_DENIED -> ProviderError("access_denied", "The share doesn't allow write access for this account.")
+            STATUS_ACCESS_DENIED -> ProviderError(ErrorCodes.ACCESS_DENIED, "The share doesn't allow write access for this account.")
             else -> ProviderError("auth_failed", "The share refused the username or password.")
         }
         // jCIFS wraps a failed connection in its own status, so the cause tells which it was
         is SmbException -> when (e.cause) {
             is UnknownHostException -> ProviderError("unknown_host", "The host can't be found: check its name or address.")
-            is ConnectException, is SocketTimeoutException -> ProviderError("network_error", "Couldn't reach ${config.host}:${config.port}.")
+            is ConnectException, is SocketTimeoutException -> ProviderError(ErrorCodes.NETWORK_ERROR, "Couldn't reach ${config.host}:${config.port}.")
             else -> statusError(e.ntStatus)
         }
         is UnknownHostException -> ProviderError("unknown_host", "The host can't be found: check its name or address.")
-        is ConnectException, is SocketTimeoutException -> ProviderError("network_error", "Couldn't reach ${config.host}:${config.port}.")
+        is ConnectException, is SocketTimeoutException -> ProviderError(ErrorCodes.NETWORK_ERROR, "Couldn't reach ${config.host}:${config.port}.")
         is MalformedURLException -> ProviderError("invalid_address", "The host or share name has characters that aren't allowed.")
-        else -> ProviderError("network_error", e.message ?: "Couldn't reach the share.")
+        else -> ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: "Couldn't reach the share.")
     }
 
     private fun statusError(status: Int): ProviderError = when (status) {
         STATUS_OBJECT_NAME_NOT_FOUND -> notFound()
-        STATUS_OBJECT_NAME_COLLISION -> ProviderError("already_exists", "An item with this name already exists.")
-        STATUS_ACCESS_DENIED -> ProviderError("access_denied", "The share doesn't allow this.")
-        STATUS_DIRECTORY_NOT_EMPTY -> ProviderError("directory_not_empty", "The folder is not empty.")
+        STATUS_OBJECT_NAME_COLLISION -> ProviderError(ErrorCodes.ALREADY_EXISTS, "An item with this name already exists.")
+        STATUS_ACCESS_DENIED -> ProviderError(ErrorCodes.ACCESS_DENIED, "The share doesn't allow this.")
+        STATUS_DIRECTORY_NOT_EMPTY -> ProviderError(ErrorCodes.DIRECTORY_NOT_EMPTY, "The folder is not empty.")
         else -> ProviderError("smb_status", "The share answered with an error (0x${status.toUInt().toString(16).uppercase()}).")
     }
 

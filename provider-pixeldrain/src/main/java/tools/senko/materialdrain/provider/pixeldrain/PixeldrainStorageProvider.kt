@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.provider.pixeldrain
 
+import tools.senko.materialdrain.provider.api.ErrorCodes
 import android.content.Context
 import android.net.Uri
 import io.ktor.http.encodeURLPathPart
@@ -236,7 +237,7 @@ class PixeldrainStorageProvider(
         override suspend fun list(archivePath: String, inside: String): ApiResponse<List<StorageNode>> {
             val body = when (val raw = filesystemApi.getZipInfo(apiKeyProvider(), archivePath)) {
                 is PdResult.Success -> raw.data
-                else -> return ApiResponse.Error(ProviderError("network_error", "The archive couldn't be read."))
+                else -> return ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, "The archive couldn't be read."))
             }
             return when (val parsed = ZipInfo.entriesIn(body, inside)) {
                 is ApiResponse.Success -> ApiResponse.Success(

@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.files
 
+import tools.senko.materialdrain.provider.api.ErrorCodes
 import android.app.Application
 import android.content.ContentValues
 import android.net.Uri
@@ -103,13 +104,13 @@ internal suspend fun downloadNode(
     // A file inside an archive is read from the archive
     (node.richDetails as? ArchiveEntryDetails)?.let { entry ->
         val archives = provider.archives
-            ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't look inside archives."))
+            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't look inside archives."))
         return archives.read(entry.archivePath, entry.entryPath, outputStream, onProgress)
     }
     val id = node.ref.id
     return if (id != null) {
         val store = provider.fileStore
-            ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't download files by id."))
+            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't download files by id."))
         // Several ids joined by commas (see DownloadManager.downloadAsZip) are one archive; file ids never contain commas
         if (',' in id) {
             store.downloadArchive(id.split(',').map { StorageRef(id = it) }, outputStream, onProgress)
@@ -118,7 +119,7 @@ internal suspend fun downloadNode(
         }
     } else {
         val browse = provider.browse
-            ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't download this file."))
+            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't download this file."))
         browse.download(node.ref.path, outputStream, onProgress)
     }
 }

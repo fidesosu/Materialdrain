@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.files
 
+import tools.senko.materialdrain.provider.api.ErrorCodes
 import android.app.Application
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
@@ -501,7 +502,7 @@ class FileInfoViewModel(
                         it.copy(
                             isLoadingUserFiles = false,
                             userFilesListErrorMessage = errorMsg,
-                            apiKeyMissingError = response.error.code == "api_key_missing" || response.error.code == "authentication_required"
+                            apiKeyMissingError = response.error.code == ErrorCodes.API_KEY_MISSING || response.error.code == ErrorCodes.AUTHENTICATION_REQUIRED
                         )
                     }
                 }
@@ -575,10 +576,10 @@ class FileInfoViewModel(
         val id = node.ref.id
         return try {
             if (id != null) {
-                val store = current.fileStore ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't delete files by id."))
+                val store = current.fileStore ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't delete files by id."))
                 store.delete(StorageRef(id = id))
             } else {
-                val browse = current.browse ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't delete this file."))
+                val browse = current.browse ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't delete this file."))
                 browse.delete(node.ref.path, recursive = node.isDirectory)
             }
         } catch (e: CancellationException) {
@@ -586,7 +587,7 @@ class FileInfoViewModel(
         } catch (e: Exception) {
             coroutineContext.ensureActive()
             ProviderLog.e("Files", "deleting '${node.name}' failed: ${e.message}", e)
-            ApiResponse.Error(ProviderError("network_error", e.message ?: "The host couldn't be reached."))
+            ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: "The host couldn't be reached."))
         }
     }
 
@@ -684,7 +685,7 @@ class FileInfoViewModel(
         viewModelScope.launch {
             val browse = provider().browse
             val response = browse?.importFiles(directoryPath, ids)
-                ?: ApiResponse.Error(ProviderError("not_supported", "This host can't add files to a folder."))
+                ?: ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't add files to a folder."))
             when (response) {
                 is ApiResponse.Success -> finishBulkOperation(
                     (if (ids.size == 1) "File added to " else "${ids.size} files added to ") + directoryPath.trim('/')
@@ -702,7 +703,7 @@ class FileInfoViewModel(
         viewModelScope.launch {
             val lists = provider().lists
             val response = lists?.create(title, ids)
-                ?: ApiResponse.Error(ProviderError("not_supported", "This host has no lists."))
+                ?: ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host has no lists."))
             when (response) {
                 is ApiResponse.Success -> finishBulkOperation("List created" + linkSuffix(response.data))
                 is ApiResponse.Error -> finishBulkOperation(
@@ -718,8 +719,8 @@ class FileInfoViewModel(
 
     /** The lists of the user which can be changed, for choosing the list to add files to. */
     suspend fun loadEditableLists(): ApiResponse<List<FileList>> {
-        if (needsKeyButMissing()) return ApiResponse.Error(ProviderError("api_key_missing", API_KEY_MISSING))
-        val lists = provider().lists ?: return ApiResponse.Error(ProviderError("not_supported", "This host has no lists."))
+        if (needsKeyButMissing()) return ApiResponse.Error(ProviderError(ErrorCodes.API_KEY_MISSING, API_KEY_MISSING))
+        val lists = provider().lists ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host has no lists."))
         return when (val response = lists.lists()) {
             is ApiResponse.Success -> ApiResponse.Success(response.data.filter { it.canEdit })
             is ApiResponse.Error -> ApiResponse.Error(response.error)
@@ -802,7 +803,9 @@ class FileInfoViewModel(
         }
         // These say the request itself is the problem (or it never arrived), a rebuilt list would fail or be a copy
         val code = updateError.code
-        if (code.startsWith("network_exception") || code in setOf("forbidden", "authentication_required", "api_key_missing")) {
+        if (ErrorCodes.isNetworkError(code) ||
+            code in setOf(ErrorCodes.FORBIDDEN, ErrorCodes.AUTHENTICATION_REQUIRED, ErrorCodes.API_KEY_MISSING)
+        ) {
             return ListRewrite.Failed("Could not change the list: ${updateError.message}")
         }
 
