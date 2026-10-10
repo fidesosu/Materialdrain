@@ -14,7 +14,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.drop
@@ -28,6 +31,9 @@ import java.io.IOException
 import java.io.OutputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
+import tools.senko.materialdrain.ContentChanges
+import tools.senko.materialdrain.UiMessageAction
+import tools.senko.materialdrain.UiMessages
 import tools.senko.materialdrain.auth.SessionManager
 import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.settings.SavedOpenedFile
@@ -175,10 +181,8 @@ data class FileInfoUiState(
     val isLoadingUserFiles: Boolean = false,
     val userFilesListErrorMessage: String? = null,
 
-    // For file deletion
+    // For file deletion (its outcome goes to the snackbar, see UiMessages)
     val isLoadingDeleteFile: Boolean = false,
-    val deleteFileSuccessMessage: String? = null,
-    val deleteFileErrorMessage: String? = null,
     val initiateDeleteFile: Boolean = false,
     val fileIdToDelete: String? = null,
     val nodeToDelete: StorageNode? = null,
@@ -190,21 +194,15 @@ data class FileInfoUiState(
     val filterQuery: String = "",
     val showFilterInput: Boolean = false,
 
-    // General messages, can be deprecated if per-file messages are sufficient
-    val fileDownloadSuccessMessage: String? = null,
-    // The last finished download, when it can be opened (it's saved on the device)
-    val fileDownloadOpen: OpenableDownload? = null,
     // The contents of an archive shown in the file details, see loadArchive
     val archive: ArchiveView? = null,
-    val fileDownloadErrorMessage: String? = null,
 
     // Scroll state preservation
     val shouldPreserveScrollPosition: Boolean = false,
 
-    // Results of actions on several files at once (delete, add to filesystem, create list)
-    val isBulkOperationRunning: Boolean = false,
-    val operationMessage: String? = null,
-    val operationError: String? = null
+    // An action on several files at once (delete, add to filesystem, create list) is running; its outcome goes to the
+    // snackbar, as does the outcome of a download (see UiMessages)
+    val isBulkOperationRunning: Boolean = false
 )
 
 /**
@@ -218,7 +216,9 @@ class FileInfoViewModel(
     private val configStore: ProviderConfigStore,
     private val sessionManager: SessionManager,
     private val transfers: TransferRegistry,
-    private val appSettings: AppSettings
+    private val appSettings: AppSettings,
+    private val messages: UiMessages,
+    private val contentChanges: ContentChanges
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FileInfoUiState())
@@ -240,6 +240,10 @@ class FileInfoViewModel(
     private var fileInfoJob: Job? = null
     private var previewJob: Job? = null
     private var archiveJob: Job? = null
+
+    private val _fileDeleted = Channel<Unit>(Channel.CONFLATED)
+    /** A file was deleted with [confirmDeleteFile]: the details of it, when they're open, have nothing left to show. */
+    val fileDeleted: Flow<Unit> = _fileDeleted.receiveAsFlow()
 
     private val _displayedFiles = MutableStateFlow<List<StorageNode>>(emptyList())
     val displayedFiles: StateFlow<List<StorageNode>> = _displayedFiles.asStateFlow()
@@ -611,41 +615,47 @@ class FileInfoViewModel(
         _uiState.update { it.copy(initiateDeleteFile = true, fileIdToDelete = node.key, nodeToDelete = node) }
     }
 
-    fun cancelDeleteFile() { _uiState.update { it.copy(initiateDeleteFile = false, fileIdToDelete = null, nodeToDelete = null, deleteFileErrorMessage = null) } }
+    fun cancelDeleteFile() { _uiState.update { it.copy(initiateDeleteFile = false, fileIdToDelete = null, nodeToDelete = null) } }
 
     fun confirmDeleteFile() {
         val node = _uiState.value.nodeToDelete ?: return
         if (needsKeyButMissing()) {
-            _uiState.update { it.copy(initiateDeleteFile = false, deleteFileErrorMessage = "API Key is missing. Cannot delete file.", apiKeyMissingError = true) }
+            _uiState.update { it.copy(initiateDeleteFile = false, apiKeyMissingError = true) }
+            messages.show("Delete failed: API Key is missing. Cannot delete file.", long = true)
             return
         }
-        _uiState.update { it.copy(isLoadingDeleteFile = true, deleteFileErrorMessage = null, deleteFileSuccessMessage = null) }
+        _uiState.update { it.copy(isLoadingDeleteFile = true) }
         viewModelScope.launch {
             when (val response = deleteNode(node)) {
                 is ApiResponse.Success -> {
                     _downloads.update { it.copy(active = it.active - node.key) }
+                    val openedFileDeleted = _uiState.value.fileInfo?.key == node.key
+                    if (openedFileDeleted) clearTextPreviewStates()
                     _uiState.update {
-                        val newFileInfo = if (it.fileInfo?.key == node.key) null else it.fileInfo
-                        if (newFileInfo == null) clearTextPreviewStates()
                         it.copy(
                             isLoadingDeleteFile = false,
                             initiateDeleteFile = false,
                             fileIdToDelete = null,
                             nodeToDelete = null,
-                            deleteFileSuccessMessage = "File deleted successfully.",
                             userFilesList = it.userFilesList.filterNot { item -> item.key == node.key },
-                            fileInfo = newFileInfo
+                            fileInfo = if (it.fileInfo?.key == node.key) null else it.fileInfo
                         )
                     }
+                    messages.show("File deleted successfully.")
+                    _fileDeleted.trySend(Unit)
+                    // A deleted file has to disappear from the folder or list it was shown in too
+                    contentChanges.notifyChanged()
                 }
-                is ApiResponse.Error -> _uiState.update {
-                    it.copy(
-                        isLoadingDeleteFile = false,
-                        initiateDeleteFile = false,
-                        fileIdToDelete = null,
-                        nodeToDelete = null,
-                        deleteFileErrorMessage = response.error.message.ifBlank { "Unknown error deleting file." }
-                    )
+                is ApiResponse.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoadingDeleteFile = false,
+                            initiateDeleteFile = false,
+                            fileIdToDelete = null,
+                            nodeToDelete = null
+                        )
+                    }
+                    messages.show("Delete failed: ${response.error.message.ifBlank { "Unknown error deleting file." }}", long = true)
                 }
             }
         }
@@ -676,7 +686,6 @@ class FileInfoViewModel(
         }
     }
 
-    fun clearDeleteMessages() { _uiState.update { it.copy(deleteFileSuccessMessage = null, deleteFileErrorMessage = null) } }
 
     fun clearApiKeyMissingError() {
         _uiState.update {
@@ -844,12 +853,6 @@ class FileInfoViewModel(
                                 etaSeconds = null
                             )
                         }
-                        _uiState.update { currentState ->
-                            currentState.copy(
-                                fileDownloadSuccessMessage = message,
-                                fileDownloadOpen = targetUri?.let { OpenableDownload(it, node.previewMimeType() ?: "*/*") }
-                            )
-                        }
                     }
                     is ApiResponse.Error -> {
                         throw IOException(response.error.message.ifBlank { "Download failed due to API error." })
@@ -879,9 +882,7 @@ class FileInfoViewModel(
                         downloadedBytes = if (e is CancellationException) 0L else it.downloadedBytes
                     )
                 }
-                if (hadDownload) {
-                    _uiState.update { it.copy(fileDownloadErrorMessage = if (e !is CancellationException) errorMsg else null) }
-                }
+                if (hadDownload && e !is CancellationException) messages.show("Download failed: $errorMsg", long = true)
             } finally {
                 try {
                     outputStream?.close()
@@ -892,8 +893,15 @@ class FileInfoViewModel(
                     // NonCancellable: a cancelled coroutine could otherwise not clean up the partial file
                     withContext(NonCancellable) { finalizeMediaStoreEntry(it, downloadSuccessful) }
                 }
-                // Reported after the file was finalized, so the notification can open it
+                // Reported after the file was finalized, so the notification (and the snackbar's Open) can open it
                 if (batchId == null) transfers.finish(transferId, outcome, outcomeMessage, if (downloadSuccessful) targetUri else null, node.mimeType)
+                if (downloadSuccessful) {
+                    messages.show(
+                        outcomeMessage.orEmpty(),
+                        long = true,
+                        action = targetUri?.let { UiMessageAction.OpenDownload(OpenableDownload(it, node.previewMimeType() ?: "*/*")) }
+                    )
+                }
             }
         }
         if (batchId == null) transfers.start(
@@ -1003,12 +1011,23 @@ class FileInfoViewModel(
     /** Checks the preconditions of an action on several files and marks it as running. */
     private fun beginBulkOperation(): Boolean {
         if (needsKeyButMissing()) {
-            _uiState.update { it.copy(operationError = API_KEY_MISSING) }
+            messages.show(API_KEY_MISSING, long = true)
             return false
         }
         if (_uiState.value.isBulkOperationRunning) return false
-        _uiState.update { it.copy(isBulkOperationRunning = true, operationMessage = null, operationError = null) }
+        _uiState.update { it.copy(isBulkOperationRunning = true) }
         return true
+    }
+
+    /**
+     * Ends an action on several files: reports how it went (a partial failure may still have changed something), and lets
+     * the other screens reload what it may have changed.
+     */
+    private fun finishBulkOperation(message: String?, error: String? = null) {
+        _uiState.update { it.copy(isBulkOperationRunning = false) }
+        message?.let { messages.show(it, long = true) }
+        error?.let { messages.show(it, long = true) }
+        contentChanges.notifyChanged()
     }
 
     private fun failureSummary(failures: List<String>): String =
@@ -1031,15 +1050,14 @@ class FileInfoViewModel(
             _uiState.update {
                 val openedFileDeleted = it.fileInfo?.key in deletedKeys
                 it.copy(
-                    isBulkOperationRunning = false,
                     userFilesList = it.userFilesList.filterNot { file -> file.key in deletedKeys },
-                    fileInfo = if (openedFileDeleted) null else it.fileInfo,
-                    operationMessage = if (failures.isEmpty()) {
-                        if (deletedKeys.size == 1) "File deleted." else "${deletedKeys.size} files deleted."
-                    } else null,
-                    operationError = if (failures.isEmpty()) null
-                    else "Deleted ${deletedKeys.size} of ${targets.size} files. Failed: ${failureSummary(failures)}"
+                    fileInfo = if (openedFileDeleted) null else it.fileInfo
                 )
+            }
+            if (failures.isEmpty()) {
+                finishBulkOperation(if (deletedKeys.size == 1) "File deleted." else "${deletedKeys.size} files deleted.")
+            } else {
+                finishBulkOperation(null, "Deleted ${deletedKeys.size} of ${targets.size} files. Failed: ${failureSummary(failures)}")
             }
         }
     }
@@ -1053,18 +1071,12 @@ class FileInfoViewModel(
             val response = browse?.importFiles(directoryPath, ids)
                 ?: ApiResponse.Error(ProviderError("not_supported", "This host can't add files to a folder."))
             when (response) {
-                is ApiResponse.Success -> _uiState.update {
-                    it.copy(
-                        isBulkOperationRunning = false,
-                        operationMessage = (if (ids.size == 1) "File added to " else "${ids.size} files added to ") + directoryPath.trim('/')
-                    )
-                }
-                is ApiResponse.Error -> _uiState.update {
-                    it.copy(
-                        isBulkOperationRunning = false,
-                        operationError = "Could not add the files: ${response.error.message.ifBlank { "unknown error" }}"
-                    )
-                }
+                is ApiResponse.Success -> finishBulkOperation(
+                    (if (ids.size == 1) "File added to " else "${ids.size} files added to ") + directoryPath.trim('/')
+                )
+                is ApiResponse.Error -> finishBulkOperation(
+                    null, "Could not add the files: ${response.error.message.ifBlank { "unknown error" }}"
+                )
             }
         }
     }
@@ -1077,18 +1089,10 @@ class FileInfoViewModel(
             val response = lists?.create(title, ids)
                 ?: ApiResponse.Error(ProviderError("not_supported", "This host has no lists."))
             when (response) {
-                is ApiResponse.Success -> _uiState.update {
-                    it.copy(
-                        isBulkOperationRunning = false,
-                        operationMessage = "List created" + linkSuffix(response.data)
-                    )
-                }
-                is ApiResponse.Error -> _uiState.update {
-                    it.copy(
-                        isBulkOperationRunning = false,
-                        operationError = "Could not create the list: ${response.error.message.ifBlank { "unknown error" }}"
-                    )
-                }
+                is ApiResponse.Success -> finishBulkOperation("List created" + linkSuffix(response.data))
+                is ApiResponse.Error -> finishBulkOperation(
+                    null, "Could not create the list: ${response.error.message.ifBlank { "unknown error" }}"
+                )
             }
         }
     }
@@ -1201,36 +1205,15 @@ class FileInfoViewModel(
 
     /** Publishes the outcome of a list change; [message] gets the extra text which goes with the outcome. */
     private fun finishListOperation(result: ListRewrite, message: (extra: String) -> String) {
-        _uiState.update {
-            when (result) {
-                is ListRewrite.Failed -> it.copy(isBulkOperationRunning = false, operationError = result.message)
-                is ListRewrite.Replaced -> it.copy(
-                    isBulkOperationRunning = false,
-                    operationMessage = message(
-                        if (provider().kind == ProviderKind.PIXELDRAIN) " The list has a new link: pixeldrain.com/l/${result.newId}"
-                        else " The list has a new id: ${result.newId}"
-                    )
+        when (result) {
+            is ListRewrite.Failed -> finishBulkOperation(null, result.message)
+            is ListRewrite.Replaced -> finishBulkOperation(
+                message(
+                    if (provider().kind == ProviderKind.PIXELDRAIN) " The list has a new link: pixeldrain.com/l/${result.newId}"
+                    else " The list has a new id: ${result.newId}"
                 )
-                else -> it.copy(isBulkOperationRunning = false, operationMessage = message(""))
-            }
-        }
-    }
-
-    fun clearOperationMessage() {
-        _uiState.update { it.copy(operationMessage = null) }
-    }
-
-    fun clearOperationError() {
-        _uiState.update { it.copy(operationError = null) }
-    }
-
-    fun clearDownloadMessages() {
-        _uiState.update {
-            it.copy(
-                fileDownloadSuccessMessage = null,
-                fileDownloadOpen = null,
-                fileDownloadErrorMessage = null
             )
+            else -> finishBulkOperation(message(""))
         }
     }
 

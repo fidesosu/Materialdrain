@@ -150,22 +150,13 @@ fun MaterialdrainScreen() {
     val snackbarHostState = remember { SnackbarHostState() }
     val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
     val uploadUiState by uploadViewModel.uiState.collectAsState()
-    val filesystemUiState by filesystemViewModel.uiState.collectAsState()
     val listsUiState by listViewModel.uiState.collectAsState()
     // Values which the effects and conditions of this screen use. A derived state recomposes this screen only when its own
     // value changes, so a progress tick of a transfer doesn't recompose the whole screen (see TransferBarSlot)
     val uploadApiKeyMissing by derivedFrom { uploadUiState.apiKeyMissing }
-    val fileInfoDeleteSuccess by derivedFrom { fileInfoUiState.deleteFileSuccessMessage }
-    val fileInfoDeleteError by derivedFrom { fileInfoUiState.deleteFileErrorMessage }
-    val fileInfoOperationMessage by derivedFrom { fileInfoUiState.operationMessage }
-    val fileInfoOperationError by derivedFrom { fileInfoUiState.operationError }
-    val fileDownloadSuccess by derivedFrom { fileInfoUiState.fileDownloadSuccessMessage }
-    val fileDownloadError by derivedFrom { fileInfoUiState.fileDownloadErrorMessage }
     val fileInfoApiKeyMissing by derivedFrom { fileInfoUiState.apiKeyMissingError }
     val userFilesListError by derivedFrom { fileInfoUiState.userFilesListErrorMessage }
     val fileInfoInitiateDelete by derivedFrom { fileInfoUiState.initiateDeleteFile }
-    val filesystemOperationMessage by derivedFrom { filesystemUiState.operationMessage }
-    val filesystemOperationError by derivedFrom { filesystemUiState.operationError }
 
     // Ask for the notification permission (Android 13+) the first time a transfer runs. Transfers work without it,
     // the progress notification is just not shown.
@@ -399,69 +390,29 @@ fun MaterialdrainScreen() {
         if (uploadApiKeyMissing && currentScreen == Screen.Upload) dialog = AppDialog.UploadApiKeyRequired
     }
 
-    LaunchedEffect(fileInfoDeleteSuccess) {
-        fileInfoUiState.deleteFileSuccessMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            fileInfoViewModel.clearDeleteMessages()
+    // The ViewModels' messages for the snackbar, one after another (see UiMessages)
+    LaunchedEffect(Unit) {
+        appContainer.uiMessages.messages.collect { message ->
+            val result = snackbarHostState.showSnackbar(
+                message.text,
+                actionLabel = message.action?.label,
+                duration = if (message.long) SnackbarDuration.Long else SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                when (val action = message.action) {
+                    is UiMessageAction.OpenDownload -> openDownloadedFile(context, action.download)
+                    null -> Unit
+                }
+            }
+        }
+    }
+    // The file whose details are open was deleted: there's nothing left to show, so back to where it was opened from
+    LaunchedEffect(fileInfoViewModel) {
+        fileInfoViewModel.fileDeleted.collect {
             if (currentScreen == Screen.FileDetail) {
                 fileInfoViewModel.setPreserveScrollPosition(previousScreen == Screen.Files)
                 navigateTo(previousScreen)
             }
-            // A deleted filesystem file has to disappear from the directory listing too
-            filesystemViewModel.refreshCurrentPath()
-        }
-    }
-    // Results of actions on several files (delete, add to filesystem, create list)
-    LaunchedEffect(fileInfoOperationMessage) {
-        fileInfoUiState.operationMessage?.let {
-            // What was changed may be shown on other screens: the opened list, the lists overview, the filesystem
-            if (listsUiState.openedList != null) listViewModel.refreshOpenedList()
-            listViewModel.fetchUserLists()
-            filesystemViewModel.refreshCurrentPath()
-            snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Long)
-            fileInfoViewModel.clearOperationMessage()
-        }
-    }
-    LaunchedEffect(fileInfoOperationError) {
-        fileInfoUiState.operationError?.let {
-            // A partial failure may still have changed something
-            if (listsUiState.openedList != null) listViewModel.refreshOpenedList()
-            filesystemViewModel.refreshCurrentPath()
-            snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Long)
-            fileInfoViewModel.clearOperationError()
-        }
-    }
-    LaunchedEffect(filesystemOperationMessage) {
-        filesystemUiState.operationMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            filesystemViewModel.clearOperationMessage()
-        }
-    }
-    LaunchedEffect(filesystemOperationError) {
-        filesystemUiState.operationError?.let {
-            snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Long)
-            filesystemViewModel.clearOperationError()
-        }
-    }
-    LaunchedEffect(fileInfoDeleteError) {
-        fileInfoUiState.deleteFileErrorMessage?.let {
-            snackbarHostState.showSnackbar("Delete failed: $it", duration = SnackbarDuration.Long)
-            fileInfoViewModel.clearDeleteMessages()
-        }
-    }
-
-    LaunchedEffect(fileDownloadSuccess) {
-        fileInfoUiState.fileDownloadSuccessMessage?.let {
-            val openable = fileInfoUiState.fileDownloadOpen
-            val result = snackbarHostState.showSnackbar(it, actionLabel = openable?.let { "Open" }, duration = SnackbarDuration.Long)
-            if (result == SnackbarResult.ActionPerformed && openable != null) openDownloadedFile(context, openable)
-            fileInfoViewModel.clearDownloadMessages()
-        }
-    }
-    LaunchedEffect(fileDownloadError) {
-        fileInfoUiState.fileDownloadErrorMessage?.let {
-            snackbarHostState.showSnackbar("Download failed: $it", duration = SnackbarDuration.Long)
-            fileInfoViewModel.clearDownloadMessages()
         }
     }
 

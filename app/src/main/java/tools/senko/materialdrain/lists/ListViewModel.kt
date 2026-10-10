@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import tools.senko.materialdrain.ContentChanges
 import tools.senko.materialdrain.auth.SessionManager
 import tools.senko.materialdrain.files.filteredAndSorted
 import tools.senko.materialdrain.provider.ProviderConfigStore
@@ -43,7 +44,8 @@ class ListViewModel(
     private val registry: ProviderRegistry,
     private val configStore: ProviderConfigStore,
     private val sessionManager: SessionManager,
-    private val appSettings: AppSettings
+    private val appSettings: AppSettings,
+    contentChanges: ContentChanges
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ListsUiState())
@@ -64,6 +66,15 @@ class ListViewModel(
                     it.copy(lists = emptyList(), openedList = null, listFiles = emptyList(), errorMessage = null, listFilterQuery = "")
                 }
                 loadApiKey()
+            }
+        }
+
+        // Files added to a list, a list created, a file deleted elsewhere: the lists and the opened one may show them
+        viewModelScope.launch {
+            contentChanges.changes.collect {
+                if (lists() == null) return@collect
+                if (_uiState.value.openedList != null) refreshOpenedList()
+                fetchUserLists()
             }
         }
 

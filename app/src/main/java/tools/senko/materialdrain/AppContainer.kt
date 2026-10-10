@@ -61,6 +61,12 @@ class AppContainer private constructor(application: Application) {
     /** Files another app shared with Materialdrain, waiting for the upload screen to take them. */
     val pendingShares = kotlinx.coroutines.flow.MutableStateFlow<List<android.net.Uri>>(emptyList())
 
+    /** The snackbar messages of the ViewModels, see UiMessages. */
+    val uiMessages = UiMessages()
+
+    /** Files which were changed, so the screens showing them reload, see ContentChanges. */
+    val contentChanges = ContentChanges()
+
     /** Whether each host answers, for the host switcher. */
     val hostHealth = HostHealth(application, providerConfigStore, appScope)
 

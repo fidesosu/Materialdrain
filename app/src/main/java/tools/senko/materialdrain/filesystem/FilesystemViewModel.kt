@@ -26,6 +26,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
+import tools.senko.materialdrain.ContentChanges
+import tools.senko.materialdrain.UiMessages
 import tools.senko.materialdrain.auth.SessionManager
 import tools.senko.materialdrain.files.filteredAndSorted
 import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
@@ -69,10 +71,8 @@ data class FilesystemUiState(
     val apiKeyMissingError: Boolean = false,
     val apiKey: String = "", // Exposed API Key, only the built-in Pixeldrain needs it
 
-    // Modifications (create folder, rename, move, delete, import)
+    // Modifications (create folder, rename, move, delete, import); their outcome goes to the snackbar (see UiMessages)
     val isModifying: Boolean = false,
-    val operationMessage: String? = null,
-    val operationError: String? = null,
 
     // Uploads into the current directory (their progress is FilesystemViewModel.uploadProgress)
     val pendingUpload: PendingFilesystemUpload? = null, // Waiting for the user to confirm overwriting existing files
@@ -135,7 +135,9 @@ class FilesystemViewModel(
     private val configStore: ProviderConfigStore,
     private val sessionManager: SessionManager,
     private val transfers: TransferRegistry,
-    private val appSettings: AppSettings
+    private val appSettings: AppSettings,
+    private val messages: UiMessages,
+    contentChanges: ContentChanges
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FilesystemUiState())
@@ -175,6 +177,10 @@ class FilesystemViewModel(
         viewModelScope.launch {
             // Choosing another host as the active one re-roots the screen on it
             configStore.changes.drop(1).collect { loadActiveProviderAndRoot() }
+        }
+        // Files deleted or added to a folder from another screen: the folder shown may have changed
+        viewModelScope.launch {
+            contentChanges.changes.collect { refreshCurrentPath() }
         }
 
         // Recomputes displayedChildren whenever the folder's contents, the filter, or the shared sorting changes
@@ -473,7 +479,7 @@ class FilesystemViewModel(
         val browse = activeProvider().browse ?: return
         if (_uiState.value.isModifying) return
         val dir = currentDir()
-        _uiState.update { it.copy(isModifying = true, operationMessage = null, operationError = null) }
+        _uiState.update { it.copy(isModifying = true) }
         viewModelScope.launch {
             var succeeded = 0
             val failures = mutableListOf<String>()
@@ -483,13 +489,10 @@ class FilesystemViewModel(
                     is ApiResponse.Error -> failures.add("${entry.name}: ${describeError(response.error)}")
                 }
             }
-            _uiState.update {
-                it.copy(
-                    isModifying = false,
-                    operationMessage = if (succeeded > 0) (if (succeeded == 1) "1 item $pastTense." else "$succeeded items $pastTense.") else null,
-                    operationError = failures.takeIf { f -> f.isNotEmpty() }
-                        ?.let { f -> f.take(3).joinToString("\n") + if (f.size > 3) "\nand ${f.size - 3} more failed" else "" }
-                )
+            _uiState.update { it.copy(isModifying = false) }
+            if (succeeded > 0) messages.show(if (succeeded == 1) "1 item $pastTense." else "$succeeded items $pastTense.")
+            if (failures.isNotEmpty()) {
+                messages.show(failures.take(3).joinToString("\n") + if (failures.size > 3) "\nand ${failures.size - 3} more failed" else "", long = true)
             }
             forgetFolderTree()
             fetchPathContent(dir)
@@ -536,11 +539,13 @@ class FilesystemViewModel(
         val browse = activeProvider().browse
         if (_uiState.value.isModifying) return
         val dir = currentDir()
-        _uiState.update { it.copy(isModifying = true, operationMessage = null, operationError = null) }
+        _uiState.update { it.copy(isModifying = true) }
         viewModelScope.launch {
-            when (val response = modifying { operation(browse) }) {
-                is ApiResponse.Success -> _uiState.update { it.copy(isModifying = false, operationMessage = "Done.") }
-                is ApiResponse.Error -> _uiState.update { it.copy(isModifying = false, operationError = describeError(response.error)) }
+            val response = modifying { operation(browse) }
+            _uiState.update { it.copy(isModifying = false) }
+            when (response) {
+                is ApiResponse.Success -> messages.show("Done.")
+                is ApiResponse.Error -> messages.show(describeError(response.error), long = true)
             }
             forgetFolderTree()
             fetchPathContent(dir)
@@ -571,7 +576,7 @@ class FilesystemViewModel(
     }
 
     private fun reportOperationError(message: String) {
-        _uiState.update { it.copy(operationError = message) }
+        messages.show(message, long = true)
     }
 
     private fun describeError(error: ProviderError): String {
@@ -588,14 +593,6 @@ class FilesystemViewModel(
             else -> null
         }
         return hint ?: error.message.ifBlank { "Unknown error." }
-    }
-
-    fun clearOperationMessage() {
-        _uiState.update { it.copy(operationMessage = null) }
-    }
-
-    fun clearOperationError() {
-        _uiState.update { it.copy(operationError = null) }
     }
 
     // --- Uploading ---
@@ -647,7 +644,6 @@ class FilesystemViewModel(
         val dir = currentDir()
         val totalBytes = items.sumOf { it.sizeBytes ?: 0L }.takeIf { it > 0 && items.all { item -> item.sizeBytes != null } }
         speedTracker.reset()
-        _uiState.update { it.copy(operationMessage = null, operationError = null) }
         _uploadProgress.value = FilesystemUploadProgress(items.first().name, 1, items.size, 0L, totalBytes)
 
         val transferId = "filesystem-upload-${nextTransferNumber++}"
@@ -696,16 +692,12 @@ class FilesystemViewModel(
                     outcomeMessage = "${failures.size} of ${items.size} uploads failed: ${failures.first()}"
                 }
                 _uploadProgress.value = null
-                _uiState.update {
-                    it.copy(
-                        operationMessage = if (uploaded > 0) (if (uploaded == 1) "1 file uploaded." else "$uploaded files uploaded.") else null,
-                        operationError = failures.takeIf { f -> f.isNotEmpty() }?.joinToString("\n")
-                    )
-                }
+                if (uploaded > 0) messages.show(if (uploaded == 1) "1 file uploaded." else "$uploaded files uploaded.")
+                if (failures.isNotEmpty()) messages.show(failures.joinToString("\n"), long = true)
             } catch (e: CancellationException) {
                 outcome = TransferOutcome.CANCELLED
                 _uploadProgress.value = null
-                _uiState.update { it.copy(operationMessage =if (uploaded > 0) "Upload cancelled, $uploaded file(s) were uploaded." else "Upload cancelled.") }
+                messages.show(if (uploaded > 0) "Upload cancelled, $uploaded file(s) were uploaded." else "Upload cancelled.")
                 throw e
             } finally {
                 transfers.finish(transferId, outcome, outcomeMessage)
