@@ -84,7 +84,6 @@ import tools.senko.materialdrain.filesystem.FilesystemViewModel
 import tools.senko.materialdrain.lists.ListViewModel
 import tools.senko.materialdrain.provider.api.FileList
 import tools.senko.materialdrain.provider.api.ProviderCapability
-import tools.senko.materialdrain.provider.api.ProviderKind
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.provider.api.StorageRef
 import tools.senko.materialdrain.settings.AppSettings
@@ -136,7 +135,6 @@ fun BrowserScreen(
     scrollState: LazyListState,
     fabHeight: Dp,
     isFabVisible: Boolean,
-    activeKind: ProviderKind,
     onSelectingChange: (Boolean) -> Unit
 ) {
     val fsState by filesystemViewModel.uiState.collectAsState()
@@ -669,7 +667,11 @@ fun BrowserScreen(
                                 canDelete = canDelete,
                                 listCanEdit = listCanEdit,
                                 thumbnailUrl = if (node.isDirectory) null else fileInfoViewModel.thumbnailFor(node),
-                                shareUrl = if (node.isDirectory) null else fileInfoViewModel.shareUrlFor(node),
+                                shareUrl = when {
+                                    !node.isDirectory -> fileInfoViewModel.shareUrlFor(node)
+                                    mode == BrowserMode.LISTS -> node.ref.id?.let { fileInfoViewModel.listShareUrlFor(it) }
+                                    else -> null
+                                },
                                 onOpen = { onOpen(node) },
                                 onToggleSelection = {
                                     selectedKeys = if (node.key in selectedKeys) selectedKeys - node.key else selectedKeys + node.key
@@ -685,8 +687,6 @@ fun BrowserScreen(
                                 // The list's own file count, not the filtered entries: removing the last matching file
                                 // mustn't look like the list itself went empty when a filter just hides the rest
                                 onRemoveFromList = { openedList?.let { actionRequest = FileActionRequest.RemoveFromList(listOf(node), it, listState.listFiles.size) } },
-                                // Lists have web links only on Pixeldrain; other hosts' lists are not on pixeldrain.com
-                                pixeldrainLinks = activeKind == ProviderKind.PIXELDRAIN,
                                 onCopyLink = { url -> copyLinkToClipboard(context, url) },
                                 onShareLink = { url -> shareLink(context, url) }
                             )
@@ -757,10 +757,10 @@ private fun BrowserEntry(
     onAddToList: () -> Unit,
     onRemoveFromList: () -> Unit,
     onCopyLink: (String) -> Unit,
-    onShareLink: (String) -> Unit,
-    pixeldrainLinks: Boolean
+    onShareLink: (String) -> Unit
 ) {
-    val folderLink = if (node.isDirectory && mode == BrowserMode.LISTS && pixeldrainLinks) "https://pixeldrain.com/l/${node.ref.id}" else null
+    // A list in the lists overview: its own page, when the host has one
+    val folderLink = if (node.isDirectory && mode == BrowserMode.LISTS) shareUrl else null
     val modified = remember(node.listDate) { formatRelativeDateTime(node.listDate) }
     FileListItem(
         name = node.name,

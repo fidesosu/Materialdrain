@@ -202,6 +202,9 @@ class FileInfoViewModel(
     /** The public link of a node, or null when the active host has none. */
     fun shareUrlFor(node: StorageNode): String? = provider().shareUrl(node)
 
+    /** The public link of the list with [listId], or null when the active host's lists have none. */
+    fun listShareUrlFor(listId: String): String? = provider().listShareUrl(listId)
+
     /** The preview image of a node, from the active host; null when it has none. */
     fun thumbnailFor(node: StorageNode): String? {
         val provider = provider()
@@ -715,7 +718,7 @@ class FileInfoViewModel(
 
     /** A link to a list, for the hosts that have one; the id on its own otherwise. */
     private fun linkSuffix(listId: String): String =
-        if (provider().kind == ProviderKind.PIXELDRAIN) ": pixeldrain.com/l/$listId" else "."
+        provider().listShareUrl(listId)?.let { ": $it" } ?: "."
 
     /** The lists of the user which can be changed, for choosing the list to add files to. */
     suspend fun loadEditableLists(): ApiResponse<List<FileList>> {
@@ -827,8 +830,8 @@ class FileInfoViewModel(
             is ListRewrite.Failed -> finishBulkOperation(null, result.message)
             is ListRewrite.Replaced -> finishBulkOperation(
                 message(
-                    if (provider().kind == ProviderKind.PIXELDRAIN) " The list has a new link: pixeldrain.com/l/${result.newId}"
-                    else " The list has a new id: ${result.newId}"
+                    provider().listShareUrl(result.newId)?.let { " The list has a new link: $it" }
+                        ?: " The list has a new id: ${result.newId}"
                 )
             )
             else -> finishBulkOperation(message(""))

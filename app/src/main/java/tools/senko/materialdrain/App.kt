@@ -867,7 +867,6 @@ fun MaterialdrainScreen() {
                             // Only the screen being shown, not one still animating out
                             showSearchModal = showSearchModal && targetScreen == currentScreen,
                             onDismissSearchModal = { showSearchModal = false },
-                            activeKind = appContainer.providerRegistry.resolve(activeHostId).kind,
                             onSelectingChange = { selectingItems = it },
                             scrollState = when (targetScreen) {
                                 Screen.Files -> filesListState

@@ -361,6 +361,8 @@ class PixeldrainStorageProvider(
         }
     }
 
+    override fun listShareUrl(listId: String): String = "https://$PIXELDRAIN_HOST/l/$listId"
+
     override fun shareUrl(node: StorageNode): String? = when {
         node.isDirectory -> null
         node.ref.id != null -> "https://$PIXELDRAIN_HOST/u/${node.ref.id}"

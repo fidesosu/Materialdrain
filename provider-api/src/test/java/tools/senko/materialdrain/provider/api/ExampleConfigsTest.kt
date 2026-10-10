@@ -30,7 +30,7 @@ class ExampleConfigsTest {
                 "browse_list", "browse_upload", "browse_download", "browse_thumbnail",
                 "browse_mkdir", "browse_rename", "browse_delete", "browse_import",
                 "user_lists", "list_info", "list_create", "list_update", "list_delete", "share_id", "share_path",
-                "thumbnail_id", "raw_id"
+                "share_list", "thumbnail_id", "raw_id"
             ),
             config.endpoints.keys
         )

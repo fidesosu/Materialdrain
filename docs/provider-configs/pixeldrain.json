@@ -274,12 +274,16 @@
     "share_path": {
       "method": "GET",
       "path": "https://pixeldrain.com/d/{path}"
+    },
+    "share_list": {
+      "method": "GET",
+      "path": "https://pixeldrain.com/l/{list_id}"
     }
   },
   "screens": [{"screen": "UPLOAD"}, {"screen": "FILES"}, {"screen": "LISTS"}, {"screen": "FILESYSTEM"}],
   "meta": {
     "id": "tools.senko.materialdrain.examples.pixeldrain",
-    "version": 7,
+    "version": 8,
     "author": "fides"
   }
 }

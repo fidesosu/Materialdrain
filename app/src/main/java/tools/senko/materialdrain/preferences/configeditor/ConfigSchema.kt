@@ -225,7 +225,8 @@ val KnownEndpoints: List<EndpointInfo> = listOf(
     EndpointInfo("thumbnail_id", "Previews and links", "The thumbnail of a file by its id.", "{id}"),
     EndpointInfo("raw_id", "Previews and links", "A file's own address, for previews and sharing.", "{id}"),
     EndpointInfo("share_id", "Previews and links", "The public page of a file.", "{id}"),
-    EndpointInfo("share_path", "Previews and links", "The public page of a path.", "{path}")
+    EndpointInfo("share_path", "Previews and links", "The public page of a path.", "{path}"),
+    EndpointInfo("share_list", "Previews and links", "The public page of a list.", "{list_id}")
 )
 
 /** The sign-in fields, for WebDAV ([webdav]: sent as HTTP Basic unless set otherwise) and generic REST configs. */

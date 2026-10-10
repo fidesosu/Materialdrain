@@ -50,6 +50,9 @@ interface StorageProvider {
     /** Public link to view/share [node], or null if [ProviderCapability.SHARE_LINK] is absent. */
     fun shareUrl(node: StorageNode): String?
 
+    /** Public link to the list with [listId] (see [lists]), or null when the host's lists have no page of their own. */
+    fun listShareUrl(listId: String): String? = null
+
     /** Thumbnail image URL for [node], or null if the provider can't generate one. */
     fun thumbnailUrl(node: StorageNode): String?
 

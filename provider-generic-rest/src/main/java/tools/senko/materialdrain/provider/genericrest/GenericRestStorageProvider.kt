@@ -62,6 +62,7 @@ private const val ENDPOINT_THUMBNAIL_ID = "thumbnail_id"
 private const val ENDPOINT_RAW_ID = "raw_id"
 private const val ENDPOINT_SHARE_ID = "share_id"
 private const val ENDPOINT_SHARE_PATH = "share_path"
+private const val ENDPOINT_SHARE_LIST = "share_list"
 private const val ENDPOINT_USER_LISTS = "user_lists"
 private const val ENDPOINT_LIST_INFO = "list_info"
 private const val ENDPOINT_LIST_CREATE = "list_create"
@@ -466,6 +467,10 @@ class GenericRestStorageProvider(
         }
         return rawContentUrl(node, attachment = false)
     }
+
+    /** The config's page of a list, when it has one. */
+    override fun listShareUrl(listId: String): String? =
+        config.endpoints[ENDPOINT_SHARE_LIST]?.let { client.resolveUrl(it, mapOf("list_id" to listId))?.toString() }
 
     override fun thumbnailUrl(node: StorageNode): String? {
         if (node.isDirectory) return null
