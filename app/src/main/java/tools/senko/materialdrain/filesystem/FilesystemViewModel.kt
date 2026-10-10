@@ -500,7 +500,6 @@ class FilesystemViewModel(
         }
     }
 
-    /** The folders inside [path], for the folder picker. */
     /** The top of the active host's folders, as the folder picker starts and stops at it (see StorageProvider.rootPath). */
     val browseRootPath: String get() = rootPath(activeProvider())
 
@@ -508,6 +507,7 @@ class FilesystemViewModel(
     val browseRootName: String
         get() = activeProvider().let { provider -> rootPath(provider).substringAfterLast('/').ifEmpty { provider.rootName } }
 
+    /** The folders inside [path], for the folder picker. */
     suspend fun listSubdirectories(path: String): ApiResponse<List<StorageNode>> {
         val provider = activeProvider()
         val browse = provider.browse ?: return ApiResponse.Error(ProviderError("not_browsable", "This host can't browse files."))

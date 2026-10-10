@@ -405,7 +405,6 @@ class FileInfoViewModel(
         }
     }
 
-    /** Shows the details of a file node (from the filesystem or the file list). Folders have no details. */
     /** Shows the folder [inside] of the archive in the details (its top when empty). */
     fun openArchiveFolder(inside: String) {
         val path = uiState.value.archive?.path ?: return
@@ -443,6 +442,7 @@ class FileInfoViewModel(
         initiateDownloadFile(entry)
     }
 
+    /** Shows the details of a file node (from the filesystem or the file list). Folders have no details. */
     fun setFileInfoFromNode(node: StorageNode) {
         fileInfoJob?.cancel()
         archiveJob?.cancel()

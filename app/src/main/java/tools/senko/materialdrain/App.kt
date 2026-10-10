@@ -206,8 +206,6 @@ fun MaterialdrainScreen() {
     val activeHostId by appContainer.providerConfigStore.activeProviderId.collectAsState()
     val loggedInUser by sessionManager.loggedInUser.collectAsState()
     val hostChecks by appContainer.hostHealth.states.collectAsState()
-    // The screens which show the files of the active host, and so the host switcher in the top bar
-    val browseScreens = setOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem)
     // Every host is checked ahead of time, so the switcher knows which ones answer before it's opened: every few minutes
     // while the app is in front (HostHealth also checks them when the network changes), and a host that was added or
     // whose address changed right away
@@ -260,7 +258,7 @@ fun MaterialdrainScreen() {
         // host which only turned on Filesystem, even if Upload was the screen open before switching to it). Also
         // checked when the screen changes: a host added or switched to from Settings only meets its tabs when Settings
         // goes back to the screen open before it, and with a single tab there's no bar to leave a missing one by
-        if (currentScreen in browseScreens &&
+        if (currentScreen in BROWSE_SCREENS &&
             currentScreen !in navBarOrder && navBarOrder.isNotEmpty()
         ) {
             currentScreen = navBarOrder.first()
@@ -442,26 +440,6 @@ fun MaterialdrainScreen() {
                     onClick = { if (uploadUiState.hasUploadable && !uploadUiState.isLoading) uploadViewModel.upload() },
                     isExtended = true,
                 ) else null
-                Screen.Files -> null /*FabDetails(
-                    screen = Screen.Files,
-                    iconResId = R.drawable.icon_add,
-                    text = "Filter",
-                    onClick = { fileInfoViewModel.toggleFilterInput() },
-                    isExtended = true
-                )
-                */
-                Screen.Lists -> null/*FabDetails(
-                    screen = Screen.Lists,
-                    iconResId = R.drawable.icon_add,
-                    text = "New List",
-                    onClick = {
-                        genericDialogTitle = "New List"
-                        genericDialogContent = "Create new list action (Not Implemented)"
-                        showGenericDialog = true
-                    },
-                    isExtended = true
-                )
-                */
                 // Only the categories whose settings are saved with the button (see SettingsCategory.hasSaveButton)
                 Screen.Settings -> if (settingsCategory(settingsCategoryId)?.hasSaveButton == true) FabDetails(
                     screen = Screen.Settings,
@@ -477,10 +455,10 @@ fun MaterialdrainScreen() {
                     },
                     isExtended = true
                 ) else null
-                Screen.FileDetail -> null
-                // Upload is an icon in the Filesystem screen's own header now (see BrowserScreen), so it works the
-                // same whichever navigation style is on, instead of only existing as this FAB
-                Screen.Filesystem -> null
+                // The file screens have no button of their own: searching is the magnifier in the top bar, and the
+                // Filesystem's upload is an icon in its own header (see BrowserScreen), so it works the same whichever
+                // navigation style is on
+                Screen.Files, Screen.Lists, Screen.Filesystem, Screen.FileDetail -> null
             }
         }
     }
@@ -535,7 +513,7 @@ fun MaterialdrainScreen() {
                                 }
                             }
                             // On the browse screens the host switcher is drawn over the bar instead (see below)
-                            if (currentScreen in browseScreens) Unit else AnimatedContent(
+                            if (currentScreen in BROWSE_SCREENS) Unit else AnimatedContent(
                                 targetState = titleText,
                                 transitionSpec = {
                                     if (reduceMotion) {
@@ -661,7 +639,7 @@ fun MaterialdrainScreen() {
                             }
                         }
                     )
-                    if (currentScreen in browseScreens) {
+                    if (currentScreen in BROWSE_SCREENS) {
                         // Centred on the band the bar's icons sit in (below the status bar), not on the whole bar
                         Box(
                             modifier = Modifier
@@ -843,10 +821,7 @@ fun MaterialdrainScreen() {
                         "\"screens\" list is empty, or only names screens this host can't offer. Edit the config in " +
                         "Settings → Hosts, or remove \"screens\" to show everything the host can do."
                     when (targetScreen) {
-                        Screen.Upload if noScreensConfigured -> CenteredTextMessage(noScreensMessage)
-                        Screen.Files if noScreensConfigured -> CenteredTextMessage(noScreensMessage)
-                        Screen.Lists if noScreensConfigured -> CenteredTextMessage(noScreensMessage)
-                        Screen.Filesystem if noScreensConfigured -> CenteredTextMessage(noScreensMessage)
+                        in BROWSE_SCREENS if noScreensConfigured -> CenteredTextMessage(noScreensMessage)
                         Screen.Upload -> UploadScreenContent(
                             uploadViewModel = uploadViewModel,
                             fabHeight = fabHeightDp,
@@ -986,6 +961,8 @@ fun MaterialdrainScreen() {
 
 
 private val SEARCH_BLUR_RADIUS = 16.dp
+/** The screens which show the files of the active host, and so the host switcher in the top bar. */
+private val BROWSE_SCREENS = setOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem)
 /** How often the hosts are checked while the app is in front, see HostHealth. */
 private const val HOST_RECHECK_MILLIS = 3 * 60_000L
 private const val SETTINGS_SAVE_TEXT = "Save Settings"
