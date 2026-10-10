@@ -73,7 +73,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
-import androidx.core.content.edit
 import tools.senko.materialdrain.files.DownloadStatus
 import tools.senko.materialdrain.navmenu.NavFabPosition
 import tools.senko.materialdrain.files.SelectionBarHeight
@@ -182,9 +181,8 @@ fun MaterialdrainScreen() {
         if (hasActiveTransfers && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
-            val prefs = context.getSharedPreferences("pixeldrain_prefs", Context.MODE_PRIVATE)
-            if (!prefs.getBoolean("asked_notification_permission", false)) {
-                prefs.edit { putBoolean("asked_notification_permission", true) }
+            if (!appContainer.appSettings.askedNotificationPermission) {
+                appContainer.appSettings.askedNotificationPermission = true
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }

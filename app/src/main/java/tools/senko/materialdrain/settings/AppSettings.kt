@@ -39,6 +39,7 @@ private const val OPENED_FILE_HOST_PREF = "opened_file_host"
 private const val BIOMETRIC_LOCK_PREF = "biometric_lock"
 private const val SEARCH_RESULT_LIMIT_PREF = "search_result_limit"
 private const val UPLOAD_IN_MODIFIED_ORDER_PREF = "upload_in_modified_order"
+private const val ASKED_NOTIFICATION_PERMISSION_PREF = "asked_notification_permission"
 
 /** The choices for [AppSettings.searchResultLimit]; 0 is no limit. */
 val SEARCH_RESULT_LIMITS = listOf(0, 200, 50, 20)
@@ -253,6 +254,11 @@ class AppSettings(context: Context) {
     var lastScreen: Screen
         get() = enumPref(LAST_SCREEN_PREF, Screen.Upload)
         set(value) = prefs.edit { putString(LAST_SCREEN_PREF, value.name) }
+
+    /** Whether the app has asked for the notification permission (Android 13+) already: it asks only once. */
+    var askedNotificationPermission: Boolean
+        get() = prefs.getBoolean(ASKED_NOTIFICATION_PERMISSION_PREF, false)
+        set(value) = prefs.edit { putBoolean(ASKED_NOTIFICATION_PERMISSION_PREF, value) }
 
     private inline fun <reified T : Enum<T>> enumPref(key: String, default: T): T =
         prefs.getString(key, null)?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: default
