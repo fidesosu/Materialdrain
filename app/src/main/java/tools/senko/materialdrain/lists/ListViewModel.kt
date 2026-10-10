@@ -2,18 +2,15 @@ package tools.senko.materialdrain.lists
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import tools.senko.materialdrain.auth.SessionManager
-import tools.senko.materialdrain.files.fileComparator
+import tools.senko.materialdrain.files.filteredAndSorted
 import tools.senko.materialdrain.provider.ProviderConfigStore
 import tools.senko.materialdrain.provider.ProviderRegistry
 import tools.senko.materialdrain.provider.api.ApiResponse
@@ -72,18 +69,12 @@ class ListViewModel(
 
         // Recomputes displayedListFiles whenever the opened list's files, the filter, or the shared sorting changes
         viewModelScope.launch {
-            combine(
+            filteredAndSorted(
                 uiState.map { it.listFiles },
                 uiState.map { it.listFilterQuery },
                 appSettings.sortField,
                 appSettings.sortAscending
-            ) { files, filterQuery, sortField, sortAscending ->
-                withContext(Dispatchers.Default) {
-                    files
-                        .filter { it.name.contains(filterQuery, ignoreCase = true) }
-                        .sortedWith(fileComparator(sortField, sortAscending))
-                }
-            }.collect { sortedAndFiltered -> _displayedListFiles.value = sortedAndFiltered }
+            ).collect { sortedAndFiltered -> _displayedListFiles.value = sortedAndFiltered }
         }
     }
 

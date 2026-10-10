@@ -1,5 +1,10 @@
 package tools.senko.materialdrain.files
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.util.parseDateTime
 import java.util.Collections
@@ -45,3 +50,24 @@ fun fileComparator(field: SortableField, ascending: Boolean, directoriesFirst: B
         .let { if (ascending) it else it.reversed() }
     return if (directoriesFirst) compareBy<StorageNode> { !it.isDirectory }.then(byField) else byField
 }
+
+/**
+ * [files] narrowed to the names containing [filterQuery], in the shared sort order. Only recomputed when one of the inputs
+ * really changes: they're usually read out of a UI state which also changes with every progress tick of a transfer, and
+ * sorting a long list again for each of those ticks is wasted work.
+ */
+fun filteredAndSorted(
+    files: Flow<List<StorageNode>>,
+    filterQuery: Flow<String>,
+    sortField: Flow<SortableField>,
+    sortAscending: Flow<Boolean>,
+    directoriesFirst: Boolean = false
+): Flow<List<StorageNode>> = combine(
+    files.distinctUntilChanged(),
+    filterQuery.distinctUntilChanged(),
+    sortField,
+    sortAscending
+) { list, query, field, ascending ->
+    list.filter { it.name.contains(query, ignoreCase = true) }
+        .sortedWith(fileComparator(field, ascending, directoriesFirst))
+}.flowOn(Dispatchers.Default)

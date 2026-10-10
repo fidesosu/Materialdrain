@@ -13,7 +13,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,7 +27,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 import tools.senko.materialdrain.auth.SessionManager
-import tools.senko.materialdrain.files.fileComparator
+import tools.senko.materialdrain.files.filteredAndSorted
 import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
 import tools.senko.materialdrain.provider.ProviderConfigStore
 import tools.senko.materialdrain.provider.ProviderRegistry
@@ -174,18 +173,13 @@ class FilesystemViewModel(
 
         // Recomputes displayedChildren whenever the folder's contents, the filter, or the shared sorting changes
         viewModelScope.launch {
-            combine(
+            filteredAndSorted(
                 uiState.map { it.visibleChildren },
                 uiState.map { it.filterQuery },
                 appSettings.sortField,
-                appSettings.sortAscending
-            ) { children, filterQuery, sortField, sortAscending ->
-                withContext(Dispatchers.Default) {
-                    children
-                        .filter { it.name.contains(filterQuery, ignoreCase = true) }
-                        .sortedWith(fileComparator(sortField, sortAscending, directoriesFirst = true))
-                }
-            }.collect { sortedAndFiltered -> _displayedChildren.value = sortedAndFiltered }
+                appSettings.sortAscending,
+                directoriesFirst = true
+            ).collect { sortedAndFiltered -> _displayedChildren.value = sortedAndFiltered }
         }
     }
 

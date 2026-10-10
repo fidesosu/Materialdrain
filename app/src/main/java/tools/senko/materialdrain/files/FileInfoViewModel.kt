@@ -17,7 +17,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -204,18 +203,12 @@ class FileInfoViewModel(
 
         // Recomputes displayedFiles whenever the list, the shared sorting, or the filter changes
         viewModelScope.launch {
-            combine(
+            filteredAndSorted(
                 uiState.map { it.userFilesList },
                 uiState.map { it.filterQuery },
                 appSettings.sortField,
                 appSettings.sortAscending
-            ) { files, filterQuery, sortField, sortAscending ->
-                withContext(Dispatchers.Default) {
-                    files
-                        .filter { it.name.contains(filterQuery, ignoreCase = true) }
-                        .sortedWith(fileComparator(sortField, sortAscending))
-                }
-            }.collect { sortedAndFiltered ->
+            ).collect { sortedAndFiltered ->
                 _displayedFiles.value = sortedAndFiltered
             }
         }
