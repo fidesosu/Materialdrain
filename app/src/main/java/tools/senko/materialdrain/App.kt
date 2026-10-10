@@ -69,7 +69,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.util.UnstableApi
 import tools.senko.materialdrain.R
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -128,9 +127,8 @@ import tools.senko.materialdrain.upload.UploadViewModel
 fun MaterialdrainScreen() {
     var previousScreen by rememberSaveable { mutableStateOf(Screen.Files) }
 
-    var showGenericDialog by remember { mutableStateOf(false) }
-    var genericDialogContent by remember { mutableStateOf("") }
-    var genericDialogTitle by remember { mutableStateOf("") }
+    // The problem shown in a dialog, if any (see AppDialog)
+    var dialog by remember { mutableStateOf<AppDialog?>(null) }
 
     val application = LocalContext.current.applicationContext as Application
     val context = LocalContext.current
@@ -156,7 +154,7 @@ fun MaterialdrainScreen() {
     val listsUiState by listViewModel.uiState.collectAsState()
     // Values which the effects and conditions of this screen use. A derived state recomposes this screen only when its own
     // value changes, so a progress tick of a transfer doesn't recompose the whole screen (see TransferBarSlot)
-    val uploadErrorMessage by derivedFrom { uploadUiState.errorMessage }
+    val uploadApiKeyMissing by derivedFrom { uploadUiState.apiKeyMissing }
     val fileInfoDeleteSuccess by derivedFrom { fileInfoUiState.deleteFileSuccessMessage }
     val fileInfoDeleteError by derivedFrom { fileInfoUiState.deleteFileErrorMessage }
     val fileInfoOperationMessage by derivedFrom { fileInfoUiState.operationMessage }
@@ -384,34 +382,21 @@ fun MaterialdrainScreen() {
     }
 
     LaunchedEffect(key1 = uploadViewModel) {
-        uploadViewModel.uiState.collectLatest { uiState ->
-            uiState.uploadResult?.let {
-                if (!it.success) {
-                    genericDialogTitle = "Upload Failed"
-                    genericDialogContent = "Error: ${it.message ?: "Unknown error"}"
-                    showGenericDialog = true
+        // Only the failure and the error of the upload, not every progress tick
+        uploadViewModel.uiState
+            .map { it.uploadResult?.takeIf { result -> !result.success } to it.errorMessage }
+            .distinctUntilChanged()
+            .collect { (failed, error) ->
+                if (failed != null) {
+                    dialog = AppDialog.UploadFailed(failed.message ?: "Unknown error")
+                } else if (error != null && dialog == null && currentScreen == Screen.Upload) {
+                    dialog = AppDialog.UploadError(error)
                 }
             }
-            uiState.errorMessage?.let {
-                if (!it.contains("API Key", ignoreCase = true) &&
-                    !it.contains("preview", ignoreCase = true) &&
-                    !it.contains("metadata", ignoreCase = true) &&
-                    !showGenericDialog &&
-                    currentScreen == Screen.Upload) {
-                    genericDialogTitle = "Upload Error"
-                    genericDialogContent = it
-                    showGenericDialog = true
-                }
-            }
-        }
     }
 
-    if (uploadErrorMessage?.contains("API Key is missing") == true && currentScreen == Screen.Upload) {
-        LaunchedEffect(uploadErrorMessage, currentScreen) {
-            genericDialogTitle = "API Key Required for Upload"
-            genericDialogContent = "Please set your API Key in the Settings screen to upload files."
-            showGenericDialog = true
-        }
+    LaunchedEffect(uploadApiKeyMissing, currentScreen) {
+        if (uploadApiKeyMissing && currentScreen == Screen.Upload) dialog = AppDialog.UploadApiKeyRequired
     }
 
     LaunchedEffect(fileInfoDeleteSuccess) {
@@ -482,12 +467,11 @@ fun MaterialdrainScreen() {
 
     if (fileInfoApiKeyMissing && (currentScreen == Screen.Files || currentScreen == Screen.FileDetail) &&
         !userFilesListError.isNullOrBlank() &&
-        !showGenericDialog && !fileInfoInitiateDelete) {
+        dialog == null && !fileInfoInitiateDelete) {
         LaunchedEffect(true, currentScreen, userFilesListError) {
-            if (fileInfoUiState.userFilesListErrorMessage!!.contains("API Key", ignoreCase = true)) {
-                genericDialogTitle = if (currentScreen == Screen.FileDetail) "API Key Required" else "API Key Required for Files"
-                genericDialogContent = fileInfoUiState.userFilesListErrorMessage!!
-                showGenericDialog = true
+            val message = fileInfoUiState.userFilesListErrorMessage
+            if (message != null && message.contains("API Key", ignoreCase = true)) {
+                dialog = AppDialog.FilesApiKeyRequired(onDetails = currentScreen == Screen.FileDetail, message = message)
             }
         }
     }
@@ -1012,37 +996,28 @@ fun MaterialdrainScreen() {
         }
         }
 
-        if (showGenericDialog) {
-            AlertDialog(
-                onDismissRequest = {
-                    showGenericDialog = false
-                    if (genericDialogTitle == "Upload Failed" || genericDialogTitle == "Upload Error") uploadViewModel.clearUploadResult()
-                    if (genericDialogContent.contains("API Key") && uploadUiState.errorMessage?.contains("API Key") == true) uploadViewModel.clearApiKeyError()
-                    if (genericDialogTitle.contains("API Key Required")) {
+        dialog?.let { shown ->
+            // Closing the dialog clears what it reported; OK on a missing API key goes to where it's set
+            fun close(confirmed: Boolean) {
+                dialog = null
+                when (shown) {
+                    is AppDialog.UploadFailed, is AppDialog.UploadError -> uploadViewModel.clearUploadResult()
+                    AppDialog.UploadApiKeyRequired -> uploadViewModel.clearApiKeyError()
+                    is AppDialog.FilesApiKeyRequired -> {
                         fileInfoViewModel.clearUserFilesError()
                         fileInfoViewModel.clearApiKeyMissingError()
-                        // Consider clearing filesystemViewModel error too if relevant
                     }
-                },
-                title = { Text(genericDialogTitle) },
-                text = { Text(genericDialogContent) },
-                confirmButton = {
-                    Button(onClick = {
-                        showGenericDialog = false
-                        if (genericDialogTitle == "Upload Failed" || genericDialogTitle == "Upload Error") uploadViewModel.clearUploadResult()
-                        if (genericDialogContent.contains("API Key") && uploadUiState.errorMessage?.contains("API Key") == true) uploadViewModel.clearApiKeyError()
-                        if (genericDialogTitle.contains("API Key Required")) {
-                            fileInfoViewModel.clearUserFilesError()
-                            fileInfoViewModel.clearApiKeyMissingError()
-                            // Consider clearing filesystemViewModel error too if relevant
-                            if (genericDialogContent.contains("Settings")) {
-                                // The place to fix a missing API key is the account
-                                settingsCategoryId = ACCOUNT_CATEGORY_ID
-                                navigateTo(Screen.Settings)
-                            }
-                        }
-                    }) { Text("OK") }
                 }
+                if (confirmed && shown.opensAccountSettings) {
+                    settingsCategoryId = ACCOUNT_CATEGORY_ID
+                    navigateTo(Screen.Settings)
+                }
+            }
+            AlertDialog(
+                onDismissRequest = { close(confirmed = false) },
+                title = { Text(shown.title) },
+                text = { Text(shown.text) },
+                confirmButton = { Button(onClick = { close(confirmed = true) }) { Text("OK") } }
             )
         }
 
@@ -1172,6 +1147,26 @@ private fun ColumnScope.TransferBarSlot(
     ) {
         (activeTransfer ?: lastTransfer)?.let { TransferStatusBar(it) }
     }
+}
+
+/**
+ * A problem the app shows in a dialog. Each kind decides its own title and text, and what closing it clears (see
+ * MaterialdrainScreen), so neither depends on the wording of a message. [opensAccountSettings]: OK goes to the account,
+ * where a missing API key is set.
+ */
+private sealed class AppDialog(val title: String, val text: String, val opensAccountSettings: Boolean = false) {
+    data class UploadFailed(val message: String) : AppDialog("Upload Failed", "Error: $message")
+    data class UploadError(val message: String) : AppDialog("Upload Error", message)
+    data object UploadApiKeyRequired : AppDialog(
+        "API Key Required for Upload",
+        "Please set your API Key in the Settings screen to upload files.",
+        opensAccountSettings = true
+    )
+    data class FilesApiKeyRequired(val onDetails: Boolean, val message: String) : AppDialog(
+        if (onDetails) "API Key Required" else "API Key Required for Files",
+        message,
+        opensAccountSettings = true
+    )
 }
 
 /** A value computed from [calc]: a reader recomposes only when that value changes, not on every change of the state it reads. */

@@ -261,8 +261,8 @@ fun UploadScreenContent(
 
                             InlineTextPreview(textContent = uiState.selectedFileTextContent)
 
-                            if (uiState.errorMessage?.contains("preview", true) == true || uiState.errorMessage?.contains("metadata", true) == true) {
-                                Text(uiState.errorMessage!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom=8.dp))
+                            uiState.fileDetailsError?.let { error ->
+                                Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom=8.dp))
                             }
                         }
                     }

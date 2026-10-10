@@ -85,7 +85,12 @@ internal fun inModifiedOrder(items: List<UploadItem>): List<UploadItem> =
 data class UploadUiState(
     val isLoading: Boolean = false,
     val uploadResult: UploadResult? = null,
+    // A failure of the upload itself, shown as a dialog
     val errorMessage: String? = null,
+    // Pixeldrain needs the login to upload and there is none: the app asks for it (see App.kt)
+    val apiKeyMissing: Boolean = false,
+    // What couldn't be read of the picked file for its preview (its text, the album, the video frame...), shown under it
+    val fileDetailsError: String? = null,
     val selectedFileName: String? = null,
     val uploadTotalSizeBytes: Long? = null,
     val uploadedBytes: Long = 0L,
@@ -126,6 +131,8 @@ data class UploadUiState(
         if (isLoading != other.isLoading) return false
         if (uploadResult != other.uploadResult) return false
         if (errorMessage != other.errorMessage) return false
+        if (apiKeyMissing != other.apiKeyMissing) return false
+        if (fileDetailsError != other.fileDetailsError) return false
         if (selectedFileName != other.selectedFileName) return false
         if (uploadTotalSizeBytes != other.uploadTotalSizeBytes) return false
         if (uploadedBytes != other.uploadedBytes) return false
@@ -164,6 +171,8 @@ data class UploadUiState(
         var result = isLoading.hashCode()
         result = 31 * result + (uploadResult?.hashCode() ?: 0)
         result = 31 * result + (errorMessage?.hashCode() ?: 0)
+        result = 31 * result + apiKeyMissing.hashCode()
+        result = 31 * result + (fileDetailsError?.hashCode() ?: 0)
         result = 31 * result + (selectedFileName?.hashCode() ?: 0)
         result = 31 * result + (uploadTotalSizeBytes?.hashCode() ?: 0)
         result = 31 * result + uploadedBytes.hashCode()
@@ -472,7 +481,7 @@ class UploadViewModel(
                     selectedFileMimeType = newMimeType,
                     selectedFileTextContent = if (newMimeType?.startsWith("text/") == true || (newMimeType == "application/octet-stream" && newTextContent != null) ) newTextContent else null,
                     textToUpload = "",
-                    errorMessage = newErrorMessage ?: it.errorMessage,
+                    fileDetailsError = newErrorMessage?.trim(),
                     uploadResult = null,
                     uploadedBytes = 0L,
                     // Audio fields
@@ -498,6 +507,7 @@ class UploadViewModel(
                     selectedFileName = null,
                     uploadTotalSizeBytes = null,
                     selectedFileUri = null,
+                    fileDetailsError = null,
                     selectedFileMimeType = null,
                     selectedFileTextContent = null,
                     queuedItems = emptyList(),
@@ -537,6 +547,7 @@ class UploadViewModel(
                         selectedFileName = null,
                         uploadTotalSizeBytes = null,
                         selectedFileUri = null,
+                        fileDetailsError = null,
                         selectedFileMimeType = null,
                         selectedFileTextContent = null,
                         textToUpload = "",
@@ -597,6 +608,7 @@ class UploadViewModel(
                     selectedFileName = null,
                     uploadTotalSizeBytes = newTextSizeBytes,
                     selectedFileUri = null,
+                    fileDetailsError = null,
                     selectedFileMimeType = null,
                     selectedFileTextContent = null,
                     errorMessage = null,
@@ -630,9 +642,7 @@ class UploadViewModel(
     }
 
     fun clearApiKeyError() {
-        if (_uiState.value.errorMessage?.contains("API Key") == true) {
-            _uiState.update { it.copy(errorMessage = null) }
-        }
+        _uiState.update { it.copy(apiKeyMissing = false) }
     }
 
     fun updateApiKey(newApiKey: String) {
@@ -659,7 +669,7 @@ class UploadViewModel(
         }
         if (batch.isEmpty()) return
         if (missingKey()) {
-            _uiState.update { it.copy(errorMessage = "API Key is missing. Please set it in Settings.") }
+            _uiState.update { it.copy(apiKeyMissing = true) }
             return
         }
 
@@ -786,10 +796,11 @@ class UploadViewModel(
             _uiState.update {
                 it.copy(
                     isLoading = false,
-                    errorMessage = "API Key is missing. Please set it in Settings.",
+                    apiKeyMissing = true,
                     selectedFileName = null,
                     uploadTotalSizeBytes = null,
                     selectedFileUri = null,
+                    fileDetailsError = null,
                     selectedFileMimeType = null,
                     selectedFileTextContent = null,
                     textToUpload = "",
@@ -817,6 +828,7 @@ class UploadViewModel(
                      selectedFileName = null,
                     uploadTotalSizeBytes = null,
                     selectedFileUri = null,
+                    fileDetailsError = null,
                     selectedFileMimeType = null,
                     selectedFileTextContent = null,
                     textToUpload = "",
@@ -925,6 +937,7 @@ class UploadViewModel(
                             uploadedBytes = finalTotalBytes ?: 0L, 
                             textToUpload = "",
                             selectedFileUri = null,
+                            fileDetailsError = null,
                             selectedFileMimeType = null,
                             selectedFileTextContent = null,
                             audioDurationMillis = null,
