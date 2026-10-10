@@ -121,6 +121,30 @@ fun StorageNode.previewMimeType(): String? {
     return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: mimeType
 }
 
+/** Takes at most [limit] bytes: writing more stops the copy with an IOException, and sets [overflowed]. */
+private class LimitedByteArrayOutputStream(private val limit: Int) : ByteArrayOutputStream() {
+    @Volatile
+    var overflowed = false
+        private set
+
+    override fun write(b: Int) {
+        ensureRoom(1)
+        super.write(b)
+    }
+
+    override fun write(b: ByteArray, off: Int, len: Int) {
+        ensureRoom(len)
+        super.write(b, off, len)
+    }
+
+    private fun ensureRoom(len: Int) {
+        if (size() + len > limit) {
+            overflowed = true
+            throw IOException("More than $limit bytes")
+        }
+    }
+}
+
 /** The folder [inside] of the archive at [path], and its entries once they've loaded. */
 data class ArchiveView(val path: String, val inside: String, val entries: List<StorageNode>?, val error: String?)
 
@@ -370,16 +394,30 @@ class FileInfoViewModel(
             return
         }
 
+        val maxSize = formatSize(MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES.toLong())
         val size = fileInfo.size ?: 0L
         if (size > MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES) {
-            _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = "File is too large (${formatSize(size)}) for text preview. Max ${formatSize(MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES.toLong())}.") }
+            _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = "File is too large (${formatSize(size)}) for text preview. Max $maxSize.") }
             return
         }
 
         _uiState.update { it.copy(isLoadingTextPreview = true, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = null) }
         viewModelScope.launch {
-            val buffer = ByteArrayOutputStream()
-            when (val response = downloadNodeTo(fileInfo, buffer) { _, _ -> }) {
+            // Capped as well: a host which doesn't tell the size (or tells it wrong) mustn't fill the memory with a huge file
+            val buffer = LimitedByteArrayOutputStream(MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES)
+            val response = try {
+                downloadNodeTo(fileInfo, buffer) { _, _ -> }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The cap stops the copy by throwing, whichever way the host passes that on
+                ApiResponse.Error(ProviderError("preview_failed", e.message.orEmpty()))
+            }
+            if (buffer.overflowed) {
+                _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewErrorMessage = "File is too large for text preview. Max $maxSize.") }
+                return@launch
+            }
+            when (response) {
                 is ApiResponse.Success -> {
                     val content = buffer.toString(Charsets.UTF_8.name())
                     // The preview on the page shows the start, cut at a line; the fullscreen view the whole file
