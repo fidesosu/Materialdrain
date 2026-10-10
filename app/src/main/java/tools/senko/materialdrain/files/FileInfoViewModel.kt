@@ -51,6 +51,7 @@ import tools.senko.materialdrain.transfer.TransferOutcome
 import tools.senko.materialdrain.transfer.TransferRegistry
 import tools.senko.materialdrain.transfer.TransferSpeedTracker
 import tools.senko.materialdrain.transfer.estimateEtaSeconds
+import tools.senko.materialdrain.util.formatSize
 
 private const val TAG = "FileInfoViewModel"
 private const val MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES = 1 * 1024 * 1024 // 1MB
@@ -1236,17 +1237,4 @@ class FileInfoViewModel(
     fun setPreserveScrollPosition(preserve: Boolean) {
         _uiState.update { it.copy(shouldPreserveScrollPosition = preserve) }
     }
-}
-
-internal fun formatSize(bytes: Long): String {
-    if (bytes < 0) return "0 B"
-    if (bytes == 0L) return "0 B"
-    val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    var size = bytes.toDouble()
-    var unitIndex = 0
-    while (size >= 1024 && unitIndex < units.size - 1) {
-        size /= 1024
-        unitIndex++
-    }
-    return java.text.DecimalFormat("#,##0.#").format(size) + " " + units[unitIndex]
 }
