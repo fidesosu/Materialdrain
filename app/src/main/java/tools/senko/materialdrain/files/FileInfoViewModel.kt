@@ -1,18 +1,10 @@
 package tools.senko.materialdrain.files
 
 import android.app.Application
-import android.content.ContentValues
-import android.net.Uri
-import android.os.Environment
-import android.provider.MediaStore
-import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -25,14 +17,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
 import tools.senko.materialdrain.ContentChanges
-import tools.senko.materialdrain.UiMessageAction
 import tools.senko.materialdrain.UiMessages
 import tools.senko.materialdrain.auth.SessionManager
 import tools.senko.materialdrain.settings.AppSettings
@@ -40,7 +30,6 @@ import tools.senko.materialdrain.settings.SavedOpenedFile
 import tools.senko.materialdrain.provider.ProviderConfigStore
 import tools.senko.materialdrain.provider.ProviderRegistry
 import tools.senko.materialdrain.provider.api.ApiResponse
-import tools.senko.materialdrain.provider.api.ArchiveEntryDetails
 import tools.senko.materialdrain.provider.forDisplay
 import tools.senko.materialdrain.provider.api.ProviderCapability
 import tools.senko.materialdrain.provider.api.FileList
@@ -51,67 +40,12 @@ import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.ui.media.MediaCovers
 import tools.senko.materialdrain.provider.api.StorageProvider
 import tools.senko.materialdrain.provider.api.StorageRef
-import tools.senko.materialdrain.transfer.TransferInfo
-import tools.senko.materialdrain.transfer.TransferKind
-import tools.senko.materialdrain.transfer.TransferOutcome
-import tools.senko.materialdrain.transfer.TransferRegistry
-import tools.senko.materialdrain.transfer.TransferSpeedTracker
-import tools.senko.materialdrain.transfer.estimateEtaSeconds
 import tools.senko.materialdrain.util.formatSize
 
-private const val TAG = "FileInfoViewModel"
 private const val MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES = 1 * 1024 * 1024 // 1MB
 private const val MAX_TEXT_PREVIEW_DISPLAY_LENGTH = 8 * 1024 // 8KB
-private const val DOWNLOAD_WRITE_BUFFER_BYTES = 256 * 1024
-private const val MAX_FILES_PER_ZIP = 100
 private const val API_KEY_MISSING = "API Key is missing. Please set it in Settings."
 
-// --- Download State Management ---
-enum class DownloadStatus {
-    PENDING,
-    DOWNLOADING,
-    COMPLETED,
-    FAILED,
-    /** Stopped by the user; nothing was saved. */
-    CANCELLED
-}
-
-data class FileDownloadState(
-    val fileId: String,
-    val fileName: String,
-    val totalBytes: Long?,
-    val downloadedBytes: Long = 0L,
-    val progressFraction: Float = 0f,
-    val bytesPerSecond: Long = 0L,
-    val etaSeconds: Long? = null,
-    val status: DownloadStatus = DownloadStatus.PENDING,
-    val message: String? = null, // For individual success/error messages
-    val targetUri: Uri? = null // To store the MediaStore URI
-)
-/**
- * A batch of files downloaded one after another. [doneBytes] are the bytes of the files finished so far; [totalBytes] is
- * null when a file's size is unknown, then the batch shows how many files are done but no percentage.
- */
-data class DownloadBatch(
-    val totalFiles: Int,
-    val doneFiles: Int = 0,
-    val totalBytes: Long?,
-    val doneBytes: Long = 0L
-)
-
-/**
- * The downloads, by node key, and the batch they belong to (null when no batch runs). Kept out of [FileInfoUiState]: it
- * changes with every progress tick, and the screens which only read the UI state shouldn't be redrawn for each of those.
- */
-data class DownloadsState(
-    val active: Map<String, FileDownloadState> = emptyMap(),
-    val batch: DownloadBatch? = null
-) {
-    /** Whether a download is waiting or running. */
-    val isDownloading: Boolean
-        get() = batch != null || active.values.any { it.status == DownloadStatus.PENDING || it.status == DownloadStatus.DOWNLOADING }
-}
-// --- End Download State Management ---
 
 /** Identifies a node in the app: its file id, or its path when it has no id (the filesystem). */
 val StorageNode.key: String get() = ref.id ?: ref.path
@@ -215,7 +149,7 @@ class FileInfoViewModel(
     private val registry: ProviderRegistry,
     private val configStore: ProviderConfigStore,
     private val sessionManager: SessionManager,
-    private val transfers: TransferRegistry,
+    private val downloadManager: DownloadManager,
     private val appSettings: AppSettings,
     private val messages: UiMessages,
     private val contentChanges: ContentChanges
@@ -223,17 +157,6 @@ class FileInfoViewModel(
 
     private val _uiState = MutableStateFlow(FileInfoUiState())
     val uiState: StateFlow<FileInfoUiState> = _uiState.asStateFlow()
-
-    private val _downloads = MutableStateFlow(DownloadsState())
-    val downloads: StateFlow<DownloadsState> = _downloads.asStateFlow()
-
-    /** Changes the download of [key], when there is one. */
-    private fun updateDownload(key: String, transform: (FileDownloadState) -> FileDownloadState) {
-        _downloads.update { state ->
-            val current = state.active[key] ?: return@update state
-            state.copy(active = state.active + (key to transform(current)))
-        }
-    }
 
     // What's loading for the file details. Each is cancelled when another file is opened: a slow answer for the file
     // opened before would otherwise land on the details of the one opened after it
@@ -364,30 +287,7 @@ class FileInfoViewModel(
         node: StorageNode,
         outputStream: OutputStream,
         onProgress: (Long, Long?) -> Unit
-    ): ApiResponse<Long> {
-        val current = provider()
-        // A file inside an archive is read from the archive
-        (node.richDetails as? ArchiveEntryDetails)?.let { entry ->
-            val archives = current.archives
-                ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't look inside archives."))
-            return archives.read(entry.archivePath, entry.entryPath, outputStream, onProgress)
-        }
-        val id = node.ref.id
-        return if (id != null) {
-            val store = current.fileStore
-                ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't download files by id."))
-            // Several ids joined by commas (see downloadFilesAsZip) are one archive; file ids never contain commas
-            if (',' in id) {
-                store.downloadArchive(id.split(',').map { StorageRef(id = it) }, outputStream, onProgress)
-            } else {
-                store.download(StorageRef(id = id), outputStream, onProgress)
-            }
-        } else {
-            val browse = current.browse
-                ?: return ApiResponse.Error(ProviderError("not_supported", "This host can't download this file."))
-            browse.download(node.ref.path, outputStream, onProgress)
-        }
-    }
+    ): ApiResponse<Long> = downloadNode(provider(), node, outputStream, onProgress)
 
     private fun fetchTextFilePreviewContent(fileInfo: StorageNode) {
         previewJob?.cancel()
@@ -632,7 +532,7 @@ class FileInfoViewModel(
         viewModelScope.launch {
             when (val response = deleteNode(node)) {
                 is ApiResponse.Success -> {
-                    _downloads.update { it.copy(active = it.active - node.key) }
+                    downloadManager.forget(listOf(node.key))
                     val openedFileDeleted = _uiState.value.fileInfo?.key == node.key
                     if (openedFileDeleted) clearTextPreviewStates()
                     _uiState.update {
@@ -700,317 +600,28 @@ class FileInfoViewModel(
         }
     }
 
-    // --- File Download Functions ---
+    // --- Downloads (see DownloadManager) ---
 
-    private suspend fun prepareDownloadTargetUriAndStream(fileName: String, mimeType: String?): Pair<Uri?, OutputStream?> {
-        return withContext(Dispatchers.IO) {
-            val context = application.applicationContext
-            val contentResolver = context.contentResolver
-            val contentValues = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                put(MediaStore.MediaColumns.MIME_TYPE, mimeType ?: "application/octet-stream")
-                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                put(MediaStore.MediaColumns.IS_PENDING, 1)
-            }
+    /** The downloads and their progress, see DownloadManager. */
+    val downloads: StateFlow<DownloadsState> get() = downloadManager.downloads
 
-            var outputStream: OutputStream? = null
-            var uri: Uri? = null
-            try {
-                uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-                uri?.let {
-                    val rawOutputStream = contentResolver.openOutputStream(it)
-                    if (rawOutputStream != null) {
-                        outputStream = BufferedOutputStream(rawOutputStream, DOWNLOAD_WRITE_BUFFER_BYTES)
-                    } else {
-                        Log.e(TAG, "ContentResolver.openOutputStream returned null for $uri")
-                    }
-                }
-                if (outputStream == null && uri != null) {
-                    contentResolver.delete(uri, null, null)
-                    uri = null
-                    throw IOException("Failed to open output stream for $uri")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to prepare download target for '$fileName': ${e.message}", e)
-                uri?.let { contentResolver.delete(it, null, null) }
-                return@withContext null to null
-            }
-            uri to outputStream
-        }
-    }
-
-    private suspend fun finalizeMediaStoreEntry(uri: Uri, success: Boolean) {
-        withContext(Dispatchers.IO) {
-            val context = application.applicationContext
-            val contentResolver = context.contentResolver
-            if (success) {
-                val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.IS_PENDING, 0)
-                }
-                try {
-                    contentResolver.update(uri, contentValues, null, null)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to clear IS_PENDING flag for $uri: ${e.message}", e)
-                }
-            } else {
-                try {
-                    contentResolver.delete(uri, null, null)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to delete MediaStore entry $uri after failed download/cancellation: ${e.message}", e)
-                }
-            }
-        }
-    }
-
-    /** Starts the download and returns its job. When [queue] is given, cancelling this download cancels the queue too. */
-    fun initiateDownloadFile(node: StorageNode, queue: Job? = null, batchId: String? = null): Job {
-        val key = node.key
-        val size = node.size ?: 0L
-
-        _downloads.update { state ->
-            val newDownloadState = FileDownloadState(
-                fileId = key,
-                fileName = node.name,
-                totalBytes = size,
-                status = DownloadStatus.PENDING
-            )
-            state.copy(active = state.active + (key to newDownloadState))
-        }
-
-        // A file of a batch reports into the batch's transfer, see downloadFilesSequentially
-        val transferId = batchId ?: "download-$key"
-        // Started lazily so that the transfer is registered before it can possibly finish
-        val downloadJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
-            var targetUri: Uri? = null
-            var outputStream: OutputStream? = null
-            var downloadSuccessful = false
-            var outcome = TransferOutcome.FAILED
-            var outcomeMessage: String? = null
-
-            try {
-                _downloads.value.active[key]?.let {
-                    targetUri = it.targetUri
-                }
-                if (targetUri == null) {
-                    val (uri, stream) = prepareDownloadTargetUriAndStream(node.name, node.mimeType)
-                    targetUri = uri
-                    outputStream = stream
-                } else {
-                    application.contentResolver.openOutputStream(targetUri)?.let {
-                        outputStream = BufferedOutputStream(it, DOWNLOAD_WRITE_BUFFER_BYTES)
-                    }
-                }
-
-                if (targetUri == null || outputStream == null) {
-                    throw IOException("Failed to prepare or re-open download target in MediaStore.")
-                }
-
-                updateDownload(key) { it.copy(status = DownloadStatus.DOWNLOADING, targetUri = targetUri) }
-
-                val speedTracker = TransferSpeedTracker()
-                val job = coroutineContext[Job]
-                val onProgress: (Long, Long?) -> Unit = { bytesRead, totalBytes ->
-                    // Called from inside the host's copy loop, which keeps reading until the file ends unless it's
-                    // stopped: a cancelled download stops here, whatever the host's own code does with cancelling
-                    if (job?.isActive == false) throw CancellationException("The download was cancelled")
-                    val progress = if (totalBytes != null && totalBytes > 0) {
-                        (bytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
-                    } else 0f
-                    val speed = speedTracker.update(bytesRead)
-                    val eta = estimateEtaSeconds(totalBytes ?: size.takeIf { it > 0 }, bytesRead, speed)
-                    if (batchId == null) {
-                        transfers.progress(transferId, bytesRead, totalBytes, speed, eta)
-                    } else {
-                        // Within a batch: the bytes of the finished files plus this one, against the whole batch
-                        val batch = _downloads.value.batch
-                        transfers.progress(transferId, (batch?.doneBytes ?: 0L) + bytesRead, batch?.totalBytes, speed, eta)
-                    }
-                    updateDownload(key) { currentDownload ->
-                        val effectiveTotal = totalBytes ?: currentDownload.totalBytes
-                        currentDownload.copy(
-                            downloadedBytes = bytesRead,
-                            progressFraction = progress,
-                            totalBytes = effectiveTotal,
-                            bytesPerSecond = speed,
-                            etaSeconds = estimateEtaSeconds(effectiveTotal, bytesRead, speed)
-                        )
-                    }
-                }
-
-                val response = downloadNodeTo(node, outputStream!!, onProgress)
-                // A host which turns the stopped copy into an error of its own: it was still a cancel
-                ensureActive()
-                when (response) {
-                    is ApiResponse.Success -> {
-                        downloadSuccessful = true
-                        val bytesCopied = response.data
-                        val message = "File '${node.name}' downloaded (${formatSize(bytesCopied)})."
-                        outcome = TransferOutcome.COMPLETED
-                        outcomeMessage = message
-                        updateDownload(key) {
-                            it.copy(
-                                status = DownloadStatus.COMPLETED,
-                                message = message,
-                                downloadedBytes = bytesCopied,
-                                progressFraction = 1f,
-                                bytesPerSecond = 0L,
-                                etaSeconds = null
-                            )
-                        }
-                    }
-                    is ApiResponse.Error -> {
-                        throw IOException(response.error.message.ifBlank { "Download failed due to API error." })
-                    }
-                }
-            } catch (e: Exception) {
-                downloadSuccessful = false
-                outcome = if (e is CancellationException) TransferOutcome.CANCELLED else TransferOutcome.FAILED
-                val errorMsg = if (e is CancellationException) {
-                    Log.i(TAG, "Download for $key was cancelled by scope.")
-                    "Download for '${node.name}' was cancelled."
-                } else {
-                    Log.e(TAG, "Error during file download process for $key: ${e.message}", e)
-                    "Download error for '${node.name}': ${e.localizedMessage ?: "Unexpected error"}"
-                }
-                outcomeMessage = errorMsg
-                val hadDownload = _downloads.value.active.containsKey(key)
-                updateDownload(key) {
-                    it.copy(
-                        status = if (e is CancellationException) DownloadStatus.CANCELLED else DownloadStatus.FAILED,
-                        message = errorMsg,
-                        // The unfinished file is deleted (see finalizeMediaStoreEntry): another try starts a new one
-                        targetUri = null,
-                        bytesPerSecond = 0L,
-                        etaSeconds = null,
-                        progressFraction = if (e is CancellationException) 0f else it.progressFraction,
-                        downloadedBytes = if (e is CancellationException) 0L else it.downloadedBytes
-                    )
-                }
-                if (hadDownload && e !is CancellationException) messages.show("Download failed: $errorMsg", long = true)
-            } finally {
-                try {
-                    outputStream?.close()
-                } catch (e: IOException) {
-                    Log.e(TAG, "Error closing output stream for ${node.name}: ${e.message}", e)
-                }
-                targetUri?.let {
-                    // NonCancellable: a cancelled coroutine could otherwise not clean up the partial file
-                    withContext(NonCancellable) { finalizeMediaStoreEntry(it, downloadSuccessful) }
-                }
-                // Reported after the file was finalized, so the notification (and the snackbar's Open) can open it
-                if (batchId == null) transfers.finish(transferId, outcome, outcomeMessage, if (downloadSuccessful) targetUri else null, node.mimeType)
-                if (downloadSuccessful) {
-                    messages.show(
-                        outcomeMessage.orEmpty(),
-                        long = true,
-                        action = targetUri?.let { UiMessageAction.OpenDownload(OpenableDownload(it, node.previewMimeType() ?: "*/*")) }
-                    )
-                }
-            }
-        }
-        if (batchId == null) transfers.start(
-            TransferInfo(transferId, TransferKind.DOWNLOAD, node.name, totalBytes = size.takeIf { it > 0 }),
-            onCancel = {
-                downloadJob.cancel()
-                queue?.cancel()
-            }
-        )
-        downloadJob.start()
-        return downloadJob
-    }
+    /** Starts the download of [node] and returns its job. */
+    fun initiateDownloadFile(node: StorageNode): Job = downloadManager.download(node)
 
     /** Stops the download of [node] started on its own (not one of a batch); its unfinished file is deleted. */
-    fun cancelDownload(node: StorageNode) = transfers.cancel("download-${node.key}")
+    fun cancelDownload(node: StorageNode) = downloadManager.cancel(node)
 
     /** Stops every download, single files and batches alike. */
-    fun cancelAllDownloads() = transfers.cancelAll(TransferKind.DOWNLOAD)
+    fun cancelAllDownloads() = downloadManager.cancelAll()
 
     // --- Actions on several files at once ---
 
     /** Downloads the files one after another, several simultaneous downloads can run into the download limits. */
-    fun downloadFilesSequentially(files: List<StorageNode>) {
-        if (files.isEmpty()) return
-        if (files.size == 1) {
-            initiateDownloadFile(files.first())
-            return
-        }
-        // The total is only known when every file has a size
-        val totalBytes = files.map { it.size }.takeIf { sizes -> sizes.all { it != null } }?.sumOf { it ?: 0L }
-        _downloads.update { it.copy(batch = DownloadBatch(totalFiles = files.size, totalBytes = totalBytes)) }
-        val batchId = "download-batch-${System.nanoTime()}"
-        // The whole batch is one transfer: one notification with its total, and one result when it ends
-        val batchJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
-            val queue = coroutineContext[Job]
-            var savedFiles = 0
-            try {
-                for (file in files) {
-                    ensureActive()
-                    // Its own job, not a child of the batch's: cancelling the batch has to stop it too
-                    val download = initiateDownloadFile(file, queue, batchId)
-                    try {
-                        download.join()
-                    } catch (e: CancellationException) {
-                        download.cancel()
-                        throw e
-                    }
-                    if (_downloads.value.active[file.key]?.status == DownloadStatus.COMPLETED) savedFiles++
-                    // Counted once the file is over, whether it was saved or failed
-                    _downloads.update { state ->
-                        val batch = state.batch ?: return@update state
-                        val finishedBytes = state.active[file.key]?.downloadedBytes ?: file.size ?: 0L
-                        state.copy(batch = batch.copy(doneFiles = batch.doneFiles + 1, doneBytes = batch.doneBytes + finishedBytes))
-                    }
-                }
-            } finally {
-                _downloads.update { it.copy(batch = null) }
-                val outcome = when {
-                    coroutineContext[Job]?.isCancelled == true -> TransferOutcome.CANCELLED
-                    savedFiles == files.size -> TransferOutcome.COMPLETED
-                    else -> TransferOutcome.FAILED
-                }
-                val message = when (outcome) {
-                    TransferOutcome.COMPLETED -> "${files.size} files downloaded."
-                    TransferOutcome.FAILED -> "$savedFiles of ${files.size} files downloaded."
-                    TransferOutcome.CANCELLED -> null
-                }
-                transfers.finish(batchId, outcome, message)
-            }
-        }
-        transfers.start(
-            TransferInfo(batchId, TransferKind.DOWNLOAD, "${files.size} files", totalBytes = totalBytes),
-            onCancel = { batchJob.cancel() }
-        )
-        batchJob.start()
-    }
+    fun downloadFilesSequentially(files: List<StorageNode>) = downloadManager.downloadSequentially(files)
 
-    /**
-     * Downloads the files as zip archive(s) when the provider serves several ids as one archive (Pixeldrain does,
-     * with comma separated ids). Otherwise the files are downloaded one after another.
-     */
-    fun downloadFilesAsZip(files: List<StorageNode>, archiveName: String) {
-        if (files.isEmpty()) return
-        if (files.size == 1) {
-            initiateDownloadFile(files.first())
-            return
-        }
-        if (files.any { it.ref.id == null || it.isDirectory } || ProviderCapability.ARCHIVE_DOWNLOAD !in provider().capabilities) {
-            downloadFilesSequentially(files)
-            return
-        }
-        val baseName = archiveName.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "files" }
-        val chunks = files.chunked(MAX_FILES_PER_ZIP)
-        val archives = chunks.mapIndexed { index, chunk ->
-            StorageNode(
-                ref = StorageRef(id = chunk.joinToString(",") { it.ref.id.orEmpty() }),
-                name = if (chunks.size == 1) "$baseName.zip" else "$baseName (part ${index + 1}).zip",
-                isDirectory = false,
-                size = chunk.sumOf { it.size ?: 0L },
-                createdAt = chunk.first().createdAt,
-                mimeType = "application/zip"
-            )
-        }
-        downloadFilesSequentially(archives)
-    }
+    /** Downloads the files as zip archive(s) where the host can, see DownloadManager.downloadAsZip. */
+    fun downloadFilesAsZip(files: List<StorageNode>, archiveName: String) = downloadManager.downloadAsZip(files, archiveName)
+
 
     /** Checks the preconditions of an action on several files and marks it as running. */
     private fun beginBulkOperation(): Boolean {
@@ -1050,7 +661,7 @@ class FileInfoViewModel(
                     is ApiResponse.Error -> failures.add("${file.name} (${response.error.message.ifBlank { "unknown error" }})")
                 }
             }
-            _downloads.update { it.copy(active = it.active - deletedKeys) }
+            downloadManager.forget(deletedKeys)
             _uiState.update {
                 val openedFileDeleted = it.fileInfo?.key in deletedKeys
                 it.copy(

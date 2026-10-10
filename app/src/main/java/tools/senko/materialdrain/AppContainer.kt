@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import tools.senko.materialdrain.auth.SessionManager
+import tools.senko.materialdrain.files.DownloadManager
 import tools.senko.materialdrain.hosts.HostHealth
 import tools.senko.materialdrain.provider.ProviderConfigStore
 import tools.senko.materialdrain.provider.api.Credentials
@@ -66,6 +67,9 @@ class AppContainer private constructor(application: Application) {
 
     /** Files which were changed, so the screens showing them reload, see ContentChanges. */
     val contentChanges = ContentChanges()
+
+    /** Downloads into the device's Downloads folder, for every screen, see DownloadManager. */
+    val downloadManager = DownloadManager(application, providerRegistry, providerConfigStore, transferRegistry, uiMessages)
 
     /** Whether each host answers, for the host switcher. */
     val hostHealth = HostHealth(application, providerConfigStore, appScope)
