@@ -3,6 +3,7 @@ package tools.senko.materialdrain.provider.pixeldrain.internal
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import tools.senko.materialdrain.provider.api.queryContentSize
 import io.ktor.client.call.body
 import io.ktor.client.request.headers
 import io.ktor.client.request.prepareGet

@@ -2,7 +2,7 @@ package tools.senko.materialdrain.provider.smb
 
 import android.content.Context
 import android.net.Uri
-import android.provider.OpenableColumns
+import tools.senko.materialdrain.provider.api.queryContentSize
 import jcifs.smb.SmbAuthException
 import jcifs.smb.SmbException
 import jcifs.smb.SmbFile
@@ -98,7 +98,7 @@ class SmbStorageProvider(
             val target = SmbPaths.normalize(path)
             if (target.isEmpty()) return@onShare ApiResponse.Error(ProviderError("invalid_path", "A file needs a name."))
             if (makeParents) client.file(SmbPaths.parentOf(target), directory = true).mkdirs()
-            val total = sizeOf(context, fileUri)
+            val total = queryContentSize(context, fileUri)
             val input = context.contentResolver.openInputStream(fileUri)
                 ?: return@onShare ApiResponse.Error(ProviderError("unreadable_file", "The file can't be read."))
             input.use { source ->
@@ -238,11 +238,6 @@ class SmbStorageProvider(
         progress.finish(total)
         return total
     }
-
-    private fun sizeOf(context: Context, uri: Uri): Long? =
-        context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) cursor.getColumnIndex(OpenableColumns.SIZE).takeIf { it >= 0 && !cursor.isNull(it) }?.let { cursor.getLong(it) } else null
-        }
 
     private fun toNode(item: SmbFile, folder: String): StorageNode {
         val name = SmbPaths.displayName(item.name.trimEnd('/'))

@@ -2,7 +2,7 @@ package tools.senko.materialdrain.provider.pixeldrain.internal
 
 import android.content.Context
 import android.net.Uri
-import android.provider.OpenableColumns
+import tools.senko.materialdrain.provider.api.queryContentSize
 import android.util.Base64
 import android.util.Log
 import io.ktor.client.HttpClient
@@ -68,20 +68,6 @@ internal class StreamingRequestBody(
             }
         }
         progress.finish(sent)
-    }
-}
-
-internal fun queryContentSize(context: Context, uri: Uri): Long? {
-    return try {
-        context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) cursor.getLong(sizeIndex) else null
-            } else null
-        }
-    } catch (e: Exception) {
-        Log.w(TAG_HTTP, "Could not determine file size for Content-Length: ${e.message}")
-        null
     }
 }
 

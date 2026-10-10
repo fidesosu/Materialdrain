@@ -2,7 +2,7 @@ package tools.senko.materialdrain.provider.genericrest
 
 import android.content.Context
 import android.net.Uri
-import android.provider.OpenableColumns
+import tools.senko.materialdrain.provider.api.queryContentSize
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -65,17 +65,6 @@ private class StreamingBody(
         }
         progress.finish(sent)
     }
-}
-
-private fun queryContentSize(context: Context, uri: Uri): Long? = try {
-    context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-        if (cursor.moveToFirst()) {
-            val index = cursor.getColumnIndex(OpenableColumns.SIZE)
-            if (index >= 0 && !cursor.isNull(index)) cursor.getLong(index) else null
-        } else null
-    }
-} catch (_: Exception) {
-    null
 }
 
 /** An auth header (name to value), decided by the provider from the entered credentials; null sends none. */

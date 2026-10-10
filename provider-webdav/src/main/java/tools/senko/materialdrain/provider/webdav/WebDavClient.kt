@@ -2,7 +2,7 @@ package tools.senko.materialdrain.provider.webdav
 
 import android.content.Context
 import android.net.Uri
-import android.provider.OpenableColumns
+import tools.senko.materialdrain.provider.api.queryContentSize
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -40,6 +40,8 @@ private class StreamingBody(
 
     override fun writeTo(sink: BufferedSink) {
         val input = openStream() ?: throw IOException("Failed to open input stream for upload.")
+        // Passed on a few times a second (the last one always), not after every chunk: see ProgressThrottle
+        val progress = ProgressThrottle(onProgress)
         var sent = 0L
         input.source().use { source ->
             while (true) {
@@ -47,21 +49,11 @@ private class StreamingBody(
                 if (read == -1L) break
                 sink.emitCompleteSegments()
                 sent += read
-                onProgress(sent)
+                progress.update(sent)
             }
         }
+        progress.finish(sent)
     }
-}
-
-private fun queryContentSize(context: Context, uri: Uri): Long? = try {
-    context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-        if (cursor.moveToFirst()) {
-            val index = cursor.getColumnIndex(OpenableColumns.SIZE)
-            if (index >= 0 && !cursor.isNull(index)) cursor.getLong(index) else null
-        } else null
-    }
-} catch (_: Exception) {
-    null
 }
 
 /** Requests every property this app understands; some servers (notably older Apache mod_dav) don't default to it on an empty body. */
