@@ -683,10 +683,9 @@ class UploadViewModel(
         val currentTextToUpload = _uiState.value.textToUpload
         val currentPickedFile = _uiState.value.pickedFile
 
+        // The file or text stays, so it can be uploaded once the key is set
         if (missingKey()) {
-            _uiState.update {
-                it.copy(isLoading = false, apiKeyMissing = true, pickedFile = null, uploadTotalSizeBytes = null, textToUpload = "")
-            }
+            _uiState.update { it.copy(isLoading = false, apiKeyMissing = true) }
             return
         }
 
