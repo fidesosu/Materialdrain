@@ -739,10 +739,11 @@ class UploadViewModel(
                 // Called from inside the host's sending loop: a cancelled upload stops there
                 if (job?.isActive == false) throw CancellationException("The upload was cancelled")
                 val speed = speedTracker.update(bytesSent)
+                val total = receivedTotalBytes ?: _uiState.value.uploadTotalSizeBytes
+                val eta = estimateEtaSeconds(total, bytesSent, speed)
+                // Not inside update {}: that may run more than once, and the notification should be updated once
+                transfers.progress(transferId, bytesSent, total, speed, eta)
                 _uiState.update {
-                    val total = receivedTotalBytes ?: it.uploadTotalSizeBytes
-                    val eta = estimateEtaSeconds(total, bytesSent, speed)
-                    transfers.progress(transferId, bytesSent, total, speed, eta)
                     it.copy(
                         uploadedBytes = bytesSent,
                         uploadTotalSizeBytes = total,
