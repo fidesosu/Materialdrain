@@ -5,13 +5,13 @@ import android.content.Context
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap // Added for video thumbnail
-import android.graphics.drawable.BitmapDrawable
 import android.graphics.pdf.PdfRenderer
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import android.util.Log
+import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
@@ -55,7 +55,7 @@ private const val TAG = "PIXEL_VM_DEBUG" // Tag for Logcat
 private const val TEXT_PREVIEW_MAX_LENGTH = 4096 // Max 4KB for text preview
 private const val VIDEO_THUMBNAIL_QUALITY = 75 // JPEG quality for video thumbnails
 private const val VIDEO_THUMBNAIL_TARGET_TIME_US = 1_000_000L // 1 second for thumbnail
-private const val APK_THUMBNAIL_QUALITY = 75 // JPEG quality for APK icons
+private const val APK_ICON_SIZE_PX = 192 // APK icons are drawn at this size for the preview
 private const val MAX_PARALLEL_UPLOADS = 3
 
 enum class UploadItemStatus { PENDING, UPLOADING, DONE, FAILED }
@@ -413,14 +413,12 @@ class UploadViewModel(
                                 // Necessary for getApplicationIcon to work with an archive file
                                 appInfo.sourceDir = apkPath
                                 appInfo.publicSourceDir = apkPath
-                                val iconDrawable = pm.getApplicationIcon(appInfo)
-                                if (iconDrawable is BitmapDrawable) {
-                                    val bitmap = iconDrawable.bitmap
-                                    val baos = ByteArrayOutputStream()
-                                    bitmap.compress(Bitmap.CompressFormat.JPEG, APK_THUMBNAIL_QUALITY, baos)
-                                    newApkIcon = baos.toByteArray()
-                                    // Bitmap doesn't need explicit recycle here as it's from system
-                                }
+                                // Most apps have an adaptive icon rather than a plain bitmap one: toBitmap draws either.
+                                // PNG keeps the transparency around the icon, which JPEG would fill with black.
+                                val bitmap = pm.getApplicationIcon(appInfo).toBitmap(APK_ICON_SIZE_PX, APK_ICON_SIZE_PX)
+                                val baos = ByteArrayOutputStream()
+                                bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
+                                newApkIcon = baos.toByteArray()
                             }
                         } else {
                             newErrorMessage = (newErrorMessage ?: "") + " Could not parse APK details."
