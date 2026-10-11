@@ -70,25 +70,13 @@ import kotlinx.coroutines.flow.filter
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.preferences.configeditor.ConfigEditor
 import tools.senko.materialdrain.provider.StoredProvider
+import tools.senko.materialdrain.provider.hostTypeOf
 import tools.senko.materialdrain.provider.api.ConfigUpdates
-import tools.senko.materialdrain.provider.api.GenericRestConfig
 import tools.senko.materialdrain.provider.api.PasswordAuthMode
 import tools.senko.materialdrain.provider.api.ProviderCapability
-import tools.senko.materialdrain.provider.api.ProviderConfig
-import tools.senko.materialdrain.provider.api.S3Config
-import tools.senko.materialdrain.provider.api.SmbAuthMode
-import tools.senko.materialdrain.provider.api.SmbConfig
-import tools.senko.materialdrain.provider.api.WebDavConfig
 import tools.senko.materialdrain.provider.api.passwordAuth
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.provider.api.ProviderConfigTemplates
-
-private fun kindLabel(config: ProviderConfig): String = when (config) {
-    is GenericRestConfig -> "Generic REST"
-    is WebDavConfig -> "WebDAV"
-    is S3Config -> "S3-compatible"
-    is SmbConfig -> "SMB share"
-}
 
 /** "Custom host settings": the list of imported configs, their update state, and importing new ones. */
 @Composable
@@ -291,9 +279,9 @@ private fun HostCard(
     var password by remember(stored.id, stored.config) { mutableStateOf(viewModel.credentialsFor(stored.id).password) }
     var showApiKey by rememberSaveable(stored.id) { mutableStateOf(apiKey.isNotBlank()) }
     val passwordMode = stored.config.passwordAuth?.mode
-    // S3 always needs both halves of a key pair, and an SMB share signs in with a username and password: neither has a
-    // single "API key" to fall back to, unlike WebDAV and generic REST hosts
-    val keyPairOnly = stored.config is S3Config || stored.config is SmbConfig
+    val hostType = remember(stored.config) { hostTypeOf(stored.config) }
+    // A host which signs in with two keys and has no API key to fall back to (S3, SMB)
+    val keyPairLabels = hostType.keyPairLabels
     val signedInAs = uiState.signedInAs[stored.id]
     val signingIn = uiState.signingInId == stored.id
     var justCopied by remember { mutableStateOf(false) }
@@ -322,7 +310,7 @@ private fun HostCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(stored.config.name, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        listOfNotNull(kindLabel(stored.config), meta?.let { "v${it.version}" }, meta?.author?.let { "by $it" }).joinToString(" · "),
+                        listOfNotNull(hostType.label,meta?.let { "v${it.version}" }, meta?.author?.let { "by $it" }).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.onSurfaceVariant
                     )
@@ -373,19 +361,15 @@ private fun HostCard(
                         }
                     }
 
-                    if (keyPairOnly) {
-                        val smb = stored.config as? SmbConfig
+                    if (keyPairLabels != null) {
                         Text("Credentials", style = MaterialTheme.typography.labelLarge, color = colors.primary)
-                        if (smb != null && smb.auth != SmbAuthMode.CREDENTIALS) {
-                            Text(
-                                "This share is opened as ${smb.auth.name.lowercase()}, so there's nothing to sign in to.",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
+                        if (!hostType.needsSignIn) {
+                            Text(hostType.noSignInNote ?: "There's nothing to sign in to.", style = MaterialTheme.typography.bodyMedium)
                         } else {
                             CredentialFields(
                                 username, { username = it }, password, { password = it },
-                                usernameLabel = if (smb != null) "Username" else "Access Key ID",
-                                passwordLabel = if (smb != null) "Password" else "Secret Access Key"
+                                usernameLabel = keyPairLabels.username,
+                                passwordLabel = keyPairLabels.password
                             )
                         }
                     } else {
@@ -447,7 +431,7 @@ private fun HostCard(
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             onClick = {
-                                if (keyPairOnly) {
+                                if (keyPairLabels != null) {
                                     viewModel.savePasswordCredentials(stored.id, username, password)
                                 } else {
                                     viewModel.saveApiKey(stored.id, apiKey)

@@ -21,14 +21,10 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.FolderShared
 import androidx.compose.material.icons.filled.QuestionMark
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,14 +56,7 @@ import tools.senko.materialdrain.auth.SessionManager
 import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
 import tools.senko.materialdrain.provider.ProviderConfigStore
 import tools.senko.materialdrain.provider.StoredProvider
-import tools.senko.materialdrain.provider.api.AuthType
-import tools.senko.materialdrain.provider.api.ConfigUpdates
-import tools.senko.materialdrain.provider.api.GenericRestConfig
-import tools.senko.materialdrain.provider.api.ProviderKind
-import tools.senko.materialdrain.provider.api.S3Config
-import tools.senko.materialdrain.provider.api.SmbAuthMode
-import tools.senko.materialdrain.provider.api.SmbConfig
-import tools.senko.materialdrain.provider.api.WebDavConfig
+import tools.senko.materialdrain.provider.hostTypeOf
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.components.AppMenu
 import tools.senko.materialdrain.ui.components.AppMenuDefaults
@@ -92,29 +81,13 @@ enum class HostStatus(val label: String) {
 data class HostOption(
     val id: String,
     val name: String,
-    val kind: ProviderKind,
+    /** The kind of host, e.g. "WebDAV" */
+    val kindLabel: String,
+    val icon: ImageVector,
     val status: HostStatus,
     val detail: String,
     val address: String?
-) {
-    val icon: ImageVector
-        get() = when (kind) {
-            ProviderKind.PIXELDRAIN -> Icons.Filled.Cloud
-            ProviderKind.WEBDAV -> Icons.Filled.FolderShared
-            ProviderKind.S3 -> Icons.Filled.Storage
-            ProviderKind.GENERIC_REST -> Icons.Filled.Dns
-            ProviderKind.SMB -> Icons.Filled.Share
-        }
-
-    val kindLabel: String
-        get() = when (kind) {
-            ProviderKind.PIXELDRAIN -> "Pixeldrain"
-            ProviderKind.WEBDAV -> "WebDAV"
-            ProviderKind.S3 -> "S3"
-            ProviderKind.GENERIC_REST -> "REST API"
-            ProviderKind.SMB -> "SMB"
-        }
-}
+)
 
 /**
  * Every host the user can switch to: the built-in Pixeldrain first, then the configured ones in the order they were
@@ -129,7 +102,8 @@ fun hostOptions(
     val pixeldrain = HostOption(
         id = PIXELDRAIN_PROVIDER_ID,
         name = "Pixeldrain",
-        kind = ProviderKind.PIXELDRAIN,
+        kindLabel = "Pixeldrain",
+        icon = Icons.Filled.Cloud,
         status = if (source == ApiKeySource.NONE) HostStatus.NOT_SIGNED_IN else HostStatus.SIGNED_IN,
         detail = when (source) {
             ApiKeySource.LOGIN -> signedInUser?.let { "Signed in as $it" } ?: "Signed in"
@@ -142,36 +116,25 @@ fun hostOptions(
 }
 
 private fun StoredProvider.toHostOption(configStore: ProviderConfigStore): HostOption {
-    val (kind, needsSignIn) = when (val config = config) {
-        is GenericRestConfig -> ProviderKind.GENERIC_REST to (config.auth.type != AuthType.NONE)
-        is WebDavConfig -> ProviderKind.WEBDAV to true
-        is S3Config -> ProviderKind.S3 to true
-        // A share can be open to guests or anonymous: then there's nothing to sign in to
-        is SmbConfig -> ProviderKind.SMB to (config.auth == SmbAuthMode.CREDENTIALS)
-    }
+    val type = hostTypeOf(config)
     val creds = configStore.credentials(id)
     val signedIn = creds.apiKey.isNotBlank() || creds.loginToken != null || creds.hasPassword
     val status = when {
-        !needsSignIn -> HostStatus.NO_SIGN_IN_NEEDED
+        !type.needsSignIn -> HostStatus.NO_SIGN_IN_NEEDED
         signedIn -> HostStatus.SIGNED_IN
         else -> HostStatus.NOT_SIGNED_IN
-    }
-    val address = when (val config = config) {
-        is GenericRestConfig -> ConfigUpdates.hostOf(config.baseUrl)
-        is WebDavConfig -> ConfigUpdates.hostOf(config.baseUrl)
-        is S3Config -> ConfigUpdates.hostOf(config.endpoint)?.let { host -> config.bucket.takeIf { it.isNotBlank() }?.let { "$host/$it" } ?: host }
-        is SmbConfig -> config.host.trim().takeIf { it.isNotEmpty() }?.let { host -> "$host/${config.share.trim('/', '\\')}" }
     }
     return HostOption(
         id = id,
         name = config.name,
-        kind = kind,
+        kindLabel = type.shortLabel,
+        icon = type.icon,
         status = status,
         detail = when {
             status == HostStatus.SIGNED_IN && creds.username.isNotBlank() -> "Signed in as ${creds.username}"
             else -> status.label
         },
-        address = address
+        address = type.address
     )
 }
 

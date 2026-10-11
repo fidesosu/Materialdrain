@@ -1,17 +1,8 @@
 package tools.senko.materialdrain.provider
 
 import tools.senko.materialdrain.provider.api.Credentials
-import tools.senko.materialdrain.provider.api.allowsAccountFallback
-import tools.senko.materialdrain.provider.api.GenericRestConfig
-import tools.senko.materialdrain.provider.api.S3Config
-import tools.senko.materialdrain.provider.api.SmbConfig
 import tools.senko.materialdrain.provider.api.StorageProvider
-import tools.senko.materialdrain.provider.api.WebDavConfig
-import tools.senko.materialdrain.provider.genericrest.GenericRestStorageProvider
 import tools.senko.materialdrain.provider.pixeldrain.PixeldrainStorageProvider
-import tools.senko.materialdrain.provider.s3.S3StorageProvider
-import tools.senko.materialdrain.provider.smb.SmbStorageProvider
-import tools.senko.materialdrain.provider.webdav.WebDavStorageProvider
 
 /**
  * Resolves configured hosts (from [configStore]) into [StorageProvider] instances. Pixeldrain is always
@@ -24,29 +15,9 @@ class ProviderRegistry(
     /** The account's own login (Settings → Account), used by hosts which fall back to it. */
     private val accountCredentials: () -> Credentials
 ) {
-    fun build(stored: StoredProvider): StorageProvider {
-        return when (val config = stored.config) {
-            is GenericRestConfig -> GenericRestStorageProvider(
-                id = stored.id,
-                config = config,
-                credentials = { ownOrAccountCredentials(stored.id, config) },
-                onLoginToken = { configStore.saveLoginToken(stored.id, it) }
-            )
-            is WebDavConfig -> WebDavStorageProvider(stored.id, config, credentials = { configStore.credentials(stored.id) })
-            is S3Config -> S3StorageProvider(stored.id, config, credentials = { configStore.credentials(stored.id) })
-            is SmbConfig -> SmbStorageProvider(stored.id, config, credentials = { configStore.credentials(stored.id) })
-        }
-    }
-
-    /**
-     * The host's own sign-in or API key. A host with `account_fallback` and none of its own uses the account's login
-     * instead, so Pixeldrain works from the Account settings alone.
-     */
-    private fun ownOrAccountCredentials(id: String, config: GenericRestConfig): Credentials {
-        val own = configStore.credentials(id)
-        val hasOwn = own.apiKey.isNotBlank() || own.loginToken != null || own.hasPassword
-        return if (!hasOwn && allowsAccountFallback(config)) accountCredentials() else own
-    }
+    /** Each kind of host builds its own provider, see [HostType.build]. */
+    fun build(stored: StoredProvider): StorageProvider =
+        hostTypeOf(stored.config).build(stored.id, configStore, accountCredentials)
 
     // Built providers are reused: the screens ask for one per row, and building one creates an HTTP client.
     // Everything is dropped when the hosts or their credentials change (see ProviderConfigStore.changes).
