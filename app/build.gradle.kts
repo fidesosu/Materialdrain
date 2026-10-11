@@ -16,7 +16,7 @@ plugins {
  *   stable and dev alike, and it stays far below Android's limit for over 4000 years.
  * The commit's time rather than the build's: building the same commit again gives the same version.
  */
-val baseVersion = "1.4"
+val baseVersion = "1.5"
 val commitEpochSeconds: Long = runCatching {
     providers.exec { commandLine("git", "log", "-1", "--format=%ct") }.standardOutput.asText.get().trim().toLong()
 }.getOrElse { System.currentTimeMillis() / 1000 }
