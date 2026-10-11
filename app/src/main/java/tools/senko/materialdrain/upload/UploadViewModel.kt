@@ -346,14 +346,10 @@ class UploadViewModel(
                 try {
                     retriever.setDataSource(context, uri)
                     newVideoDurationMillis = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
-                    var bitmap: Bitmap? = null
-                    bitmap = retriever.getFrameAtTime(VIDEO_THUMBNAIL_TARGET_TIME_US, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                    if (bitmap == null && true) {
-                        bitmap = retriever.getPrimaryImage()
-                    }
-                    if (bitmap == null) {
-                        bitmap = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                    }
+                    // A frame a second in, else the file's own cover picture, else the very first frame
+                    val bitmap = retriever.getFrameAtTime(VIDEO_THUMBNAIL_TARGET_TIME_US, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        ?: retriever.primaryImage
+                        ?: retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
                     bitmap?.let {
                         val baos = ByteArrayOutputStream()
                         it.compress(Bitmap.CompressFormat.JPEG, VIDEO_THUMBNAIL_QUALITY, baos)
