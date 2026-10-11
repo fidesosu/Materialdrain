@@ -36,6 +36,15 @@ class SourceHighlightingTest {
         assertTrue(isTextFile("Main.java", "application/octet-stream"))
         assertTrue(isTextFile("notes.bin", "text/plain"))
         assertFalse(isTextFile("photo.bin", "application/octet-stream"))
+        assertTrue(isTextFile("feed", "application/rss+xml"))
+        assertTrue(isTextFile("page", "Text/HTML; charset=utf-8"))
+        assertTrue(isTextFile("web.config", null))
+    }
+
+    @Test
+    fun `audio and video are never text, whatever the extension`() {
+        assertFalse(isTextFile("recording.ts", "video/mp2t"))
+        assertTrue(isTextFile("index.ts", "application/octet-stream"))
     }
 
     @Test

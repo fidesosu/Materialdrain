@@ -295,22 +295,9 @@ class FileInfoViewModel(
 
     private fun fetchTextFilePreviewContent(fileInfo: StorageNode) {
         previewJob?.cancel()
-        val mimeType = fileInfo.previewMimeType() ?: ""
-        val commonTextMimeTypes = listOf(
-            "text/plain", "text/html", "text/css", "text/javascript", "text/xml", "text/csv",
-            "application/json", "application/xml", "application/javascript", "application/rtf",
-            "application/x-sh", "application/x-csh", "application/x-python", "application/x-perl"
-        )
-        val commonTextExtensions = listOf(".log", ".ini", ".conf", ".cfg", ".md", ".yaml", ".yml", ".toml")
-
-        val isLikelyTextFile = commonTextMimeTypes.any { mimeType.startsWith(it, ignoreCase = true) } ||
-                isTextFile(fileInfo.name, mimeType) ||
-                (mimeType.startsWith("application/octet-stream", ignoreCase = true) &&
-                        commonTextExtensions.any { fileInfo.name.endsWith(it, ignoreCase = true) })
-
         // Not text: nothing to say about it (the details show the file's kind already), but the text of the previous file
         // mustn't stay on screen
-        if (!isLikelyTextFile) {
+        if (!isTextFile(fileInfo.name, fileInfo.previewMimeType())) {
             _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = null) }
             return
         }

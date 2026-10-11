@@ -41,6 +41,7 @@ import tools.senko.materialdrain.provider.api.ApiResponse
 import tools.senko.materialdrain.provider.api.ProviderKind
 import tools.senko.materialdrain.provider.pixeldrain.internal.PixeldrainCoreApi
 import tools.senko.materialdrain.auth.SessionManager
+import tools.senko.materialdrain.files.isTextFile
 import tools.senko.materialdrain.transfer.TransferInfo
 import tools.senko.materialdrain.transfer.TransferKind
 import tools.senko.materialdrain.transfer.TransferOutcome
@@ -286,24 +287,7 @@ class UploadViewModel(
                 }
             }
 
-            if (newMimeType != null &&
-                (newMimeType.startsWith("text/") ||
-                 newMimeType == "application/json" ||
-                 newMimeType == "application/xml" ||
-                 newMimeType == "application/javascript" ||
-                 newMimeType == "application/rss+xml" ||
-                 newMimeType == "application/atom+xml" ||
-                 (newMimeType == "application/octet-stream" && // For octet-stream, check common text extensions
-                  (newFileName?.endsWith(".txt", true) == true ||
-                   newFileName?.endsWith(".log", true) == true ||
-                   newFileName?.endsWith(".ini", true) == true ||
-                   newFileName?.endsWith(".xml", true) == true ||
-                   newFileName?.endsWith(".json", true) == true ||
-                   newFileName?.endsWith(".js", true) == true ||
-                   newFileName?.endsWith(".config", true) == true ||
-                   newFileName?.endsWith(".md", true) == true ||
-                   newFileName?.endsWith(".csv", true) == true)))
-            ) {
+            if (isTextFile(newFileName.orEmpty(), newMimeType)) {
                 try {
                     context.contentResolver.openInputStream(uri)?.use { inputStream ->
                         BufferedReader(InputStreamReader(inputStream)).use { reader ->
@@ -442,7 +426,7 @@ class UploadViewModel(
             sizeBytes = newFileSizeBytes,
             mimeType = newMimeType,
             detailsError = newErrorMessage?.trim(),
-            textContent = if (newMimeType?.startsWith("text/") == true || newMimeType == "application/octet-stream") newTextContent else null,
+            textContent = newTextContent,
             audioDurationMillis = newAudioDurationMillis,
             audioBitrate = newAudioBitrate,
             audioArtist = newAudioArtist,

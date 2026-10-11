@@ -218,7 +218,7 @@ object SourceLanguages {
         "toml" to toml,
         "ini" to ini, "cfg" to ini, "conf" to ini, "properties" to ini,
         "gradle" to gradle,
-        "html" to markup, "htm" to markup, "xhtml" to markup, "xml" to markup, "svg" to markup, "vue" to markup, "svelte" to markup,
+        "html" to markup, "htm" to markup, "xhtml" to markup, "xml" to markup, "config" to markup, "svg" to markup, "vue" to markup, "svelte" to markup,
         "md" to markdown, "markdown" to markdown,
         "diff" to diff, "patch" to diff,
         "log" to log,
@@ -243,11 +243,23 @@ fun languageFor(fileName: String, firstLine: String? = null): SourceLanguage? {
     return SourceLanguages.byShebang.entries.firstOrNull { interpreter.startsWith(it.key) }?.value
 }
 
-/** Whether the file is shown as text: it has a known source or text extension, or a text type from the server. */
+/** Types which are text, though not text/... */
+private val TEXT_MIME_TYPES = setOf(
+    "application/json", "application/xml", "application/javascript", "application/rss+xml", "application/atom+xml",
+    "application/rtf", "application/x-sh", "application/x-csh", "application/x-python", "application/x-perl",
+)
+
+/**
+ * Whether the file is shown as text: it has a known source or text extension, or a text type. Used by both the file
+ * details and the Upload screen, so the two agree. Audio and video never are, whatever the extension says: `.ts` is
+ * TypeScript but also an MPEG video.
+ */
 fun isTextFile(fileName: String, mimeType: String?): Boolean {
+    val type = mimeType?.substringBefore(';')?.trim()?.lowercase()
+    if (type != null && (type.startsWith("audio/") || type.startsWith("video/"))) return false
     val extension = fileName.substringAfterLast('.', "").lowercase()
     if (extension.isNotEmpty() && SourceLanguages.byExtension.containsKey(extension)) return true
-    return mimeType?.let { it.startsWith("text/") || it == "application/json" || it == "application/xml" || it == "application/javascript" } ?: false
+    return type != null && (type.startsWith("text/") || type in TEXT_MIME_TYPES)
 }
 
 enum class TokenKind {
