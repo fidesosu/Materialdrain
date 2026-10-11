@@ -201,6 +201,8 @@ class UploadViewModel(
     val uiState: StateFlow<UploadUiState> = _uiState.asStateFlow()
 
     private var uploadJob: Job? = null
+    // The reading of the files just picked
+    private var pickJob: Job? = null
     private val speedTracker = TransferSpeedTracker()
     private var nextItemId = 0
     private var nextTransferNumber = 0
@@ -213,6 +215,8 @@ class UploadViewModel(
     }
 
     fun onFileSelected(uri: Uri?, context: Context) {
+        // A pick still being read is replaced by this one
+        pickJob?.cancel()
         if (uri == null) {
             _uiState.update {
                 it.copy(
@@ -226,16 +230,21 @@ class UploadViewModel(
             }
             return
         }
-        val picked = readPickedFile(uri, context)
-        _uiState.update {
-            it.copy(
-                pickedFile = picked,
-                uploadTotalSizeBytes = picked.sizeBytes,
-                queuedItems = emptyList(),
-                textToUpload = "",
-                uploadResult = null,
-                uploadedBytes = 0L
-            )
+        val appContext = context.applicationContext
+        pickJob = viewModelScope.launch {
+            // Not on the main thread: an APK is copied whole to read its icon, media and PDFs are opened to read their
+            // details, and a file shared from a cloud app may first have to be downloaded
+            val picked = withContext(Dispatchers.IO) { readPickedFile(uri, appContext) }
+            _uiState.update {
+                it.copy(
+                    pickedFile = picked,
+                    uploadTotalSizeBytes = picked.sizeBytes,
+                    queuedItems = emptyList(),
+                    textToUpload = "",
+                    uploadResult = null,
+                    uploadedBytes = 0L
+                )
+            }
         }
     }
 
@@ -455,27 +464,29 @@ class UploadViewModel(
     }
 
     fun onFilesSelected(uris: List<Uri>, context: Context) {
-        when (uris.size) {
-            0 -> onFileSelected(null, context)
-            1 -> onFileSelected(uris.first(), context)
-            else -> viewModelScope.launch {
-                val items = withContext(Dispatchers.IO) {
-                    uris.map { uri -> readUploadItem(uri, context) }
-                }.let { picked ->
-                    // In the order they'll go in, from the start, so it can be seen before uploading (see uploadQueuedItems)
-                    if (appSettings.uploadInModifiedOrder.value) inModifiedOrder(picked) else picked
-                }
-                _uiState.update {
-                    it.copy(
-                        queuedItems = items,
-                        pickedFile = null,
-                        uploadTotalSizeBytes = null,
-                        textToUpload = "",
-                        errorMessage = null,
-                        uploadResult = null,
-                        uploadedBytes = 0L
-                    )
-                }
+        if (uris.size <= 1) {
+            onFileSelected(uris.firstOrNull(), context)
+            return
+        }
+        // A pick still being read is replaced by this one
+        pickJob?.cancel()
+        pickJob = viewModelScope.launch {
+            val items = withContext(Dispatchers.IO) {
+                uris.map { uri -> readUploadItem(uri, context) }
+            }.let { picked ->
+                // In the order they'll go in, from the start, so it can be seen before uploading (see uploadQueuedItems)
+                if (appSettings.uploadInModifiedOrder.value) inModifiedOrder(picked) else picked
+            }
+            _uiState.update {
+                it.copy(
+                    queuedItems = items,
+                    pickedFile = null,
+                    uploadTotalSizeBytes = null,
+                    textToUpload = "",
+                    errorMessage = null,
+                    uploadResult = null,
+                    uploadedBytes = 0L
+                )
             }
         }
     }
