@@ -36,16 +36,11 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     SettingsCategory(
         id = ACCOUNT_CATEGORY_ID,
         title = "Account",
-        summary = "Login and API key",
+        summary = "Your pixeldrain account, usage and billing",
         icon = Icons.Filled.AccountCircle,
         group = SettingsGroup.ACCOUNT,
-        hasSaveButton = true, // the API key is saved with the button
-        items = listOf(
-            SettingsItem.Header("Account login"),
-            SettingsItem.Custom { LoginSection() },
-            SettingsItem.Header("API key"),
-            SettingsItem.Custom { ApiKeySection() }
-        )
+        // One page of its own, see AccountPage; the API key has its own Save button there
+        items = listOf(SettingsItem.Custom { AccountPage() })
     ),
 
     SettingsCategory(
@@ -291,7 +286,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
 )
 
 /** Opens [url] in the browser; nothing happens when the device has none. */
-private fun openLink(context: Context, url: String) {
+internal fun openLink(context: Context, url: String) {
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (_: ActivityNotFoundException) {

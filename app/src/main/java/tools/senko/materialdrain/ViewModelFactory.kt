@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import tools.senko.materialdrain.files.FileInfoViewModel
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
 import tools.senko.materialdrain.lists.ListViewModel
+import tools.senko.materialdrain.preferences.AccountViewModel
 import tools.senko.materialdrain.preferences.AuthViewModel
 import tools.senko.materialdrain.preferences.ProviderSettingsViewModel
 import tools.senko.materialdrain.upload.UploadViewModel
@@ -31,6 +32,9 @@ class ViewModelFactory(
         }
         if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
             return AuthViewModel(container.userApi, container.sessionManager) as T
+        }
+        if (modelClass.isAssignableFrom(AccountViewModel::class.java)) {
+            return AccountViewModel(container.userApi, container.sessionManager, container.uiMessages) as T
         }
         if (modelClass.isAssignableFrom(ProviderSettingsViewModel::class.java)) {
             return ProviderSettingsViewModel(container.providerConfigStore, container.providerRegistry, container.providerUpdater) as T

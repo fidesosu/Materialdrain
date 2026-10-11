@@ -3,7 +3,10 @@ package tools.senko.materialdrain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import tools.senko.materialdrain.ui.components.NumberOdometer
 import tools.senko.materialdrain.ui.components.OdometerSpec
+import tools.senko.materialdrain.ui.components.alignTexts
+import tools.senko.materialdrain.ui.components.valueDirection
 import tools.senko.materialdrain.ui.components.buildPath
 import tools.senko.materialdrain.ui.components.buildRoute
 import tools.senko.materialdrain.ui.components.glyphAlpha
@@ -255,6 +258,66 @@ class OdometerPlanTest {
     @Test
     fun identicalTextsNeedNoTransition() {
         assertEquals(0f, planOdometer("Same", "Same", spec).totalMillis, 0f)
+    }
+
+    // --- Numbers: pushed, and lined up ---
+
+    private val numbers = NumberOdometer
+
+    @Test
+    fun aNumberWhichGrowsAtTheFrontOnlyChangesWhatChanged() {
+        val (starts, targets) = alignTexts("9.1 GB", "10.1 GB")
+        assertEquals(7, starts.size)
+        val changed = starts.indices.filter { starts[it] != targets[it] }
+        // The 1 in front appears and the 9 becomes a 0, ".1 GB" stays where it is
+        assertEquals(listOf(0, 1), changed)
+        assertEquals(-1, starts[0])
+        assertEquals('9'.code, starts[1])
+        assertEquals('0'.code, targets[1])
+        val plan = planOdometer("9.1 GB", "10.1 GB", numbers)
+        for (column in plan.columnsAt(plan.totalMillis / 2).drop(2)) {
+            assertEquals(1, column.glyphs.size)
+            assertEquals(0f, column.glyphs.single().offset, 0f)
+        }
+    }
+
+    @Test
+    fun aPushedCharacterHasOnlyTheNewOneAsGhostNextToIt() {
+        val plan = planOdometer("3", "7", numbers)
+        val fade = numbers.ghostFadeMillis.toFloat()
+        // Faded in where it already is, right below, before anything moves
+        val ghostIn = plan.columnsAt(fade).single()
+        val shown = ghostIn.glyphs.associate { it.code.toChar() to it.offset }
+        assertEquals(setOf('3', '7'), shown.keys)
+        assertEquals(0f, shown.getValue('3'), 0.001f)
+        assertEquals(1f, shown.getValue('7'), 0.001f)
+        // Then it pushes the old one up and out, without passing 4, 5 and 6
+        var t = 0f
+        while (t <= plan.totalMillis) {
+            assertTrue(plan.columnsAt(t).single().glyphs.all { it.code == '3'.code || it.code == '7'.code })
+            t += 5f
+        }
+        assertEquals("7", plan.centerTextAt(plan.totalMillis))
+    }
+
+    @Test
+    fun theWholeNumberIsPushedTheWayItsValueGoes() {
+        // 19 -> 20: the 9 becomes a 0 but the number grows, so it's pushed up like the 1 -> 2
+        val together = numbers.copy(leftToRightSpread = 0f)
+        val up = planOdometer("19", "20", together).columnsAt(numbers.ghostFadeMillis.toFloat())
+        assertTrue(up.all { column -> column.glyphs.any { it.code == column.targetCode && it.offset > 0f } })
+        // 20 -> 19: down, the new ones come from above
+        val down = planOdometer("20", "19", together).columnsAt(numbers.ghostFadeMillis.toFloat())
+        assertTrue(down.all { column -> column.glyphs.any { it.code == column.targetCode && it.offset < 0f } })
+        assertEquals(1, valueDirection("900 MB", "1.2 GB"))
+        assertEquals(-1, valueDirection("€12.50", "€9.75"))
+        assertEquals(1, valueDirection("1,234", "12,345"))
+    }
+
+    @Test
+    fun aSpaceComingOrGoingDoesntMove() {
+        val plan = planOdometer("12 ", "12", numbers)
+        for (column in plan.columnsAt(plan.totalMillis / 2)) assertTrue(column.glyphs.all { it.offset == 0f })
     }
 
     @Test

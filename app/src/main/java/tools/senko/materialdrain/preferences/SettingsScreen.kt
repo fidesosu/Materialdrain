@@ -44,6 +44,7 @@ fun SettingsScreenContent(
     onCategoryChange: (String?) -> Unit,
     appSettings: AppSettings,
     authViewModel: AuthViewModel,
+    accountViewModel: AccountViewModel,
     apiKeyInput: String,
     onApiKeyInputChange: (String) -> Unit,
     providerSettingsViewModel: ProviderSettingsViewModel,
@@ -56,7 +57,7 @@ fun SettingsScreenContent(
         if (categoryId != null) onCategoryChange(null) else onNavigateBack()
     }
 
-    val environment = SettingsEnvironment(appSettings, authViewModel, apiKeyInput, onApiKeyInputChange, providerSettingsViewModel)
+    val environment = SettingsEnvironment(appSettings, authViewModel, accountViewModel, apiKeyInput, onApiKeyInputChange, providerSettingsViewModel)
     val reduceMotion = LocalReduceMotion.current
     // Each page keeps how far it was scrolled, for when it's come back to
     val pageStates = rememberSaveableStateHolder()

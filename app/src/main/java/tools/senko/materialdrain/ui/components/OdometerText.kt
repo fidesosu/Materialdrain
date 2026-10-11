@@ -70,6 +70,11 @@ private const val GHOST_REACH = 1.25f
  * @param maxSpeedCharsPerSecond optional limit of the top speed, in characters per second
  * @param maxStepsPerChar limit of steps for wheels whose characters are far apart in the code table
  * @param reelSpacing distance between two characters on a wheel, in font sizes
+ * @param push for numbers: a character which changes isn't rolled through the ones between, the new one fades in as a
+ * ghost right next to the old one and pushes it out (up when the value grows, down when it shrinks), and it's the only
+ * ghost, see [NumberOdometer]
+ * @param alignChanges lines the old and the new text up so that as many characters as possible stay where they are
+ * ("9.1 GB" to "10.1 GB" only changes the 9 and adds a 1 in front), instead of comparing them from the left
  */
 data class OdometerSpec(
     val durationMillis: Int = 450,
@@ -81,8 +86,13 @@ data class OdometerSpec(
     val decelerationFraction: Float = 0.4f,
     val maxSpeedCharsPerSecond: Float? = null,
     val maxStepsPerChar: Int = 26,
-    val reelSpacing: Float = 1.15f
+    val reelSpacing: Float = 1.15f,
+    val push: Boolean = false,
+    val alignChanges: Boolean = false
 )
+
+/** For numbers, amounts and sizes: each changed digit is pushed out by the new one, and what stays the same doesn't move. */
+val NumberOdometer = OdometerSpec(push = true, alignChanges = true)
 
 // --- The route of a single character ---
 
@@ -229,7 +239,8 @@ internal class OdometerPlan(
                 else -> slot.strip[position(slot, t).first.roundToInt().coerceIn(0, slot.strip.lastIndex)]
             }
         }
-        return codes.dropLastWhile { it == BLANK }.joinToString("") { (if (it == BLANK) ' ' else it.toChar()).toString() }
+        // A blank is no character: the texts can be lined up with blanks before them as well as after them
+        return codes.filter { it != BLANK }.joinToString("") { it.toChar().toString() }
     }
 
     private fun columnAt(slot: OdometerSlot, elapsedMillis: Float): OdometerColumn {
@@ -290,11 +301,21 @@ internal fun staticOdometerPlan(text: String, spec: OdometerSpec) =
 
 /** Works out how every character position gets from [from] to [to], see [OdometerSpec] for the timing. */
 internal fun planOdometer(from: String, to: String, spec: OdometerSpec): OdometerPlan {
-    val positions = max(from.length, to.length)
-    val starts = IntArray(positions) { from.getOrNull(it)?.code ?: BLANK }
-    val targets = IntArray(positions) { to.getOrNull(it)?.code ?: BLANK }
+    val (starts, targets) = if (spec.alignChanges) alignTexts(from, to) else {
+        val count = max(from.length, to.length)
+        IntArray(count) { from.getOrNull(it)?.code ?: BLANK } to IntArray(count) { to.getOrNull(it)?.code ?: BLANK }
+    }
+    val positions = starts.size
+    // Pushed: the whole text goes one way, the way its value goes
+    val pushDirection = if (spec.push) valueDirection(from, to) else null
     val routes = Array(positions) { i ->
-        if (starts[i] == targets[i]) null else buildRoute(starts[i], targets[i], spec.maxStepsPerChar)
+        when {
+            starts[i] == targets[i] -> null
+            // A space coming or going isn't worth a movement
+            spec.push && isEmpty(starts[i]) && isEmpty(targets[i]) -> null
+            spec.push -> Route(intArrayOf(targets[i]), pushDirection ?: orderDirection(starts[i], targets[i]))
+            else -> buildRoute(starts[i], targets[i], spec.maxStepsPerChar)
+        }
     }
     val mostSteps = routes.maxOfOrNull { it?.path?.size ?: 0 } ?: 0
     if (mostSteps == 0) return staticOdometerPlan(to, spec)
@@ -326,15 +347,85 @@ internal fun planOdometer(from: String, to: String, spec: OdometerSpec): Odomete
         val duration = rollTime + 2 * fade
         total = max(total, delay + duration)
 
-        // The wheel in its natural order, with a neighbour on each side
+        // The wheel in its natural order, with a neighbour on each side; pushed, only the old and the new character
         val route0 = intArrayOf(starts[i]) + route.path
         val ascending = if (route.direction >= 0) route0 else route0.reversedArray()
-        val strip = intArrayOf(neighbour(ascending.first(), -1)) + ascending + intArrayOf(neighbour(ascending.last(), 1))
-        val startIndex = if (route.direction >= 0) 1 else route0.size
-        val targetIndex = if (route.direction >= 0) route0.size else 1
+        val ends = if (spec.push) 0 else 1
+        val strip = if (spec.push) ascending else intArrayOf(neighbour(ascending.first(), -1)) + ascending + intArrayOf(neighbour(ascending.last(), 1))
+        val startIndex = if (route.direction >= 0) ends else route0.size - 1 + ends
+        val targetIndex = if (route.direction >= 0) route0.size - 1 + ends else ends
         OdometerSlot(starts[i], targets[i], strip, startIndex, targetIndex, duration, fade, delay)
     }
     return OdometerPlan(slots, total, spec)
+}
+
+/** Nothing to draw: a blank or a space. */
+private fun isEmpty(code: Int) = code == BLANK || code == ' '.code
+
+/** Up (1) when [to] comes after [from] in its order (letters, digits, the code table), else down (-1). */
+private fun orderDirection(from: Int, to: Int): Int {
+    if (from == BLANK) return 1
+    if (to == BLANK) return -1
+    val a = letterIndex(from) ?: digitIndex(from) ?: from
+    val b = letterIndex(to) ?: digitIndex(to) ?: to
+    return if (b >= a) 1 else -1
+}
+
+/** A number with an optional size unit after it, like "9.1 GB", "1,234" or "€12.50". */
+private val AMOUNT = Regex("(\\d[\\d.,\u00A0\u202F ]*\\d|\\d)\\s*([KMGTP]?i?B)?")
+private val UNIT_POWERS = mapOf("B" to 0, "KB" to 1, "MB" to 2, "GB" to 3, "TB" to 4, "PB" to 5)
+
+/** What the first amount in [text] is worth, with its unit; null when there is none. */
+internal fun amountOf(text: String): Double? {
+    val match = AMOUNT.find(text) ?: return null
+    val digits = match.groupValues[1].filter { it.isDigit() || it == '.' || it == ',' }
+    // The last separator followed by one or two digits is a decimal point, the others group thousands
+    val last = digits.indexOfLast { it == '.' || it == ',' }
+    val number = if (last >= 0 && digits.length - last - 1 in 1..2) {
+        (digits.substring(0, last).filter(Char::isDigit) + "." + digits.substring(last + 1)).toDoubleOrNull()
+    } else {
+        digits.filter(Char::isDigit).toDoubleOrNull()
+    } ?: return null
+    val power = UNIT_POWERS[match.groupValues[2].replace("i", "")] ?: 0
+    return number * Math.pow(1024.0, power.toDouble())
+}
+
+/** Up (1) when the amount in [to] is bigger than the one in [from], down (-1) when smaller; null without both. */
+internal fun valueDirection(from: String, to: String): Int? {
+    val a = amountOf(from) ?: return null
+    val b = amountOf(to) ?: return null
+    return when {
+        b > a -> 1
+        b < a -> -1
+        else -> null
+    }
+}
+
+/**
+ * The two texts lined up, with blanks where one has no character: shifted against each other so that the most
+ * characters are the same in both. Of equally good ways, the one with their ends together, as numbers grow at the front.
+ */
+internal fun alignTexts(from: String, to: String): Pair<IntArray, IntArray> {
+    val endsTogether = to.length - from.length
+    var bestShift = endsTogether
+    var bestScore = -1
+    // from[i] goes in the column of to[i + shift]
+    for (shift in -from.length..to.length) {
+        var score = 0
+        for (i in from.indices) {
+            val j = i + shift
+            if (j in to.indices && from[i] == to[j]) score++
+        }
+        if (score > bestScore || (score == bestScore && shift == endsTogether)) {
+            bestScore = score
+            bestShift = shift
+        }
+    }
+    val first = min(0, bestShift)
+    val count = max(to.length, from.length + bestShift) - first
+    val starts = IntArray(count) { c -> from.getOrNull(c + first - bestShift)?.code ?: BLANK }
+    val targets = IntArray(count) { c -> to.getOrNull(c + first)?.code ?: BLANK }
+    return starts to targets
 }
 
 // --- The component ---

@@ -115,6 +115,22 @@ class AuthViewModel(
         }
     }
 
+    /** Saves the API key entered by hand, which is used while not logged in. */
+    fun saveApiKey(apiKey: String) {
+        // The ViewModels which use the key watch it themselves (see SessionManager.apiKey)
+        sessionManager.saveManualApiKey(apiKey)
+        _uiState.update {
+            it.copy(
+                errorMessage = null,
+                infoMessage = when {
+                    apiKey.isBlank() -> "API key removed."
+                    sessionManager.activeSource() == ApiKeySource.LOGIN -> "API key saved. It's used after you log out."
+                    else -> "API key saved."
+                }
+            )
+        }
+    }
+
     /** Keeps the source shown in the UI current. */
     private fun refreshSource() {
         _uiState.update { it.copy(activeSource = sessionManager.activeSource(), loggedInUser = sessionManager.loggedInUser.value) }

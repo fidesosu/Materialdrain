@@ -91,6 +91,7 @@ import tools.senko.materialdrain.lists.ListViewModel
 import tools.senko.materialdrain.navmenu.NavFabMenu
 import tools.senko.materialdrain.navmenu.menu
 import tools.senko.materialdrain.preferences.ACCOUNT_CATEGORY_ID
+import tools.senko.materialdrain.preferences.AccountViewModel
 import tools.senko.materialdrain.preferences.HOSTS_CATEGORY_ID
 import tools.senko.materialdrain.preferences.AuthViewModel
 import tools.senko.materialdrain.preferences.ProviderSettingsViewModel
@@ -144,6 +145,7 @@ fun MaterialdrainScreen() {
     val filesystemViewModel: FilesystemViewModel = viewModel(viewModelStoreOwner = transferOwner, factory = viewModelFactory)
     val listViewModel: ListViewModel = viewModel(factory = viewModelFactory)
     val authViewModel: AuthViewModel = viewModel(factory = viewModelFactory)
+    val accountViewModel: AccountViewModel = viewModel(factory = viewModelFactory)
     val providerSettingsViewModel: ProviderSettingsViewModel = viewModel(factory = viewModelFactory)
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -881,6 +883,7 @@ fun MaterialdrainScreen() {
                             apiKeyInput = apiKeyInput,
                             onApiKeyInputChange = { apiKeyInput = it },
                             authViewModel = authViewModel,
+                            accountViewModel = accountViewModel,
                             providerSettingsViewModel = providerSettingsViewModel,
                             fabHeight = fabHeightDp,
                             isFabVisible = isFabVisible,

@@ -12,6 +12,7 @@ import tools.senko.materialdrain.settings.AppSettings
 class SettingsEnvironment(
     val appSettings: AppSettings,
     val authViewModel: AuthViewModel,
+    val accountViewModel: AccountViewModel,
     val apiKeyInput: String,
     val onApiKeyInputChange: (String) -> Unit,
     val providerSettingsViewModel: ProviderSettingsViewModel
