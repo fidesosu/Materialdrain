@@ -291,6 +291,9 @@ private fun HostCard(
     var password by remember(stored.id, stored.config) { mutableStateOf(viewModel.credentialsFor(stored.id).password) }
     var showApiKey by rememberSaveable(stored.id) { mutableStateOf(apiKey.isNotBlank()) }
     val passwordMode = stored.config.passwordAuth?.mode
+    // S3 always needs both halves of a key pair, and an SMB share signs in with a username and password: neither has a
+    // single "API key" to fall back to, unlike WebDAV and generic REST hosts
+    val keyPairOnly = stored.config is S3Config || stored.config is SmbConfig
     val signedInAs = uiState.signedInAs[stored.id]
     val signingIn = uiState.signingInId == stored.id
     var justCopied by remember { mutableStateOf(false) }
@@ -370,9 +373,7 @@ private fun HostCard(
                         }
                     }
 
-                    if (stored.config is S3Config || stored.config is SmbConfig) {
-                        // S3 always needs both halves of a key pair - there's no single "API key" concept to
-                        // fall back to, unlike WebDAV/generic REST hosts. An SMB share signs in with a username and password.
+                    if (keyPairOnly) {
                         val smb = stored.config as? SmbConfig
                         Text("Credentials", style = MaterialTheme.typography.labelLarge, color = colors.primary)
                         if (smb != null && smb.auth != SmbAuthMode.CREDENTIALS) {
@@ -381,20 +382,10 @@ private fun HostCard(
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         } else {
-                            OutlinedTextField(
-                                value = username,
-                                onValueChange = { username = it },
-                                label = { Text(if (smb != null) "Username" else "Access Key ID") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = password,
-                                onValueChange = { password = it },
-                                label = { Text(if (smb != null) "Password" else "Secret Access Key") },
-                                singleLine = true,
-                                visualTransformation = PasswordVisualTransformation(),
-                                modifier = Modifier.fillMaxWidth()
+                            CredentialFields(
+                                username, { username = it }, password, { password = it },
+                                usernameLabel = if (smb != null) "Username" else "Access Key ID",
+                                passwordLabel = if (smb != null) "Password" else "Secret Access Key"
                             )
                         }
                     } else {
@@ -408,23 +399,10 @@ private fun HostCard(
                                 }
                             } else {
                                 val canSignIn = username.isNotBlank() && password.isNotEmpty() && !signingIn
-                                OutlinedTextField(
-                                    value = username,
-                                    onValueChange = { username = it },
-                                    label = { Text("Username or e-mail") },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                OutlinedTextField(
-                                    value = password,
-                                    onValueChange = { password = it },
-                                    label = { Text("Password") },
-                                    singleLine = true,
-                                    visualTransformation = PasswordVisualTransformation(),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                                    keyboardActions = KeyboardActions(onDone = { if (canSignIn) viewModel.signIn(stored.id, username, password) }),
-                                    modifier = Modifier.fillMaxWidth()
+                                CredentialFields(
+                                    username, { username = it }, password, { password = it },
+                                    usernameLabel = "Username or e-mail",
+                                    onSignIn = { if (canSignIn) viewModel.signIn(stored.id, username, password) }
                                 )
                                 Button(
                                     onClick = { viewModel.signIn(stored.id, username, password) },
@@ -438,23 +416,7 @@ private fun HostCard(
                                 }
                             }
                             // Sent with every request, so it has to be kept
-                            PasswordAuthMode.BASIC -> {
-                                OutlinedTextField(
-                                    value = username,
-                                    onValueChange = { username = it },
-                                    label = { Text("Username") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                OutlinedTextField(
-                                    value = password,
-                                    onValueChange = { password = it },
-                                    label = { Text("Password") },
-                                    singleLine = true,
-                                    visualTransformation = PasswordVisualTransformation(),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
+                            PasswordAuthMode.BASIC -> CredentialFields(username, { username = it }, password, { password = it })
                             null -> {}
                         }
 
@@ -485,7 +447,7 @@ private fun HostCard(
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             onClick = {
-                                if (stored.config is S3Config || stored.config is SmbConfig) {
+                                if (keyPairOnly) {
                                     viewModel.savePasswordCredentials(stored.id, username, password)
                                 } else {
                                     viewModel.saveApiKey(stored.id, apiKey)
@@ -551,6 +513,41 @@ private fun HostCard(
             }
         }
     }
+}
+
+/**
+ * A host's username and password fields, labelled as that kind of host calls them. The password is never shown.
+ *
+ * @param onSignIn for a sign-in form: the username gets an e-mail keyboard and Next, and Done on the password calls this
+ */
+@Composable
+private fun CredentialFields(
+    username: String,
+    onUsernameChange: (String) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    usernameLabel: String = "Username",
+    passwordLabel: String = "Password",
+    onSignIn: (() -> Unit)? = null
+) {
+    OutlinedTextField(
+        value = username,
+        onValueChange = onUsernameChange,
+        label = { Text(usernameLabel) },
+        singleLine = true,
+        keyboardOptions = if (onSignIn != null) KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next) else KeyboardOptions.Default,
+        modifier = Modifier.fillMaxWidth()
+    )
+    OutlinedTextField(
+        value = password,
+        onValueChange = onPasswordChange,
+        label = { Text(passwordLabel) },
+        singleLine = true,
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = if (onSignIn != null) KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done) else KeyboardOptions.Default,
+        keyboardActions = if (onSignIn != null) KeyboardActions(onDone = { onSignIn() }) else KeyboardActions.Default,
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 @Composable
