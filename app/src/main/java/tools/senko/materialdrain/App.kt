@@ -156,6 +156,7 @@ fun MaterialdrainScreen() {
     val fileInfoApiKeyMissing by derivedFrom { fileInfoUiState.apiKeyMissingError }
     val userFilesListError by derivedFrom { fileInfoUiState.userFilesListErrorMessage }
     val fileInfoInitiateDelete by derivedFrom { fileInfoUiState.initiateDeleteFile }
+    val listOpened by derivedFrom { listsUiState.openedList != null }
 
     // Ask for the notification permission (Android 13+) the first time a transfer runs. Transfers work without it,
     // the progress notification is just not shown.
@@ -298,7 +299,7 @@ fun MaterialdrainScreen() {
     // screens with a list of files to search have one: the lists overview is just titles
     var showSearchModal by rememberSaveable { mutableStateOf(false) }
     val searchAvailable = currentScreen == Screen.Files || currentScreen == Screen.Filesystem ||
-        (currentScreen == Screen.Lists && listsUiState.openedList != null)
+        (currentScreen == Screen.Lists && listOpened)
     LaunchedEffect(searchAvailable) { if (!searchAvailable) showSearchModal = false }
     // Whether the navigation prototype's window is open (see NavFabMenu)
     var navMenuOpen by remember { mutableStateOf(false) }
@@ -843,7 +844,7 @@ fun MaterialdrainScreen() {
                             onSelectingChange = { selectingItems = it },
                             scrollState = when (targetScreen) {
                                 Screen.Files -> filesListState
-                                Screen.Lists -> if (listsUiState.openedList != null) listContentsListState else listsListState
+                                Screen.Lists -> if (listOpened) listContentsListState else listsListState
                                 else -> filesystemListState
                             },
                             onFileSelected = { navigateTo(Screen.FileDetail) },
