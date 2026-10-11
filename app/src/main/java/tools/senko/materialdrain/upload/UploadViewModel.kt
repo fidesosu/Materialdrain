@@ -82,6 +82,38 @@ data class UploadItem(
 internal fun inModifiedOrder(items: List<UploadItem>): List<UploadItem> =
     items.sortedBy { it.lastModifiedMillis ?: Long.MAX_VALUE }
 
+/**
+ * The one file picked for upload, with what its preview shows. Which of the details are filled depends on its type:
+ * the audio ones for audio, the video ones for video, and so on.
+ *
+ * Not a data class: it holds pictures as byte arrays, which a data class would only compare by reference anyway. One is
+ * made per pick and never changed, so comparing by identity is right.
+ */
+class PickedFile(
+    val uri: Uri,
+    val name: String?,
+    val sizeBytes: Long?,
+    val mimeType: String?,
+    /** What couldn't be read of it for the preview (its text, the album, the video frame...), shown under it */
+    val detailsError: String? = null,
+    val textContent: String? = null,
+    // Audio
+    val audioDurationMillis: Long? = null,
+    val audioBitrate: Int? = null,
+    val audioArtist: String? = null,
+    val audioAlbum: String? = null,
+    val audioAlbumArt: ByteArray? = null,
+    // Video
+    val videoThumbnail: ByteArray? = null,
+    val videoDurationMillis: Long? = null,
+    // PDF
+    val pdfPageCount: Int? = null,
+    // APK
+    val apkVersionName: String? = null,
+    val apkPackageName: String? = null,
+    val apkIcon: ByteArray? = null
+)
+
 data class UploadUiState(
     val isLoading: Boolean = false,
     val uploadResult: UploadResult? = null,
@@ -89,9 +121,6 @@ data class UploadUiState(
     val errorMessage: String? = null,
     // Pixeldrain needs the login to upload and there is none: the app asks for it (see App.kt)
     val apiKeyMissing: Boolean = false,
-    // What couldn't be read of the picked file for its preview (its text, the album, the video frame...), shown under it
-    val fileDetailsError: String? = null,
-    val selectedFileName: String? = null,
     val uploadTotalSizeBytes: Long? = null,
     val uploadedBytes: Long = 0L,
     val uploadSpeedBytesPerSec: Long = 0L,
@@ -99,103 +128,12 @@ data class UploadUiState(
     // Multi-file selection (used when more than one file is picked)
     val queuedItems: List<UploadItem> = emptyList(),
     val textToUpload: String = "",
-    val selectedFileUri: Uri? = null,      // For preview purposes
-    val selectedFileMimeType: String? = null, // For preview type determination
-    val selectedFileTextContent: String? = null, // For text file preview
-    // Audio specific fields
-    val audioDurationMillis: Long? = null,
-    val audioBitrate: Int? = null,
-    val audioArtist: String? = null,
-    val audioAlbum: String? = null,
-    val audioAlbumArt: ByteArray? = null,
-    // Video specific fields
-    val videoThumbnail: ByteArray? = null,
-    val videoDurationMillis: Long? = null,
-    // PDF specific fields
-    val pdfPageCount: Int? = null,
-    // APK specific fields
-    val apkVersionName: String? = null,
-    val apkPackageName: String? = null,
-    val apkIcon: ByteArray? = null
+    // A single picked file (more than one go to queuedItems)
+    val pickedFile: PickedFile? = null
 ) {
     val hasUploadable: Boolean
-        get() = selectedFileUri != null || textToUpload.isNotBlank() ||
+        get() = pickedFile != null || textToUpload.isNotBlank() ||
             queuedItems.any { it.status == UploadItemStatus.PENDING || it.status == UploadItemStatus.FAILED }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as UploadUiState
-
-        if (isLoading != other.isLoading) return false
-        if (uploadResult != other.uploadResult) return false
-        if (errorMessage != other.errorMessage) return false
-        if (apiKeyMissing != other.apiKeyMissing) return false
-        if (fileDetailsError != other.fileDetailsError) return false
-        if (selectedFileName != other.selectedFileName) return false
-        if (uploadTotalSizeBytes != other.uploadTotalSizeBytes) return false
-        if (uploadedBytes != other.uploadedBytes) return false
-        if (uploadSpeedBytesPerSec != other.uploadSpeedBytesPerSec) return false
-        if (uploadEtaSeconds != other.uploadEtaSeconds) return false
-        if (queuedItems != other.queuedItems) return false
-        if (textToUpload != other.textToUpload) return false
-        if (selectedFileUri != other.selectedFileUri) return false
-        if (selectedFileMimeType != other.selectedFileMimeType) return false
-        if (selectedFileTextContent != other.selectedFileTextContent) return false
-        if (audioDurationMillis != other.audioDurationMillis) return false
-        if (audioBitrate != other.audioBitrate) return false
-        if (audioArtist != other.audioArtist) return false
-        if (audioAlbum != other.audioAlbum) return false
-        if (audioAlbumArt != null) {
-            if (other.audioAlbumArt == null) return false
-            if (!audioAlbumArt.contentEquals(other.audioAlbumArt)) return false
-        } else if (other.audioAlbumArt != null) return false
-        if (videoDurationMillis != other.videoDurationMillis) return false
-        if (videoThumbnail != null) {
-            if (other.videoThumbnail == null) return false
-            if (!videoThumbnail.contentEquals(other.videoThumbnail)) return false
-        } else if (other.videoThumbnail != null) return false
-        if (pdfPageCount != other.pdfPageCount) return false
-        if (apkVersionName != other.apkVersionName) return false
-        if (apkPackageName != other.apkPackageName) return false
-        if (apkIcon != null) {
-            if (other.apkIcon == null) return false
-            if (!apkIcon.contentEquals(other.apkIcon)) return false
-        } else if (other.apkIcon != null) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = isLoading.hashCode()
-        result = 31 * result + (uploadResult?.hashCode() ?: 0)
-        result = 31 * result + (errorMessage?.hashCode() ?: 0)
-        result = 31 * result + apiKeyMissing.hashCode()
-        result = 31 * result + (fileDetailsError?.hashCode() ?: 0)
-        result = 31 * result + (selectedFileName?.hashCode() ?: 0)
-        result = 31 * result + (uploadTotalSizeBytes?.hashCode() ?: 0)
-        result = 31 * result + uploadedBytes.hashCode()
-        result = 31 * result + uploadSpeedBytesPerSec.hashCode()
-        result = 31 * result + (uploadEtaSeconds?.hashCode() ?: 0)
-        result = 31 * result + queuedItems.hashCode()
-        result = 31 * result + textToUpload.hashCode()
-        result = 31 * result + (selectedFileUri?.hashCode() ?: 0)
-        result = 31 * result + (selectedFileMimeType?.hashCode() ?: 0)
-        result = 31 * result + (selectedFileTextContent?.hashCode() ?: 0)
-        result = 31 * result + (audioDurationMillis?.hashCode() ?: 0)
-        result = 31 * result + (audioBitrate ?: 0)
-        result = 31 * result + (audioArtist?.hashCode() ?: 0)
-        result = 31 * result + (audioAlbum?.hashCode() ?: 0)
-        result = 31 * result + (audioAlbumArt?.contentHashCode() ?: 0)
-        result = 31 * result + (videoDurationMillis?.hashCode() ?: 0)
-        result = 31 * result + (videoThumbnail?.contentHashCode() ?: 0)
-        result = 31 * result + (pdfPageCount ?: 0)
-        result = 31 * result + (apkVersionName?.hashCode() ?: 0)
-        result = 31 * result + (apkPackageName?.hashCode() ?: 0)
-        result = 31 * result + (apkIcon?.contentHashCode() ?: 0)
-        return result
-    }
 }
 
 /** The outcome of one upload, the same for every host. */
@@ -275,6 +213,34 @@ class UploadViewModel(
     }
 
     fun onFileSelected(uri: Uri?, context: Context) {
+        if (uri == null) {
+            _uiState.update {
+                it.copy(
+                    pickedFile = null,
+                    uploadTotalSizeBytes = null,
+                    queuedItems = emptyList(),
+                    errorMessage = null,
+                    uploadResult = null,
+                    uploadedBytes = 0L
+                )
+            }
+            return
+        }
+        val picked = readPickedFile(uri, context)
+        _uiState.update {
+            it.copy(
+                pickedFile = picked,
+                uploadTotalSizeBytes = picked.sizeBytes,
+                queuedItems = emptyList(),
+                textToUpload = "",
+                uploadResult = null,
+                uploadedBytes = 0L
+            )
+        }
+    }
+
+    /** Reads the picked file's name, size and type, and what its preview shows. What can't be read is left out and told in its detailsError. */
+    private fun readPickedFile(uri: Uri, context: Context): PickedFile {
         var newFileName: String? = null
         var newFileSizeBytes: Long? = null
         var newMimeType: String? = null
@@ -295,235 +261,197 @@ class UploadViewModel(
         var newApkPackageName: String? = null
         var newApkIcon: ByteArray? = null
 
-        if (uri != null) {
-            try {
-                newMimeType = context.contentResolver.getType(uri)
-                context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                        val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                        newFileName = cursor.getString(nameIndex)
-                        if (!cursor.isNull(sizeIndex)) {
-                            newFileSizeBytes = cursor.getLong(sizeIndex)
+        try {
+            newMimeType = context.contentResolver.getType(uri)
+            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    newFileName = cursor.getString(nameIndex)
+                    if (!cursor.isNull(sizeIndex)) {
+                        newFileSizeBytes = cursor.getLong(sizeIndex)
+                    } else {
+                        Log.w(TAG, "File size is unavailable for URI: $uri")
+                        newFileSizeBytes = null
+                    }
+                }
+            }
+
+            if (newMimeType != null &&
+                (newMimeType.startsWith("text/") ||
+                 newMimeType == "application/json" ||
+                 newMimeType == "application/xml" ||
+                 newMimeType == "application/javascript" ||
+                 newMimeType == "application/rss+xml" ||
+                 newMimeType == "application/atom+xml" ||
+                 (newMimeType == "application/octet-stream" && // For octet-stream, check common text extensions
+                  (newFileName?.endsWith(".txt", true) == true ||
+                   newFileName?.endsWith(".log", true) == true ||
+                   newFileName?.endsWith(".ini", true) == true ||
+                   newFileName?.endsWith(".xml", true) == true ||
+                   newFileName?.endsWith(".json", true) == true ||
+                   newFileName?.endsWith(".js", true) == true ||
+                   newFileName?.endsWith(".config", true) == true ||
+                   newFileName?.endsWith(".md", true) == true ||
+                   newFileName?.endsWith(".csv", true) == true)))
+            ) {
+                try {
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        BufferedReader(InputStreamReader(inputStream)).use { reader ->
+                            val charBuffer = CharArray(TEXT_PREVIEW_MAX_LENGTH)
+                            val bytesRead = reader.read(charBuffer)
+                            if (bytesRead > 0) {
+                                newTextContent = String(charBuffer, 0, bytesRead)
+                            }
+                        }
+                    }
+                } catch (e: IOException) {
+                    Log.e(TAG, "Error reading text content for preview: ${e.message}", e)
+                    newErrorMessage = (newErrorMessage ?: "") + " Could not read file for preview."
+                }
+            }
+
+            if (newMimeType?.startsWith("audio/") == true) {
+                val retriever = MediaMetadataRetriever()
+                try {
+                    retriever.setDataSource(context, uri)
+                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.let {
+                        newAudioDurationMillis = it
+                    }
+                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toIntOrNull()?.let {
+                        newAudioBitrate = it
+                    }
+                    newAudioArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                    newAudioAlbum = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                    newAudioAlbumArt = retriever.embeddedPicture
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error extracting audio metadata: ${e.message}", e)
+                    newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve audio metadata."
+                } finally {
+                    retriever.release()
+                }
+            }
+
+            if (newMimeType?.startsWith("video/") == true) {
+                val retriever = MediaMetadataRetriever()
+                try {
+                    retriever.setDataSource(context, uri)
+                    newVideoDurationMillis = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+                    var bitmap: Bitmap? = null
+                    bitmap = retriever.getFrameAtTime(VIDEO_THUMBNAIL_TARGET_TIME_US, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    if (bitmap == null && true) {
+                        bitmap = retriever.getPrimaryImage()
+                    }
+                    if (bitmap == null) {
+                        bitmap = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    }
+                    bitmap?.let {
+                        val baos = ByteArrayOutputStream()
+                        it.compress(Bitmap.CompressFormat.JPEG, VIDEO_THUMBNAIL_QUALITY, baos)
+                        newVideoThumbnail = baos.toByteArray()
+                        it.recycle()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error extracting video metadata/thumbnail: ${e.message}", e)
+                    newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve video metadata or thumbnail."
+                } finally {
+                    retriever.release()
+                }
+            }
+
+            if (newMimeType == "application/pdf") {
+                var pfd: ParcelFileDescriptor? = null
+                var renderer: PdfRenderer? = null
+                try {
+                    pfd = context.contentResolver.openFileDescriptor(uri, "r")
+                    pfd?.let {
+                        renderer = PdfRenderer(it)
+                        newPdfPageCount = renderer.pageCount
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error getting PDF page count: ${e.message}", e)
+                    newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve PDF details."
+                } finally {
+                    renderer?.close()
+                    pfd?.close()
+                }
+            }
+
+            if (newMimeType == "application/vnd.android.package-archive") {
+                var tempApkFile: File? = null
+                try {
+                    // PackageManager needs a file path, so copy from URI to a temp file if it's a content URI
+                    val apkPath = if (uri.scheme == "content") {
+                        val tempFileName = "temp_apk_preview_${System.currentTimeMillis()}.apk"
+                        tempApkFile = File(context.cacheDir, tempFileName)
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            FileOutputStream(tempApkFile).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        tempApkFile.absolutePath
+                    } else {
+                        uri.path // Assume it's already a file path
+                    }
+
+                    apkPath?.let {
+                        val pm = context.packageManager
+                        val packageInfo: PackageInfo? = pm.getPackageArchiveInfo(it, PackageManager.GET_META_DATA)
+                        if (packageInfo != null) {
+                            newApkVersionName = packageInfo.versionName
+                            newApkPackageName = packageInfo.packageName
+                            packageInfo.applicationInfo?.let { appInfo ->
+                                // Necessary for getApplicationIcon to work with an archive file
+                                appInfo.sourceDir = apkPath
+                                appInfo.publicSourceDir = apkPath
+                                val iconDrawable = pm.getApplicationIcon(appInfo)
+                                if (iconDrawable is BitmapDrawable) {
+                                    val bitmap = iconDrawable.bitmap
+                                    val baos = ByteArrayOutputStream()
+                                    bitmap.compress(Bitmap.CompressFormat.JPEG, APK_THUMBNAIL_QUALITY, baos)
+                                    newApkIcon = baos.toByteArray()
+                                    // Bitmap doesn't need explicit recycle here as it's from system
+                                }
+                            }
                         } else {
-                            Log.w(TAG, "File size is unavailable for URI: $uri")
-                            newFileSizeBytes = null
+                            newErrorMessage = (newErrorMessage ?: "") + " Could not parse APK details."
                         }
                     }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error extracting APK info: ${e.message}", e)
+                    newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve APK details."
+                } finally {
+                    tempApkFile?.delete() // Clean up temp file
                 }
-
-                if (newMimeType != null &&
-                    (newMimeType.startsWith("text/") ||
-                     newMimeType == "application/json" ||
-                     newMimeType == "application/xml" ||
-                     newMimeType == "application/javascript" ||
-                     newMimeType == "application/rss+xml" ||
-                     newMimeType == "application/atom+xml" ||
-                     (newMimeType == "application/octet-stream" && // For octet-stream, check common text extensions
-                      (newFileName?.endsWith(".txt", true) == true ||
-                       newFileName?.endsWith(".log", true) == true ||
-                       newFileName?.endsWith(".ini", true) == true ||
-                       newFileName?.endsWith(".xml", true) == true ||
-                       newFileName?.endsWith(".json", true) == true ||
-                       newFileName?.endsWith(".js", true) == true ||
-                       newFileName?.endsWith(".config", true) == true ||
-                       newFileName?.endsWith(".md", true) == true ||
-                       newFileName?.endsWith(".csv", true) == true)))
-                ) {
-                    try {
-                        context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                            BufferedReader(InputStreamReader(inputStream)).use { reader ->
-                                val charBuffer = CharArray(TEXT_PREVIEW_MAX_LENGTH)
-                                val bytesRead = reader.read(charBuffer)
-                                if (bytesRead > 0) {
-                                    newTextContent = String(charBuffer, 0, bytesRead)
-                                }
-                            }
-                        }
-                    } catch (e: IOException) {
-                        Log.e(TAG, "Error reading text content for preview: ${e.message}", e)
-                        newErrorMessage = (newErrorMessage ?: "") + " Could not read file for preview."
-                    }
-                }
-
-                if (newMimeType?.startsWith("audio/") == true) {
-                    val retriever = MediaMetadataRetriever()
-                    try {
-                        retriever.setDataSource(context, uri)
-                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.let {
-                            newAudioDurationMillis = it
-                        }
-                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toIntOrNull()?.let {
-                            newAudioBitrate = it
-                        }
-                        newAudioArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-                        newAudioAlbum = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
-                        newAudioAlbumArt = retriever.embeddedPicture
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error extracting audio metadata: ${e.message}", e)
-                        newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve audio metadata."
-                    } finally {
-                        retriever.release()
-                    }
-                }
-
-                if (newMimeType?.startsWith("video/") == true) {
-                    val retriever = MediaMetadataRetriever()
-                    try {
-                        retriever.setDataSource(context, uri)
-                        newVideoDurationMillis = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
-                        var bitmap: Bitmap? = null
-                        bitmap = retriever.getFrameAtTime(VIDEO_THUMBNAIL_TARGET_TIME_US, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                        if (bitmap == null && true) {
-                            bitmap = retriever.getPrimaryImage()
-                        }
-                        if (bitmap == null) {
-                            bitmap = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                        }
-                        bitmap?.let {
-                            val baos = ByteArrayOutputStream()
-                            it.compress(Bitmap.CompressFormat.JPEG, VIDEO_THUMBNAIL_QUALITY, baos)
-                            newVideoThumbnail = baos.toByteArray()
-                            it.recycle()
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error extracting video metadata/thumbnail: ${e.message}", e)
-                        newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve video metadata or thumbnail."
-                    } finally {
-                        retriever.release()
-                    }
-                }
-
-                if (newMimeType == "application/pdf") {
-                    var pfd: ParcelFileDescriptor? = null
-                    var renderer: PdfRenderer? = null
-                    try {
-                        pfd = context.contentResolver.openFileDescriptor(uri, "r")
-                        pfd?.let {
-                            renderer = PdfRenderer(it)
-                            newPdfPageCount = renderer.pageCount
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error getting PDF page count: ${e.message}", e)
-                        newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve PDF details."
-                    } finally {
-                        renderer?.close()
-                        pfd?.close()
-                    }
-                }
-
-                if (newMimeType == "application/vnd.android.package-archive") {
-                    var tempApkFile: File? = null
-                    try {
-                        // PackageManager needs a file path, so copy from URI to a temp file if it's a content URI
-                        val apkPath = if (uri.scheme == "content") {
-                            val tempFileName = "temp_apk_preview_${System.currentTimeMillis()}.apk"
-                            tempApkFile = File(context.cacheDir, tempFileName)
-                            context.contentResolver.openInputStream(uri)?.use { input ->
-                                FileOutputStream(tempApkFile).use { output ->
-                                    input.copyTo(output)
-                                }
-                            }
-                            tempApkFile.absolutePath
-                        } else {
-                            uri.path // Assume it's already a file path
-                        }
-
-                        apkPath?.let {
-                            val pm = context.packageManager
-                            val packageInfo: PackageInfo? = pm.getPackageArchiveInfo(it, PackageManager.GET_META_DATA)
-                            if (packageInfo != null) {
-                                newApkVersionName = packageInfo.versionName
-                                newApkPackageName = packageInfo.packageName
-                                packageInfo.applicationInfo?.let { appInfo ->
-                                    // Necessary for getApplicationIcon to work with an archive file
-                                    appInfo.sourceDir = apkPath
-                                    appInfo.publicSourceDir = apkPath
-                                    val iconDrawable = pm.getApplicationIcon(appInfo)
-                                    if (iconDrawable is BitmapDrawable) {
-                                        val bitmap = iconDrawable.bitmap
-                                        val baos = ByteArrayOutputStream()
-                                        bitmap.compress(Bitmap.CompressFormat.JPEG, APK_THUMBNAIL_QUALITY, baos)
-                                        newApkIcon = baos.toByteArray()
-                                        // Bitmap doesn't need explicit recycle here as it's from system
-                                    }
-                                }
-                            } else {
-                                newErrorMessage = (newErrorMessage ?: "") + " Could not parse APK details."
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error extracting APK info: ${e.message}", e)
-                        newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve APK details."
-                    } finally {
-                        tempApkFile?.delete() // Clean up temp file
-                    }
-                }
-
-
-            } catch (e: Exception) {
-                Log.e(TAG, "Error querying file details: ${e.message}", e)
-                newFileName = "Error reading file"
-                newFileSizeBytes = null
-                newMimeType = null
-                newErrorMessage = (newErrorMessage ?: "") + " Error accessing file details."
             }
-            _uiState.update {
-                it.copy(
-                    queuedItems = emptyList(),
-                    selectedFileName = newFileName,
-                    uploadTotalSizeBytes = newFileSizeBytes,
-                    selectedFileUri = uri,
-                    selectedFileMimeType = newMimeType,
-                    selectedFileTextContent = if (newMimeType?.startsWith("text/") == true || (newMimeType == "application/octet-stream" && newTextContent != null) ) newTextContent else null,
-                    textToUpload = "",
-                    fileDetailsError = newErrorMessage?.trim(),
-                    uploadResult = null,
-                    uploadedBytes = 0L,
-                    // Audio fields
-                    audioDurationMillis = if (newMimeType?.startsWith("audio/") == true) newAudioDurationMillis else null,
-                    audioBitrate = if (newMimeType?.startsWith("audio/") == true) newAudioBitrate else null,
-                    audioArtist = if (newMimeType?.startsWith("audio/") == true) newAudioArtist else null,
-                    audioAlbum = if (newMimeType?.startsWith("audio/") == true) newAudioAlbum else null,
-                    audioAlbumArt = if (newMimeType?.startsWith("audio/") == true) newAudioAlbumArt else null,
-                    // Video fields
-                    videoThumbnail = if (newMimeType?.startsWith("video/") == true) newVideoThumbnail else null,
-                    videoDurationMillis = if (newMimeType?.startsWith("video/") == true) newVideoDurationMillis else null,
-                    // PDF fields
-                    pdfPageCount = if (newMimeType == "application/pdf") newPdfPageCount else null,
-                    // APK fields
-                    apkVersionName = if (newMimeType == "application/vnd.android.package-archive") newApkVersionName else null,
-                    apkPackageName = if (newMimeType == "application/vnd.android.package-archive") newApkPackageName else null,
-                    apkIcon = if (newMimeType == "application/vnd.android.package-archive") newApkIcon else null
-                )
-            }
-        } else {
-            _uiState.update {
-                it.copy(
-                    selectedFileName = null,
-                    uploadTotalSizeBytes = null,
-                    selectedFileUri = null,
-                    fileDetailsError = null,
-                    selectedFileMimeType = null,
-                    selectedFileTextContent = null,
-                    queuedItems = emptyList(),
-                    errorMessage = null,
-                    uploadResult = null,
-                    uploadedBytes = 0L,
-                    audioDurationMillis = null,
-                    audioBitrate = null,
-                    audioArtist = null,
-                    audioAlbum = null,
-                    audioAlbumArt = null,
-                    videoThumbnail = null,
-                    videoDurationMillis = null,
-                    pdfPageCount = null,
-                    apkVersionName = null,
-                    apkPackageName = null,
-                    apkIcon = null
-                )
-            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error querying file details: ${e.message}", e)
+            newFileName = "Error reading file"
+            newFileSizeBytes = null
+            newMimeType = null
+            newErrorMessage = (newErrorMessage ?: "") + " Error accessing file details."
         }
+
+        // Each of the details is only read for its own type, so the others are still null here
+        return PickedFile(
+            uri = uri,
+            name = newFileName,
+            sizeBytes = newFileSizeBytes,
+            mimeType = newMimeType,
+            detailsError = newErrorMessage?.trim(),
+            textContent = if (newMimeType?.startsWith("text/") == true || newMimeType == "application/octet-stream") newTextContent else null,
+            audioDurationMillis = newAudioDurationMillis,
+            audioBitrate = newAudioBitrate,
+            audioArtist = newAudioArtist,
+            audioAlbum = newAudioAlbum,
+            audioAlbumArt = newAudioAlbumArt,
+            videoThumbnail = newVideoThumbnail,
+            videoDurationMillis = newVideoDurationMillis,
+            pdfPageCount = newPdfPageCount,
+            apkVersionName = newApkVersionName,
+            apkPackageName = newApkPackageName,
+            apkIcon = newApkIcon
+        )
     }
 
     fun onFilesSelected(uris: List<Uri>, context: Context) {
@@ -540,27 +468,12 @@ class UploadViewModel(
                 _uiState.update {
                     it.copy(
                         queuedItems = items,
-                        selectedFileName = null,
+                        pickedFile = null,
                         uploadTotalSizeBytes = null,
-                        selectedFileUri = null,
-                        fileDetailsError = null,
-                        selectedFileMimeType = null,
-                        selectedFileTextContent = null,
                         textToUpload = "",
                         errorMessage = null,
                         uploadResult = null,
-                        uploadedBytes = 0L,
-                        audioDurationMillis = null,
-                        audioBitrate = null,
-                        audioArtist = null,
-                        audioAlbum = null,
-                        audioAlbumArt = null,
-                        videoThumbnail = null,
-                        videoDurationMillis = null,
-                        pdfPageCount = null,
-                        apkVersionName = null,
-                        apkPackageName = null,
-                        apkIcon = null
+                        uploadedBytes = 0L
                     )
                 }
             }
@@ -594,40 +507,23 @@ class UploadViewModel(
     }
 
     fun onTextToUploadChanged(newText: String) {
-        var newTextSizeBytes: Long? = null
         if (newText.isNotBlank()) {
-            newTextSizeBytes = newText.toByteArray().size.toLong()
             _uiState.update {
                 it.copy(
                     textToUpload = newText,
                     queuedItems = emptyList(),
-                    selectedFileName = null,
-                    uploadTotalSizeBytes = newTextSizeBytes,
-                    selectedFileUri = null,
-                    fileDetailsError = null,
-                    selectedFileMimeType = null,
-                    selectedFileTextContent = null,
+                    pickedFile = null,
+                    uploadTotalSizeBytes = newText.toByteArray().size.toLong(),
                     errorMessage = null,
                     uploadResult = null,
-                    uploadedBytes = 0L,
-                    audioDurationMillis = null,
-                    audioBitrate = null,
-                    audioArtist = null,
-                    audioAlbum = null,
-                    audioAlbumArt = null,
-                    videoThumbnail = null,
-                    videoDurationMillis = null,
-                    pdfPageCount = null,
-                    apkVersionName = null,
-                    apkPackageName = null,
-                    apkIcon = null
+                    uploadedBytes = 0L
                 )
             }
         } else {
              _uiState.update {
                 it.copy(
                     textToUpload = newText,
-                    uploadTotalSizeBytes = if(it.selectedFileUri != null) it.uploadTotalSizeBytes else null, // Keep existing file size if a file is selected
+                    uploadTotalSizeBytes = if (it.pickedFile != null) it.uploadTotalSizeBytes else null, // Keep existing file size if a file is selected
                     errorMessage = null,
                     uploadResult = null,
                     uploadedBytes = 0L
@@ -780,65 +676,29 @@ class UploadViewModel(
         }
 
         val currentTextToUpload = _uiState.value.textToUpload
-        val currentSelectedFileUri = _uiState.value.selectedFileUri
+        val currentPickedFile = _uiState.value.pickedFile
 
         if (missingKey()) {
             _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    apiKeyMissing = true,
-                    selectedFileName = null,
-                    uploadTotalSizeBytes = null,
-                    selectedFileUri = null,
-                    fileDetailsError = null,
-                    selectedFileMimeType = null,
-                    selectedFileTextContent = null,
-                    textToUpload = "",
-                    audioDurationMillis = null,
-                    audioBitrate = null,
-                    audioArtist = null,
-                    audioAlbum = null,
-                    audioAlbumArt = null,
-                    videoThumbnail = null,
-                    videoDurationMillis = null,
-                    pdfPageCount = null,
-                    apkVersionName = null,
-                    apkPackageName = null,
-                    apkIcon = null
-                )
+                it.copy(isLoading = false, apiKeyMissing = true, pickedFile = null, uploadTotalSizeBytes = null, textToUpload = "")
             }
             return
         }
 
-        if (currentSelectedFileUri == null && currentTextToUpload.isBlank()) {
+        if (currentPickedFile == null && currentTextToUpload.isBlank()) {
             _uiState.update {
                 it.copy(
                     isLoading = false,
                     errorMessage = "No file selected or text provided.",
-                     selectedFileName = null,
+                    pickedFile = null,
                     uploadTotalSizeBytes = null,
-                    selectedFileUri = null,
-                    fileDetailsError = null,
-                    selectedFileMimeType = null,
-                    selectedFileTextContent = null,
-                    textToUpload = "",
-                    audioDurationMillis = null,
-                    audioBitrate = null,
-                    audioArtist = null,
-                    audioAlbum = null,
-                    audioAlbumArt = null,
-                    videoThumbnail = null,
-                    videoDurationMillis = null,
-                    pdfPageCount = null,
-                    apkVersionName = null,
-                    apkPackageName = null,
-                    apkIcon = null
+                    textToUpload = ""
                 )
             }
             return
         }
 
-        val totalBytesForUpload = if (currentSelectedFileUri != null) {
+        val totalBytesForUpload = if (currentPickedFile != null) {
             _uiState.value.uploadTotalSizeBytes
         } else if (currentTextToUpload.isNotBlank()) {
             currentTextToUpload.toByteArray().size.toLong()
@@ -862,12 +722,12 @@ class UploadViewModel(
 
         val transferId = "upload-single-${nextTransferNumber++}"
         transfers.start(
-            TransferInfo(transferId, TransferKind.UPLOAD, _uiState.value.selectedFileName ?: "text", totalBytes = totalBytesForUpload),
+            TransferInfo(transferId, TransferKind.UPLOAD, currentPickedFile?.name ?: "text", totalBytes = totalBytesForUpload),
             onCancel = { cancelUpload() }
         )
 
         uploadJob = viewModelScope.launch {
-            val currentFileNameForUpload = _uiState.value.selectedFileName
+            val currentFileNameForUpload = currentPickedFile?.name
             var operationType = "unknown"
 
             val job = coroutineContext[Job]
@@ -889,10 +749,10 @@ class UploadViewModel(
             }
 
             val response: UploadResult? = try {
-                if (currentSelectedFileUri != null) {
+                if (currentPickedFile != null) {
                     operationType = "file from URI"
                     val fileName = currentFileNameForUpload ?: "pixeldrain_upload_${System.currentTimeMillis()}"
-                    uploadFile(fileName, currentSelectedFileUri, progressCallback)
+                    uploadFile(fileName, currentPickedFile.uri, progressCallback)
                 } else if (currentTextToUpload.isNotBlank()) {
                     operationType = "text"
                     val fileName = "text_upload_${System.currentTimeMillis()}.txt"
@@ -922,25 +782,10 @@ class UploadViewModel(
                             isLoading = false,
                             uploadResult = response,
                             errorMessage = null,
-                            selectedFileName = null,
+                            pickedFile = null,
                             uploadTotalSizeBytes = null,
-                            uploadedBytes = finalTotalBytes ?: 0L, 
-                            textToUpload = "",
-                            selectedFileUri = null,
-                            fileDetailsError = null,
-                            selectedFileMimeType = null,
-                            selectedFileTextContent = null,
-                            audioDurationMillis = null,
-                            audioBitrate = null,
-                            audioArtist = null,
-                            audioAlbum = null,
-                            audioAlbumArt = null,
-                            videoThumbnail = null,
-                            videoDurationMillis = null,
-                            pdfPageCount = null,
-                            apkVersionName = null,
-                            apkPackageName = null,
-                            apkIcon = null
+                            uploadedBytes = finalTotalBytes ?: 0L,
+                            textToUpload = ""
                         )
                     }
                 } else {

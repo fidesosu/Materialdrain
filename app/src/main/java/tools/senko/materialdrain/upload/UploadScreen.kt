@@ -123,7 +123,7 @@ fun UploadScreenContent(
 
                 when (selectedTabIndex) {
                     0 -> {
-                        val hasSelection = uiState.selectedFileName != null || uiState.queuedItems.isNotEmpty()
+                        val hasSelection = uiState.pickedFile != null || uiState.queuedItems.isNotEmpty()
                         if (!hasSelection) {
                             UploadDropZone(
                                 enabled = !uiState.isLoading,
@@ -149,63 +149,52 @@ fun UploadScreenContent(
                                 onClear = uploadViewModel::clearQueuedItems
                             )
                         }
-                        uiState.selectedFileName?.let {
+                        uiState.pickedFile?.let { file ->
                             Spacer(modifier = Modifier.height(8.dp))
                             Card(modifier = Modifier.fillMaxWidth()){
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Text("Selected File:", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                                    InfoRow("Name:", uiState.selectedFileName ?: "N/A")
-                                    uiState.uploadTotalSizeBytes?.let { s -> InfoRow("Size:", formatSize(s)) }
-                                    uiState.selectedFileMimeType?.let { mt -> InfoRow("Type:", mt) }
-
-                                    if (uiState.selectedFileMimeType?.startsWith("audio/") == true) {
-                                        uiState.audioDurationMillis?.let { d -> InfoRow("Duration:", formatDurationMillis(d)) }
-                                        uiState.audioBitrate?.let { b -> InfoRow("Bitrate:", "${b / 1000} kbps") }
-                                        uiState.audioArtist?.let { a -> InfoRow("Artist:", a) }
-                                        uiState.audioAlbum?.let { al -> InfoRow("Album:", al) }
-                                    }
-
-                                    if (uiState.selectedFileMimeType?.startsWith("video/") == true) {
-                                        uiState.videoDurationMillis?.let { d -> InfoRow("Duration:", formatDurationMillis(d)) }
-                                    }
-
-                                    if (uiState.selectedFileMimeType == "application/pdf") {
-                                        uiState.pdfPageCount?.let { pc -> InfoRow("Pages:", pc.toString()) }
-                                    }
-
-                                    if (uiState.selectedFileMimeType == "application/vnd.android.package-archive") {
-                                        uiState.apkPackageName?.let { pn -> InfoRow("Package:", pn) }
-                                        uiState.apkVersionName?.let { vn -> InfoRow("Version:", vn) }
-                                    }
+                                    InfoRow("Name:", file.name ?: "N/A")
+                                    file.sizeBytes?.let { s -> InfoRow("Size:", formatSize(s)) }
+                                    file.mimeType?.let { mt -> InfoRow("Type:", mt) }
+                                    // Each of these is only filled for its own type
+                                    file.audioDurationMillis?.let { d -> InfoRow("Duration:", formatDurationMillis(d)) }
+                                    file.audioBitrate?.let { b -> InfoRow("Bitrate:", "${b / 1000} kbps") }
+                                    file.audioArtist?.let { a -> InfoRow("Artist:", a) }
+                                    file.audioAlbum?.let { al -> InfoRow("Album:", al) }
+                                    file.videoDurationMillis?.let { d -> InfoRow("Duration:", formatDurationMillis(d)) }
+                                    file.pdfPageCount?.let { pc -> InfoRow("Pages:", pc.toString()) }
+                                    file.apkPackageName?.let { pn -> InfoRow("Package:", pn) }
+                                    file.apkVersionName?.let { vn -> InfoRow("Version:", vn) }
                                 }
                             }
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            if (uiState.selectedFileMimeType?.startsWith("image/") == true) {
+                            if (file.mimeType?.startsWith("image/") == true) {
                                 InlineImagePreview(
-                                    imageSource = uiState.selectedFileUri,
+                                    imageSource = file.uri,
                                     contentDescription = "Selected image preview",
                                     apiKey = null,
                                     onFullScreenClick = {
-                                        fullScreenPreviewUri = uiState.selectedFileUri
-                                        fullScreenPreviewMimeType = uiState.selectedFileMimeType
+                                        fullScreenPreviewUri = file.uri
+                                        fullScreenPreviewMimeType = file.mimeType
                                     }
                                 )
                             }
 
-                            if (uiState.selectedFileMimeType?.startsWith("video/") == true) {
+                            if (file.mimeType?.startsWith("video/") == true) {
                                 InlineVideoPreview(
-                                    thumbnailSource = uiState.videoThumbnail, // Upload screen uses fetched byte array for thumbnail
+                                    thumbnailSource = file.videoThumbnail, // Upload screen uses fetched byte array for thumbnail
                                     contentDescription = "Selected video preview",
                                     apiKey = null,
                                     onFullScreenClick = {
-                                        fullScreenPreviewUri = uiState.selectedFileUri
-                                        fullScreenPreviewMimeType = uiState.selectedFileMimeType
+                                        fullScreenPreviewUri = file.uri
+                                        fullScreenPreviewMimeType = file.mimeType
                                     }
                                 )
                             }
 
-                            if (uiState.selectedFileUri != null && uiState.selectedFileMimeType == "application/pdf" && uiState.pdfPageCount != null) {
+                            if (file.mimeType == "application/pdf" && file.pdfPageCount != null) {
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -222,7 +211,7 @@ fun UploadScreenContent(
                                 }
                             }
 
-                            if (uiState.selectedFileUri != null && uiState.selectedFileMimeType == "application/vnd.android.package-archive") {
+                            if (file.mimeType == "application/vnd.android.package-archive") {
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -234,7 +223,7 @@ fun UploadScreenContent(
                                         modifier = Modifier.fillMaxSize().padding(16.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        uiState.apkIcon?.let {
+                                        file.apkIcon?.let {
                                             val bitmap = remember(it) { BitmapFactory.decodeByteArray(it, 0, it.size) }
                                             Image(
                                                 bitmap = bitmap.asImageBitmap(),
@@ -247,21 +236,21 @@ fun UploadScreenContent(
                                 }
                             }
 
-                            if (uiState.selectedFileUri != null && uiState.selectedFileMimeType?.startsWith("audio/") == true) {
+                            if (file.mimeType?.startsWith("audio/") == true) {
                                 AudioPlayerPreview(
-                                    audioUri = uiState.selectedFileUri!!,
+                                    audioUri = file.uri,
                                     apiKey = null,
                                     title = null,
-                                    artist = uiState.audioArtist,
-                                    album = uiState.audioAlbum,
-                                    albumArtSource = uiState.audioAlbumArt,
-                                    durationHintMillis = uiState.audioDurationMillis
+                                    artist = file.audioArtist,
+                                    album = file.audioAlbum,
+                                    albumArtSource = file.audioAlbumArt,
+                                    durationHintMillis = file.audioDurationMillis
                                 )
                             }
 
-                            InlineTextPreview(textContent = uiState.selectedFileTextContent)
+                            InlineTextPreview(textContent = file.textContent)
 
-                            uiState.fileDetailsError?.let { error ->
+                            file.detailsError?.let { error ->
                                 Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom=8.dp))
                             }
                         }
@@ -299,7 +288,7 @@ fun UploadScreenContent(
 
                 if (!uiState.isLoading && uploadResult == null) {
                     val effectiveSize = if (selectedTabIndex == 0) uiState.uploadTotalSizeBytes else uiState.textToUpload.toByteArray().size.toLong().takeIf { it > 0 }
-                    if (effectiveSize != null && (uiState.selectedFileUri != null || uiState.textToUpload.isNotBlank())) {
+                    if (effectiveSize != null && (uiState.pickedFile != null ||uiState.textToUpload.isNotBlank())) {
                         Text("Ready to upload. Size: ${formatSize(effectiveSize)}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom=8.dp), textAlign = TextAlign.Center)
                     }
                 }
