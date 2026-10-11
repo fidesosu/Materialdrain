@@ -56,6 +56,13 @@ interface StorageProvider {
     /** Thumbnail image URL for [node], or null if the provider can't generate one. */
     fun thumbnailUrl(node: StorageNode): String?
 
+    /**
+     * Whether [thumbnailUrl] is already made on this device from the file itself (photos, video frames, album covers),
+     * so the app takes it as it is instead of making its own from the file.
+     */
+    val thumbnailsMadeOnDevice: Boolean
+        get() = false
+
     /** Direct link to the raw bytes of [node] (e.g. for streaming media playback). */
     fun rawContentUrl(node: StorageNode, attachment: Boolean = false): String?
 

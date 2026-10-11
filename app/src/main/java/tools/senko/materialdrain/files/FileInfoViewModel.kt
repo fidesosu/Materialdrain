@@ -209,8 +209,8 @@ class FileInfoViewModel(
     fun thumbnailFor(node: StorageNode): String? {
         val provider = provider()
         val thumbnail = provider.thumbnailUrl(node)
-        // SMB shares make their own on the device, and only real ones: photos, video frames and album covers
-        if (provider.kind == ProviderKind.SMB) return thumbnail
+        // A host whose thumbnails are made on the device already (SMB shares) has nothing to improve on
+        if (provider.thumbnailsMadeOnDevice) return thumbnail
         // Songs show their album cover, read out of the file itself. One without a cover keeps the app's own music tile
         // (see FileIcon) rather than the host's generic picture
         if (!node.isDirectory && node.previewMimeType()?.startsWith("audio/") == true) {

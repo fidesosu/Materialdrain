@@ -164,6 +164,9 @@ class SmbStorageProvider(
     override fun thumbnailUrl(node: StorageNode): String? =
         if (node.isDirectory) null else SmbContentServer.thumbnailUrl(id, node.ref.path, version = node.modifiedAt ?: node.size?.toString())
 
+    // Only real ones: photos, video frames and album covers
+    override val thumbnailsMadeOnDevice: Boolean = true
+
     override fun rawContentUrl(node: StorageNode, attachment: Boolean): String? =
         if (node.isDirectory) null else SmbContentServer.rawUrl(id, node.ref.path)
 
