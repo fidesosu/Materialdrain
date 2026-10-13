@@ -31,8 +31,6 @@ import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxState
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -124,7 +122,9 @@ fun AppSnackbarHost(
             enter = fadeIn(fade) + slideInVertically(snackbarMotion<IntOffset>(reduceMotion)) { it },
             exit = fadeOut(fade) + slideOutVertically(snackbarMotion<IntOffset>(reduceMotion)) { it }
         ) {
-            shown?.let { snackbarData ->
+            // Each message gets its own item, so its swipe state is never handed to the box of the one before (see
+            // DismissibleSnackbar)
+            shown?.let { snackbarData -> key(snackbarData) {
                 SnackbarItem(
                     snackbarData = snackbarData,
                     styled = styled,
@@ -136,9 +136,31 @@ fun AppSnackbarHost(
                         onDismiss()
                     }
                 )
-            }
+            } }
         }
     }
+}
+
+/**
+ * The snackbar's swipe away, in either direction. Its state lives and dies with this one box: a [SwipeToDismissBox] keeps
+ * the anchors of the state it was first measured with, so a state handed to a box that is already laid out has no anchors
+ * in the app's lookahead pass (the [androidx.compose.animation.SharedTransitionLayout] around it), and the box crashes
+ * placing itself at their NaN position. A new message or the other look therefore makes a new box with a new state.
+ */
+@Composable
+private fun DismissibleSnackbar(
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val state = rememberSwipeToDismissBoxState()
+    SwipeToDismissBox(
+        state = state,
+        modifier = modifier,
+        backgroundContent = { /* No background needed for this use case */ },
+        onDismiss = { onDismiss() },
+        content = { content() }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -151,14 +173,6 @@ private fun SnackbarItem(
     reduceMotion: Boolean,
     onDismiss: () -> Unit
 ) {
-    val dismissState = key(snackbarData) {
-        rememberSwipeToDismissBoxState()
-    }
-
-    LaunchedEffect(dismissState.currentValue) {
-        if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) onDismiss()
-    }
-
     // Two lines of the message; a tap shows all of it
     var expanded by remember(snackbarData) { mutableStateOf(false) }
     val actionLabel = snackbarData.visuals.actionLabel
@@ -175,7 +189,7 @@ private fun SnackbarItem(
     ) { isStyled ->
         if (isStyled) {
             StyledSnackbar(
-                dismissState = dismissState,
+                onDismiss = onDismiss,
                 snackbarData = snackbarData,
                 message = message,
                 actionLabel = actionLabel,
@@ -187,7 +201,7 @@ private fun SnackbarItem(
             )
         } else {
             StandardSnackbar(
-                dismissState = dismissState,
+                onDismiss = onDismiss,
                 snackbarData = snackbarData,
                 message = message,
                 actionLabel = actionLabel,
@@ -202,7 +216,7 @@ private fun SnackbarItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun StandardSnackbar(
-    dismissState: SwipeToDismissBoxState,
+    onDismiss: () -> Unit,
     snackbarData: SnackbarData,
     message: String,
     actionLabel: String?,
@@ -215,38 +229,34 @@ private fun StandardSnackbar(
         modifier = Modifier.fillMaxWidth().animateContentSize(animationSpec = snackbarMotion<IntSize>(reduceMotion)),
         contentAlignment = Alignment.BottomCenter
     ) {
-        SwipeToDismissBox(
-            state = dismissState,
-            backgroundContent = { /* No background needed for this use case */ },
-            content = {
-                Snackbar(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    action = actionLabel?.let { label ->
-                        {
-                            TextButton(onClick = { snackbarData.performAction() }) {
-                                Text(label, color = MaterialTheme.colorScheme.primary)
-                            }
+        DismissibleSnackbar(onDismiss = onDismiss) {
+            Snackbar(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                action = actionLabel?.let { label ->
+                    {
+                        TextButton(onClick = { snackbarData.performAction() }) {
+                            Text(label, color = MaterialTheme.colorScheme.primary)
                         }
-                    },
-                    content = {
-                        Text(
-                            text = message,
-                            maxLines = if (expanded) Int.MAX_VALUE else 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.clickable { onToggleExpanded() }
-                        )
                     }
-                )
-            }
-        )
+                },
+                content = {
+                    Text(
+                        text = message,
+                        maxLines = if (expanded) Int.MAX_VALUE else 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable { onToggleExpanded() }
+                    )
+                }
+            )
+        }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun StyledSnackbar(
-    dismissState: SwipeToDismissBoxState,
+    onDismiss: () -> Unit,
     snackbarData: SnackbarData,
     message: String,
     actionLabel: String?,
@@ -283,46 +293,41 @@ private fun StyledSnackbar(
             verticalAlignment = Alignment.Bottom
         ) {
             Spacer(Modifier.width(startGap))
-            SwipeToDismissBox(
-                state = dismissState,
-                modifier = Modifier.weight(1f),
-                backgroundContent = { /* No background needed for this use case */ },
-                content = {
-                    Surface(
-                        // As tall as the button, unless the message is longer and needs more room
-                        modifier = Modifier.fillMaxWidth().then(
-                            if (expanded || fabSize <= 0.dp) Modifier.heightIn(min = fabSize.coerceAtLeast(56.dp))
-                            else Modifier.height(fabSize)
-                        ),
-                        shape = RoundedCornerShape(EdgeCorner),
-                        // The same colours as the standard snackbar, so both look like one kind of message
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        shadowElevation = 6.dp
+            DismissibleSnackbar(onDismiss = onDismiss, modifier = Modifier.weight(1f)) {
+                Surface(
+                    // As tall as the button, unless the message is longer and needs more room
+                    modifier = Modifier.fillMaxWidth().then(
+                        if (expanded || fabSize <= 0.dp) Modifier.heightIn(min = fabSize.coerceAtLeast(56.dp))
+                        else Modifier.height(fabSize)
+                    ),
+                    shape = RoundedCornerShape(EdgeCorner),
+                    // The same colours as the standard snackbar, so both look like one kind of message
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    shadowElevation = 6.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = message,
-                                style = MaterialTheme.typography.labelLarge,
-                                maxLines = if (expanded) Int.MAX_VALUE else 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f).clickable { onToggleExpanded() }
-                            )
-                            if (actionLabel != null) {
-                                TextButton(
-                                    onClick = { snackbarData.performAction() },
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                                ) {
-                                    Text(actionLabel, style = MaterialTheme.typography.labelLarge)
-                                }
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = if (expanded) Int.MAX_VALUE else 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f).clickable { onToggleExpanded() }
+                        )
+                        if (actionLabel != null) {
+                            TextButton(
+                                onClick = { snackbarData.performAction() },
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                            ) {
+                                Text(actionLabel, style = MaterialTheme.typography.labelLarge)
                             }
                         }
                     }
                 }
-            )
+            }
             Spacer(Modifier.width(endGap))
         }
     }

@@ -17,13 +17,11 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -69,6 +67,7 @@ import tools.senko.materialdrain.ui.LocalBottomInset
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.components.CodePreview
 import tools.senko.materialdrain.ui.components.DotScrollbar
+import tools.senko.materialdrain.ui.components.ExpandableText
 import tools.senko.materialdrain.ui.components.FileIcon
 import tools.senko.materialdrain.ui.components.NumberOdometer
 import tools.senko.materialdrain.ui.components.OdometerText
@@ -307,7 +306,7 @@ fun FileInfoDetailsCard(
                         add { DetailRow(Icons.Filled.Visibility, "Last viewed", formatApiDateTimeString(date), relativeTime(date)) }
                     }
                     folderOf(fileInfo)?.let { folder ->
-                        add { DetailRow(Icons.Filled.Folder, "Folder", folder, onCopy = { copy("Folder", folder) }) }
+                        add { DetailRow(Icons.Filled.Folder, "Folder", folder, collapsedLines = 2, onCopy = { copy("Folder", folder) }) }
                     }
                     rich?.let { autoDeleteText(it) }?.let { text ->
                         add { DetailRow(Icons.Filled.AutoDelete, "Deletes itself", text) }
@@ -330,6 +329,7 @@ fun FileInfoDetailsCard(
                                     icon = Icons.Filled.Link,
                                     label = "Link",
                                     value = link.removePrefix("https://"),
+                                    collapsedLines = 1,
                                     onCopy = { copy("Link", link) },
                                     onOpen = {
                                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, link.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
@@ -338,10 +338,10 @@ fun FileInfoDetailsCard(
                             }
                         }
                         fileInfo.ref.id?.let { id ->
-                            add { DetailRow(Icons.Filled.Numbers, "ID", id, monospace = true, onCopy = { copy("ID", id) }) }
+                            add { DetailRow(Icons.Filled.Numbers, "ID", id, monospace = true, collapsedLines = 1, onCopy = { copy("ID", id) }) }
                         }
                         rich?.sha256?.let { hash ->
-                            add { DetailRow(Icons.Filled.Fingerprint, "SHA-256", hash, monospace = true, collapsible = true, onCopy = { copy("SHA-256", hash) }) }
+                            add { DetailRow(Icons.Filled.Fingerprint, "SHA-256", hash, monospace = true, collapsedLines = 1, onCopy = { copy("SHA-256", hash) }) }
                         }
                     }
                     rows.forEachIndexed { index, row ->
@@ -377,10 +377,8 @@ private fun FileHeader(file: StorageNode, showTile: Boolean) {
             Spacer(Modifier.width(12.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
-            SelectionContainer {
-                Text(file.name, style = MaterialTheme.typography.titleMedium, maxLines = 4, overflow = TextOverflow.Ellipsis)
-            }
-            Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ExpandableText(file.name, style = MaterialTheme.typography.titleMedium, collapsedLines = 2)
+            Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -671,7 +669,7 @@ private fun RowDivider() {
 
 /**
  * One detail: its icon, its name over its value (selectable), an optional line under the value, and buttons to copy or
- * open it. A [collapsible] value (a hash) shows one line until it's tapped.
+ * open it. The value shows [collapsedLines] lines at most, and all of it when tapped (see [ExpandableText]).
  */
 @Composable
 private fun DetailRow(
@@ -680,33 +678,28 @@ private fun DetailRow(
     value: String,
     supporting: String? = null,
     monospace: Boolean = false,
-    collapsible: Boolean = false,
+    collapsedLines: Int = 3,
     onCopy: (() -> Unit)? = null,
     onOpen: (() -> Unit)? = null
 ) {
-    var expanded by remember { mutableStateOf(!collapsible) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (collapsible) Modifier.clickable { expanded = !expanded } else Modifier)
             .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
         Spacer(Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            SelectionContainer {
-                Text(
-                    value,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontFamily = if (monospace) FontFamily.Monospace else null,
-                    maxLines = if (expanded) Int.MAX_VALUE else 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            ExpandableText(
+                value,
+                style = MaterialTheme.typography.bodyLarge,
+                fontFamily = if (monospace) FontFamily.Monospace else null,
+                collapsedLines = collapsedLines
+            )
             supporting?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
         onOpen?.let {

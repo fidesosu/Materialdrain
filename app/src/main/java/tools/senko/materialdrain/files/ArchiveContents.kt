@@ -59,7 +59,8 @@ fun ArchiveContents(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        // The folder it's in is the end of the path, which stays in sight
+                        overflow = TextOverflow.StartEllipsis
                     )
                 }
                 if (archive.inside.isNotEmpty()) {
@@ -128,7 +129,8 @@ private fun ArchiveRow(
         )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(entry.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Cut in the middle, so the extension stays in sight
+            Text(entry.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
             if (!entry.isDirectory) {
                 Text(
                     formatSize(entry.size ?: 0L),

@@ -143,7 +143,9 @@ private fun BoxScope.DotScrollbarStrip(
     fun geometry(viewportPx: Float): DotGeometry? {
         val track = (viewportPx - 2 * marginPx - bottomInsetPx).coerceAtLeast(0f)
         val m = metrics(viewportPx)
-        if (!m.scrollable || track <= 0f) return null
+        // A lazy list's length is an estimate, which can come out no longer than the view: there's nothing to scroll then,
+        // and the fraction below would be 0 / 0, a NaN position the layout can't round
+        if (!m.scrollable || track <= 0f || !(m.contentPx > viewportPx)) return null
         // The stretched line is the visible share of the content, kept between a short and a modest length so it never
         // shrinks to a speck on long lists or fills the track on short ones
         val full = (viewportPx / m.contentPx * track).coerceIn(minLinePx.coerceAtMost(track), maxLinePx.coerceAtMost(track))
