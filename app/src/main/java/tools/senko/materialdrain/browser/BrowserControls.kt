@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -168,16 +169,20 @@ fun SortControls(
     /** Actions at the end of the row, behind a "New" menu, e.g. the filesystem's upload and new folder. */
     actions: List<SortRowAction> = emptyList(),
     /** Stops the transfer shown in the bar above (a download, an upload); null while there's none. */
-    onCancelTransfer: (() -> Unit)? = null
+    onCancelTransfer: (() -> Unit)? = null,
+    /** Loads the thumbnails the data saver holds back (see DataSaver); null while there are none held back. */
+    onLoadThumbnails: (() -> Unit)? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
     val currentSortName = SortOptions.find { it.second == sortField }?.first.orEmpty()
     val directionIcon = if (sortAscending) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward
     val directionDescription = if (sortAscending) "Ascending" else "Descending"
 
-    // Kept while Cancel shrinks away, when there's no transfer left to cancel
+    // Kept while Cancel shrinks away, when there's no transfer left to cancel; the same for Thumbnails once they're loaded
     var lastCancel by remember { mutableStateOf(onCancelTransfer) }
     if (onCancelTransfer != null) lastCancel = onCancelTransfer
+    var lastLoadThumbnails by remember { mutableStateOf(onLoadThumbnails) }
+    if (onLoadThumbnails != null) lastLoadThumbnails = onLoadThumbnails
 
     BoxWithConstraints(
         modifier = Modifier
@@ -189,7 +194,7 @@ fun SortControls(
         // Sort by alone fills the row, beside New they split it by content, and a Cancel appearing during a transfer
         // makes room for itself. On a narrow screen they all give way alike, their text ending in "…"
         val needs = sortRowNeeds()
-        val shown = listOf(true, onCancelTransfer != null, actions.isNotEmpty())
+        val shown = listOf(true, onCancelTransfer != null, actions.isNotEmpty(), onLoadThumbnails != null)
         val visibleNeeds = needs.filterIndexed { i, _ -> shown[i] }
         val room = maxWidth - SortRowGap * (visibleNeeds.size - 1)
         val scale = room / visibleNeeds.fold(0.dp) { sum, need -> sum + need }
@@ -202,6 +207,7 @@ fun SortControls(
             animateDpAsState(if (isShown && i != firstShown) SortRowGap else 0.dp, sizeSpring, label = "sortRowGap$i").value
         }
         val cancelAlpha by animateFloatAsState(if (shown[1]) 1f else 0f, label = "sortRowCancel")
+        val thumbnailsAlpha by animateFloatAsState(if (shown[3]) 1f else 0f, label = "sortRowThumbnails")
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Sort: a floating card with a menu. Reselecting the field already sorted on flips its direction (see
@@ -256,6 +262,17 @@ fun SortControls(
             if (actions.isNotEmpty() || widths[2] > 0.dp) {
                 SortRowActions(actions, modifier = Modifier.padding(start = gaps[2]).width(widths[2]))
             }
+
+            // The thumbnails the data saver holds back, all at once; there while they're held back, and while it shrinks away
+            if (shown[3] || widths[3] > 0.dp) {
+                Box(modifier = Modifier.padding(start = gaps[3]).width(widths[3]).graphicsLayer { alpha = thumbnailsAlpha }) {
+                    FloatingCardButton(onClick = { lastLoadThumbnails?.invoke() }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Outlined.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Thumbnails", style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
         }
     }
 }
@@ -265,8 +282,8 @@ private val SortRowGap = 8.dp
 
 /**
  * What each card of the sort row needs to show all of itself, in the row's order: Sort by (wide enough for the longest
- * field name, so it doesn't change size between fields), Cancel and New. From their text as it's drawn, plus their
- * icons and padding (see [FloatingCardButton]).
+ * field name, so it doesn't change size between fields), Cancel, New and Thumbnails. From their text as it's drawn, plus
+ * their icons and padding (see [FloatingCardButton]).
  */
 @Composable
 private fun sortRowNeeds(): List<Dp> {
@@ -281,7 +298,8 @@ private fun sortRowNeeds(): List<Dp> {
         listOf(
             padding + sortText + 8.dp + 16.dp,
             padding + 18.dp + 6.dp + textWidth("Cancel", large),
-            padding + 18.dp + 6.dp + textWidth("New", large) + 4.dp
+            padding + 18.dp + 6.dp + textWidth("New", large) + 4.dp,
+            padding + 18.dp + 6.dp + textWidth("Thumbnails", large)
         )
     }
 }

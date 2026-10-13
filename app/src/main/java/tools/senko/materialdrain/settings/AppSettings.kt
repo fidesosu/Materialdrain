@@ -26,6 +26,12 @@ private const val NAV_FAB_POSITION_PREF = "nav_fab_position"
 private const val SORT_FIELD_PREF = "files_sort_field"
 private const val SORT_ASCENDING_PREF = "files_sort_ascending"
 private const val TEXT_WRAP_PREF = "text_wrap"
+private const val DATA_SAVER_PREF = "data_saver"
+private const val DATA_SAVER_MOBILE_ONLY_PREF = "data_saver_mobile_only"
+private const val HOLD_THUMBNAILS_PREF = "data_saver_hold_thumbnails"
+private const val HOLD_PREVIEWS_PREF = "data_saver_hold_previews"
+private const val HOLD_CONFIG_UPDATES_PREF = "data_saver_hold_config_updates"
+private const val HOLD_HOST_CHECKS_PREF = "data_saver_hold_host_checks"
 private const val LAST_SCREEN_PREF = "last_screen"
 private const val FILESYSTEM_PATH_PREFIX = "filesystem_path_"
 private const val OPENED_LIST_ID_PREF = "opened_list_id"
@@ -198,6 +204,62 @@ class AppSettings(context: Context) {
     fun setTextWrap(wrap: Boolean) {
         prefs.edit { putBoolean(TEXT_WRAP_PREF, wrap) }
         _textWrap.value = wrap
+    }
+
+    // ---- Data saver (see DataSaver, which works out when it applies) ----
+
+    private val _dataSaver = MutableStateFlow(prefs.getBoolean(DATA_SAVER_PREF, false))
+    /** What the app would load by itself is only loaded when asked for. Off by default. */
+    val dataSaver: StateFlow<Boolean> = _dataSaver.asStateFlow()
+
+    fun setDataSaver(enabled: Boolean) {
+        prefs.edit { putBoolean(DATA_SAVER_PREF, enabled) }
+        _dataSaver.value = enabled
+    }
+
+    private val _dataSaverMobileOnly = MutableStateFlow(prefs.getBoolean(DATA_SAVER_MOBILE_ONLY_PREF, false))
+    /** The data saver only applies on mobile data (a metered network), not on Wi-Fi. Off by default: it always applies. */
+    val dataSaverMobileOnly: StateFlow<Boolean> = _dataSaverMobileOnly.asStateFlow()
+
+    fun setDataSaverMobileOnly(mobileOnly: Boolean) {
+        prefs.edit { putBoolean(DATA_SAVER_MOBILE_ONLY_PREF, mobileOnly) }
+        _dataSaverMobileOnly.value = mobileOnly
+    }
+
+    private val _holdThumbnails = MutableStateFlow(prefs.getBoolean(HOLD_THUMBNAILS_PREF, true))
+    /** With the data saver, the thumbnails in the lists wait to be asked for. */
+    val holdThumbnails: StateFlow<Boolean> = _holdThumbnails.asStateFlow()
+
+    fun setHoldThumbnails(hold: Boolean) {
+        prefs.edit { putBoolean(HOLD_THUMBNAILS_PREF, hold) }
+        _holdThumbnails.value = hold
+    }
+
+    private val _holdPreviews = MutableStateFlow(prefs.getBoolean(HOLD_PREVIEWS_PREF, true))
+    /** With the data saver, a file's preview (picture, video, song, text, archive) waits to be asked for. */
+    val holdPreviews: StateFlow<Boolean> = _holdPreviews.asStateFlow()
+
+    fun setHoldPreviews(hold: Boolean) {
+        prefs.edit { putBoolean(HOLD_PREVIEWS_PREF, hold) }
+        _holdPreviews.value = hold
+    }
+
+    private val _holdConfigUpdates = MutableStateFlow(prefs.getBoolean(HOLD_CONFIG_UPDATES_PREF, true))
+    /** With the data saver, the configs aren't checked for updates when the app starts, only from the hosts' page. */
+    val holdConfigUpdates: StateFlow<Boolean> = _holdConfigUpdates.asStateFlow()
+
+    fun setHoldConfigUpdates(hold: Boolean) {
+        prefs.edit { putBoolean(HOLD_CONFIG_UPDATES_PREF, hold) }
+        _holdConfigUpdates.value = hold
+    }
+
+    private val _holdHostChecks = MutableStateFlow(prefs.getBoolean(HOLD_HOST_CHECKS_PREF, true))
+    /** With the data saver, the hosts aren't checked in the background, only from the host switcher's refresh. */
+    val holdHostChecks: StateFlow<Boolean> = _holdHostChecks.asStateFlow()
+
+    fun setHoldHostChecks(hold: Boolean) {
+        prefs.edit { putBoolean(HOLD_HOST_CHECKS_PREF, hold) }
+        _holdHostChecks.value = hold
     }
 
     /** The folder last open on the Filesystem screen of [hostId], null when none is saved. */

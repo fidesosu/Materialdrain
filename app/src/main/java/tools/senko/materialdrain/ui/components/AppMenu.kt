@@ -1,15 +1,12 @@
 package tools.senko.materialdrain.ui.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -41,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -130,10 +128,9 @@ fun BoxScope.AppMenu(
     var anchorWidthPx by remember { mutableIntStateOf(0) }
     Spacer(Modifier.matchParentSize().onSizeChanged { anchorWidthPx = it.width })
 
-    // The popup stays while the menu shrinks away
-    val visibleState = remember { MutableTransitionState(false) }
-    visibleState.targetState = expanded
-    if (!visibleState.currentState && !visibleState.targetState) return
+    // The popup stays while the menu shrinks away; everything remembered after this is new for each opening
+    var present by remember { mutableStateOf(false) }
+    if (!expanded && !present) return
 
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
@@ -143,8 +140,10 @@ fun BoxScope.AppMenu(
     val narrowest = (if (matchAnchorWidth) maxOf(minWidth, anchorWidth) else minWidth).coerceAtMost(widest)
     val tallest = if (maxHeight != Dp.Unspecified) maxHeight else configuration.screenHeightDp.dp * AppMenuDefaults.MAX_HEIGHT_FRACTION
 
-    // Where the menu ended up, so it grows out of the button's side of it
-    var placement by remember { mutableStateOf(MenuPlacement(below = true, pivotX = 0f)) }
+    // Where the menu ended up, so it grows out of the button's side of it. Only known once the popup is placed, a frame
+    // after it's first laid out: until then the menu isn't shown, and only then it starts growing. Grown from a guess, it
+    // would start out of the wrong corner and visibly move to the right one
+    var placement by remember { mutableStateOf<MenuPlacement?>(null) }
     val positionProvider = remember(side, edge, density) {
         AnchoredMenuPosition(
             side = side,
@@ -155,37 +154,49 @@ fun BoxScope.AppMenu(
             onPlaced = { if (it != placement) placement = it }
         )
     }
+    // 0 = gone, 1 = open
+    val progress = remember { Animatable(0f) }
+    val placed = placement != null
+    LaunchedEffect(expanded, placed) {
+        if (expanded) {
+            present = true
+            if (placed) progress.animateTo(1f, tween(duration, easing = FastOutSlowInEasing))
+        } else {
+            progress.animateTo(0f, tween(duration, easing = FastOutSlowInEasing))
+            present = false
+        }
+    }
 
     Popup(popupPositionProvider = positionProvider, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
-        val origin = TransformOrigin(placement.pivotX, if (placement.below) 0f else 1f)
         Box(modifier = Modifier.padding(AppMenuDefaults.ShadowRoom)) {
-            AnimatedVisibility(
-                visibleState = visibleState,
-                enter = fadeIn(tween(duration / 2)) +
-                    scaleIn(tween(duration, easing = FastOutSlowInEasing), initialScale = 0.85f, transformOrigin = origin),
-                exit = fadeOut(tween(duration)) +
-                    scaleOut(tween(duration, easing = FastOutSlowInEasing), targetScale = 0.85f, transformOrigin = origin)
-            ) {
-                Surface(
-                    shape = FloatingCardShape,
-                    // Opaque, unlike a floating card button: a menu over a list would be hard to read with it showing through
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    border = floatingCardBorder(),
-                    shadowElevation = 6.dp,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    modifier = modifier
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .width(IntrinsicSize.Max)
-                            .widthIn(min = narrowest, max = widest)
-                            .heightIn(max = tallest)
-                            .verticalScroll(rememberScrollState())
-                            .padding(AppMenuDefaults.Gap),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                        content = content
-                    )
+            Surface(
+                shape = FloatingCardShape,
+                // Opaque, unlike a floating card button: a menu over a list would be hard to read with it showing through
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = floatingCardBorder(),
+                shadowElevation = 6.dp,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                modifier = modifier.graphicsLayer {
+                    val shown = placement
+                    val p = progress.value
+                    // Fades in during the first half of opening, out during the whole of closing
+                    alpha = if (shown == null) 0f else if (expanded) (p * 2f).coerceAtMost(1f) else p
+                    val scale = 0.85f + 0.15f * p
+                    scaleX = scale
+                    scaleY = scale
+                    if (shown != null) transformOrigin = TransformOrigin(shown.pivotX, if (shown.below) 0f else 1f)
                 }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .width(IntrinsicSize.Max)
+                        .widthIn(min = narrowest, max = widest)
+                        .heightIn(max = tallest)
+                        .verticalScroll(rememberScrollState())
+                        .padding(AppMenuDefaults.Gap),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    content = content
+                )
             }
         }
     }

@@ -48,8 +48,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil.ImageLoader
@@ -229,20 +227,16 @@ fun InlineImagePreview(
         }
     }
 }
-/** Space around the fullscreen picture, the picture is fitted into what is left. */
-internal val FullscreenImagePadding = 8.dp
-
 /**
  * Pinch to zoom, drag to pan, double tap on the picture to zoom in and out, and a tap outside the picture
  * calls [onTapOutside]. A tap outside is acted upon at once; only a tap on the picture waits for a possible second one.
  *
- * @param imageSize the size of the picture in pixels once it is known (its shape decides where it is), or null. As
- * long as it is not known everything counts as outside.
+ * @param imageSize the size of the picture in pixels once it is known (its shape decides where it is, fitted into
+ * the whole box), or null. As long as it is not known everything counts as outside.
  */
 @Composable
 internal fun ZoomableBox(
     imageSize: androidx.compose.ui.geometry.Size?,
-    imagePadding: Dp,
     onTapOutside: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
@@ -252,7 +246,6 @@ internal fun ZoomableBox(
     var size by remember { mutableStateOf(IntSize.Zero) }
     val currentOnTapOutside by rememberUpdatedState(onTapOutside)
     val currentImageSize by rememberUpdatedState(imageSize)
-    val paddingPx = with(LocalDensity.current) { imagePadding.toPx() }
 
     fun clamp(value: Offset, forScale: Float): Offset {
         val maxX = size.width * (forScale - 1f) / 2f
@@ -264,7 +257,7 @@ internal fun ZoomableBox(
     fun isOnImage(point: Offset): Boolean {
         val image = currentImageSize ?: return false
         if (size == IntSize.Zero || image.width <= 0f || image.height <= 0f) return false
-        val fit = minOf((size.width - 2 * paddingPx) / image.width, (size.height - 2 * paddingPx) / image.height)
+        val fit = minOf(size.width / image.width, size.height / image.height)
         val center = Offset(size.width / 2f, size.height / 2f)
         // The zoom is around the middle of the box, undo it to get to the point on the unzoomed picture
         val unzoomed = center + (point - center - offset) / scale

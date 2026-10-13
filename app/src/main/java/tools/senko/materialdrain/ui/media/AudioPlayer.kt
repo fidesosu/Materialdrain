@@ -38,6 +38,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
@@ -69,7 +71,9 @@ fun AudioPlayerPreview(
     durationHintMillis: Long?,
     modifier: Modifier = Modifier,
     /** The space around the card; the file details leave none above it, so it starts right under the top bar. */
-    outerPadding: PaddingValues = PaddingValues(vertical = 8.dp)
+    outerPadding: PaddingValues = PaddingValues(vertical = 8.dp),
+    /** The cover is held back (the data saver, see DataSaver): its square loads it when tapped. */
+    onLoadArt: (() -> Unit)? = null
 ) {
     val player = rememberManagedPlayer(audioUri, apiKey, isVideo = false, prepareNow = false)
     val state = rememberPlayerUiState(player)
@@ -95,11 +99,15 @@ fun AudioPlayerPreview(
                 Box(
                     modifier = Modifier
                         .size(72.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, MediaControlShape),
+                        .clip(MediaControlShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .then(if (onLoadArt != null) Modifier.clickable(onClickLabel = "Load the cover", onClick = onLoadArt) else Modifier),
                     contentAlignment = Alignment.Center
                 ) {
                     val artModifier = Modifier.fillMaxSize()
-                    when (albumArtSource) {
+                    if (onLoadArt != null) {
+                        Icon(Icons.Outlined.Image, contentDescription = "Load the cover", modifier = Modifier.size(28.dp))
+                    } else when (albumArtSource) {
                         is ByteArray -> {
                             val bitmap = remember(albumArtSource) {
                                 try { BitmapFactory.decodeByteArray(albumArtSource, 0, albumArtSource.size) } catch (_: Exception) { null }

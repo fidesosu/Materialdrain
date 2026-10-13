@@ -23,6 +23,8 @@ val commitEpochSeconds: Long = runCatching {
 val versionStamp: String = DateTimeFormatter.ofPattern("yyyyMMdd.HHmm").format(Instant.ofEpochSecond(commitEpochSeconds).atZone(ZoneOffset.UTC))
 val versionSuffix: String = System.getenv("VERSION_SUFFIX").orEmpty()
 val computedVersionName = "$baseVersion.$versionStamp$versionSuffix"
+
+// Calculate Epoch second since: January 1, 2025 at 12:00:00 AM UTC
 val computedVersionCode: Int = ((commitEpochSeconds - 1_735_689_600L) / 60).toInt().coerceAtLeast(2)
 
 android {

@@ -27,6 +27,7 @@ import tools.senko.materialdrain.ContentChanges
 import tools.senko.materialdrain.UiMessages
 import tools.senko.materialdrain.auth.SessionManager
 import tools.senko.materialdrain.settings.AppSettings
+import tools.senko.materialdrain.settings.DataSaver
 import tools.senko.materialdrain.settings.SavedOpenedFile
 import tools.senko.materialdrain.provider.ProviderConfigStore
 import tools.senko.materialdrain.provider.ProviderRegistry
@@ -43,7 +44,7 @@ import tools.senko.materialdrain.provider.api.StorageProvider
 import tools.senko.materialdrain.provider.api.StorageRef
 import tools.senko.materialdrain.util.formatSize
 
-private const val MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES = 1 * 1024 * 1024 // 1MB
+internal const val MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES = 1 * 1024 * 1024 // 1MB
 private const val MAX_TEXT_PREVIEW_DISPLAY_LENGTH = 8 * 1024 // 8KB
 private const val API_KEY_MISSING = "API Key is missing. Please set it in Settings."
 
@@ -132,6 +133,9 @@ data class FileInfoUiState(
     // The contents of an archive shown in the file details, see loadArchive
     val archive: ArchiveView? = null,
 
+    // The data saver holds the preview back (see DataSaver): nothing of it is loaded until loadPreview
+    val previewHeld: Boolean = false,
+
     // Scroll state preservation
     val shouldPreserveScrollPosition: Boolean = false,
 
@@ -153,7 +157,8 @@ class FileInfoViewModel(
     private val downloadManager: DownloadManager,
     private val appSettings: AppSettings,
     private val messages: UiMessages,
-    private val contentChanges: ContentChanges
+    private val contentChanges: ContentChanges,
+    private val dataSaver: DataSaver
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FileInfoUiState())
@@ -377,7 +382,7 @@ class FileInfoViewModel(
                     _uiState.update { it.copy(isLoadingFileInfo = false, fileInfo = response.data) }
                     appSettings.openedFile = SavedOpenedFile(configStore.activeProviderId.value, fileId, "")
                     // Only fetch text preview if the main file info call was successful
-                    fetchTextFilePreviewContent(response.data)
+                    showPreview(response.data, withArchive = false)
                 }
                 is ApiResponse.Error -> {
                     _uiState.update {
@@ -452,17 +457,43 @@ class FileInfoViewModel(
             )
         }
         node.ref.id?.let { appSettings.openedFile = SavedOpenedFile(configStore.activeProviderId.value, it, node.ref.path) }
-        fetchTextFilePreviewContent(node)
-        // An archive shows what's inside it, in the details
         _uiState.update { it.copy(archive = null) }
-        if (isArchiveName(node.name)) loadArchive(node.ref.path, "")
+        // An archive shows what's inside it, in the details
+        showPreview(node, withArchive = isArchiveName(node.name))
+    }
+
+    /** Whether the preview of the file shown now lists an archive's contents too, for [loadPreview]. */
+    private var previewWithArchive = false
+
+    /**
+     * Loads what the details preview [node] with: its text, and with [withArchive] what's inside it. With the data saver
+     * holding previews back, nothing is loaded yet: the details offer to (see [loadPreview]).
+     */
+    private fun showPreview(node: StorageNode, withArchive: Boolean) {
+        previewWithArchive = withArchive
+        if (dataSaver.holdPreviews.value) {
+            clearTextPreviewStates()
+            _uiState.update { it.copy(previewHeld = true) }
+            return
+        }
+        _uiState.update { it.copy(previewHeld = false) }
+        fetchTextFilePreviewContent(node)
+        if (withArchive) loadArchive(node.ref.path, "")
+    }
+
+    /** Loads the preview the data saver held back, see [showPreview]. */
+    fun loadPreview() {
+        val node = uiState.value.fileInfo ?: return
+        _uiState.update { it.copy(previewHeld = false) }
+        fetchTextFilePreviewContent(node)
+        if (previewWithArchive) loadArchive(node.ref.path, "")
     }
 
     fun clearFileInfoDisplay() {
         fileInfoJob?.cancel()
         archiveJob?.cancel()
         appSettings.openedFile = null
-        _uiState.update { it.copy(fileInfo = null, isLoadingFileInfo = false, archive = null) }
+        _uiState.update { it.copy(fileInfo = null, isLoadingFileInfo = false, archive = null, previewHeld = false) }
         clearTextPreviewStates()
     }
 

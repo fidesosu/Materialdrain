@@ -2,6 +2,7 @@ package tools.senko.materialdrain.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import tools.senko.materialdrain.settings.LocalDataSaver
 import tools.senko.materialdrain.ui.media.HostRequestAuth
 import tools.senko.materialdrain.util.formatSize
 
@@ -74,7 +76,7 @@ fun FileListItem(
             .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        FileIcon(name = name, isDirectory = type == "dir", thumbnailUrl = thumbnailUrl, size = 56.dp)
+        FileIcon(name = name, isDirectory = type == "dir", thumbnailUrl = thumbnailUrl, size = 56.dp, loadOnTap = !selectionMode)
 
         Spacer(modifier = Modifier.width(16.dp))
 
@@ -121,17 +123,26 @@ fun FileListItem(
  * document...) with a small glyph of it, and the file's thumbnail over it when it has one. The thumbnail fades in over
  * the tile, so a row looks the same while it loads, and a file whose thumbnail fails just keeps its tile. The
  * thumbnail is decoded at [size], not at the size of the original image.
+ *
+ * A thumbnail the data saver holds back (see DataSaver) isn't loaded: the tile looks as it does without one, and loads
+ * the thumbnail when tapped, unless [loadOnTap] is off (while files are being selected, a tap selects).
  */
 @Composable
-fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp, cornerRadius: Dp = size / 4) {
+fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp, cornerRadius: Dp = size / 4, loadOnTap: Boolean = true) {
     val shape = RoundedCornerShape(cornerRadius)
     val kind = remember(name, isDirectory) { FileKind.of(name, isDirectory) }
     val (container, content) = kind.colors()
+    val dataSaver = LocalDataSaver.current
+    val held = thumbnailUrl != null && !isDirectory && !dataSaver.showsThumbnail(thumbnailUrl)
     Box(
         modifier = Modifier
             .size(size)
             .clip(shape)
-            .background(container),
+            .background(container)
+            .then(
+                if (held && loadOnTap) Modifier.clickable(onClickLabel = "Load the thumbnail") { dataSaver.loadThumbnail(thumbnailUrl!!) }
+                else Modifier
+            ),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -140,7 +151,7 @@ fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp
             tint = content,
             modifier = Modifier.size(size * 0.46f)
         )
-        if (thumbnailUrl != null && !isDirectory) {
+        if (!held && thumbnailUrl != null && !isDirectory) {
             val context = LocalContext.current
             // Built once per URL and login: a new request on every recomposition makes Coil load the thumbnail again
             val headers = HostRequestAuth.headersFor(thumbnailUrl)

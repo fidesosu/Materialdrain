@@ -68,8 +68,9 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.DropdownMenu
+import tools.senko.materialdrain.ui.components.AppMenu
+import tools.senko.materialdrain.ui.components.AppMenuDivider
+import tools.senko.materialdrain.ui.components.AppMenuItem
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Delete
@@ -253,32 +254,25 @@ private fun AvatarButton(user: UserInfo, avatar: AvatarState) {
         ) {
             Icon(Icons.Filled.Edit, contentDescription = null, tint = colors.onSecondaryContainer, modifier = Modifier.size(12.dp))
         }
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+        AppMenu(expanded = menuOpen, onDismiss = { menuOpen = false }) {
             Text(
                 "Only kept on this device",
                 style = MaterialTheme.typography.labelMedium,
                 color = colors.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
             )
-            DropdownMenuItem(
-                text = { Text("Choose a picture") },
-                leadingIcon = { Icon(Icons.Filled.Image, contentDescription = null) },
+            AppMenuItem(
+                text = "Choose a picture",
+                leadingIcon = Icons.Filled.Image,
                 onClick = {
                     menuOpen = false
                     picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
             )
             if (avatar.picture != null) {
-                DropdownMenuItem(
-                    text = { Text("Adjust crop") },
-                    leadingIcon = { Icon(Icons.Filled.Crop, contentDescription = null) },
-                    onClick = { menuOpen = false; avatar.recrop() }
-                )
-                DropdownMenuItem(
-                    text = { Text("Remove picture") },
-                    leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
-                    onClick = { menuOpen = false; avatar.remove() }
-                )
+                AppMenuItem(text = "Adjust crop", leadingIcon = Icons.Filled.Crop, onClick = { menuOpen = false; avatar.recrop() })
+                AppMenuDivider()
+                AppMenuItem(text = "Remove picture", leadingIcon = Icons.Filled.Delete, destructive = true, onClick = { menuOpen = false; avatar.remove() })
             }
         }
     }
@@ -306,6 +300,122 @@ private fun HeroSurface(glow: Color = Color.Transparent, content: @Composable Co
             .padding(20.dp),
         content = content
     )
+}
+
+/** How big the picture is on the settings' account tile. */
+private val TileAvatarSize = 48.dp
+
+/**
+ * The account at the top of the settings, which opens its page. A card like the other categories' tiles, but bigger and
+ * with more in it: the picture, name and e-mail with the plan beside them, then how full the storage and this month's
+ * transfer are, and the number of files and the credit. Logged out, it asks to log in. The account is loaded for it once
+ * (see AccountViewModel.ensureLoaded), not each time the settings are opened.
+ */
+@Composable
+internal fun SettingsEnvironment.AccountTile(onOpen: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val state by accountViewModel.uiState.collectAsState()
+    LaunchedEffect(Unit) { accountViewModel.ensureLoaded() }
+    val user = (state.user as? Loadable.Loaded)?.data?.takeIf { state.hasKey }
+    val avatar = user?.let { rememberAccountAvatar(it.id.ifBlank { it.username }) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(AccountCardShape)
+            .background(colors.surfaceContainerLow)
+            .clickable(onClickLabel = "Open your account", onClick = onOpen)
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(TileAvatarSize).clip(AvatarShape).background(if (user != null) colors.primary else colors.primaryContainer)
+            ) {
+                val picture = avatar?.picture
+                when {
+                    picture != null -> AvatarPictureView(picture, contentDescription = null, modifier = Modifier.size(TileAvatarSize))
+                    user != null -> Text(user.username.firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.titleLarge, color = colors.onPrimary)
+                    else -> Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = colors.onPrimaryContainer, modifier = Modifier.size(28.dp))
+                }
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                val title = when {
+                    user != null -> user.username
+                    state.hasKey -> "Your account"
+                    else -> "Log in to pixeldrain"
+                }
+                Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val line = when {
+                    user != null -> user.emailAddresses.firstOrNull() ?: "No e-mail address"
+                    state.user is Loadable.Failed -> "Couldn't load the account"
+                    state.hasKey -> "Loading…"
+                    else -> "To see your storage, statistics and billing"
+                }
+                Text(line, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (user != null) {
+                Text(
+                    user.subscription.name.ifBlank { "Free" },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colors.onSecondaryContainer,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(colors.secondaryContainer)
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                )
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = colors.onSurfaceVariant)
+        }
+        if (user != null) {
+            val plan = user.subscription
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                TileMeter("Storage", user.storageSpaceUsed, plan.storageSpace, Modifier.weight(1f))
+                // The account's own cap when it set one, else the plan's (as on the account's page)
+                TileMeter("Transfer", user.monthlyTransferUsed, user.monthlyTransferCap.takeIf { it > 0 } ?: plan.monthlyTransferCap, Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(8.dp))
+            val numbers = NumberFormat.getIntegerInstance()
+            Text(
+                "${numbers.format(user.fileCount)} files · ${formatEuro(user.balanceMicroEur)} credit",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+/** A small meter of the account tile: what's used of [limit], or only the amount when there's no limit. */
+@Composable
+private fun TileMeter(label: String, used: Long, limit: Long, modifier: Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Column(modifier = modifier) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(
+                if (limit > 0) "${formatSize(used)} / ${formatSize(limit)}" else formatSize(used),
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        if (limit > 0) {
+            val fraction = (used.toDouble() / limit).toFloat().coerceIn(0f, 1f)
+            LinearProgressIndicator(
+                progress = { fraction },
+                color = if (fraction > 0.9f) colors.error else colors.primary,
+                modifier = Modifier.fillMaxWidth().height(4.dp)
+            )
+        } else {
+            // No limit: nothing to fill, a quiet line keeps the two alike
+            HorizontalDivider(color = colors.outlineVariant, modifier = Modifier.padding(vertical = 1.5.dp))
+        }
+    }
 }
 
 @Composable

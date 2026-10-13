@@ -17,6 +17,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.AutoDelete
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DataSaverOn
 import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
@@ -47,6 +49,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -145,11 +148,32 @@ fun FileInfoDetailsCard(
             // Only the private filesystem needs the login for previews
             val previewApiKey = uiState.apiKey.takeIf { isFilesystemFile && it.isNotBlank() }
             // A picture, video or song preview starts just under the top bar, with a little room; anything else keeps more
+            // Held back by the data saver, a picture or video keeps its frame in the same place (see HeldPreview)
             val mediaPreviewFirst = showPreviews && uiState.archive == null &&
                 (previewType?.startsWith("image/") == true || previewType?.startsWith("video/") == true || previewType?.startsWith("audio/") == true)
             if (!mediaPreviewFirst) Spacer(Modifier.height(16.dp))
             val mediaPadding = PaddingValues(top = 8.dp, bottom = 8.dp)
-            if (showPreviews) {
+            if (showPreviews && uiState.previewHeld) {
+                // The data saver holds it back: its frame, to load it, for a file that has something to preview
+                if (previewType?.startsWith("audio/") == true) {
+                    // A song only streams once it's played anyway: the player as always, but its cover waits to be tapped
+                    AudioPlayerPreview(
+                        audioUri = rawFileApiUrl.toUri(),
+                        apiKey = previewApiKey,
+                        title = fileInfo.name,
+                        artist = null,
+                        album = null,
+                        albumArtSource = null,
+                        durationHintMillis = null,
+                        outerPadding = mediaPadding,
+                        onLoadArt = fileInfoViewModel::loadPreview
+                    )
+                } else {
+                    val canPreview = isArchiveName(fileInfo.name) || isTextFile(fileInfo.name, previewType) || actualThumbnailUrl != null ||
+                        listOf("image/", "video/").any { previewType?.startsWith(it) == true }
+                    if (canPreview) HeldPreview(fileInfo, previewType, mediaPadding, onLoad = fileInfoViewModel::loadPreview)
+                }
+            } else if (showPreviews) {
                 // An archive shows its contents where a preview would be
                 if (uiState.archive != null) {
                     uiState.archive?.let { archive ->
@@ -236,7 +260,7 @@ fun FileInfoDetailsCard(
 
             // Whether the preview above already shows the file's picture (the image, a video frame, a song's cover); then the
             // header doesn't repeat it with the tile of its kind
-            val previewShowsPicture = uiState.archive == null && when {
+            val previewShowsPicture = !uiState.previewHeld && uiState.archive == null && when {
                 previewType?.startsWith("image/") == true || previewType?.startsWith("video/") == true || previewType?.startsWith("audio/") == true -> true
                 uiState.isLoadingTextPreview || uiState.textPreviewContent != null || uiState.textPreviewErrorMessage != null -> false
                 else -> actualThumbnailUrl != null
@@ -379,6 +403,57 @@ private fun FileHeader(file: StorageNode, showTile: Boolean) {
         Column(modifier = Modifier.weight(1f)) {
             ExpandableText(file.name, style = MaterialTheme.typography.titleMedium, collapsedLines = 2)
             Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** How tall a held text or archive preview is: the most the text preview takes (see CodePreview). */
+private val HeldPreviewHeight = 200.dp
+
+/**
+ * A preview the data saver holds back (see DataSaver): the frame the preview would have, the same size and shape, in a
+ * plain colour, saying what it would show and (where it's known) about how much that loads. A tap anywhere on it loads it.
+ */
+@Composable
+private fun HeldPreview(file: StorageNode, previewType: String?, mediaPadding: PaddingValues, onLoad: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val size = file.size
+    val media = RoundedCornerShape(8.dp)
+    // What it would show, what that loads, and the preview's own frame: its size, shape and colour
+    class Held(val what: String, val cost: String?, val frame: Modifier, val shape: RoundedCornerShape, val color: Color)
+    val held = when {
+        isArchiveName(file.name) -> Held("what's inside", null, Modifier.height(HeldPreviewHeight), RoundedCornerShape(12.dp), scheme.surfaceContainerHighest)
+        isTextFile(file.name, previewType) && previewType?.startsWith("image/") != true -> Held(
+            "the text",
+            size?.let { "Up to ${formatSize(minOf(it, MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES.toLong()))}" },
+            Modifier.padding(top = 8.dp).height(HeldPreviewHeight),
+            RoundedCornerShape(16.dp),
+            scheme.surfaceContainerHighest
+        )
+        previewType?.startsWith("image/") == true ->
+            Held("the picture", size?.let { "About ${formatSize(it)}" }, Modifier.aspectRatio(16f / 9f).padding(mediaPadding), media, scheme.surfaceContainerHigh)
+        previewType?.startsWith("video/") == true ->
+            Held("the video", "Streams once it's played", Modifier.aspectRatio(16f / 9f).padding(mediaPadding), media, scheme.surfaceContainerHigh)
+        else -> Held("the thumbnail", null, Modifier.aspectRatio(16f / 9f).padding(vertical = 8.dp), RoundedCornerShape(12.dp), scheme.surfaceContainerHigh)
+    }
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(held.frame)
+            .clip(held.shape)
+            .background(held.color)
+            .clickable(onClickLabel = "Load the preview", onClick = onLoad)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
+            Icon(Icons.Filled.DataSaverOn, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.height(8.dp))
+            Text("Tap to load ${held.what}", style = MaterialTheme.typography.labelLarge, color = scheme.onSurface)
+            Text(
+                listOfNotNull("Data saver", held.cost).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant
+            )
         }
     }
 }

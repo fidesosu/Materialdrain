@@ -93,6 +93,8 @@ import tools.senko.materialdrain.navmenu.menu
 import tools.senko.materialdrain.preferences.ACCOUNT_CATEGORY_ID
 import tools.senko.materialdrain.preferences.AccountViewModel
 import tools.senko.materialdrain.preferences.HOSTS_CATEGORY_ID
+import tools.senko.materialdrain.settings.DataSaverState
+import tools.senko.materialdrain.settings.LocalDataSaver
 import tools.senko.materialdrain.preferences.AuthViewModel
 import tools.senko.materialdrain.preferences.ProviderSettingsViewModel
 import tools.senko.materialdrain.preferences.SettingsScreenContent
@@ -480,11 +482,26 @@ fun MaterialdrainScreen() {
     val entryOffsetPx = with(localDensity) { 160.dp.toPx() }
     val isFabVisible = showNavFab || fabState != null
 
+    // The thumbnails the data saver holds back, for every picture of a file in the app (see FileIcon)
+    val dataSaver = appContainer.dataSaver
+    val holdThumbnails by dataSaver.holdThumbnails.collectAsState()
+    val allThumbnailsAsked by dataSaver.allThumbnailsAsked.collectAsState()
+    val askedThumbnails by dataSaver.askedThumbnails.collectAsState()
+    val dataSaverState = remember(holdThumbnails, allThumbnailsAsked, askedThumbnails) {
+        DataSaverState(
+            holdThumbnails = holdThumbnails && !allThumbnailsAsked,
+            askedThumbnails = askedThumbnails,
+            loadThumbnail = dataSaver::askThumbnail,
+            loadAllThumbnails = dataSaver::askAllThumbnails
+        )
+    }
+
     CompositionLocalProvider(
         LocalReduceMotion provides reduceMotion,
         LocalBlurredBackdrop provides blurredBackdrop,
         LocalTextWrap provides textWrap,
-        LocalVideoLoop provides videoLoop
+        LocalVideoLoop provides videoLoop,
+        LocalDataSaver provides dataSaverState
     ) {
     SharedTransitionLayout {
         // The Box lets the FAB navigation prototype (Developer settings) sit on top of the Scaffold. Blurred as a
@@ -659,7 +676,7 @@ fun MaterialdrainScreen() {
                                 onManage = { openHostSettings(null) },
                                 // Only hosts not checked in the last half minute: the list is normally known already
                                 onOpened = { appContainer.hostHealth.checkAll() },
-                                onRefresh = { appContainer.hostHealth.checkAll(force = true) }
+                                onRefresh = { appContainer.hostHealth.checkAll(force = true, asked = true) }
                             )
                         }
                     }

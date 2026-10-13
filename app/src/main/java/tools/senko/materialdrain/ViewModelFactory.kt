@@ -22,7 +22,7 @@ class ViewModelFactory(
             return UploadViewModel(application, container.providerRegistry, container.providerConfigStore, container.sessionManager, container.transferRegistry, container.appSettings) as T
         }
         if (modelClass.isAssignableFrom(FileInfoViewModel::class.java)) {
-            return FileInfoViewModel(application, container.providerRegistry, container.providerConfigStore, container.sessionManager, container.downloadManager, container.appSettings, container.uiMessages, container.contentChanges) as T
+            return FileInfoViewModel(application, container.providerRegistry, container.providerConfigStore, container.sessionManager, container.downloadManager, container.appSettings, container.uiMessages, container.contentChanges, container.dataSaver) as T
         }
         if (modelClass.isAssignableFrom(FilesystemViewModel::class.java)) {
             return FilesystemViewModel(application, container.providerRegistry, container.providerConfigStore, container.sessionManager, container.transferRegistry, container.appSettings, container.uiMessages, container.contentChanges) as T

@@ -71,8 +71,11 @@ class AppContainer private constructor(application: Application) {
     /** Downloads into the device's Downloads folder, for every screen, see DownloadManager. */
     val downloadManager = DownloadManager(application, providerRegistry, providerConfigStore, transferRegistry, uiMessages)
 
-    /** Whether each host answers, for the host switcher. */
-    val hostHealth = HostHealth(application, providerConfigStore, appScope)
+    /** What the app would load by itself waits to be asked for, when it's on, see DataSaver. */
+    val dataSaver = tools.senko.materialdrain.settings.DataSaver(application, appSettings, appScope)
+
+    /** Whether each host answers, for the host switcher. With the data saver, only when asked (see HostHealth.checkAll). */
+    val hostHealth = HostHealth(application, providerConfigStore, appScope, holdBackground = { dataSaver.holdHostChecks.value })
 
     init {
         importBundledPixeldrainConfig(application, providerConfigStore)
@@ -96,8 +99,9 @@ class AppContainer private constructor(application: Application) {
         HostRequestAuth.headersFor = { url ->
             providerRegistry.resolve(providerConfigStore.activeProviderId.value).requestHeaders(url)
         }
-        // Auto-update happens at app start only (at most once a day per config), there's no background job
-        appScope.launch { providerUpdater.runAutoUpdates() }
+        // Auto-update happens at app start only (at most once a day per config), there's no background job. With the data
+        // saver it waits for "Check all for updates" on the hosts' page
+        if (!dataSaver.holdConfigUpdates.value) appScope.launch { providerUpdater.runAutoUpdates() }
     }
 
     /**

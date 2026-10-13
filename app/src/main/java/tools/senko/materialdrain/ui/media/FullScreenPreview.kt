@@ -97,7 +97,6 @@ fun FullScreenMediaPreviewDialog(
                     var imageSize by remember(previewUri) { mutableStateOf<androidx.compose.ui.geometry.Size?>(null) }
                     ZoomableBox(
                         imageSize = imageSize,
-                        imagePadding = FullscreenImagePadding,
                         onTapOutside = onDismissRequest
                     ) {
                         LayeredPreviewImage(
@@ -116,7 +115,8 @@ fun FullScreenMediaPreviewDialog(
                                     imageSize = size.takeIf { it.width.isFinite() && it.height.isFinite() && it.width > 0f && it.height > 0f }
                                 }
                             },
-                            modifier = Modifier.fillMaxSize().padding(FullscreenImagePadding)
+                            // Edge to edge, like the video player
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
                 }

@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import tools.senko.materialdrain.settings.LocalDataSaver
 import tools.senko.materialdrain.files.FileActionDialogs
 import tools.senko.materialdrain.files.FileActionRequest
 import tools.senko.materialdrain.files.FileInfoViewModel
@@ -542,6 +543,8 @@ fun BrowserScreen(
             downloading -> { { fileInfoViewModel.cancelAllDownloads() } }
             else -> null
         }
+        // The thumbnails the data saver holds back, all at once (see DataSaver); null while none are held back
+        val loadThumbnails = LocalDataSaver.current.let { if (it.holdThumbnails) it.loadAllThumbnails else null }
         Column(modifier = Modifier.fillMaxSize()) {
             // Header: the sorting and filter of whichever mode's list is sortable (every mode except the lists overview,
             // which is just titles), then right above the content the path (filesystem) or the list being shown (lists)
@@ -556,7 +559,8 @@ fun BrowserScreen(
                             if (canMkdirFs) add(SortRowAction(Icons.Filled.CreateNewFolder, "New folder", enabled = !fsState.isModifying) { showNewFolderDialog = true })
                             if (fsState.canImport) add(SortRowAction(Icons.Filled.Link, "Import files by ID", enabled = !fsState.isModifying) { showImportDialog = true })
                         } else emptyList(),
-                        onCancelTransfer = cancelTransfer
+                        onCancelTransfer = cancelTransfer,
+                        onLoadThumbnails = loadThumbnails
                     )
                     PathBreadcrumb(
                         pathSegments = fsState.pathSegments,
@@ -568,7 +572,8 @@ fun BrowserScreen(
                         sortField = sortField,
                         sortAscending = sortAscending,
                         onSortFieldSelected = { appSettings.changeSortOrder(it) },
-                        onCancelTransfer = cancelTransfer
+                        onCancelTransfer = cancelTransfer,
+                        onLoadThumbnails = loadThumbnails
                     )
                     if (!selectionMode) {
                         Row(
@@ -605,7 +610,8 @@ fun BrowserScreen(
                     sortField = sortField,
                     sortAscending = sortAscending,
                     onSortFieldSelected = { appSettings.changeSortOrder(it) },
-                    onCancelTransfer = cancelTransfer
+                    onCancelTransfer = cancelTransfer,
+                    onLoadThumbnails = loadThumbnails
                 )
             }
 

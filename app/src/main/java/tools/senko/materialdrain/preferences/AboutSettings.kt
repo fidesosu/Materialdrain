@@ -43,7 +43,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 /** What this build of the app is, read from the installed package. */
-private data class AppAbout(
+internal data class AppAbout(
     val versionName: String,
     val versionCode: Long,
     val kind: String,
@@ -63,7 +63,7 @@ private data class AppAbout(
 /** "1.4.20261009.1530" or "1.4.20261009.1530-dev": a base version, then the commit's date and time in UTC. */
 private val VERSION_PATTERN = Regex("""^\d+(?:\.\d+)*\.(\d{8})\.(\d{4})(-dev)?$""")
 
-private fun readAbout(context: Context): AppAbout {
+internal fun readAbout(context: Context): AppAbout {
     val info = context.packageManager.getPackageInfo(context.packageName, 0)
     val versionName = info.versionName.orEmpty()
     val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0

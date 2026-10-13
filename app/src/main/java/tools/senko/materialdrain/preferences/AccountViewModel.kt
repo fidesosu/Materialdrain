@@ -102,6 +102,11 @@ class AccountViewModel(
      * The account page was opened: the account is loaded (again, so it's current), and from then on whenever the key
      * changes. Nothing is asked for before the page is first opened.
      */
+    /** Loads the account once, for something which shows it outside its page (the settings' account tile). */
+    fun ensureLoaded() {
+        if (!watchingKey) onPageShown()
+    }
+
     fun onPageShown() {
         if (watchingKey) {
             refresh()

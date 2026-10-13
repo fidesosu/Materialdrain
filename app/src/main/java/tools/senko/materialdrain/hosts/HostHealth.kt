@@ -83,6 +83,8 @@ class HostHealth(
     context: Context,
     private val configStore: ProviderConfigStore,
     private val scope: CoroutineScope,
+    /** Whether the checks the app makes by itself wait for one that's asked for (the data saver, see DataSaver). */
+    private val holdBackground: () -> Boolean = { false },
 ) {
     private val _states = MutableStateFlow<Map<String, HostCheck>>(emptyMap())
     val states: StateFlow<Map<String, HostCheck>> = _states.asStateFlow()
@@ -112,8 +114,14 @@ class HostHealth(
 
     private fun hostIds(): List<String> = listOf(PIXELDRAIN_PROVIDER_ID) + configStore.providers.value.map { it.id }
 
-    /** Checks every host; with [force], also those checked a moment ago. */
-    fun checkAll(force: Boolean = false) = check(hostIds(), force)
+    /**
+     * Checks every host; with [force], also those checked a moment ago. A check the app makes by itself is left out while
+     * the data saver holds them back; one that's [asked] for (the switcher's refresh) is always made.
+     */
+    fun checkAll(force: Boolean = false, asked: Boolean = false) {
+        if (!asked && holdBackground()) return
+        check(hostIds(), force)
+    }
 
     /** Checks the given hosts in the background; a host checked within the last half minute is left as it is, unless [force]. */
     fun check(hostIds: Collection<String>, force: Boolean = false) {
