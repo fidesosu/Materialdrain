@@ -8,7 +8,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -65,7 +64,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
@@ -73,6 +71,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.ui.Modifier
@@ -214,26 +213,28 @@ private fun AccountHero(user: UserInfo, onRefresh: () -> Unit) {
 private val AvatarSize = 64.dp
 
 /**
- * The account's picture, or its initial without one. Tapped, it offers to choose a picture from the device or to remove
- * it; the picture is only kept on this device (see AccountAvatarStore).
+ * The account's picture (which moves when it's a GIF or an animated WebP), or its initial without one. Tapped, it offers
+ * to choose a picture from the device, to move the square of it that's shown, or to remove it; a picture which isn't
+ * square is cropped first (see AvatarCropper). The picture is only kept on this device (see AccountAvatarStore).
  */
 @Composable
 private fun AvatarButton(user: UserInfo, avatar: AvatarState) {
     val colors = MaterialTheme.colorScheme
     var menuOpen by remember { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let(avatar.choose) }
+    avatar.cropping?.let { AvatarCropper(it, onKeep = avatar.keep, onCancel = avatar.cancelCrop) }
     Box {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(AvatarSize)
-                .clip(CircleShape)
+                .clip(AvatarShape)
                 .background(colors.primary)
                 .clickable(onClickLabel = "Change picture") { menuOpen = true }
         ) {
             val picture = avatar.picture
             if (picture != null) {
-                Image(picture, contentDescription = "Your picture", contentScale = ContentScale.Crop, modifier = Modifier.size(AvatarSize))
+                AvatarPictureView(picture, contentDescription = "Your picture", modifier = Modifier.size(AvatarSize))
             } else {
                 Text(user.username.firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.headlineMedium, color = colors.onPrimary)
             }
@@ -268,6 +269,11 @@ private fun AvatarButton(user: UserInfo, avatar: AvatarState) {
                 }
             )
             if (avatar.picture != null) {
+                DropdownMenuItem(
+                    text = { Text("Adjust crop") },
+                    leadingIcon = { Icon(Icons.Filled.Crop, contentDescription = null) },
+                    onClick = { menuOpen = false; avatar.recrop() }
+                )
                 DropdownMenuItem(
                     text = { Text("Remove picture") },
                     leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
