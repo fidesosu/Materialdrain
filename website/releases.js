@@ -77,23 +77,44 @@
     fillOlder(stable.slice(1));
   }
 
+  // "Last refresh: 2 min 5 s ago", counting up from when the list was read from GitHub (a kept list's, not the visit's)
+  function showRefreshed(at) {
+    const label = document.getElementById("releases-refreshed");
+    label.title = new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
+    const tick = () => {
+      const seconds = Math.max(0, Math.floor((Date.now() - at) / 1000));
+      const h = Math.floor(seconds / 3600), m = Math.floor(seconds / 60) % 60, s = seconds % 60;
+      const ago = seconds < 5 ? "just now"
+        : seconds < 60 ? `${s} s ago`
+        : seconds < 3600 ? `${m} min ${s} s ago`
+        : `${h} h ${m} min ago`;
+      label.textContent = `Last refresh: ${ago}`;
+    };
+    tick();
+    setInterval(tick, 1000);
+  }
+
+  // The releases and when they were read from GitHub
   async function load() {
     try {
       const cached = JSON.parse(sessionStorage.getItem(CACHE_KEY) || "null");
-      if (cached && Date.now() - cached.at < CACHE_MILLIS) return cached.releases;
+      if (cached && Date.now() - cached.at < CACHE_MILLIS) return cached;
     } catch (_) { /* no cache to use */ }
     const response = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=30`, {
       headers: { Accept: "application/vnd.github+json" },
     });
     if (!response.ok) throw new Error(`GitHub answered ${response.status}`);
-    const releases = await response.json();
+    const fetched = { at: Date.now(), releases: await response.json() };
     try {
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), releases }));
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify(fetched));
     } catch (_) { /* storage full or off: fine */ }
-    return releases;
+    return fetched;
   }
 
-  load().then(show).catch(() => {
+  load().then(({ at, releases }) => {
+    show(releases);
+    showRefreshed(at);
+  }).catch(() => {
     document.getElementById("releases-status").textContent =
       "Couldn't load the builds from GitHub just now: the buttons open the releases page instead.";
   });

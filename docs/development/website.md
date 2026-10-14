@@ -222,6 +222,9 @@ only lists them, and every download comes straight from GitHub.
    workflow named their APKs differently, so for those it's the tag without its `v`. The date is when the APK was
    uploaded, not when the release was published: the `dev-build` release is published once and then only edited, so
    its own date stays the first development build's, while each push to `dev` uploads a new APK.
+5. **Last refresh** beside the Download heading counts up, every second, from when the list was read from GitHub: a
+   list kept from an earlier visit counts from that visit's request, not from this one. Its tooltip has the exact
+   time. When the list couldn't be loaded it stays empty.
 
 If GitHub can't be reached, or the visitor's requests are used up, the page says so and the cards keep their plain
 links to the releases page, which are in the HTML from the start. So the page works, if more plainly, without the

@@ -208,3 +208,6 @@ a:focus-visible {
 
 /* Nothing to say about the builds: no empty line for it */
 #releases-status:empty { display: none; }
+
+/* Counts up every second: the digits keep their width so the line doesn't shift */
+#releases-refreshed { font-variant-numeric: tabular-nums; }

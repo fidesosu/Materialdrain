@@ -24,7 +24,11 @@
     </header>
 
     <section class="downloads" aria-labelledby="downloads-title">
-      <h2 id="downloads-title">Download</h2>
+      <div class="section-head">
+        <h2 id="downloads-title">Download</h2>
+        <!-- How long ago the builds were read from GitHub; set by releases.js -->
+        <span class="small" id="releases-refreshed"></span>
+      </div>
       <!-- Filled in by releases.js from GitHub's releases; these links are what's left if that can't be reached -->
       <div class="cards">
         <a class="card primary" id="stable" href="https://github.com/fidesosu/Materialdrain/releases/latest">
