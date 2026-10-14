@@ -20,8 +20,13 @@
     return fromFile ? fromFile[1] : (release.tag_name || release.name || "").replace(/^v(?=\d)/, "");
   };
 
-  const dateOf = (release) =>
-    new Date(release.published_at || release.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  // The APK's upload, not the release's: the dev-build release is published once and only edited after that, so its
+  // own date stays the first build's, while its APK is uploaded again by every push to dev
+  const dateOf = (release) => {
+    const apk = apkOf(release);
+    return new Date(apk.updated_at || apk.created_at || release.published_at)
+      .toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  };
 
   const sizeOf = (asset) => `${(asset.size / (1024 * 1024)).toFixed(1)} MB`;
 
