@@ -20,7 +20,7 @@ import androidx.compose.ui.res.painterResource
 import tools.senko.materialdrain.R
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import tools.senko.materialdrain.ui.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The padding is a share of the icon, not a fixed size: a fixed one left almost no room for the logo where the
+     icon is drawn small (the status bar, a file manager). 15% keeps the logo about as big as it looked on the launcher with 22dp -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
     android:drawable="@drawable/pixeldrain_launcher"
-    android:inset="22dp" />
+    android:inset="15%" />

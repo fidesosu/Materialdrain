@@ -17,11 +17,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Forward10
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Replay10
+import tools.senko.materialdrain.ui.icons.filled.Forward10
+import tools.senko.materialdrain.ui.icons.filled.MusicNote
+import tools.senko.materialdrain.ui.icons.filled.Pause
+import tools.senko.materialdrain.ui.icons.filled.PlayArrow
+import tools.senko.materialdrain.ui.icons.filled.Replay10
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -39,7 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.outlined.Image
+import tools.senko.materialdrain.ui.icons.outlined.Image
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale

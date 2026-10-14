@@ -28,10 +28,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.outlined.Info
+import tools.senko.materialdrain.ui.icons.automirrored.filled.KeyboardArrowRight
+import tools.senko.materialdrain.ui.icons.automirrored.filled.OpenInNew
+import tools.senko.materialdrain.ui.icons.filled.Info
+import tools.senko.materialdrain.ui.icons.outlined.Info
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme

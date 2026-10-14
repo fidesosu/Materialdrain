@@ -1,10 +1,10 @@
 package tools.senko.materialdrain.provider
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Dns
-import androidx.compose.material.icons.filled.FolderShared
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Storage
+import tools.senko.materialdrain.ui.icons.filled.Dns
+import tools.senko.materialdrain.ui.icons.filled.FolderShared
+import tools.senko.materialdrain.ui.icons.filled.Share
+import tools.senko.materialdrain.ui.icons.filled.Storage
 import androidx.compose.ui.graphics.vector.ImageVector
 import tools.senko.materialdrain.hosts.HealthTarget
 import tools.senko.materialdrain.provider.api.AuthType

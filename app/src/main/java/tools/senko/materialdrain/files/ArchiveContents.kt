@@ -12,10 +12,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Folder
+import tools.senko.materialdrain.ui.icons.automirrored.filled.ArrowBack
+import tools.senko.materialdrain.ui.icons.automirrored.filled.InsertDriveFile
+import tools.senko.materialdrain.ui.icons.filled.Download
+import tools.senko.materialdrain.ui.icons.filled.Folder
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon

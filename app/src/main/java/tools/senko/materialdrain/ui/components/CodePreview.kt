@@ -36,10 +36,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.WrapText
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.OpenInFull
+import tools.senko.materialdrain.ui.icons.automirrored.filled.WrapText
+import tools.senko.materialdrain.ui.icons.filled.Close
+import tools.senko.materialdrain.ui.icons.filled.ContentCopy
+import tools.senko.materialdrain.ui.icons.filled.OpenInFull
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
