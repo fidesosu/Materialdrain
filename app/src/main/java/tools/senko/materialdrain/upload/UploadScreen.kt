@@ -154,18 +154,18 @@ fun UploadScreenContent(
                             Card(modifier = Modifier.fillMaxWidth()){
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Text("Selected File:", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                                    InfoRow("Name:", file.name ?: "N/A")
-                                    file.sizeBytes?.let { s -> InfoRow("Size:", formatSize(s)) }
-                                    file.mimeType?.let { mt -> InfoRow("Type:", mt) }
+                                    InfoRow("Name", file.name ?: "N/A")
+                                    file.sizeBytes?.let { s -> InfoRow("Size", formatSize(s)) }
+                                    file.mimeType?.let { mt -> InfoRow("Type", mt) }
                                     // Each of these is only filled for its own type
-                                    file.audioDurationMillis?.let { d -> InfoRow("Duration:", formatDurationMillis(d)) }
-                                    file.audioBitrate?.let { b -> InfoRow("Bitrate:", "${b / 1000} kbps") }
-                                    file.audioArtist?.let { a -> InfoRow("Artist:", a) }
-                                    file.audioAlbum?.let { al -> InfoRow("Album:", al) }
-                                    file.videoDurationMillis?.let { d -> InfoRow("Duration:", formatDurationMillis(d)) }
-                                    file.pdfPageCount?.let { pc -> InfoRow("Pages:", pc.toString()) }
-                                    file.apkPackageName?.let { pn -> InfoRow("Package:", pn) }
-                                    file.apkVersionName?.let { vn -> InfoRow("Version:", vn) }
+                                    file.audioDurationMillis?.let { d -> InfoRow("Duration", formatDurationMillis(d)) }
+                                    file.audioBitrate?.let { b -> InfoRow("Bitrate", "${b / 1000} kbps") }
+                                    file.audioArtist?.let { a -> InfoRow("Artist", a) }
+                                    file.audioAlbum?.let { al -> InfoRow("Album", al) }
+                                    file.videoDurationMillis?.let { d -> InfoRow("Duration", formatDurationMillis(d)) }
+                                    file.pdfPageCount?.let { pc -> InfoRow("Pages", pc.toString()) }
+                                    file.apkPackageName?.let { pn -> InfoRow("Package", pn) }
+                                    file.apkVersionName?.let { vn -> InfoRow("Version", vn) }
                                 }
                             }
                             Spacer(modifier = Modifier.height(8.dp))

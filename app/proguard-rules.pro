@@ -24,6 +24,12 @@
 -keep class jcifs.** { *; }
 -keep interface jcifs.** { *; }
 -dontwarn jcifs.**
--keep class org.bouncycastle.** { *; }
+# BouncyCastle, for jCIFS-ng: its ASN.1 and key derivation classes jCIFS-ng uses directly, so R8 keeps those like any code.
+# It also asks BouncyCastle's provider for MD4 (NTLM sign-in) and AESCMAC (SMB 3 signing) by name, and the provider finds
+# each algorithm's classes by name as well, skipping those that aren't there: only those are kept by name. Keeping all of
+# BouncyCastle made it most of the APK
+-keep class org.bouncycastle.jce.provider.BouncyCastleProvider { *; }
+-keep class org.bouncycastle.jcajce.provider.digest.MD4* { *; }
+-keep class org.bouncycastle.jcajce.provider.symmetric.AES* { *; }
 -dontwarn org.bouncycastle.**
 -dontwarn org.slf4j.**

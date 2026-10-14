@@ -46,6 +46,7 @@ private const val OPENED_FILE_HOST_PREF = "opened_file_host"
 private const val BIOMETRIC_LOCK_PREF = "biometric_lock"
 private const val SEARCH_RESULT_LIMIT_PREF = "search_result_limit"
 private const val UPLOAD_IN_MODIFIED_ORDER_PREF = "upload_in_modified_order"
+private const val CONFIRM_DOWNLOAD_TAP_PREF = "confirm_download_tap"
 private const val ASKED_NOTIFICATION_PERMISSION_PREF = "asked_notification_permission"
 
 /** The choices for [AppSettings.searchResultLimit]; 0 is no limit. */
@@ -109,6 +110,15 @@ class AppSettings(context: Context) {
     fun setUploadInModifiedOrder(enabled: Boolean) {
         prefs.edit { putBoolean(UPLOAD_IN_MODIFIED_ORDER_PREF, enabled) }
         _uploadInModifiedOrder.value = enabled
+    }
+
+    private val _confirmDownloadTap = MutableStateFlow(prefs.getBoolean(CONFIRM_DOWNLOAD_TAP_PREF, true))
+    /** The Download button in a file's details asks to be tapped again before it starts; off, one tap starts it. */
+    val confirmDownloadTap: StateFlow<Boolean> = _confirmDownloadTap.asStateFlow()
+
+    fun setConfirmDownloadTap(enabled: Boolean) {
+        prefs.edit { putBoolean(CONFIRM_DOWNLOAD_TAP_PREF, enabled) }
+        _confirmDownloadTap.value = enabled
     }
 
     private val _loopVideos = MutableStateFlow(prefs.getBoolean(LOOP_VIDEOS_PREF, false))

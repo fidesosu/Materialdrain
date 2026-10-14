@@ -30,7 +30,12 @@ object ZipInfo {
         }
         if (root["success"]?.jsonPrimitive?.booleanOrNull == false) {
             val code = root["value"]?.jsonPrimitive?.contentOrNull ?: "archive_error"
-            val message = root["message"]?.jsonPrimitive?.contentOrNull ?: "The archive couldn't be read."
+            // Pixeldrain says "This file is not a valid zip file" for a password-protected one as well
+            val message = if (code == "invalid_zip_file") {
+                "This archive is either not valid or has a password."
+            } else {
+                root["message"]?.jsonPrimitive?.contentOrNull ?: "The archive couldn't be read."
+            }
             return ApiResponse.Error(ProviderError(code, message))
         }
 

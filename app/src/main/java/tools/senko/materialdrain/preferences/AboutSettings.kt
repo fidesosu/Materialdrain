@@ -55,7 +55,7 @@ internal data class AppAbout(
     fun asText(): String = buildString {
         appendLine("Materialdrain $versionName ($kind)")
         appendLine("Version code $versionCode")
-        committed?.let { appendLine("Built from a commit of $it") }
+        committed?.let { appendLine("Commit date $it") }
         append("Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}), ${Build.MANUFACTURER} ${Build.MODEL}")
     }
 }
@@ -119,7 +119,7 @@ fun SettingsEnvironment.AboutSection() {
         SelectionContainer {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 AboutRow("Version code", about.versionCode.toString())
-                about.committed?.let { AboutRow("Built from a commit of", it) }
+                about.committed?.let { AboutRow("Commit date", it) }
                 AboutRow("Android", "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
                 AboutRow("Package", about.packageName)
             }

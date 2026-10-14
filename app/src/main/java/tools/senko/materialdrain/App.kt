@@ -109,6 +109,7 @@ import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.LocalVideoLoop
 import tools.senko.materialdrain.ui.VideoLoopSetting
 import tools.senko.materialdrain.ui.components.AppMenu
+import tools.senko.materialdrain.ui.components.PAGE_TRANSITION_MS
 import tools.senko.materialdrain.ui.components.pageTransition
 import tools.senko.materialdrain.ui.components.AppMenuDivider
 import tools.senko.materialdrain.ui.components.AppMenuItem
@@ -378,10 +379,13 @@ fun MaterialdrainScreen() {
             Screen.Filesystem -> { /* Placeholder for Filesystem specific logic if needed. ViewModel handles its own loading. */ }
             Screen.FileDetail -> fileInfoViewModel.setFilterInputVisible(false)
             else -> {
-                if (currentScreen != Screen.FileDetail) fileInfoViewModel.clearFileInfoDisplay()
                 fileInfoViewModel.clearUserFilesError()
                 fileInfoViewModel.clearApiKeyMissingError()
                 fileInfoViewModel.setFilterInputVisible(false)
+                // Once the details have slid out: until then they still show the file, instead of "File details not
+                // available" with its previews gone. Going back into the details before that cancels it
+                delay(PAGE_TRANSITION_MS.toLong())
+                fileInfoViewModel.clearFileInfoDisplay()
             }
         }
     }
@@ -713,8 +717,10 @@ fun MaterialdrainScreen() {
                     visible = !navPrototype && currentScreen != Screen.FileDetail && navBarOrder.size > 1,
                     // Above the upload button, so the button slides down behind the bar
                     modifier = Modifier.zIndex(2f),
-                    enter = if (reduceMotion) fadeIn(tween(100)) else fadeIn() + expandVertically(),
-                    exit = if (reduceMotion) fadeOut(tween(100)) else fadeOut() + shrinkVertically()
+                    // The bar rises out of the bottom edge and sinks back into it, its icons with it: its top stays on the
+                    // growing or shrinking space, which the page above follows
+                    enter = if (reduceMotion) fadeIn(tween(100)) else fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                    exit = if (reduceMotion) fadeOut(tween(100)) else fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
                 ) {
                     BottomNavigationBar(currentTab, navBarOrder, onTabSelected = selectTab)
                 }

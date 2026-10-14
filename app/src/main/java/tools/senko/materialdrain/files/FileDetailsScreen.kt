@@ -291,9 +291,11 @@ fun FileInfoDetailsCard(
             }
 
             Spacer(Modifier.height(12.dp))
+            val confirmDownload by fileInfoViewModel.confirmDownloadTap.collectAsState()
             WithDownload(fileInfoViewModel.downloads, fileInfo.key) { download ->
             ActionRow(
                 download = download,
+                confirmDownload = confirmDownload,
                 canDownload = rich?.canDownload != false,
                 shareUrl = shareUrl,
                 canDelete = fileInfoViewModel.canDeleteFiles(),
@@ -521,13 +523,14 @@ private fun WithDownload(downloads: StateFlow<DownloadsState>, key: String, cont
  * The file's actions in one row: the download button, which takes the room there is, then Share, Copy link and Delete
  * as buttons of their own icon.
  *
- * The download button goes through the download (see [DownloadButton]): tapped once it asks to be tapped again (a slip
- * of the finger doesn't start a download of what may be gigabytes), while it runs it shows the progress and stops the download when tapped,
- * and once the file is saved it opens it.
+ * The download button goes through the download (see [DownloadButton]): with [confirmDownload], tapped once it asks to be
+ * tapped again (a slip of the finger doesn't start a download of what may be gigabytes), while it runs it shows the
+ * progress and stops the download when tapped, and once the file is saved it opens it.
  */
 @Composable
 private fun ActionRow(
     download: FileDownloadState?,
+    confirmDownload: Boolean,
     canDownload: Boolean,
     shareUrl: String?,
     canDelete: Boolean,
@@ -559,7 +562,7 @@ private fun ActionRow(
             onClick = when {
                 running -> onCancel
                 saved != null -> { { onOpen(saved) } }
-                armed -> { { armed = false; onDownload() } }
+                armed || !confirmDownload -> { { armed = false; onDownload() } }
                 else -> { { armed = true } }
             },
             modifier = Modifier.weight(1f)

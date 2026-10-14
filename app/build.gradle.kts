@@ -86,6 +86,13 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        resources {
+            // BouncyCastle's tables for what the SMB provider never uses: post-quantum Picnic (over 1 MB) and the
+            // messages of its certificate path checks
+            excludes += setOf("org/bouncycastle/pqc/**", "org/bouncycastle/x509/*.properties")
+        }
+    }
 }
 
 kotlin {

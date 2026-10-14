@@ -212,6 +212,9 @@ class FileInfoViewModel(
     private val _displayedFiles = MutableStateFlow<List<StorageNode>>(emptyList())
     val displayedFiles: StateFlow<List<StorageNode>> = _displayedFiles.asStateFlow()
 
+    /** Whether the details' Download button asks to be tapped again (see AppSettings.confirmDownloadTap). */
+    val confirmDownloadTap: StateFlow<Boolean> get() = appSettings.confirmDownloadTap
+
     init {
         loadApiKey()
 

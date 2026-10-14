@@ -51,7 +51,7 @@ class ZipInfoTest {
         val answer = """{"success":false,"value":"invalid_zip_file","message":"This file is not a valid zip file"}"""
         val error = ZipInfo.entriesIn(answer, "") as ApiResponse.Error
         assertEquals("invalid_zip_file", error.error.code)
-        assertEquals("This file is not a valid zip file", error.error.message)
+        assertEquals("This archive is either not valid or has a password.", error.error.message)
     }
 
     @Test

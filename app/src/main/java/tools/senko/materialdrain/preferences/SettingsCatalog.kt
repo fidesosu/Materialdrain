@@ -167,7 +167,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     SettingsCategory(
         id = "files",
         title = "Files",
-        summary = "Your filesystem, uploads and search",
+        summary = "Your filesystem, uploads, downloads and search",
         icon = Icons.Filled.Folder,
         tone = CategoryTone.PRIMARY,
         items = listOf(
@@ -187,6 +187,14 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                     "many small files, which otherwise go a few at once.",
                 isChecked = { appSettings.uploadInModifiedOrder.collectAsState().value },
                 onCheckedChange = { appSettings.setUploadInModifiedOrder(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Tap twice to download",
+                summary = "In a file's details",
+                info = "The Download button in a file's details asks to be tapped again before it starts, so a slip of " +
+                    "the finger doesn't start a download of what may be gigabytes. Off, one tap starts it.",
+                isChecked = { appSettings.confirmDownloadTap.collectAsState().value },
+                onCheckedChange = { appSettings.setConfirmDownloadTap(it) }
             ),
             SettingsItem.Choice(
                 title = "Most search results",
