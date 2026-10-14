@@ -188,8 +188,9 @@ transfer in the registry, so one notification shows its total.
 
 `MainActivity` has an intent filter for `ACTION_SEND` and `ACTION_SEND_MULTIPLE` with any MIME type. `handleShare`
 takes the `EXTRA_STREAM` URIs and puts them in `AppContainer.pendingShares`. It's called from `onCreate` (only when
-`savedInstanceState == null`, so rotating the screen doesn't upload the same files again) and from `onNewIntent`, since
-the activity is `singleTop`.
+`savedInstanceState == null`, so rotating the screen doesn't upload the same files again) and from `onNewIntent`. The
+activity is `singleTask`: there is one copy of the app, in its own task, and a share always reaches it. With `singleTop`,
+a share could start a second copy on top of the sharing app, which the share could miss.
 
 `App.kt` watches that flow. When files are waiting and the app isn't locked, it opens the Upload screen, hands the
 files to `uploadViewModel.onFilesSelected`, and empties the flow:
@@ -296,7 +297,9 @@ comma (file ids never contain one) and calls `fileStore.downloadArchive` instead
 
 When a download finishes, the snackbar has an **Open** button. `openDownloadedFile` (`files/OpenDownloaded.kt`) sends
 an `ACTION_VIEW` intent with the saved URI, the file's type and `FLAG_GRANT_READ_URI_PERMISSION`, so an APK opens the
-installer and a zip opens an archive app. If no app can open it, a toast says so.
+installer and a zip opens an archive app. If no app can open it, a toast says so. The installer only takes an APK
+from an app that declares `REQUEST_INSTALL_PACKAGES`; without it, it closes at once without a word. Android asks the user
+once to allow installs from Materialdrain.
 
 ## An upload, from pick to notification
 

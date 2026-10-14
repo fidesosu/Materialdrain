@@ -164,6 +164,7 @@ The details page (`files/FileDetailsScreen.kt`) picks one preview by the file's 
 | `image/*` | `InlineImagePreview` | `ui/media/ImagePreview.kt` |
 | `video/*` | `InlineVideoPreview`, then the fullscreen player | `ui/media/VideoPlayer.kt` |
 | `audio/*` | `AudioPlayerPreview` | `ui/media/AudioPlayer.kt` |
+| A PDF (`application/pdf`, or a `.pdf` name) | `InlinePdfPreview`, then `FullScreenPdfDialog` | `ui/media/PdfPreview.kt` |
 | Text | `CodePreview` | `ui/components/CodePreview.kt` |
 | Anything else with a thumbnail | The thumbnail in a card | |
 
@@ -248,11 +249,40 @@ colours are too few and too close together to tell a type from a call from a key
 
 A file named `.zip`, `.7z`, `.rar`, `.tar`, `.tgz` or `.apk` is opened as an archive when the host has `ArchiveOps`
 (Pixeldrain, with its `?zip_info` and `?zip_file` API; a REST API config with `archive_info` and `archive_file`
-endpoints). The archive itself is never downloaded just to look inside.
+endpoints) and `ArchiveOps.canOpen` says it can reach this one (`FileInfoViewModel.showsArchive`): Pixeldrain only can
+for the files of its filesystem, not those of the account. The tab the details were opened from can also leave it out
+(`ARCHIVE_BROWSE` in its `disabled_capabilities`). The archive itself is never downloaded just to look inside, and the
+listing is read off the main thread.
 
 `ArchiveContents` shows the folder you're in, its folders to open and its files to save, and a button to go up. Files
 inside can only be saved, not opened: `downloadArchiveEntry` starts an ordinary download, and `downloadNodeTo` reads
 the entry with `ArchiveOps.read`.
+
+### PDFs
+
+Android's `PdfRenderer` draws a PDF's pages, but only from a whole file on the device, so a PDF is loaded into the app's
+cache first (`FileInfoViewModel.fetchPdfPreview`, through the same `downloadNodeTo` as a download):
+
+| Limit | Value | Constant |
+| --- | --- | --- |
+| Loaded without being asked for | 16 MB; a bigger one waits for a tap (`PdfPreviewState.Large`) | `MAX_PDF_AUTO_LOAD_BYTES` |
+| Largest that's loaded at all | 64 MB, also when the host doesn't tell the size (`LimitedOutputStream` stops the copy) | `MAX_PDF_PREVIEW_BYTES` |
+| Kept in `cacheDir/pdf-preview` | The last 5, by host, file, size and date, so a changed file isn't shown from an old copy | `PDF_CACHE_KEPT` |
+
+A held-back preview (the data saver) counts a tap on it as asking, whatever the size. A copy that left the cache while
+the details were open (the cache was cleared) is loaded again instead of being called damaged.
+
+`PdfPreview.kt` opens the file with a `PdfDocument`, which reads every page's size once, so pages take their place before
+they're drawn, and draws one page at a time behind a `Mutex` (`PdfRenderer` can only have one page open). A page is
+drawn at most 2560 px wide and 8 million pixels, on white, as on paper. A damaged page with no width or height counts as
+square instead of crashing the layout.
+
+- **In the details**, `InlinePdfPreview` is a card like the other previews: the top of the first page, the number of
+  pages, and a tap opens it full screen. While it loads it shows how far along it is.
+- **Full screen**, `FullScreenPdfDialog` shows every page in a `LazyColumn`, scrolled with a finger and zoomed with two
+  (or a double tap, up to 5×). Zooming lays the pages out wider rather than stretching them, so scrolling keeps up with
+  the finger, and each page is drawn again, sharp, once the zoom has settled (200 ms).
+- A password-protected PDF can't be opened by `PdfRenderer`; it says so instead.
 
 ## SMB files by address
 

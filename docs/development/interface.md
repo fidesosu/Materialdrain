@@ -27,13 +27,19 @@ for back.
 | --- | --- | --- |
 | `Screen` | `Navigation.kt` | Every screen: `Upload`, `Files`, `Filesystem`, `FileDetail`, `Lists`, `Settings` |
 | `HostScreen.toScreen()` | `Navigation.kt` | Maps provider-api's `HostScreen` to the app's `Screen`. The one place the two meet, as provider-api can't see the app module |
-| `BottomNavigationBar` | `Navigation.kt` | A Material `NavigationBar` with one item per screen of `navBarOrder` |
+| `Tab` | `Navigation.kt` | One tab of the host: a `Screen` of its kind and its entry in the config (`ScreenConfig`), with its `id` and `title` |
+| `BottomNavigationBar` | `Navigation.kt` | A Material `NavigationBar` with one item per tab of `navBarOrder` |
 | `FabDetails` | `Navigation.kt` | What the extended FAB shows for a screen: icon, text, action |
 | `TransferBarSlot` | `App.kt` | The progress bar under the top bar (see [TransferStatusBar](#transferstatusbar)) |
-| `lastScreen` | `settings/AppSettings.kt` | The screen the app was on, so it opens there again |
+| `lastScreen`, `lastTabId` | `settings/AppSettings.kt` | The screen and tab the app was on, so it opens there again |
 
 Screen changes animate with `AnimatedContent`: a vertical slide in tab order, or a quick crossfade with reduced motion
-(see [Reduced motion](#reduced-motion-and-the-other-locals)).
+(see [Reduced motion](#reduced-motion-and-the-other-locals)). Its state is a `Shown`: the screen, the tab and the host.
+A page sliding out keeps its own host and tab, so it goes on showing its own browser; `contentKey` leaves the host out,
+so switching hosts on the same tab changes the page in place instead of sliding.
+
+The bottom bar rises out of the bottom edge and sinks back into it, its icons with it: it expands and shrinks with its
+top kept on the space (`expandFrom` / `shrinkTowards = Alignment.Top`), so the page above follows it.
 
 ### Tabs come from the host
 
@@ -52,8 +58,10 @@ flowchart LR
 - **A config** picks its screens with `screens` (see [Screens](../hosts/config-format.md#screens)).
   `resolveScreens` in provider-api keeps them in the config's order and drops the ones the host can't back.
 - **The built-in Pixeldrain host** isn't a config, so it gets Upload and then whatever its capabilities allow.
-- **A screen's config entry** can rename the tab (`screenTitle`) and take capabilities away from it
-  (`disabledCapabilities`, passed to `BrowserScreen`).
+- **A screen's config entry** can rename the tab (`Tab.title`) and take capabilities away from it
+  (`disabledCapabilities`, passed to `BrowserScreen`, and to the file details through `FileInfoViewModel.setTabLimits`).
+- **Several tabs of one kind** are told apart by `Tab.id`. The bar selects a `Tab`, not a `Screen`: `currentTabId`
+  says which tab of the current screen's kind is shown (`tabOf(screen)`), and falls back to the first of that kind.
 - **A screen the new host doesn't offer** falls back to the first one it does. This runs when the host changes and when
   the screen changes, since a host switched to from Settings only meets its tabs when you leave Settings.
 - **No screens at all** (`"screens": []`, or only ones the host can't back) shows a message saying so instead of a
@@ -85,10 +93,9 @@ the bottom bar. It's off by default and turned on in **Settings → Developer �
   `SWIPE_TIMEOUT_MILLIS` of starting to move. The spot is saved in `AppSettings.navFabPosition`.
 - The window grows out of the button's corner; with reduced motion it only fades. On Android 12 and up the screen
   behind it is blurred (`navMenuBlur` in `App.kt`).
-- **What it lists doesn't follow the host yet.** It shows the menu picked in **Developer → Preview navigation as**:
-  `PixeldrainNavMenu` (Upload, Files, Lists, Filesystem) or `TrueNasMockNavMenu`, a mock with dozens of entries to see
-  how the window copes. Mock items have no `screen` and only highlight when tapped. Picking a tab the host doesn't
-  offer lands on its first screen, through the fallback above.
+- It shows the menu picked in **Developer → Preview navigation as**: **This host** (the active host's tabs, as the
+  bottom bar has them, so a second Filesystem tab can be reached too) or `TrueNasMockNavMenu`, a mock with dozens of
+  entries to see how the window copes. Mock items have no `tab` and only highlight when tapped.
 
 ### The host switcher
 
@@ -103,7 +110,7 @@ in the order they were added), each with its address, whether it answers and whe
 - The badge shows the state with a symbol as well as a colour (tick, cross, question mark, crossed-out cloud), so it
   doesn't hang on colour alone.
 - Choosing a host calls `ProviderConfigStore.setActive`. The gear, or **Sign in**, opens that host's settings;
-  **Manage hosts** opens **Settings → Advanced**.
+  **Manage hosts** opens **Settings → Hosts**.
 
 ## BrowserScreen
 
@@ -305,8 +312,10 @@ The `Box` should hold only the button: the menu measures that box to place itsel
 ### SharedSnackbar
 
 `AppSnackbarHost` in `SharedSnackbar.kt` replaces Material's `SnackbarHost`. It shows and hides the snackbar itself so
-it can animate in and out, keeps the last message while that one leaves, and grows upward. With `styled` (the
-navigation prototype) it takes the navigation button's look and, when the button sits at an edge, shares its row.
+it can animate in and out, keeps the last message while that one leaves, and grows upward. Every snackbar has one look:
+rounded corners, the label type and the FAB's height, at full width. When the navigation prototype's button sits at an
+edge, the snackbar shares its row and leaves the button's space free. Each message gets its own `SwipeToDismissBox`
+(`DismissibleSnackbar`), as a swipe state handed to an already laid-out box crashes in the lookahead pass.
 `snackbarMotion(reduceMotion)` is the one motion for the snackbar and for the buttons that lift above it, so they move
 together; it's instant with reduced motion.
 

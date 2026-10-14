@@ -29,7 +29,7 @@ The app keeps the session (or the key) encrypted on the device; your password is
 
 ## Adding another host
 
-Open **Settings → Advanced**. Under **Add a custom host**, pick the kind of host (*WebDAV*, *S3*, *SMB*, or
+Open **Settings → Hosts**. Under **Add a custom host**, pick the kind of host (*WebDAV*, *S3*, *SMB*, or
 *REST API*): a form opens with everything that kind needs, with the usual values already filled in. Change the
 address (and anything else that's different for you) and press **Add host**. Then enter your sign-in on the host's
 card, which appears in the list above.

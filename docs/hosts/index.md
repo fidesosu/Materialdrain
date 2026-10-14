@@ -22,7 +22,7 @@ REST API has no standard, so its config also describes each request, and that's 
 
 ## Adding a host, step by step
 
-1. Open **Settings → Advanced**, and scroll to **Add a custom host**.
+1. Open **Settings → Hosts**, and scroll to **Add a custom host**.
 2. Under **New host**, press the kind you want: **WebDAV**, **S3**, **SMB** or **REST API (from Pixeldrain)**.
 3. The [config editor](editor.md) opens on a complete config of that kind. The usual values are filled in; change the
    address and anything else that's different for you. Every field says what it's for.
@@ -42,7 +42,7 @@ REST API has no standard, so its config also describes each request, and that's 
 
 ## A host's card
 
-Each host in **Settings → Advanced** has a card with:
+Each host in **Settings → Hosts** has a card with:
 
 - its **sign-in**: the fields depend on the kind and the config ([Sign-in](sign-in.md));
 - **Test connection**: checks the address and the sign-in, field by field;

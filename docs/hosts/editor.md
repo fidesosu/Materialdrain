@@ -6,7 +6,7 @@ card.
 
 ## Starting a new host
 
-Under **Settings → Advanced → Add a custom host**:
+Under **Settings → Hosts → Add a custom host**:
 
 - **New host** has a button per kind. Each one opens the editor on a complete config of that kind, with every field
   the app reads, at its default or at an example value. Change the address (and whatever else differs), then **Add

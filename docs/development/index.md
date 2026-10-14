@@ -50,9 +50,32 @@ The APK lands in `app/build/outputs/apk/debug/app-debug.apk`; `./gradlew install
 or emulator. A debug build has the same `applicationId` as the releases, `tools.senko.materialdrain`, but is signed with
 your machine's debug key, so Android won't install it over a release build: uninstall that first.
 
-`./gradlew assembleRelease` needs the release key (see [Signing](#signing)), so locally you'll want the debug build.
-The release build is minified and has unused resources removed (`isMinifyEnabled`, `isShrinkResources`), with the
-rules in `app/proguard-rules.pro`.
+`./gradlew assembleRelease` needs the release key (see [Signing](#signing)), so locally you'll usually want the debug
+build. To try a change on a phone that has a release installed, build a release instead, as a debug build can't be
+installed over it.
+
+| | Debug | Release |
+| --- | --- | --- |
+| Shrunk by R8 | no | yes (`isMinifyEnabled`, `isShrinkResources`), with `app/proguard-rules.pro` |
+| Size | about 64 MB | about 9 MB |
+| Time | about 20 s after a small change | about 2 min, 75 s of it R8 going through every library |
+
+### R8 and the SMB provider
+
+The SMB provider uses jcifs-ng, which brings in BouncyCastle. Most of BouncyCastle is reached directly by code, so R8
+keeps what's used and drops the rest. What's found **by name** at runtime has to be kept by a rule in
+`proguard-rules.pro`:
+
+- all of `jcifs.**`, which finds its own protocol classes by name;
+- from BouncyCastle, only its JCA provider (`BouncyCastleProvider`) and the two algorithms jcifs-ng asks it for by name:
+  `MD4` (the NTLM sign-in) and `AESCMAC` (SMB 3 signing). The provider finds an algorithm's classes by name too, and
+  skips the ones that aren't there.
+
+Keeping all of BouncyCastle made it about 40% of the app's code (13 MB instead of 9). If an SMB sign-in fails on a
+release build with a missing algorithm, jcifs-ng asked for one more by name: keep its classes too, e.g.
+`-keep class org.bouncycastle.jcajce.provider.digest.SHA256* { *; }`. `-keep class org.bouncycastle.** { *; }` always
+works, at the old size. BouncyCastle's data files for what isn't used (post-quantum Picnic, certificate path messages)
+are left out in `packaging.resources.excludes` in `app/build.gradle.kts`.
 
 ## Testing
 
@@ -138,7 +161,11 @@ Release builds are signed with the release key, which lives in the repository's 
 
 `app/build.gradle.kts` reads the file and the two passwords (from environment variables of the same names). The
 workflow fails with a clear message when `KEYSTORE_BASE64` isn't set, and deletes the key file at the end, even when
-the build failed. `*.jks` files are in `.gitignore`.
+the build failed. `*.jks` files are in `.gitignore`, so switching or resetting branches never touches a local copy.
+
+To build a release locally, put the key at the root of the project as `materialdrain-release.jks` and set the two
+passwords as environment variables. Keep a copy of the key and its passwords somewhere outside the project: the
+secrets can't be read back from GitHub, and without this key no update installs over the released app.
 
 ## Versions
 

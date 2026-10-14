@@ -2,7 +2,8 @@
 
 Which screens you see depends on the host you're using: Pixeldrain has all four, a WebDAV, S3 or SMB host has Upload
 and Filesystem, and a REST API host has whichever its config turns on (see [Screens](../hosts/config-format.md#screens)).
-When a host has only one screen, the tabs are hidden and that screen is simply shown.
+When a host has only one screen, the tabs are hidden and that screen is simply shown. A host can also have several
+Filesystem tabs, each opening at a folder of its own (see [Several tabs of one kind](../hosts/config-format.md#several-tabs-of-one-kind)).
 
 ## Upload
 
@@ -10,11 +11,11 @@ Pick one or more files, or switch to text and paste some, then press **Upload**.
 
 - Picked files are listed with their size before anything is sent; a single file shows a preview: an image, a video's
   first frame, a song's cover and details, a PDF's page count, an app's icon and name.
-- Up to three files go up at a time. With **Settings → Uploads → Upload in the order the files were changed** on, they
-  go one after another instead, oldest first, so the newest ends up at the top of the host's list.
+- Up to three files go up at a time. With **Settings → Files → Upload by last change** on, they go one after another
+  instead, oldest first, so the newest ends up at the top of the host's list.
 - When it's done, each file's link can be copied, or all of them at once.
-- **Sharing into the app**: in any other app, *Share* a file (or several) and choose Materialdrain. They land here,
-  ready to upload.
+- **Sharing into the app**: in any other app, *Share* a file (or several) and choose Materialdrain. The app opens on
+  this screen with them, ready to upload; it waits for the unlock when the app is locked.
 
 On Pixeldrain, files go into your account's file list. On a WebDAV, S3 or SMB host, which have no such list, they go
 into the host's top folder (the config's `root_path` or `prefix`).
@@ -36,7 +37,8 @@ own can have files removed from it, and the **All (ZIP)** button downloads the w
 
 ## Filesystem
 
-A folder browser, for every host that has folders.
+A folder browser, for every host that has folders. Each Filesystem tab keeps its own folder, and opens at it again
+after a restart; a tab with its own root folder can't go above it.
 
 - The **path** above the list shows where you are. Tap any part of it to go back there; the back button goes up a
   folder.
@@ -54,7 +56,7 @@ On the Filesystem screen, search looks through the open folder **and every folde
 folders in the background while the box is open, nearest first, and the matches come in as they're found. Each match
 says which folder it's in. Searching again is instant until something changes on the host.
 
-All matches are shown, unless you set a limit in **Settings → Search**.
+All matches are shown, unless you set a limit in **Settings → Files → Most search results**.
 
 ## Selecting several files
 
@@ -72,11 +74,17 @@ Back, or the ✕, ends the selection.
 Tap a file to open it.
 
 - **The preview** at the top: an image (tap for full screen, pinch to zoom), a video (tap to play full screen), a song
-  with its player, the start of a text or code file with colours (open it full screen for all of it), or the contents
-  of an archive (zip, 7z, rar, tar, apk), whose files can be downloaded one by one.
-- **The actions**: *Download* (tap twice: the first tap asks for the second, so a slip of the finger doesn't start a
-  big download), *Share the link*, *Copy the link*, *Delete*. While it downloads, the button shows the progress and
-  cancels when tapped; when it's done, it opens the file.
+  with its player, the start of a text or code file with colours (open it full screen for all of it), a PDF, or the
+  contents of an archive (zip, 7z, rar, tar, apk) where the host can look inside it, whose files can be downloaded one
+  by one. With the [data saver](settings.md#data-saver) on, the preview waits for a tap.
+- **A PDF** shows the top of its first page and how many pages it has; tap it for every page full screen, scrolled with
+  a finger, zoomed with two (or a double tap). It's loaded into the app to be shown (at most 64 MB, and only the last
+  few PDFs are kept); one over 16 MB waits for a tap first.
+- **The actions**: *Download*, *Share the link*, *Copy the link*, *Delete*. *Download* asks to be tapped twice, so a
+  slip of the finger doesn't start a big download (**Settings → Files → Tap twice to download** turns that off). While
+  it downloads, the button shows the progress and cancels when tapped; when it's done, it opens the file. The snackbar
+  that says it's done has an **Open** too. An APK opens the installer, which asks once to allow installs from
+  Materialdrain.
 - **The details**: size, type, dates, and on Pixeldrain the views, downloads and bandwidth, links and ids (tap to copy).
 
 ## Transfers

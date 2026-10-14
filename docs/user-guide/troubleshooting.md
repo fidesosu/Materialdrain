@@ -3,7 +3,7 @@
 ??? question "A host says it doesn't answer"
     The dot of the host switcher (and its menu) says why: the address can't be found, the connection was refused, it
     took too long, or your phone is offline. The check is only whether the address answers, without signing in; whether
-    your sign-in works is **Test connection** on the host's card in **Settings → Advanced**. For an SMB share, the
+    your sign-in works is **Test connection** on the host's card in **Settings → Hosts**. For an SMB share, the
     server has to be on the same network (or reachable through a VPN).
 
 ??? question "There are no files, or a screen is missing"

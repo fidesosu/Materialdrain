@@ -83,8 +83,14 @@ Everything that shows a file works from a URL: the image loader, the video and a
 | `BrowseOps` | Folders and paths | `list(path)`, `upload`, `download`, `createDirectory`, `rename`, `delete(path, recursive)`, `importFiles` (default: not supported) |
 | `FileListOps` | One flat "everything on the account" listing | `list()` |
 | `ListOps` | Named lists of files (Pixeldrain's lists) | `lists`, `listContents`, `create`, `update`, `delete` |
-| `ArchiveOps` | Looking inside an archive on the host without downloading it | `list(archivePath, inside)`, `read(archivePath, entryPath, ...)` |
+| `ArchiveOps` | Looking inside an archive on the host without downloading it | `canOpen(archive)`, `list(archive, inside)`, `read(archive, entryPath, ...)` |
 | `AccountOps` | The account's name and quota | `accountInfo` |
+
+`ArchiveOps` takes the archive as a `StorageRef`, and `canOpen` says whether this host can reach that one: Pixeldrain's
+`?zip_info` only exists on its filesystem (by path), not for the files of the account (by id); a REST API config reaches
+by whichever of `{path}` and `{id}` its `archive_info` endpoint asks for. The file details only offer an archive's
+contents where `canOpen` is true, instead of failing. A file read out of an archive keeps where it came from in
+`ArchiveEntryDetails(archive, entryPath)`, which a download reads it back through.
 
 `FileListOps` and `BrowseOps` are kept apart on purpose. A host can upload, download and delete by id without any
 way to ask what's already there; `fileList` being null is how that's told apart from a host that lists per folder.
@@ -132,7 +138,7 @@ fun isBackedBy(capabilities: Set<ProviderCapability>): Boolean = when (this) {
 fun resolveScreens(screens: List<ScreenConfig>?, capabilities: Set<ProviderCapability>): List<ScreenConfig> =
     (screens ?: HostScreen.entries.map { ScreenConfig(it) })
         .filter { it.screen.isBackedBy(capabilities) }
-        .distinctBy { it.screen }
+        .distinctBy { it.tabId }
 ```
 
 | The config says | The tabs |
@@ -141,12 +147,20 @@ fun resolveScreens(screens: List<ScreenConfig>?, capabilities: Set<ProviderCapab
 | A list | Those, in the config's order |
 | `[]` | None: the app says the host has no screens to show |
 | A screen the host can't back | Left out, rather than shown full of errors |
-| A screen listed twice | Shown once, where it's first listed |
+| Two tabs with one id | Shown once, where the first is listed (`screenProblems` says so, for the editor and the import) |
 | `"filesystem"` | Read as `FILESYSTEM`: `ScreenEntrySerializer` trims and upper-cases names |
 
-`ScreenEntrySerializer` also reads a bare name as `{"screen": ...}`, and writes a screen with no `name` and no
-`disabled_capabilities` back as just its name, so exported configs stay short. `disabledCapabilities` only ever takes
-away: `BrowserScreen` checks `UPLOAD`, `MKDIR`, `RENAME` and `DELETE` against it.
+A `ScreenConfig` has its kind (`screen`), and optionally an `id`, a `name`, a `root` and `disabledCapabilities`:
+
+- `tabId` is its `id`, or the kind in lower case (`"filesystem"`). Two tabs of one kind need ids of their own; the app
+  keeps a tab's state (its open folder, its scroll position) by it.
+- `rootFolder` is its `root` without slashes around it, `""` for the whole host. Only a Filesystem tab uses it.
+- `screenProblems(screens)` says, in words, what's wrong: two tabs with one id, a root on a tab that has no folders.
+
+`ScreenEntrySerializer` also reads a bare name as `{"screen": ...}`, and writes a screen with nothing else set back as
+just its name, so exported configs stay short. `disabledCapabilities` only ever takes away: `BrowserScreen` checks
+`UPLOAD`, `MKDIR`, `RENAME` and `DELETE` against it, and the file details (`FileInfoViewModel.setTabLimits`) `DELETE`
+and `ARCHIVE_BROWSE`, for the tab they were opened from.
 
 The built-in Pixeldrain host has no config, so it doesn't go through `resolveScreens`: `App.kt` builds its tabs from
 its capabilities directly. See [Screens follow the host](architecture.md#screens-follow-the-host).
@@ -401,7 +415,7 @@ an existing kind: `grep -rn "SmbConfig\|ProviderKind.SMB\|\"smb\"" --include=*.k
 7. **The config editor**: a `fooSections` list in `app/.../preferences/configeditor/ConfigSchema.kt`, and a branch in
    `sectionsFor` and `kindLabel`. `ConfigSchemaTest` fails if the template has a field the form doesn't describe.
 8. **The template**: an entry in `ProviderConfigTemplates.Kind` and a branch in `config(kind)`. It becomes a **New
-   host** button in **Settings → Advanced** by itself.
+   host** button in **Settings → Hosts** by itself.
 9. **The rest of the app** that names each kind:
     - `preferences/AdvancedSettings.kt`: `kindLabel`, and the host card's sign-in fields. S3 and SMB have a branch of
       their own there (a key pair, or a username and password, and no API key); every other kind gets its fields from

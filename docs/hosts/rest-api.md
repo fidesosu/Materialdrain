@@ -167,13 +167,19 @@ Each name unlocks a part of the app; leave out what your API can't do. A file wi
 | `browse_rename` | `{path}`, `{target}`, `{make_parents}` | Renaming or moving; `{target}` is the new path |
 | `browse_delete` | `{path}`, `{recursive}` | Deleting a file or a folder |
 | `browse_import` | `{path}`, `{files_json}` | Copying files into a folder by their ids (Pixeldrain's *Import files by ID*) |
-| `archive_info` | `{path}` | What's inside an archive, without downloading it: shown in the file's details. The answer is in Pixeldrain's `zip_info` shape (below) |
-| `archive_file` | `{path}`, `{entry}` | One file out of an archive; `{entry}` is its path inside it |
+| `archive_info` | `{path}` or `{id}` | What's inside an archive, without downloading it: shown in the file's details. The answer is in Pixeldrain's `zip_info` shape (below) |
+| `archive_file` | `{path}` or `{id}`, and `{entry}` | One file out of an archive; `{entry}` is its path inside it |
+
+The archive endpoints reach an archive the way their placeholders say: with `{path}`, the archives in the folders (the
+Filesystem tab); with `{id}`, the files of the account (the Files tab). An archive the endpoint can't reach shows no
+contents in its details, rather than an error. Pixeldrain's `?zip_info` only exists on its filesystem, so its config
+writes `{path}`.
 
 ??? info "The shape of an `archive_info` answer"
     The archive's top has `children`, an object mapping each entry's name to its own object. A folder's object has
     `children` too; a file's has its `size`. An archive that couldn't be read answers `"success": false`, with `value`
-    and `message`.
+    and `message`. Pixeldrain's `invalid_zip_file` (said of a password-protected archive as well) is shown as "This
+    archive is either not valid or has a password."
 
     ```json
     { "children": { "photos": { "children": { "cat.jpg": { "size": 52311 } } }, "notes.txt": { "size": 120 } } }

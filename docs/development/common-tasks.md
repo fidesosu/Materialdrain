@@ -30,7 +30,9 @@ or through a `CompositionLocal`.
     helper, as `sortField` and `navFabPosition` do.
 
 2. **Show it** in `preferences/SettingsCatalog.kt`: add an item to the `items` of the right `SettingsCategory`. A switch
-   is a `SettingsItem.Toggle`; `isChecked` runs while composing, so it collects the flow and stays up to date:
+   is a `SettingsItem.Toggle`; `isChecked` runs while composing, so it collects the flow and stays up to date. `info`
+   is the explanation behind its ⓘ, and `children` are settings of its own, indented under it and out of reach while
+   it's off:
 
     ```kotlin
     SettingsItem.Toggle(
@@ -41,9 +43,8 @@ or through a `CompositionLocal`.
     )
     ```
 
-    Anything that isn't a switch, an action, a note or a header is a `SettingsItem.Custom` with a
-    `SettingsEnvironment.XSection()` composable in a file of its own, like `SearchResultLimitSection` in
-    `preferences/SearchSettings.kt`.
+    A few options side by side (segmented buttons) are a `SettingsItem.Choice`, like **Most search results**. Anything
+    else is a `SettingsItem.Custom` with a `SettingsEnvironment.XSection()` composable in a file of its own.
 
 3. **A new category** is a new `SettingsCategory(id, title, summary, icon, items)` in the `SettingsCatalog` list, in the
    order it should appear. Nothing else needs to change: `SettingsScreen.kt` renders every category and item from the
@@ -199,6 +200,55 @@ branch in `FileInfoDetailsCard`. See [Thumbnails and previews](media.md) for how
    the lists show its icon and colour. A text format that should be coloured goes into `SourceLanguages.byExtension`
    in `files/SourceHighlighting.kt`, which also makes `isTextFile` show it as text.
 7. **Document it** under *File details* in the website's `docs/user-guide/screens.md`.
+
+## Adding an icon
+
+The app keeps only the Material icons it uses, not `material-icons-extended` (thousands of icons, about 30 MB of the
+debug APK). They're in `ui/icons/`, one line each, named as in the library, so the code reads the same:
+
+| File | Icons |
+| --- | --- |
+| `filled/FilledIcons.kt` | `Icons.Filled.*` |
+| `outlined/OutlinedIcons.kt` | `Icons.Outlined.*` |
+| `automirrored/filled/AutoMirroredFilledIcons.kt` | `Icons.AutoMirrored.Filled.*`: icons that flip in right-to-left languages (arrows, "open in new") |
+| `AppIcons.kt` | `icon()`, which builds an icon from its path the way the library does |
+
+1. Find the icon at [fonts.google.com/icons](https://fonts.google.com/icons), in the **Material Icons** set (not
+   Material Symbols, which are drawn differently), in its style (Filled or Outlined).
+2. Download its SVG (24 px) and copy the `d` of its `<path>`.
+3. Add a line for it to the file of its style, sorted by name. One with several paths passes each:
+   `icon("Filled.Name", "M…", "M…")`. One that points somewhere goes in `AutoMirroredFilledIcons.kt`, with
+   `autoMirror = true`.
+
+    ```kotlin
+    val Icons.Filled.Add: ImageVector by lazy { icon("Filled.Add", "M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6v2Z") }
+    ```
+
+4. Import it from the app (`Icons` itself still comes from `material-icons-core`):
+
+    ```kotlin
+    import androidx.compose.material.icons.Icons
+    import tools.senko.materialdrain.ui.icons.filled.Add
+    ```
+
+For many icons at once, add `material-icons-extended` as a `testImplementation` for a moment and write the lines from
+the library's own `ImageVector`s in a unit test (their `root` holds the paths as `PathNode`s), the way the files were
+first made; then remove it again.
+
+## Changing the app's icon
+
+There is one logo, `res/drawable/pixeldrain_launcher.xml` (white), and one splash copy of it,
+`res/drawable/pixeldrain_splash.xml` (in `@color/pixeldrain_icon`: a launcher icon can't take its colour from the
+theme, so the splash's coloured one is its own file). To change the logo, change those two.
+
+The adaptive icon (`mipmap-anydpi/ic_launcher.xml`) places the logo through `ic_launcher_foreground_padded.xml` and, for
+themed icons, `ic_launcher_monochrome_padded.xml`. Their padding is a **share of the icon** (`android:inset="15%"`), not
+a size in dp. The icon is drawn at many sizes: large on the launcher, small in the status bar (OxygenOS and ColorOS show
+the app's icon there) and smaller still in a file manager's list. A padding in dp is the same at every size, so the
+small icons were nearly all padding: a sliver of the logo, or a dot. To make the logo bigger or smaller everywhere,
+change the `inset` of both `_padded` files. Keep the logo inside the middle two thirds, which the launcher's mask shows.
+
+The splash screen is always drawn at one size, so `ic_splash_icon_padded.xml` keeps its padding in dp.
 
 ## Logging
 

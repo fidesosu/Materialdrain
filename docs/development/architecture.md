@@ -82,7 +82,7 @@ All packages are under `tools.senko.materialdrain`.
 | (top level) | `MainActivity`, `App.kt` (the Compose shell), `Navigation.kt`, `AppContainer`, `ViewModelFactory` |
 | `browser` | `BrowserScreen`, the one screen behind Files, Lists and Filesystem, its controls and the search results |
 | `files` | The Files screen's ViewModel (`FileInfoViewModel`), the file details page, file menus, sorting, archive contents, text highlighting |
-| `filesystem` | `FilesystemViewModel`: folder browsing, uploads into folders, the folder tree index for search |
+| `filesystem` | `FilesystemViewModel`: folder browsing, uploads into folders, the folder tree index for search. One per Filesystem tab of a host |
 | `upload` | The Upload screen and `UploadViewModel` |
 | `lists` | `ListViewModel`: lists of files and their contents |
 | `transfer` | `TransferRegistry` (every running upload and download), the foreground `TransferService`, notifications, speed |
@@ -173,6 +173,14 @@ order it's needed; something that needs an object gets it from the container, or
 The three ViewModels that run uploads and downloads (`UploadViewModel`, `FileInfoViewModel`, `FilesystemViewModel`)
 are created in `transferViewModelStoreOwner` rather than the activity. Being tied to the process, they and their
 transfers survive the activity being closed while a transfer runs. See [Uploads and downloads](transfers.md).
+
+There is a `FilesystemViewModel` for each Filesystem tab, keyed by the host, the tab's id and its root
+(`filesystemViewModelFor` in `App.kt`), so each tab keeps its own folder, listing and upload. `bind` gives it its host,
+tab and root once, after it's made. Only the tab on screen loads anything (`show` and `hide`, from the page's
+`DisposableEffect`): a change while a tab is hidden (a sign-in, a config edit, files deleted elsewhere) is caught up when
+it's shown again. The folder open in a tab is kept by the host's id for its usual tab, as before there were several,
+and by the host's and the tab's for the others. The other screens use the host's first Filesystem tab, e.g. for the
+folder picker of **Add to filesystem**.
 
 ## Hosts at run time
 

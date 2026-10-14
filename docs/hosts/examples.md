@@ -2,7 +2,7 @@
 
 These configs ship with the app's source, in
 [`docs/provider-configs`](https://github.com/fidesosu/Materialdrain/tree/dev/docs/provider-configs). Copy one,
-change the address, paste it under **Settings → Advanced → Or paste a config**, and enter the sign-in on its card.
+change the address, paste it under **Settings → Hosts → Or paste a config**, and enter the sign-in on its card.
 
 | File | Kind | What it is |
 | --- | --- | --- |

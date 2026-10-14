@@ -1,7 +1,7 @@
 # Sign-in
 
 A config never holds a password, a key or a token. It only says **how** the host wants them sent; you type them in on
-the host's card under **Settings → Advanced**, and they stay on your phone. That's what makes a config safe to share.
+the host's card under **Settings → Hosts**, and they stay on your phone. That's what makes a config safe to share.
 
 ## What you're asked for
 

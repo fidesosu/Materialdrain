@@ -160,9 +160,9 @@ The text the app shows is written in Kotlin, next to the code that shows it (the
 - **Sentence case** for buttons, titles and labels: **Check all for updates**, **Add a custom host**, **Or paste a
   config**. Some older labels are still in Title Case; fix them as you pass.
 - **Say what happened and what to do.** A refused sign-in reads "Not signed in. Sign in, or add an API key for this
-  host under Settings → Advanced." (`ProviderError.forDisplay()`).
+  host under Settings → Hosts." (`ProviderError.forDisplay()`).
 - **Messages are sentences**, with a full stop: "1 file was uploaded to $dir.", "Upload cancelled."
-- **Name settings the way the screen does**, with **Settings → Advanced** style paths, so the user can find them.
+- **Name settings the way the screen does**, with **Settings → Hosts** style paths, so the user can find them.
 
 Why: the app is used by people who don't know what WebDAV or a 401 is, and they shouldn't need to.
 
