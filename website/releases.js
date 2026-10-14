@@ -41,8 +41,14 @@
   }
 
   function fillOlder(releases) {
-    if (releases.length === 0) return;
     const list = document.getElementById("older-list");
+    if (releases.length === 0) {
+      const item = document.createElement("li");
+      item.className = "version-meta";
+      item.textContent = "None yet.";
+      list.append(item);
+      return;
+    }
     for (const release of releases.slice(0, OLDER_SHOWN)) {
       const apk = apkOf(release);
       const item = document.createElement("li");
@@ -56,7 +62,6 @@
       item.append(link, meta);
       list.append(item);
     }
-    document.getElementById("older").hidden = false;
   }
 
   function show(releases) {

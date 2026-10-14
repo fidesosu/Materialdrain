@@ -215,7 +215,8 @@ only lists them, and every download comes straight from GitHub.
    visit.
 2. Drafts and releases without an `.apk` are left out.
 3. **Stable** is the newest release that isn't a pre-release and isn't tagged `dev-build`. **Development** is the
-   release tagged `dev-build`. Up to 8 older stable releases are listed under **Older versions**.
+   release tagged `dev-build`. Up to 8 older stable releases are listed under **Older versions** ("None yet." when
+   there are none).
 4. Each card links straight to its APK, and shows the version, the date and the size. The version is read from the
    APK's name (`Materialdrain-1.4.20261009.1530.apk` gives `1.4.20261009.1530`); releases from before the build
    workflow named their APKs differently, so for those it's the tag without its `v`.
@@ -223,3 +224,17 @@ only lists them, and every download comes straight from GitHub.
 If GitHub can't be reached, or the visitor's requests are used up, the page says so and the cards keep their plain
 links to the releases page, which are in the HTML from the start. So the page works, if more plainly, without the
 script.
+
+## The home page's layout
+
+On a computer the home page fits one screen, without a sidebar: `main` is up to 1200 px wide, at least as tall as the
+window, and centres its content top to bottom.
+
+- **The top**: the title and its line, with the Documentation and Source code links beside them (`.top`,
+  `.top-links`). The links go under the title only when there's no room for both.
+- **Download**: the Stable and Development cards side by side, as wide as the page.
+- **Older versions**: a grid of tiles (`.versions`), four to a row from 960 px wide, so the 8 shown make two full rows;
+  narrower, as many as fit. "All releases on GitHub" is at the end of the heading's line (`.section-head`).
+
+All of it fits 1280 × 720. Under 640 px wide (a phone) the page starts at the top, everything stacks, and it scrolls.
+Showing more than 8 older versions (`OLDER_SHOWN` in `releases.js`) adds rows, and may no longer fit a small screen.

@@ -41,7 +41,6 @@
 
 body {
   margin: 0;
-  min-height: 100vh;
   background: var(--bg-main);
   color: var(--text-main);
   font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -49,11 +48,50 @@ body {
 
 ::selection { background: var(--accent-deep); color: var(--text-main); }
 
+/* One screen on a computer: as wide as reads well, and centred top to bottom when there's room to spare */
 main {
-  max-width: 720px;
+  max-width: 1200px;
+  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0 auto;
-  padding: 72px 24px;
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 36px;
 }
+
+/* The title, with the links to the documentation and the source at its side */
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+}
+
+/* The title's side takes what the links leave, so they stay beside it until there's no room for both */
+.top > div { flex: 1 1 420px; }
+.top-links { display: flex; gap: 8px; flex-wrap: wrap; flex: none; }
+.top-links a {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  text-decoration: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.top-links a:hover { background: var(--bg-soft); border-color: var(--border-focus); }
+
+/* A section's title, with a link at the other end of its line */
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin: 0 0 16px;
+}
+.section-head h2 { margin: 0; }
 
 h1 {
   font-size: 2.75rem;
@@ -69,7 +107,7 @@ h2 {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--accent-muted);
-  margin: 56px 0 16px;
+  margin: 0 0 16px;
 }
 
 .lead { font-size: 1.15rem; color: var(--text-muted); margin: 0; }
@@ -94,7 +132,7 @@ a:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 22px;
+  padding: 26px 28px;
   border-radius: 20px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -126,36 +164,47 @@ a:focus-visible {
 /* A build that isn't published yet: there's nothing to download */
 .card.empty { opacity: 0.6; pointer-events: none; }
 
-.card-title { font-size: 1.15rem; font-weight: 650; }
-.card-version { font-size: 0.95rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.card-title { font-size: 1.3rem; font-weight: 650; }
+.card-version { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .card-text { font-size: 0.9rem; opacity: 0.8; }
 
-h3 { font-size: 1rem; margin: 32px 0 12px; color: var(--text-main); }
-
-.versions { list-style: none; padding: 0; margin: 0 0 12px; }
+/* The older versions side by side, a small tile each: the version, then when it was made and how big it is */
+.versions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
 .versions li {
   display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.versions li:last-child { border-bottom: none; }
-.versions a { font-weight: 600; font-variant-numeric: tabular-nums; }
-.version-meta { color: var(--text-muted); font-size: 0.9rem; }
-
-.links { list-style: none; padding: 0; margin: 0; }
-.links li {
-  margin: 0 0 8px;
+  flex-direction: column;
+  gap: 2px;
   padding: 12px 16px;
   border-radius: 14px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
+}
+.versions a { font-weight: 600; font-variant-numeric: tabular-nums; }
+.version-meta { color: var(--text-muted); font-size: 0.9rem; }
+.versions li.version-meta { background: none; border: none; padding: 0; }
+
+/* Wide enough: four a row, so the eight shown (see releases.js) make two full rows */
+@media (min-width: 960px) {
+  .versions { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* A phone: the page scrolls, with less room around it */
+@media (max-width: 640px) {
+  main { padding: 32px 20px; justify-content: flex-start; gap: 32px; }
+  h1 { font-size: 2.25rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card { transition: none; }
+  .card, .top-links a { transition: none; }
   .card:hover, .card.primary:hover { transform: none; }
 }
+
+/* Nothing to say about the builds: no empty line for it */
+#releases-status:empty { display: none; }

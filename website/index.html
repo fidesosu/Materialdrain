@@ -10,9 +10,17 @@
 </head>
 <body>
   <main>
-    <header>
-      <h1>Materialdrain</h1>
-      <p class="lead">An Android app for Pixeldrain and your other file hosts: WebDAV, S3, SMB shares and any REST API.</p>
+    <!-- The page fits one screen on a computer: the title with its links beside it, the two builds side by side, and
+         the older versions as a grid underneath. A phone stacks them and scrolls -->
+    <header class="top">
+      <div>
+        <h1>Materialdrain</h1>
+        <p class="lead">An Android app for Pixeldrain and your other file hosts: WebDAV, S3, SMB shares and any REST API.</p>
+      </div>
+      <nav class="top-links" aria-label="More">
+        <a href="/docs/" title="How to use the app, how to add a host to it, and how it is built">Documentation</a>
+        <a href="https://github.com/fidesosu/Materialdrain">Source code</a>
+      </nav>
     </header>
 
     <section class="downloads" aria-labelledby="downloads-title">
@@ -31,20 +39,14 @@
         </a>
       </div>
       <p class="small" id="releases-status"></p>
-
-      <div id="older" hidden>
-        <h3>Older versions</h3>
-        <ul class="versions" id="older-list"></ul>
-      </div>
-      <p class="small"><a href="https://github.com/fidesosu/Materialdrain/releases">All releases on GitHub</a></p>
     </section>
 
-    <section aria-labelledby="more-title">
-      <h2 id="more-title">More</h2>
-      <ul class="links">
-        <li><a href="/docs/">Documentation</a>: how to use the app, how to add a host to it, and how it is built</li>
-        <li><a href="https://github.com/fidesosu/Materialdrain">Source code</a> on GitHub</li>
-      </ul>
+    <section class="older" aria-labelledby="older-title">
+      <div class="section-head">
+        <h2 id="older-title">Older versions</h2>
+        <a class="small" href="https://github.com/fidesosu/Materialdrain/releases">All releases on GitHub</a>
+      </div>
+      <ul class="versions" id="older-list"></ul>
     </section>
   </main>
 </body>
