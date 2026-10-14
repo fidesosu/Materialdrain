@@ -1,0 +1,213 @@
+/* The home page's look. The same palette as the documentation (docs/stylesheets/extra.css): a dark rose. */
+:root {
+  color-scheme: dark;
+
+  /* Backgrounds */
+  --bg-main: #1a1617;
+  --bg-surface: #251f21;
+  --bg-soft: #362d30;
+
+  /* Borders */
+  --border-subtle: #453a3d;
+  --border-focus: #8c6a74;
+
+  /* Accents */
+  --accent-highlight: #eec1c8;
+  --accent-primary: #d4a5b2;
+  --accent-muted: #a3818a;
+  --accent-deep: #7f5f68;
+  --accent-glow: rgba(212, 165, 178, 0.15);
+
+  /* Typography */
+  --text-main: #f2ecee;
+  --text-muted: #b0a2a6;
+  --text-inverse: #1a1617;
+
+  /* Links */
+  --link-color: #e2b2be;
+  --link-hover: #fcd7dd;
+
+  /* Semantic colors */
+  --blue: #6a6ca6;
+  --red: #ba465b;
+  --green: #6aa694;
+  --yellow: #e0b06b;
+
+  /* Made from the ones above: a short, sharp shadow (no blur to speak of), only under a card being pointed at */
+  --shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg-main);
+  color: var(--text-main);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+::selection { background: var(--accent-deep); color: var(--text-main); }
+
+/* One screen on a computer: as wide as reads well, and centred top to bottom when there's room to spare */
+main {
+  max-width: 1200px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 36px;
+}
+
+/* The title, with the links to the documentation and the source at its side */
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+}
+
+/* The title's side takes what the links leave, so they stay beside it until there's no room for both */
+.top > div { flex: 1 1 420px; }
+.top-links { display: flex; gap: 8px; flex-wrap: wrap; flex: none; }
+.top-links a {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  text-decoration: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.top-links a:hover { background: var(--bg-soft); border-color: var(--border-focus); }
+
+/* A section's title, with a link at the other end of its line */
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin: 0 0 16px;
+}
+.section-head h2 { margin: 0; }
+
+h1 {
+  font-size: 2.75rem;
+  line-height: 1.15;
+  margin: 0 0 12px;
+  color: var(--accent-highlight);
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-muted);
+  margin: 0 0 16px;
+}
+
+.lead { font-size: 1.15rem; color: var(--text-muted); margin: 0; }
+.small { font-size: 0.9rem; color: var(--text-muted); }
+
+a { color: var(--link-color); text-underline-offset: 3px; }
+a:hover { color: var(--link-hover); }
+
+a:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 26px 28px;
+  border-radius: 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  text-decoration: none;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.card:hover {
+  color: var(--text-main);
+  background: var(--bg-soft);
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+.card.primary {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--text-inverse);
+}
+
+.card.primary:hover {
+  background: var(--accent-highlight);
+  border-color: var(--accent-highlight);
+  color: var(--text-inverse);
+}
+
+/* A build that isn't published yet: there's nothing to download */
+.card.empty { opacity: 0.6; pointer-events: none; }
+
+.card-title { font-size: 1.3rem; font-weight: 650; }
+.card-version { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.card-text { font-size: 0.9rem; opacity: 0.8; }
+
+/* The older versions side by side, a small tile each: the version, then when it was made and how big it is */
+.versions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
+.versions li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+}
+.versions a { font-weight: 600; font-variant-numeric: tabular-nums; }
+.version-meta { color: var(--text-muted); font-size: 0.9rem; }
+.versions li.version-meta { background: none; border: none; padding: 0; }
+
+/* Wide enough: four a row, so the eight shown (see releases.js) make two full rows */
+@media (min-width: 960px) {
+  .versions { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* A phone: the page scrolls, with less room around it */
+@media (max-width: 640px) {
+  main { padding: 32px 20px; justify-content: flex-start; gap: 32px; }
+  h1 { font-size: 2.25rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .top-links a { transition: none; }
+  .card:hover, .card.primary:hover { transform: none; }
+}
+
+/* Nothing to say about the builds: no empty line for it */
+#releases-status:empty { display: none; }
+
+/* Counts up every second: the digits keep their width so the line doesn't shift */
+#releases-refreshed { font-variant-numeric: tabular-nums; }
