@@ -814,7 +814,6 @@ fun MaterialdrainScreen() {
                 // The snackbar stays at the bottom; while selecting it sits above the selection bar
                 AppSnackbarHost(
                     hostState = snackbarHostState,
-                    styled = navPrototype && fabState == null,
                     edgeFab = if (snackbarBesideFab) navFabPosition else null,
                     fabSize = fabHeightDp,
                     reduceMotion = reduceMotion,

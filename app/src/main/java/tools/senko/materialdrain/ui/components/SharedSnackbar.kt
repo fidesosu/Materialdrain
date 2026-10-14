@@ -1,6 +1,5 @@
 package tools.senko.materialdrain.ui.components
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -12,7 +11,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -26,7 +24,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -64,9 +61,6 @@ private val SideMargin = 8.dp
 /** How long the snackbar moves and the navigation button lifts. They share it, so they flow together. */
 private const val SNACKBAR_MOTION_MS = 300
 
-/** How long the styled and the standard look take to fade into each other. */
-private const val LOOK_FADE_MS = 200
-
 /** How long the snackbar takes to auto-dismiss, as [SnackbarHost] times it. Null for an indefinite one. */
 private fun autoDismissMs(duration: SnackbarDuration): Long? = when (duration) {
     SnackbarDuration.Short -> 4_000L
@@ -82,9 +76,9 @@ fun <T> snackbarMotion(reduceMotion: Boolean): FiniteAnimationSpec<T> =
     if (reduceMotion) snap() else tween(SNACKBAR_MOTION_MS, easing = FastOutSlowInEasing)
 
 /**
- * The snackbar. With [styled], it has the navigation button's look: its colours, corners and label type, and its height
- * is the button's ([fabSize]). When the button sits at the left or right edge ([edgeFab]), the snackbar shares the button's
- * row and leaves the button's space free; otherwise it takes the full width. Without [styled] it is the standard snackbar.
+ * The snackbar, with the navigation button's look: rounded corners, the label type, and the button's height ([fabSize]).
+ * When the navigation prototype's button sits at the left or right edge ([edgeFab]), the snackbar shares the button's row
+ * and leaves the button's space free; otherwise it takes the full width.
  *
  * The host itself shows and hides the snackbar, so it can animate in and out. It keeps the last message while that one leaves.
  * Its size changes grow upward from the bottom.
@@ -94,7 +88,6 @@ fun <T> snackbarMotion(reduceMotion: Boolean): FiniteAnimationSpec<T> =
 fun AppSnackbarHost(
     hostState: SnackbarHostState,
     modifier: Modifier = Modifier,
-    styled: Boolean = false,
     edgeFab: NavFabPosition? = null,
     fabSize: Dp = 56.dp,
     reduceMotion: Boolean = false,
@@ -127,7 +120,6 @@ fun AppSnackbarHost(
             shown?.let { snackbarData -> key(snackbarData) {
                 SnackbarItem(
                     snackbarData = snackbarData,
-                    styled = styled,
                     edgeFab = edgeFab,
                     fabSize = fabSize,
                     reduceMotion = reduceMotion,
@@ -145,7 +137,7 @@ fun AppSnackbarHost(
  * The snackbar's swipe away, in either direction. Its state lives and dies with this one box: a [SwipeToDismissBox] keeps
  * the anchors of the state it was first measured with, so a state handed to a box that is already laid out has no anchors
  * in the app's lookahead pass (the [androidx.compose.animation.SharedTransitionLayout] around it), and the box crashes
- * placing itself at their NaN position. A new message or the other look therefore makes a new box with a new state.
+ * placing itself at their NaN position. A new message therefore makes a new box with a new state.
  */
 @Composable
 private fun DismissibleSnackbar(
@@ -163,11 +155,9 @@ private fun DismissibleSnackbar(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SnackbarItem(
     snackbarData: SnackbarData,
-    styled: Boolean,
     edgeFab: NavFabPosition?,
     fabSize: Dp,
     reduceMotion: Boolean,
@@ -178,94 +168,6 @@ private fun SnackbarItem(
     val actionLabel = snackbarData.visuals.actionLabel
     val message = snackbarData.visuals.message
 
-    // Switching between the styled and the standard look fades between the two, instead of swapping at once
-    AnimatedContent(
-        targetState = styled,
-        transitionSpec = {
-            val fade = tween<Float>(if (reduceMotion) 100 else LOOK_FADE_MS)
-            fadeIn(fade) togetherWith fadeOut(fade)
-        },
-        label = "snackbarLook"
-    ) { isStyled ->
-        if (isStyled) {
-            StyledSnackbar(
-                onDismiss = onDismiss,
-                snackbarData = snackbarData,
-                message = message,
-                actionLabel = actionLabel,
-                fabSize = fabSize,
-                edgeFab = edgeFab,
-                reduceMotion = reduceMotion,
-                expanded = expanded,
-                onToggleExpanded = { expanded = !expanded }
-            )
-        } else {
-            StandardSnackbar(
-                onDismiss = onDismiss,
-                snackbarData = snackbarData,
-                message = message,
-                actionLabel = actionLabel,
-                reduceMotion = reduceMotion,
-                expanded = expanded,
-                onToggleExpanded = { expanded = !expanded }
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun StandardSnackbar(
-    onDismiss: () -> Unit,
-    snackbarData: SnackbarData,
-    message: String,
-    actionLabel: String?,
-    reduceMotion: Boolean,
-    expanded: Boolean,
-    onToggleExpanded: () -> Unit
-) {
-    // Grows upward: the box is aligned to its bottom, so a change of height keeps the bottom edge in place
-    Box(
-        modifier = Modifier.fillMaxWidth().animateContentSize(animationSpec = snackbarMotion<IntSize>(reduceMotion)),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        DismissibleSnackbar(onDismiss = onDismiss) {
-            Snackbar(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                action = actionLabel?.let { label ->
-                    {
-                        TextButton(onClick = { snackbarData.performAction() }) {
-                            Text(label, color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                },
-                content = {
-                    Text(
-                        text = message,
-                        maxLines = if (expanded) Int.MAX_VALUE else 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable { onToggleExpanded() }
-                    )
-                }
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun StyledSnackbar(
-    onDismiss: () -> Unit,
-    snackbarData: SnackbarData,
-    message: String,
-    actionLabel: String?,
-    fabSize: Dp,
-    edgeFab: NavFabPosition?,
-    reduceMotion: Boolean,
-    expanded: Boolean,
-    onToggleExpanded: () -> Unit
-) {
     val motion = snackbarMotion<Dp>(reduceMotion)
     // The gap beside the button eases in and out with the button, so the message doesn't jump when the button comes or goes
     val startGap by animateDpAsState(
@@ -315,7 +217,7 @@ private fun StyledSnackbar(
                             style = MaterialTheme.typography.labelLarge,
                             maxLines = if (expanded) Int.MAX_VALUE else 2,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f).clickable { onToggleExpanded() }
+                            modifier = Modifier.weight(1f).clickable { expanded = !expanded }
                         )
                         if (actionLabel != null) {
                             TextButton(
