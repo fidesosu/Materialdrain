@@ -280,10 +280,15 @@
       "path": "https://pixeldrain.com/l/{list_id}"
     }
   },
-  "screens": [{"screen": "UPLOAD"}, {"screen": "FILES"}, {"screen": "LISTS"}, {"screen": "FILESYSTEM"}],
+  "screens": [
+    {"screen": "UPLOAD", "id": "upload"},
+    {"screen": "FILES", "id": "files"},
+    {"screen": "LISTS", "id": "lists"},
+    {"screen": "FILESYSTEM", "id": "filesystem"}
+  ],
   "meta": {
     "id": "tools.senko.materialdrain.examples.pixeldrain",
-    "version": 8,
+    "version": 9,
     "author": "fides"
   }
 }

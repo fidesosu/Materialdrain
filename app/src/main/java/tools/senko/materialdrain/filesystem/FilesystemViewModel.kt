@@ -126,9 +126,13 @@ data class FilesystemUploadProgress(
 )
 
 /**
- * The universal file browser: folders, files, upload, rename, move, delete, for whichever provider is
- * active. Everything goes through [StorageProvider.browse], so a host with the BROWSE capability shows here
- * with the actions its capabilities and permissions allow.
+ * The universal file browser: folders, files, upload, rename, move, delete. Everything goes through
+ * [StorageProvider.browse], so a host with the BROWSE capability shows here with the actions its capabilities and
+ * permissions allow.
+ *
+ * One of these per Filesystem tab of a host (see [bind]): a host can have several, each with its own root, and each
+ * keeps its own folder, listing and upload, so switching between them (or to another host and back) shows each where it
+ * was at once. Only the tab on screen ([show]) loads anything; one that isn't catches up when it's shown again.
  */
 class FilesystemViewModel(
     private val application: Application,
@@ -169,23 +173,68 @@ class FilesystemViewModel(
     private val speedTracker = TransferSpeedTracker()
     private var nextTransferNumber = 0
 
+    // ---- The host and tab this browser is for (see bind) ----
+
+    private var hostId: String = configStore.activeProviderId.value
+    private var tabId: String = DEFAULT_TAB_ID
+    /** The tab's own root under the host's top, "" for the whole host (see ScreenConfig.root). */
+    private var tabRoot: String = ""
+    private var bound = false
+    /** Whether the tab is on screen: only then is anything loaded. */
+    private var shown = false
+    /** Something changed while the tab wasn't on screen; when it's shown again, the host is loaded again or the folder refreshed. */
+    private var pendingReload = true
+    private var pendingRefresh = false
+
+    /**
+     * Makes this the browser of [tabId] on the host [hostId], rooted at [root] (see ScreenConfig.root); only the first
+     * call counts, a browser stays with its tab. Nothing is loaded until it's [show]n.
+     */
+    fun bind(hostId: String, tabId: String, root: String) {
+        if (bound) return
+        bound = true
+        this.hostId = hostId
+        this.tabId = tabId
+        this.tabRoot = root.trim().trim('/')
+    }
+
+    /** The tab is on screen: it loads what it hasn't yet, or what changed since it was last shown. */
+    fun show() {
+        shown = true
+        when {
+            pendingReload -> loadActiveProviderAndRoot()
+            pendingRefresh -> refreshCurrentPath()
+        }
+        pendingReload = false
+        pendingRefresh = false
+    }
+
+    /** The tab left the screen: changes from now on wait until it's shown again. */
+    fun hide() {
+        shown = false
+    }
+
+    /** Where the folder open in this tab is kept: the host's id for its usual tab, as it always was, else with the tab's. */
+    private val pathKey: String get() = if (tabId == DEFAULT_TAB_ID && tabRoot.isEmpty()) hostId else "$hostId#$tabId"
+
     init {
         viewModelScope.launch {
             appSettings.hideSearchIndex.collect { hide -> _uiState.update { it.copy(hideSearchIndex = hide) } }
         }
-        Log.d(TAG_FS_VM, "ViewModel init. Loading the active provider and its root.")
-        loadActiveProviderAndRoot()
+        // The host's config or credentials changed: the folders are listed again, now if the tab is on screen. Another host
+        // being made the active one changes nothing for this tab's own host
         viewModelScope.launch {
-            // Choosing another host as the active one re-roots the screen on it
-            configStore.changes.drop(1).collect { loadActiveProviderAndRoot() }
+            configStore.changes.drop(1).collect {
+                if (shown && configStore.activeProviderId.value == hostId) loadActiveProviderAndRoot() else pendingReload = true
+            }
         }
         // A login, a logout or a saved API key: the folders are listed again with it
         viewModelScope.launch {
-            sessionManager.apiKey.drop(1).collect { loadActiveProviderAndRoot() }
+            sessionManager.apiKey.drop(1).collect { if (shown) loadActiveProviderAndRoot() else pendingReload = true }
         }
         // Files deleted or added to a folder from another screen: the folder shown may have changed
         viewModelScope.launch {
-            contentChanges.changes.collect { refreshCurrentPath() }
+            contentChanges.changes.collect { if (shown) refreshCurrentPath() else pendingRefresh = true }
         }
 
         // Recomputes displayedChildren whenever the folder's contents, the filter, or the shared sorting changes
@@ -204,10 +253,22 @@ class FilesystemViewModel(
         _uiState.update { it.copy(filterQuery = query) }
     }
 
-    private fun activeProvider(): StorageProvider = registry.resolve(configStore.activeProviderId.value)
+    /** The host of this tab (see [bind]). Named as before, when there was one browser for whichever host was active. */
+    private fun activeProvider(): StorageProvider = registry.resolve(hostId)
 
-    /** The root of the active provider, as the provider declares it (Pixeldrain's "me" bucket, a config's browse_root). */
-    private fun rootPath(provider: StorageProvider): String = provider.rootPath
+    /**
+     * The top of this tab: the provider's own root (Pixeldrain's "me" bucket, a config's browse_root) and, under it, the
+     * tab's root when it has one.
+     */
+    private fun rootPath(provider: StorageProvider): String {
+        if (tabRoot.isEmpty()) return provider.rootPath
+        val base = provider.rootPath.trim('/')
+        return if (base.isEmpty()) tabRoot else "$base/$tabRoot"
+    }
+
+    /** Whether [path] is the tab's top or a folder under it. */
+    private fun isWithinRoot(path: String, root: String): Boolean =
+        root.trim('/').isEmpty() || path == root || path.startsWith(root.trimEnd('/') + "/")
 
     private fun loadActiveProviderAndRoot() {
         forgetFolderTree()
@@ -226,8 +287,8 @@ class FilesystemViewModel(
         if (provider.browse == null) {
             _uiState.update { it.copy(isLoading = false, errorMessage = "This host can't browse files.") }
         } else if (provider.kind != ProviderKind.PIXELDRAIN || sessionManager.currentApiKey().isNotBlank()) {
-            // The folder last open on this host, or its root when there is none (or it can't be listed any more)
-            val saved = appSettings.filesystemPath(configStore.activeProviderId.value)
+            // The folder last open in this tab, or its root when there is none (or it can't be listed any more)
+            val saved = appSettings.filesystemPath(pathKey)
             fetchPathContent(saved ?: rootPath(provider), fallbackToRoot = saved != null)
         }
     }
@@ -246,13 +307,16 @@ class FilesystemViewModel(
     private fun normalizePath(path: String, root: String): String = path.trim('/').ifEmpty { root }
 
     private fun generatePathSegments(fullPath: String, provider: StorageProvider): List<PathSegment> {
+        val root = rootPath(provider)
         var built = ""
         val segments = fullPath.split('/').filter { it.isNotEmpty() }.map { name ->
             built = if (built.isEmpty()) name else "$built/$name"
             PathSegment(name, built)
         }
+            // A tab with its own root starts at it: the folders above aren't its to go to
+            .filter { tabRoot.isEmpty() || isWithinRoot(it.fullPath, root) }
         // A host rooted at its very top ("") has no folder name for the root, so it gets its own crumb to go back to
-        return if (rootPath(provider).isEmpty()) listOf(PathSegment(provider.rootName, "")) + segments else segments
+        return if (root.isEmpty()) listOf(PathSegment(provider.rootName, "")) + segments else segments
     }
 
     fun fetchPathContent(path: String, fallbackToRoot: Boolean = false) {
@@ -261,7 +325,9 @@ class FilesystemViewModel(
             _uiState.update { it.copy(isLoading = false, errorMessage = "This host can't browse files.") }
             return
         }
-        val normalized = normalizePath(path, rootPath(provider))
+        val root = rootPath(provider)
+        // Never above the tab's root (a folder saved before the root was set, a move's destination)
+        val normalized = normalizePath(path, root).let { if (tabRoot.isEmpty() || isWithinRoot(it, root)) it else normalizePath(root, root) }
         ProviderLog.d("Filesystem", "listing '$normalized' on '${provider.displayName}' (${provider.kind})")
         _uiState.update { it.copy(isLoading = true, errorMessage = null, apiKeyMissingError = false) }
         viewModelScope.launch {
@@ -272,7 +338,7 @@ class FilesystemViewModel(
                             .thenBy { it.name.lowercase() }
                     )
                     folderCache[normalized] = response.data.children
-                    appSettings.setFilesystemPath(configStore.activeProviderId.value, normalized)
+                    appSettings.setFilesystemPath(pathKey, normalized)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -723,7 +789,9 @@ class FilesystemViewModel(
             ApiResponse.Error(ProviderError("upload_failed", e.message ?: "The upload failed."))
         }
 
-    private companion object {
-        const val API_KEY_MISSING = "API Key is missing. Please set it in Settings to browse the filesystem."
+    companion object {
+        private const val API_KEY_MISSING = "API Key is missing. Please set it in Settings to browse the filesystem."
+        /** The id of a host's Filesystem tab when its config gives it none (see ScreenConfig.tabId). */
+        const val DEFAULT_TAB_ID = "filesystem"
     }
 }

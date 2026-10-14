@@ -45,9 +45,11 @@ object ProviderConfigTemplates {
 
     /**
      * The screens a folder host (WebDAV, S3, SMB) can back, written out so the template shows what can be set: the same
-     * as leaving "screens" out, but easy to trim down or rename. They have no flat file list or lists of their own.
+     * as leaving "screens" out, but easy to trim down, rename, or copy into a second Filesystem tab (another id and
+     * root). They have no flat file list or lists of their own.
      */
-    private fun folderHostScreens(): List<ScreenConfig> = listOf(ScreenConfig(HostScreen.UPLOAD), ScreenConfig(HostScreen.FILESYSTEM))
+    private fun folderHostScreens(): List<ScreenConfig> =
+        listOf(ScreenConfig(HostScreen.UPLOAD, id = "upload"), ScreenConfig(HostScreen.FILESYSTEM, id = "filesystem"))
 
     private fun meta(kind: String) = ProviderConfigMeta(id = "example.$kind", version = 1, author = "")
 }

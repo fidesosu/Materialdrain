@@ -5,7 +5,9 @@ import android.app.Application
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +21,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import kotlin.coroutines.cancellation.CancellationException
@@ -88,8 +92,38 @@ private class LimitedByteArrayOutputStream(private val limit: Int) : ByteArrayOu
     }
 }
 
-/** The folder [inside] of the archive at [path], and its entries once they've loaded. */
-data class ArchiveView(val path: String, val inside: String, val entries: List<StorageNode>?, val error: String?)
+/** A file that takes at most [limit] bytes, as [LimitedByteArrayOutputStream] does. */
+private class LimitedFileOutputStream(file: File, private val limit: Long) : FileOutputStream(file) {
+    @Volatile
+    var overflowed = false
+        private set
+    private var written = 0L
+
+    override fun write(b: Int) {
+        ensureRoom(1)
+        super.write(b)
+    }
+
+    override fun write(b: ByteArray, off: Int, len: Int) {
+        ensureRoom(len)
+        super.write(b, off, len)
+    }
+
+    private fun ensureRoom(len: Int) {
+        if (written + len > limit) {
+            overflowed = true
+            throw IOException("More than $limit bytes")
+        }
+        written += len
+    }
+}
+
+/** Where PDFs are kept for their preview, in the app's cache, and how many of them. */
+private const val PDF_CACHE_FOLDER = "pdf-preview"
+private const val PDF_CACHE_KEPT = 5
+
+/** The folder [inside] of the [archive], and its entries once they've loaded. */
+data class ArchiveView(val archive: StorageRef, val inside: String, val entries: List<StorageNode>?, val error: String?)
 
 /** Archives which can be looked inside from the file details (see ArchiveOps). */
 private val ARCHIVE_EXTENSIONS = setOf("zip", "7z", "rar", "tar", "tgz", "apk")
@@ -98,6 +132,20 @@ private val ARCHIVE_EXTENSIONS = setOf("zip", "7z", "rar", "tar", "tgz", "apk")
 private val DEVICE_THUMBNAIL_EXTENSIONS = setOf("heic", "heif", "avif")
 
 fun isArchiveName(name: String): Boolean = name.substringAfterLast('.', "").lowercase() in ARCHIVE_EXTENSIONS
+
+/** Whether a file is a PDF, by its type or (when the host doesn't say) its name. */
+fun isPdf(name: String, mimeType: String?): Boolean =
+    mimeType == "application/pdf" || name.substringAfterLast('.', "").equals("pdf", ignoreCase = true)
+
+/** The most of a PDF that's loaded for its preview: Android draws the pages from a whole file on the device. */
+internal const val MAX_PDF_PREVIEW_BYTES = 64L * 1024 * 1024
+
+/** A PDF's preview: loading into the app's cache, ready to be drawn from [file], or why it can't be shown. */
+sealed interface PdfPreviewState {
+    data class Loading(val loadedBytes: Long, val totalBytes: Long?) : PdfPreviewState
+    data class Ready(val file: File) : PdfPreviewState
+    data class Failed(val message: String) : PdfPreviewState
+}
 
 data class FileInfoUiState(
     // For single file info
@@ -135,6 +183,9 @@ data class FileInfoUiState(
 
     // The data saver holds the preview back (see DataSaver): nothing of it is loaded until loadPreview
     val previewHeld: Boolean = false,
+
+    // A PDF's preview, see fetchPdfPreview
+    val pdfPreview: PdfPreviewState? = null,
 
     // Scroll state preservation
     val shouldPreserveScrollPosition: Boolean = false,
@@ -245,7 +296,7 @@ class FileInfoViewModel(
     fun rawUrlFor(node: StorageNode): String? = provider().rawContentUrl(node, attachment = false)
 
     /** Whether the active host lets its files be deleted. */
-    fun canDeleteFiles(): Boolean = ProviderCapability.DELETE in provider().capabilities
+    fun canDeleteFiles(): Boolean = ProviderCapability.DELETE in provider().capabilities && ProviderCapability.DELETE !in tabLimits
 
     /** The key the UI needs, only the built-in Pixeldrain has one. */
     private fun apiKeyForUi(): String =
@@ -282,13 +333,107 @@ class FileInfoViewModel(
 
     private fun clearTextPreviewStates() {
         previewJob?.cancel()
+        pdfJob?.cancel()
         _uiState.update {
             it.copy(
                 isLoadingTextPreview = false,
                 textPreviewContent = null, textPreviewFullContent = null,
-                textPreviewErrorMessage = null
+                textPreviewErrorMessage = null,
+                pdfPreview = null
             )
         }
+    }
+
+    private var pdfJob: Job? = null
+
+    /**
+     * Loads a PDF into the app's cache for its preview: Android draws a PDF's pages from a file on the device (see
+     * PdfPreview). One already there from before is used again; the cache holds only the last few, see [trimPdfCache].
+     */
+    private fun fetchPdfPreview(node: StorageNode) {
+        pdfJob?.cancel()
+        if (!isPdf(node.name, node.previewMimeType())) {
+            _uiState.update { it.copy(pdfPreview = null) }
+            return
+        }
+        val size = node.size
+        if (size != null && size > MAX_PDF_PREVIEW_BYTES) {
+            _uiState.update {
+                it.copy(pdfPreview = PdfPreviewState.Failed("Too big to preview (${formatSize(size)}, at most ${formatSize(MAX_PDF_PREVIEW_BYTES)}). Download it to read it."))
+            }
+            return
+        }
+        val folder = File(application.cacheDir, PDF_CACHE_FOLDER)
+        // By host and file, and its size and date, so a changed file isn't shown from an older copy
+        val name = "${configStore.activeProviderId.value}|${node.key}|${node.size}|${node.modifiedAt ?: node.createdAt}".hashCode().toUInt().toString(16)
+        val file = File(folder, "$name.pdf")
+        if (file.isFile && file.length() > 0) {
+            file.setLastModified(System.currentTimeMillis())
+            _uiState.update { it.copy(pdfPreview = PdfPreviewState.Ready(file)) }
+            return
+        }
+        _uiState.update { it.copy(pdfPreview = PdfPreviewState.Loading(0L, size)) }
+        pdfJob = viewModelScope.launch {
+            val partial = File(folder, "$name.part")
+            var lastShown = 0L
+            var overflowed = false
+            val response = try {
+                withContext(Dispatchers.IO) {
+                    folder.mkdirs()
+                    // Capped as well: a host which doesn't tell the size mustn't fill the device with a huge file
+                    val out = LimitedFileOutputStream(partial, MAX_PDF_PREVIEW_BYTES)
+                    try {
+                        downloadNodeTo(node, out) { read, total ->
+                            // Often enough to move the bar, not on every buffer
+                            if (read - lastShown >= 256 * 1024 || read == total) {
+                                lastShown = read
+                                _uiState.update { it.copy(pdfPreview = PdfPreviewState.Loading(read, total ?: size)) }
+                            }
+                        }
+                    } finally {
+                        overflowed = out.overflowed
+                        out.close()
+                    }
+                }
+            } catch (e: CancellationException) {
+                withContext(NonCancellable + Dispatchers.IO) { partial.delete() }
+                throw e
+            } catch (e: Exception) {
+                // The cap stops the copy by throwing, whichever way the host passes that on
+                ApiResponse.Error(ProviderError("preview_failed", e.message.orEmpty()))
+            }
+            if (overflowed) {
+                withContext(Dispatchers.IO) { partial.delete() }
+                _uiState.update {
+                    it.copy(pdfPreview = PdfPreviewState.Failed("Too big to preview (at most ${formatSize(MAX_PDF_PREVIEW_BYTES)}). Download it to read it."))
+                }
+                return@launch
+            }
+            val outcome = withContext(Dispatchers.IO) {
+                when (response) {
+                    is ApiResponse.Success -> if (partial.renameTo(file)) {
+                        trimPdfCache(folder, keep = file)
+                        PdfPreviewState.Ready(file)
+                    } else {
+                        partial.delete()
+                        PdfPreviewState.Failed("The PDF couldn't be kept for its preview.")
+                    }
+                    is ApiResponse.Error -> {
+                        partial.delete()
+                        PdfPreviewState.Failed(response.error.message.ifBlank { "The PDF couldn't be loaded." })
+                    }
+                }
+            }
+            _uiState.update { it.copy(pdfPreview = outcome) }
+        }
+    }
+
+    /** Keeps the cache of PDFs to the last few opened, [keep] (the one just loaded) among them. */
+    private fun trimPdfCache(folder: File, keep: File) {
+        folder.listFiles { it: File -> it.extension == "pdf" && it != keep }
+            ?.sortedByDescending { it.lastModified() }
+            ?.drop(PDF_CACHE_KEPT - 1)
+            ?.forEach { it.delete() }
     }
 
     /** Reads the file from the provider, as the file id or the path it has. */
@@ -382,7 +527,7 @@ class FileInfoViewModel(
                     _uiState.update { it.copy(isLoadingFileInfo = false, fileInfo = response.data) }
                     appSettings.openedFile = SavedOpenedFile(configStore.activeProviderId.value, fileId, "")
                     // Only fetch text preview if the main file info call was successful
-                    showPreview(response.data, withArchive = false)
+                    showPreview(response.data, withArchive = showsArchive(response.data))
                 }
                 is ApiResponse.Error -> {
                     _uiState.update {
@@ -399,30 +544,48 @@ class FileInfoViewModel(
 
     /** Shows the folder [inside] of the archive in the details (its top when empty). */
     fun openArchiveFolder(inside: String) {
-        val path = uiState.value.archive?.path ?: return
-        loadArchive(path, inside)
+        val archive = uiState.value.archive?.archive ?: return
+        loadArchive(archive, inside)
     }
 
-    /** Lists the folder [inside] of the archive at [path] for the details, see FileDetailsScreen. */
-    private fun loadArchive(path: String, inside: String) {
+    /**
+     * What the tab the files are opened from takes away (see ScreenConfig.disabledCapabilities): looking inside archives,
+     * deleting. Set by the screen whenever another tab is shown.
+     */
+    private var tabLimits: Set<ProviderCapability> = emptySet()
+
+    fun setTabLimits(disabled: Set<ProviderCapability>) {
+        tabLimits = disabled
+    }
+
+    /**
+     * Whether the details show what's inside [node]: an archive the host can reach to look inside (Pixeldrain only can for
+     * the filesystem's, not the files of the account), unless the tab it's opened from leaves that out.
+     */
+    fun showsArchive(node: StorageNode): Boolean =
+        isArchiveName(node.name) && ProviderCapability.ARCHIVE_BROWSE !in tabLimits && provider().archives?.canOpen(node.ref) == true
+
+    /** Lists the folder [inside] of the [archive] for the details, see FileDetailsScreen. */
+    private fun loadArchive(archive: StorageRef, inside: String) {
         val archives = provider().archives ?: return
         archiveJob?.cancel()
-        _uiState.update { it.copy(archive = ArchiveView(path, inside, entries = null, error = null)) }
+        _uiState.update { it.copy(archive = ArchiveView(archive, inside, entries = null, error = null)) }
         archiveJob = viewModelScope.launch {
-            val result = archives.list(path, inside)
+            // Off the main thread, whether or not the host's own call already is
+            val result = withContext(Dispatchers.IO) { archives.list(archive, inside) }
             _uiState.update { state ->
-                if (state.archive?.path != path) return@update state
+                if (state.archive?.archive != archive) return@update state
                 when (result) {
                     is ApiResponse.Success -> state.copy(
                         archive = ArchiveView(
-                            path,
+                            archive,
                             inside,
                             result.data.sortedWith(compareBy<StorageNode> { !it.isDirectory }.thenBy { it.name.lowercase() }),
                             error = null
                         )
                     )
                     is ApiResponse.Error -> state.copy(
-                        archive = ArchiveView(path, inside, entries = null, error = result.error.message.ifBlank { "This file can't be opened as an archive." })
+                        archive = ArchiveView(archive, inside, entries = null, error = result.error.message.ifBlank { "This file can't be opened as an archive." })
                     )
                 }
             }
@@ -458,8 +621,8 @@ class FileInfoViewModel(
         }
         node.ref.id?.let { appSettings.openedFile = SavedOpenedFile(configStore.activeProviderId.value, it, node.ref.path) }
         _uiState.update { it.copy(archive = null) }
-        // An archive shows what's inside it, in the details
-        showPreview(node, withArchive = isArchiveName(node.name))
+        // An archive shows what's inside it, in the details, where the host can look inside it
+        showPreview(node, withArchive = showsArchive(node))
     }
 
     /** Whether the preview of the file shown now lists an archive's contents too, for [loadPreview]. */
@@ -478,7 +641,8 @@ class FileInfoViewModel(
         }
         _uiState.update { it.copy(previewHeld = false) }
         fetchTextFilePreviewContent(node)
-        if (withArchive) loadArchive(node.ref.path, "")
+        fetchPdfPreview(node)
+        if (withArchive) loadArchive(node.ref, "")
     }
 
     /** Loads the preview the data saver held back, see [showPreview]. */
@@ -486,7 +650,8 @@ class FileInfoViewModel(
         val node = uiState.value.fileInfo ?: return
         _uiState.update { it.copy(previewHeld = false) }
         fetchTextFilePreviewContent(node)
-        if (previewWithArchive) loadArchive(node.ref.path, "")
+        fetchPdfPreview(node)
+        if (previewWithArchive) loadArchive(node.ref, "")
     }
 
     fun clearFileInfoDisplay() {

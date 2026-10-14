@@ -50,7 +50,9 @@ object ProviderConfigCodec {
         JsonObject(
             linkedMapOf(
                 "screen" to obj.getValue("screen"),
+                "id" to (obj["id"] ?: JsonNull),
                 "name" to (obj["name"] ?: JsonNull),
+                "root" to (obj["root"] ?: JsonNull),
                 "disabled_capabilities" to (obj["disabled_capabilities"] ?: JsonArray(emptyList()))
             )
         )

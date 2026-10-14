@@ -77,7 +77,9 @@ import tools.senko.materialdrain.ui.components.OdometerText
 import tools.senko.materialdrain.ui.components.fileKindLabel
 import tools.senko.materialdrain.ui.media.AudioPlayerPreview
 import tools.senko.materialdrain.ui.media.FullScreenMediaPreviewDialog
+import tools.senko.materialdrain.ui.media.FullScreenPdfDialog
 import tools.senko.materialdrain.ui.media.InlineImagePreview
+import tools.senko.materialdrain.ui.media.InlinePdfPreview
 import tools.senko.materialdrain.ui.media.InlineVideoPreview
 import tools.senko.materialdrain.ui.media.imageRequest
 import tools.senko.materialdrain.util.formatApiDateTimeString
@@ -124,6 +126,10 @@ fun FileInfoDetailsCard(
         coroutineScope.launch { snackbarHostState.showSnackbar("$what copied") }
     }
 
+    // A PDF open full screen: its file in the app's cache (see FileInfoViewModel.fetchPdfPreview)
+    var fullScreenPdf by remember { mutableStateOf<java.io.File?>(null) }
+    fullScreenPdf?.let { file -> FullScreenPdfDialog(file, title = fileInfo.name, onDismissRequest = { fullScreenPdf = null }) }
+
     if (fullScreenPreviewUri != null) {
         FullScreenMediaPreviewDialog(
             previewUri = fullScreenPreviewUri,
@@ -150,7 +156,8 @@ fun FileInfoDetailsCard(
             // A picture, video or song preview starts just under the top bar, with a little room; anything else keeps more
             // Held back by the data saver, a picture or video keeps its frame in the same place (see HeldPreview)
             val mediaPreviewFirst = showPreviews && uiState.archive == null &&
-                (previewType?.startsWith("image/") == true || previewType?.startsWith("video/") == true || previewType?.startsWith("audio/") == true)
+                (previewType?.startsWith("image/") == true || previewType?.startsWith("video/") == true || previewType?.startsWith("audio/") == true ||
+                    isPdf(fileInfo.name, previewType))
             if (!mediaPreviewFirst) Spacer(Modifier.height(16.dp))
             val mediaPadding = PaddingValues(top = 8.dp, bottom = 8.dp)
             if (showPreviews && uiState.previewHeld) {
@@ -169,9 +176,11 @@ fun FileInfoDetailsCard(
                         onLoadArt = fileInfoViewModel::loadPreview
                     )
                 } else {
-                    val canPreview = isArchiveName(fileInfo.name) || isTextFile(fileInfo.name, previewType) || actualThumbnailUrl != null ||
-                        listOf("image/", "video/").any { previewType?.startsWith(it) == true }
-                    if (canPreview) HeldPreview(fileInfo, previewType, mediaPadding, onLoad = fileInfoViewModel::loadPreview)
+                    // Only an archive the host can look inside has its contents to load
+                    val withArchive = fileInfoViewModel.showsArchive(fileInfo)
+                    val canPreview = withArchive || isTextFile(fileInfo.name, previewType) || isPdf(fileInfo.name, previewType) ||
+                        actualThumbnailUrl != null || listOf("image/", "video/").any { previewType?.startsWith(it) == true }
+                    if (canPreview) HeldPreview(fileInfo, previewType, withArchive, mediaPadding, onLoad = fileInfoViewModel::loadPreview)
                 }
             } else if (showPreviews) {
                 // An archive shows its contents where a preview would be
@@ -219,6 +228,10 @@ fun FileInfoDetailsCard(
                         durationHintMillis = null,
                         outerPadding = mediaPadding
                     )
+                } else if (uiState.pdfPreview != null) {
+                    uiState.pdfPreview?.let { pdf ->
+                        InlinePdfPreview(pdf, outerPadding = mediaPadding, onFullScreen = { fullScreenPdf = it })
+                    }
                 } else if (uiState.isLoadingTextPreview) {
                     Box(modifier = Modifier.fillMaxWidth().height(100.dp).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
@@ -415,14 +428,21 @@ private val HeldPreviewHeight = 200.dp
  * plain colour, saying what it would show and (where it's known) about how much that loads. A tap anywhere on it loads it.
  */
 @Composable
-private fun HeldPreview(file: StorageNode, previewType: String?, mediaPadding: PaddingValues, onLoad: () -> Unit) {
+private fun HeldPreview(file: StorageNode, previewType: String?, withArchive: Boolean, mediaPadding: PaddingValues, onLoad: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val size = file.size
     val media = RoundedCornerShape(8.dp)
     // What it would show, what that loads, and the preview's own frame: its size, shape and colour
     class Held(val what: String, val cost: String?, val frame: Modifier, val shape: RoundedCornerShape, val color: Color)
     val held = when {
-        isArchiveName(file.name) -> Held("what's inside", null, Modifier.height(HeldPreviewHeight), RoundedCornerShape(12.dp), scheme.surfaceContainerHighest)
+        withArchive -> Held("what's inside", null, Modifier.height(HeldPreviewHeight), RoundedCornerShape(12.dp), scheme.surfaceContainerHighest)
+        isPdf(file.name, previewType) -> Held(
+            "the PDF",
+            size?.let { if (it > MAX_PDF_PREVIEW_BYTES) "Too big to preview" else "About ${formatSize(it)}" },
+            Modifier.aspectRatio(16f / 9f).padding(mediaPadding),
+            media,
+            scheme.surfaceContainerHigh
+        )
         isTextFile(file.name, previewType) && previewType?.startsWith("image/") != true -> Held(
             "the text",
             size?.let { "Up to ${formatSize(minOf(it, MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES.toLong()))}" },

@@ -11,8 +11,8 @@ import kotlinx.serialization.json.longOrNull
 /** An entry inside an archive. [path] is relative to the archive's top, e.g. "test/folder1". */
 data class ArchiveEntry(val name: String, val path: String, val isDirectory: Boolean, val size: Long?)
 
-/** A file inside an archive: where the archive is on the host, and the file's path within it. */
-data class ArchiveEntryDetails(val archivePath: String, val entryPath: String) : RichDetails
+/** A file inside an archive: the archive on the host (as [ArchiveOps] reached it), and the file's path within it. */
+data class ArchiveEntryDetails(val archive: StorageRef, val entryPath: String) : RichDetails
 
 /**
  * Reads a `?zip_info` answer. Its shape: the root object has "children", an object which maps each entry's name to

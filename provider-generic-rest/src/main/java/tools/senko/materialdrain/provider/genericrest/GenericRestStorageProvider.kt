@@ -70,13 +70,34 @@ private const val ENDPOINT_LIST_UPDATE = "list_update"
 private const val ENDPOINT_LIST_DELETE = "list_delete"
 
 /** An entry of an archive as a node; a file keeps where it is inside which archive, so it can be read later. */
-private fun ArchiveEntry.toStorageNode(archivePath: String) = StorageNode(
+private fun ArchiveEntry.toStorageNode(archive: StorageRef) = StorageNode(
     ref = StorageRef(path = path),
     name = name,
     isDirectory = isDirectory,
     size = size,
-    richDetails = if (isDirectory) null else ArchiveEntryDetails(archivePath, path),
+    richDetails = if (isDirectory) null else ArchiveEntryDetails(archive, path),
 )
+
+/** Whether [endpoint] asks for the {[placeholder]} anywhere: its path, query, form or JSON body. */
+internal fun usesPlaceholder(endpoint: EndpointConfig, placeholder: String): Boolean {
+    val token = "{$placeholder}"
+    return token in endpoint.path || endpoint.query.values.any { token in it } || endpoint.form.values.any { token in it } ||
+        endpoint.json?.contains(token) == true
+}
+
+/**
+ * Whether [endpoint] can reach [archive]: by its {path} (an archive in the folders) or its {id} (a file of the account),
+ * whichever the config wrote into it. One that asks for neither reaches every archive the same way.
+ */
+internal fun reachesArchive(endpoint: EndpointConfig, archive: StorageRef): Boolean {
+    val byPath = usesPlaceholder(endpoint, "path")
+    val byId = usesPlaceholder(endpoint, "id")
+    return (byPath && archive.path.isNotBlank()) || (byId && !archive.id.isNullOrBlank()) || (!byPath && !byId)
+}
+
+/** The placeholders an archive endpoint is filled with: both ways of reaching it, whichever it asks for. */
+private fun archivePlaceholders(archive: StorageRef): Map<String, String> =
+    mapOf("path" to archive.path.trim('/'), "id" to archive.id.orEmpty())
 
 /** Values of a node's "is_directory" mapping that mean it's a folder: the config maps whatever its API calls it. */
 private val DIRECTORY_VALUES = setOf("dir", "directory", "folder", "true")
@@ -124,22 +145,29 @@ class GenericRestStorageProvider(
     /** Lists of files, when the config declares the user_lists endpoint. */
     override val lists: ListOps? = config.endpoints[ENDPOINT_USER_LISTS]?.let { listsOps(it) }
 
-    /** Looking inside archives, when the config declares archive_info (the listing) and archive_file (one file). */
+    /**
+     * Looking inside archives, when the config declares archive_info (the listing) and archive_file (one file). The
+     * endpoint says which archives it reaches: with {path} those in the folders, with {id} the files of the account (see
+     * [reachesArchive]).
+     */
     override val archives: ArchiveOps? = config.endpoints[ENDPOINT_ARCHIVE_INFO]?.let { infoEndpoint ->
         object : ArchiveOps {
-            override suspend fun list(archivePath: String, inside: String): ApiResponse<List<StorageNode>> {
+            override fun canOpen(archive: StorageRef): Boolean = reachesArchive(infoEndpoint, archive)
+
+            override suspend fun list(archive: StorageRef, inside: String): ApiResponse<List<StorageNode>> {
+                if (!canOpen(archive)) return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't look inside this archive."))
                 return reaching {
-                    val result = buffered(infoEndpoint, mapOf("path" to archivePath.trim('/')))
+                    val result = buffered(infoEndpoint, archivePlaceholders(archive))
                         ?: return ApiResponse.Error(ProviderError("bad_endpoint", "archive_info endpoint could not be resolved."))
                     return when (val parsed = ZipInfo.entriesIn(result.bodyText, inside)) {
-                        is ApiResponse.Success -> ApiResponse.Success(parsed.data.map { it.toStorageNode(archivePath) })
+                        is ApiResponse.Success -> ApiResponse.Success(parsed.data.map { it.toStorageNode(archive) })
                         is ApiResponse.Error -> ApiResponse.Error(parsed.error)
                     }
                 }
             }
 
             override suspend fun read(
-                archivePath: String,
+                archive: StorageRef,
                 entryPath: String,
                 outputStream: java.io.OutputStream,
                 onProgress: (read: Long, total: Long?) -> Unit
@@ -152,7 +180,7 @@ class GenericRestStorageProvider(
                         { auth ->
                             client.executeDownload(
                                 endpoint,
-                                mapOf("path" to archivePath.trim('/'), "entry" to "/" + entryPath.trim('/')),
+                                archivePlaceholders(archive) + ("entry" to "/" + entryPath.trim('/')),
                                 auth,
                                 outputStream
                             ) { read, total ->

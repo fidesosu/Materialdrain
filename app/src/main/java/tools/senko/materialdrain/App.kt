@@ -135,16 +135,17 @@ fun MaterialdrainScreen() {
     val application = LocalContext.current.applicationContext as Application
     val context = LocalContext.current
     val appContainer = remember { AppContainer.get(application) }
-    // The app opens on the screen it was last on
+    // The app opens on the screen it was last on, and of a host with several tabs of that kind, on the same one
     var currentScreen by rememberSaveable { mutableStateOf(appContainer.appSettings.lastScreen) }
+    var currentTabId by rememberSaveable { mutableStateOf(appContainer.appSettings.lastTabId) }
     val sessionManager = appContainer.sessionManager
     val viewModelFactory = remember { ViewModelFactory(application, appContainer) }
 
-    // The ViewModels which own uploads/downloads outlive the activity, so transfers continue in the background
+    // The ViewModels which own uploads/downloads outlive the activity, so transfers continue in the background. The
+    // filesystem has one per Filesystem tab, see filesystemViewModelFor
     val transferOwner = appContainer.transferViewModelStoreOwner
     val uploadViewModel: UploadViewModel = viewModel(viewModelStoreOwner = transferOwner, factory = viewModelFactory)
     val fileInfoViewModel: FileInfoViewModel = viewModel(viewModelStoreOwner = transferOwner, factory = viewModelFactory)
-    val filesystemViewModel: FilesystemViewModel = viewModel(viewModelStoreOwner = transferOwner, factory = viewModelFactory)
     val listViewModel: ListViewModel = viewModel(factory = viewModelFactory)
     val authViewModel: AuthViewModel = viewModel(factory = viewModelFactory)
     val accountViewModel: AccountViewModel = viewModel(factory = viewModelFactory)
@@ -239,34 +240,49 @@ fun MaterialdrainScreen() {
     val configScreens = remember(activeCapabilities, activeConfig) {
         activeConfig?.let { resolveScreens(it.screens, activeCapabilities) }
     }
+    // Each tab with its entry in the config, for its own name, root and the actions it takes away (see ScreenConfig). Not
+    // config-driven (the built-in Pixeldrain) means one tab of each kind the host can back, with nothing taken away
     val navBarOrder = remember(activeCapabilities, configScreens) {
-        configScreens?.map { it.screen.toScreen() } ?: buildList {
-            add(Screen.Upload)
-            if (ProviderCapability.ENUMERATE in activeCapabilities) add(Screen.Files)
-            if (ProviderCapability.LISTS in activeCapabilities) add(Screen.Lists)
-            if (ProviderCapability.BROWSE in activeCapabilities) add(Screen.Filesystem)
+        configScreens?.map { Tab(it.screen.toScreen(), it) } ?: buildList {
+            add(Tab(Screen.Upload))
+            if (ProviderCapability.ENUMERATE in activeCapabilities) add(Tab(Screen.Files))
+            if (ProviderCapability.LISTS in activeCapabilities) add(Tab(Screen.Lists))
+            if (ProviderCapability.BROWSE in activeCapabilities) add(Tab(Screen.Filesystem))
         }
     }
     // A config with no screens to show (it chose none, or only ones the host can't back): nothing to fall back to, so
     // the current screen shows a message instead (see the main content below)
     val noScreensConfigured = activeConfig != null && navBarOrder.isEmpty()
-    // This screen's entry in the config, for its custom name and the capabilities it takes away (see ScreenConfig).
-    // Not config-driven (the built-in Pixeldrain) means nothing is taken away and the screen keeps its default name
-    val activeScreenConfigs = remember(configScreens) {
-        configScreens?.associateBy { it.screen.toScreen() } ?: emptyMap()
-    }
-    fun screenTitle(screen: Screen): String = activeScreenConfigs[screen]?.name?.takeIf { it.isNotBlank() } ?: screen.title
+    /** The tab of [screen]'s kind that's shown for it: the one last chosen, else the first of that kind. */
+    fun tabOf(screen: Screen): Tab? =
+        navBarOrder.firstOrNull { it.screen == screen && it.id == currentTabId } ?: navBarOrder.firstOrNull { it.screen == screen }
+    val currentTab = if (currentScreen in BROWSE_SCREENS) tabOf(currentScreen) else null
+    fun screenTitle(screen: Screen): String = tabOf(screen)?.title ?: screen.title
     LaunchedEffect(navBarOrder, currentScreen) {
         // A tab the new host doesn't offer falls back to the first one it does (e.g. Upload isn't reachable on a
         // host which only turned on Filesystem, even if Upload was the screen open before switching to it). Also
         // checked when the screen changes: a host added or switched to from Settings only meets its tabs when Settings
         // goes back to the screen open before it, and with a single tab there's no bar to leave a missing one by
-        if (currentScreen in BROWSE_SCREENS &&
-            currentScreen !in navBarOrder && navBarOrder.isNotEmpty()
-        ) {
-            currentScreen = navBarOrder.first()
+        if (currentScreen in BROWSE_SCREENS && tabOf(currentScreen) == null && navBarOrder.isNotEmpty()) {
+            currentScreen = navBarOrder.first().screen
+            currentTabId = navBarOrder.first().id
         }
     }
+    LaunchedEffect(currentTab?.id) { currentTab?.let { appContainer.appSettings.lastTabId = it.id } }
+    // The details take away what the tab they're opened from does (see FileInfoViewModel.setTabLimits): the tab shown, or
+    // the one the details were opened from
+    val openingTab = currentTab ?: tabOf(previousScreen)?.takeIf { previousScreen in BROWSE_SCREENS }
+    LaunchedEffect(openingTab?.config?.disabledCapabilities) {
+        fileInfoViewModel.setTabLimits(openingTab?.config?.disabledCapabilities ?: emptySet())
+    }
+    // The browser of each Filesystem tab of the active host (one per tab, see FilesystemViewModel.bind). The other screens
+    // use the host's first one for picking a folder in it
+    val hostFilesystemTab = navBarOrder.firstOrNull { it.screen == Screen.Filesystem }
+    val filesystemViewModel = filesystemViewModelFor(
+        activeHostId, currentTab?.takeIf { it.screen == Screen.Filesystem } ?: hostFilesystemTab, transferOwner, viewModelFactory
+    )
+    // The scroll position of each Filesystem tab, kept across visits to other screens
+    val filesystemListStates = rememberSaveable(saver = TabScrollStates.Saver) { TabScrollStates() }
     var showFileDetailMenu by remember { mutableStateOf(false) }
     // While items are selected the bar is at the bottom, so the FAB and the snackbars move up over it
     var selectingItems by remember { mutableStateOf(false) }
@@ -276,13 +292,17 @@ fun MaterialdrainScreen() {
     val filesListState = rememberLazyListState()
     val listsListState = rememberLazyListState()
     val listContentsListState = rememberLazyListState()
-    val filesystemListState = rememberLazyListState()
 
     val navigateTo = { screen: Screen ->
         if (currentScreen != screen) {
             previousScreen = currentScreen
             currentScreen = screen
         }
+    }
+    // A tab of the bar: the screen of its kind, as that tab
+    val selectTab = { tab: Tab ->
+        currentTabId = tab.id
+        navigateTo(tab.screen)
     }
     // Remembered so the app opens where it was closed
     LaunchedEffect(currentScreen) { appContainer.appSettings.lastScreen = currentScreen }
@@ -694,9 +714,7 @@ fun MaterialdrainScreen() {
                     enter = if (reduceMotion) fadeIn(tween(100)) else fadeIn() + expandVertically(),
                     exit = if (reduceMotion) fadeOut(tween(100)) else fadeOut() + shrinkVertically()
                 ) {
-                    BottomNavigationBar(currentScreen, navBarOrder, labelFor = ::screenTitle) { selectedScreen ->
-                        navigateTo(selectedScreen)
-                    }
+                    BottomNavigationBar(currentTab, navBarOrder, onTabSelected = selectTab)
                 }
             },
             floatingActionButton = {
@@ -800,22 +818,26 @@ fun MaterialdrainScreen() {
             }
         ) { paddingValues ->
             AnimatedContent(
-                targetState = currentScreen,
+                // The tab too: two tabs of one kind (two Filesystem tabs) are two pages, moved between like any tabs
+                targetState = Shown(currentScreen, currentTab?.id),
                 transitionSpec = {
-                    val initialIndex = navBarOrder.indexOf(initialState)
-                    val targetIndex = navBarOrder.indexOf(targetState)
+                    fun Shown.index() = navBarOrder.indexOfFirst { it.screen == screen && it.id == tabId }
+                    val initialIndex = initialState.index()
+                    val targetIndex = targetState.index()
                     val forward = when {
                         // Between two tabs: the way they lie in the navigation bar
                         initialIndex != -1 && targetIndex != -1 -> targetIndex > initialIndex
                         // Into a screen that isn't a tab (a file's details, the settings) is deeper, out of one back
                         targetIndex == -1 && initialIndex != -1 -> true
                         initialIndex == -1 && targetIndex != -1 -> false
-                        else -> targetState.ordinal > initialState.ordinal
+                        else -> targetState.screen.ordinal > initialState.screen.ordinal
                     }
                     pageTransition(forward, reduceMotion)
                 },
                 label = "screenTransition"
-            ) { targetScreen ->
+            ) { shown ->
+                val targetScreen = shown.screen
+                val targetTab = navBarOrder.firstOrNull { it.screen == targetScreen && it.id == shown.tabId } ?: tabOf(targetScreen)
                 // Without the app's bottom bar, the file screens and the details go on under the system's navigation bar
                 // (the lists add room for it after their last item, see LocalBottomInset) instead of being cut off above it.
                 // The upload and settings screens keep their buttons clear of it.
@@ -846,30 +868,44 @@ fun MaterialdrainScreen() {
                             isFabVisible = isFabVisible,
                             inlineUploadButton = navPrototype
                         )
-                        Screen.Files, Screen.Lists, Screen.Filesystem -> BrowserScreen(
-                            mode = when (targetScreen) {
-                                Screen.Files -> BrowserMode.FILES
-                                Screen.Lists -> BrowserMode.LISTS
-                                else -> BrowserMode.FILESYSTEM
-                            },
-                            filesystemViewModel = filesystemViewModel,
-                            fileInfoViewModel = fileInfoViewModel,
-                            listViewModel = listViewModel,
-                            appSettings = appContainer.appSettings,
-                            disabledCapabilities = activeScreenConfigs[targetScreen]?.disabledCapabilities ?: emptySet(),
-                            // Only the screen being shown, not one still animating out
-                            showSearchModal = showSearchModal && targetScreen == currentScreen,
-                            onDismissSearchModal = { showSearchModal = false },
-                            onSelectingChange = { selectingItems = it },
-                            scrollState = when (targetScreen) {
-                                Screen.Files -> filesListState
-                                Screen.Lists -> if (listOpened) listContentsListState else listsListState
-                                else -> filesystemListState
-                            },
-                            onFileSelected = { navigateTo(Screen.FileDetail) },
-                            fabHeight = fabHeightDp,
-                            isFabVisible = isFabVisible
-                        )
+                        Screen.Files, Screen.Lists, Screen.Filesystem -> {
+                            // A Filesystem tab has its own browser, loading only while it's on screen; the other tabs use
+                            // the host's first one, for picking a folder in it
+                            val tabFilesystem = if (targetScreen == Screen.Filesystem) {
+                                filesystemViewModelFor(activeHostId, targetTab, transferOwner, viewModelFactory).also { browser ->
+                                    DisposableEffect(browser) {
+                                        browser.show()
+                                        onDispose { browser.hide() }
+                                    }
+                                }
+                            } else {
+                                filesystemViewModel
+                            }
+                            BrowserScreen(
+                                mode = when (targetScreen) {
+                                    Screen.Files -> BrowserMode.FILES
+                                    Screen.Lists -> BrowserMode.LISTS
+                                    else -> BrowserMode.FILESYSTEM
+                                },
+                                filesystemViewModel = tabFilesystem,
+                                fileInfoViewModel = fileInfoViewModel,
+                                listViewModel = listViewModel,
+                                appSettings = appContainer.appSettings,
+                                disabledCapabilities = targetTab?.config?.disabledCapabilities ?: emptySet(),
+                                // Only the screen being shown, not one still animating out
+                                showSearchModal = showSearchModal && shown == Shown(currentScreen, currentTab?.id),
+                                onDismissSearchModal = { showSearchModal = false },
+                                onSelectingChange = { selectingItems = it },
+                                scrollState = when (targetScreen) {
+                                    Screen.Files -> filesListState
+                                    Screen.Lists -> if (listOpened) listContentsListState else listsListState
+                                    else -> filesystemListStates.of("$activeHostId:${targetTab?.id}")
+                                },
+                                onFileSelected = { navigateTo(Screen.FileDetail) },
+                                fabHeight = fabHeightDp,
+                                isFabVisible = isFabVisible
+                            )
+                        }
                         Screen.FileDetail -> {
                             fileInfoUiState.fileInfo?.let { info ->
                                 FileInfoDetailsCard(
@@ -978,6 +1014,47 @@ fun MaterialdrainScreen() {
     }
 }
 
+
+/** What the main content shows: a [screen], and for a tab of the host, which of its tabs ([Tab.id]). */
+private data class Shown(val screen: Screen, val tabId: String?)
+
+/**
+ * The browser of the Filesystem [tab] on the host [hostId]: one per tab (and root), so each keeps its own folder and
+ * listing, and like the other ViewModels which own transfers it outlives the activity. Without a tab, the host's usual one.
+ */
+@Composable
+private fun filesystemViewModelFor(
+    hostId: String,
+    tab: Tab?,
+    owner: androidx.lifecycle.ViewModelStoreOwner,
+    factory: ViewModelFactory
+): FilesystemViewModel {
+    val tabId = tab?.id ?: FilesystemViewModel.DEFAULT_TAB_ID
+    val root = tab?.config?.rootFolder.orEmpty()
+    val browser: FilesystemViewModel = viewModel(key = "filesystem:$hostId:$tabId:$root", viewModelStoreOwner = owner, factory = factory)
+    browser.bind(hostId, tabId, root)
+    return browser
+}
+
+/** The scroll position of each Filesystem tab, by host and tab, kept across visits and when the activity is made again. */
+private class TabScrollStates(initial: Map<String, Pair<Int, Int>> = emptyMap()) {
+    private val states = HashMap<String, androidx.compose.foundation.lazy.LazyListState>().apply {
+        initial.forEach { (key, position) -> put(key, androidx.compose.foundation.lazy.LazyListState(position.first, position.second)) }
+    }
+
+    fun of(key: String) = states.getOrPut(key) { androidx.compose.foundation.lazy.LazyListState() }
+
+    companion object {
+        val Saver = androidx.compose.runtime.saveable.Saver<TabScrollStates, ArrayList<Any>>(
+            save = { scrolls ->
+                ArrayList(scrolls.states.flatMap { (key, state) -> listOf(key, state.firstVisibleItemIndex, state.firstVisibleItemScrollOffset) })
+            },
+            restore = { saved ->
+                TabScrollStates(saved.chunked(3).associate { (key, index, offset) -> key as String to ((index as Int) to (offset as Int)) })
+            }
+        )
+    }
+}
 
 private val SEARCH_BLUR_RADIUS = 16.dp
 /** The screens which show the files of the active host, and so the host switcher in the top bar. */

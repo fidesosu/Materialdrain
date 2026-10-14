@@ -40,15 +40,21 @@ interface FileStoreOps {
 }
 
 /**
- * Looking inside archives (zip, 7z, rar, tar...) that are on the host. [archivePath] is the archive's own path on the
- * host; [inside] is a folder within it, "" for its top. Only present with [ProviderCapability.ARCHIVE_BROWSE].
+ * Looking inside archives (zip, 7z, rar, tar...) that are on the host. [archive] is the archive itself; [inside] is a
+ * folder within it, "" for its top. Only present with [ProviderCapability.ARCHIVE_BROWSE].
+ *
+ * A host can often only reach an archive one way: Pixeldrain's ?zip_info is on its filesystem (by path), and there is
+ * none for the files of the account (by id). [canOpen] says whether this archive can be reached, so an archive the
+ * host can't look inside isn't offered at all, instead of failing.
  */
 interface ArchiveOps {
-    suspend fun list(archivePath: String, inside: String): ApiResponse<List<StorageNode>>
+    fun canOpen(archive: StorageRef): Boolean
+
+    suspend fun list(archive: StorageRef, inside: String): ApiResponse<List<StorageNode>>
 
     /** Writes one file of the archive, [entryPath] is its path within the archive (no leading slash). */
     suspend fun read(
-        archivePath: String,
+        archive: StorageRef,
         entryPath: String,
         outputStream: OutputStream,
         onProgress: (read: Long, total: Long?) -> Unit

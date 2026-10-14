@@ -83,7 +83,8 @@ private val nameField = FieldSpec(
 
 private val screensField = FieldSpec(
     "screens", "Screens",
-    "Which tabs this host shows, and in what order. Left to the app, every tab the host can back is shown.",
+    "Which tabs this host shows, and in what order. Left to the app, every tab the host can back is shown. A kind can " +
+        "be shown more than once, each with its own id (and for the filesystem its own root folder).",
     kind = FieldKind.Screens, common = true
 )
 
@@ -214,8 +215,13 @@ val KnownEndpoints: List<EndpointInfo> = listOf(
     EndpointInfo("browse_rename", "Filesystem tab", "Renaming or moving a file or folder.", "{path}, {target} and {make_parents}"),
     EndpointInfo("browse_delete", "Filesystem tab", "Deleting a file or folder by its path.", "{path} and {recursive}"),
     EndpointInfo("browse_import", "Filesystem tab", "Copying files into a folder by their ids.", "{path} and {files_json}"),
-    EndpointInfo("archive_info", "Filesystem tab", "What's inside an archive, without downloading it.", "{path}"),
-    EndpointInfo("archive_file", "Filesystem tab", "One file out of an archive.", "{path} and {entry}"),
+    EndpointInfo(
+        "archive_info", "Filesystem tab",
+        "What's inside an archive, without downloading it. With {path} for the archives in the folders, with {id} for the " +
+            "files of the account: an archive the endpoint can't reach shows no contents.",
+        "{path} or {id}"
+    ),
+    EndpointInfo("archive_file", "Filesystem tab", "One file out of an archive.", "{path} or {id}, and {entry}"),
     EndpointInfo("user_lists", "Lists tab", "The lists of the account."),
     EndpointInfo("list_info", "Lists tab", "The files of one list.", "{list_id}"),
     EndpointInfo("list_create", "Lists tab", "Making a list.", "{title_json} and {files_json}"),

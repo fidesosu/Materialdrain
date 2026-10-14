@@ -105,7 +105,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                     SettingsItem.Toggle(
                         title = "Previews",
                         summary = "Load preview in a file's details",
-                        info = "Pictures, videos, songs, text and the contents of archives. A video or song still only " +
+                        info = "Pictures, videos, songs, text, PDFs and the contents of archives. A video or song still only " +
                             "streams once it's played.",
                         isChecked = { appSettings.holdPreviews.collectAsState().value },
                         onCheckedChange = { appSettings.setHoldPreviews(it) }

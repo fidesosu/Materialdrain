@@ -232,10 +232,16 @@ class PixeldrainStorageProvider(
             }
     }
 
-    /** Inside archives with ?zip_info and ?zip_file: the archive itself is never downloaded just to look at it. */
+    /**
+     * Inside archives with ?zip_info and ?zip_file: the archive itself is never downloaded just to look at it. Those are
+     * only on the filesystem: a file of the account (by id, the Files tab) has no way in.
+     */
     override val archives: ArchiveOps = object : ArchiveOps {
-        override suspend fun list(archivePath: String, inside: String): ApiResponse<List<StorageNode>> {
-            val body = when (val raw = filesystemApi.getZipInfo(apiKeyProvider(), archivePath)) {
+        override fun canOpen(archive: StorageRef): Boolean = archive.path.isNotBlank()
+
+        override suspend fun list(archive: StorageRef, inside: String): ApiResponse<List<StorageNode>> {
+            if (!canOpen(archive)) return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "Only archives in the filesystem can be looked inside."))
+            val body = when (val raw = filesystemApi.getZipInfo(apiKeyProvider(), archive.path)) {
                 is PdResult.Success -> raw.data
                 else -> return ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, "The archive couldn't be read."))
             }
@@ -247,7 +253,7 @@ class PixeldrainStorageProvider(
                             name = it.name,
                             isDirectory = it.isDirectory,
                             size = it.size,
-                            richDetails = if (it.isDirectory) null else ArchiveEntryDetails(archivePath, it.path),
+                            richDetails = if (it.isDirectory) null else ArchiveEntryDetails(archive, it.path),
                         )
                     }
                 )
@@ -256,12 +262,12 @@ class PixeldrainStorageProvider(
         }
 
         override suspend fun read(
-            archivePath: String,
+            archive: StorageRef,
             entryPath: String,
             outputStream: OutputStream,
             onProgress: (read: Long, total: Long?) -> Unit
         ): ApiResponse<Long> =
-            filesystemApi.downloadZipEntry(apiKeyProvider(), archivePath, "/" + entryPath.trimStart('/'), outputStream, onProgress).map { it }
+            filesystemApi.downloadZipEntry(apiKeyProvider(), archive.path, "/" + entryPath.trimStart('/'), outputStream, onProgress).map { it }
     }
 
     override val fileStore = object : FileStoreOps {

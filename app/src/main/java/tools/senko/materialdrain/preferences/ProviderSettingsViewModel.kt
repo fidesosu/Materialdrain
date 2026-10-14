@@ -23,6 +23,7 @@ import tools.senko.materialdrain.provider.api.SignInResult
 import tools.senko.materialdrain.provider.api.ProviderConfigCodec
 import tools.senko.materialdrain.provider.api.ProviderValidationResult
 import tools.senko.materialdrain.provider.api.SensitiveChange
+import tools.senko.materialdrain.provider.api.screenProblems
 
 /** An update which needs the user's go-ahead: it changes where credentials go, and/or discards their edits. */
 data class UpdateApproval(
@@ -107,7 +108,9 @@ class ProviderSettingsViewModel(
         }
         // The newly imported host is the one the Files, Lists and Filesystem screens use
         configStore.setActive(configStore.import(source))
-        _uiState.update { it.copy(importError = null) }
+        // It works, but not all of its tabs show: said under the field, rather than left to be found out
+        val problems = screenProblems(source.config.screens)
+        _uiState.update { it.copy(importError = problems.takeIf { p -> p.isNotEmpty() }?.joinToString(" ", prefix = "Added. ")) }
         return true
     }
 

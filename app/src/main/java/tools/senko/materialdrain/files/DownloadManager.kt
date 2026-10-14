@@ -105,7 +105,7 @@ internal suspend fun downloadNode(
     (node.richDetails as? ArchiveEntryDetails)?.let { entry ->
         val archives = provider.archives
             ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't look inside archives."))
-        return archives.read(entry.archivePath, entry.entryPath, outputStream, onProgress)
+        return archives.read(entry.archive, entry.entryPath, outputStream, onProgress)
     }
     val id = node.ref.id
     return if (id != null) {

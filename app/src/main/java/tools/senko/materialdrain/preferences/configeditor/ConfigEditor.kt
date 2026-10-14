@@ -765,6 +765,7 @@ internal fun hasProblem(fields: List<FieldSpec>, obj: JsonObject): Boolean = fie
             val endpoints = value as? JsonObject
             endpoints.isNullOrEmpty() || endpoints.any { (name, endpoint) -> endpointHasProblem(name, endpoint) }
         }
+        FieldKind.Screens -> screenEntryProblems(value).isNotEmpty()
         // A field with a default can be left out, the default stands in
         else -> spec.required && spec.default == null && (value == null || (value as? JsonPrimitive)?.let { it.isString && it.content.isBlank() } == true)
     }

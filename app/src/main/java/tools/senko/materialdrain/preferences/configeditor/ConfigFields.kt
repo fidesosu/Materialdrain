@@ -69,6 +69,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import tools.senko.materialdrain.provider.api.HostScreen
+import tools.senko.materialdrain.provider.api.ScreenConfig
+import tools.senko.materialdrain.provider.api.screenProblems
 import tools.senko.materialdrain.ui.components.AppMenu
 import tools.senko.materialdrain.ui.components.AppMenuItem
 import tools.senko.materialdrain.ui.components.OverflowMenuButton
@@ -444,15 +446,27 @@ private fun HostScreen.help(): String = when (this) {
 }
 
 /** The actions a screen can leave out, by the names a config uses for them. */
-private val HideableActions = listOf("UPLOAD" to "Upload", "MKDIR" to "New folder", "RENAME" to "Rename and move", "DELETE" to "Delete")
+private val HideableActions = listOf(
+    "UPLOAD" to "Upload", "MKDIR" to "New folder", "RENAME" to "Rename and move", "DELETE" to "Delete",
+    "ARCHIVE_BROWSE" to "Look inside archives"
+)
 
 /** One screen of the config, with what it may hold besides its name, which is kept as it is. */
-internal data class ScreenEntry(val screen: String, val name: String?, val disabled: List<String>, val extra: JsonObject) {
+internal data class ScreenEntry(
+    val screen: String,
+    val name: String?,
+    val disabled: List<String>,
+    val extra: JsonObject,
+    val id: String? = null,
+    val root: String? = null
+) {
     fun toJson(): JsonElement {
-        if (name.isNullOrBlank() && disabled.isEmpty() && extra.isEmpty()) return JsonPrimitive(screen)
+        if (id.isNullOrBlank() && name.isNullOrBlank() && root.isNullOrBlank() && disabled.isEmpty() && extra.isEmpty()) return JsonPrimitive(screen)
         return JsonObject(LinkedHashMap<String, JsonElement>().apply {
             put("screen", JsonPrimitive(screen))
+            if (!id.isNullOrBlank()) put("id", JsonPrimitive(id))
             if (!name.isNullOrBlank()) put("name", JsonPrimitive(name))
+            if (!root.isNullOrBlank()) put("root", JsonPrimitive(root))
             if (disabled.isNotEmpty()) put("disabled_capabilities", JsonArray(disabled.map { JsonPrimitive(it) }))
             putAll(extra)
         })
@@ -460,6 +474,9 @@ internal data class ScreenEntry(val screen: String, val name: String?, val disab
 
     /** What the tab is called: its own name, or the screen's. */
     fun title(): String = name?.takeIf { it.isNotBlank() } ?: HostScreen.entries.firstOrNull { it.name == screen }?.label() ?: screen
+
+    /** The tab as the app reads it, for its id and checks (see screenProblems); null for a kind the app doesn't know. */
+    fun toScreenConfig(): ScreenConfig? = HostScreen.entries.firstOrNull { it.name == screen }?.let { ScreenConfig(it, id = id, root = root) }
 
     companion object {
         fun of(element: JsonElement): ScreenEntry? = when {
@@ -469,7 +486,9 @@ internal data class ScreenEntry(val screen: String, val name: String?, val disab
                     screen = screen.trim().uppercase(),
                     name = element.textOf("name"),
                     disabled = (element["disabled_capabilities"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content?.uppercase() }.orEmpty(),
-                    extra = JsonObject(element - setOf("screen", "name", "disabled_capabilities"))
+                    extra = JsonObject(element - setOf("screen", "id", "name", "root", "disabled_capabilities")),
+                    id = element.textOf("id"),
+                    root = element.textOf("root")
                 )
             }
             else -> null
@@ -477,15 +496,28 @@ internal data class ScreenEntry(val screen: String, val name: String?, val disab
     }
 }
 
+/** What's wrong with the screens of a config's [value] (see screenProblems): two tabs with one id, a root where it does nothing. */
+internal fun screenEntryProblems(value: JsonElement?): List<String> =
+    screenProblems((value as? JsonArray)?.mapNotNull { ScreenEntry.of(it)?.toScreenConfig() })
+
+/** An id for another tab of [screen]'s kind that none of [entries] has yet: "filesystem-2", "filesystem-3"... */
+private fun freeTabId(screen: String, entries: List<ScreenEntry>): String {
+    val taken = entries.mapNotNull { it.toScreenConfig()?.tabId }.toSet()
+    val base = screen.lowercase()
+    return generateSequence(2) { it + 1 }.map { "$base-$it" }.first { it !in taken }
+}
+
 /**
  * The tabs: left to the app (every one the host can back), or chosen, each ticked one in the order shown. A tab's ⋮
- * menu (or a tap on it) gives its own name and the actions it leaves out, and moves it.
+ * menu (or a tap on it) gives its own name, id, root and the actions it leaves out, moves it, and adds another tab of its
+ * kind (with an id of its own, so both show).
  */
 @Composable
 private fun ScreensField(spec: FieldSpec, value: JsonElement?, onValue: (JsonElement?) -> Unit) {
     val entries = (value as? JsonArray)?.mapNotNull { ScreenEntry.of(it) }
     val chosen = entries != null
     fun write(list: List<ScreenEntry>) = onValue(JsonArray(list.map { it.toJson() }))
+    val problems = screenEntryProblems(value)
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
@@ -506,21 +538,32 @@ private fun ScreensField(spec: FieldSpec, value: JsonElement?, onValue: (JsonEle
         }
         if (entries != null) {
             val unticked = HostScreen.entries.filter { screen -> entries.none { it.screen == screen.name } }
+            // The ids taken more than once: those tabs say so, as only the first of them shows
+            val ids = entries.map { it.toScreenConfig()?.tabId }
             Column(modifier = Modifier.fillMaxWidth().clip(RowShape).background(MaterialTheme.colorScheme.surfaceContainerLow)) {
                 entries.forEachIndexed { index, entry ->
                     ScreenRow(
                         entry = entry,
                         ticked = true,
-                        onTick = { write(entries - entry) },
+                        repeatedId = ids[index] != null && ids.count { it == ids[index] } > 1,
+                        onTick = { write(entries.filterIndexed { i, _ -> i != index }) },
                         onChange = { changed -> write(entries.toMutableList().also { it[index] = changed }) },
                         onUp = if (index > 0) ({ write(entries.toMutableList().also { java.util.Collections.swap(it, index, index - 1) }) }) else null,
-                        onDown = if (index < entries.lastIndex) ({ write(entries.toMutableList().also { java.util.Collections.swap(it, index, index + 1) }) }) else null
+                        onDown = if (index < entries.lastIndex) ({ write(entries.toMutableList().also { java.util.Collections.swap(it, index, index + 1) }) }) else null,
+                        // Right under this one, with its own id so both show
+                        onAddAnother = {
+                            val another = ScreenEntry(entry.screen, null, emptyList(), JsonObject(emptyMap()), id = freeTabId(entry.screen, entries))
+                            write(entries.toMutableList().also { it.add(index + 1, another) })
+                        }
                     )
                 }
                 unticked.forEach { screen ->
                     val entry = ScreenEntry(screen.name, null, emptyList(), JsonObject(emptyMap()))
-                    ScreenRow(entry = entry, ticked = false, onTick = { write(entries + entry) }, onChange = {}, onUp = null, onDown = null)
+                    ScreenRow(entry = entry, ticked = false, repeatedId = false, onTick = { write(entries + entry) }, onChange = {}, onUp = null, onDown = null, onAddAnother = null)
                 }
+            }
+            problems.forEach { problem ->
+                Text(problem, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -530,13 +573,16 @@ private fun ScreensField(spec: FieldSpec, value: JsonElement?, onValue: (JsonEle
 private fun ScreenRow(
     entry: ScreenEntry,
     ticked: Boolean,
+    repeatedId: Boolean,
     onTick: () -> Unit,
     onChange: (ScreenEntry) -> Unit,
     onUp: (() -> Unit)?,
-    onDown: (() -> Unit)?
+    onDown: (() -> Unit)?,
+    onAddAnother: (() -> Unit)?
 ) {
     val screen = HostScreen.entries.firstOrNull { it.name == entry.screen }
     var editing by remember(entry.screen) { mutableStateOf(false) }
+    val tabId = entry.toScreenConfig()?.tabId ?: entry.screen.lowercase()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -555,18 +601,30 @@ private fun ScreenRow(
             )
             Text(
                 listOfNotNull(
-                    screen?.help(),
+                    // A root or an id of its own says more than what the kind of tab is
+                    entry.root?.takeIf { it.isNotBlank() }?.let { "In /${it.trim('/')}" } ?: screen?.help(),
+                    "id $tabId".takeIf { !entry.id.isNullOrBlank() },
                     "${entry.disabled.size} left out".takeIf { entry.disabled.isNotEmpty() }
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (repeatedId) {
+                Text(
+                    "Another tab has the id \"$tabId\": only the first one shows.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
         if (ticked) {
             OverflowMenuButton(contentDescription = "${entry.title()} options") { close ->
-                AppMenuItem("Name and actions", leadingIcon = Icons.Filled.Edit, onClick = { close(); editing = true })
+                AppMenuItem("Name, id and actions", leadingIcon = Icons.Filled.Edit, onClick = { close(); editing = true })
                 AppMenuItem("Move up", leadingIcon = Icons.Filled.ArrowUpward, enabled = onUp != null, onClick = { close(); onUp?.invoke() })
                 AppMenuItem("Move down", leadingIcon = Icons.Filled.ArrowDownward, enabled = onDown != null, onClick = { close(); onDown?.invoke() })
+                if (onAddAnother != null) {
+                    AppMenuItem("Another ${screen?.label() ?: entry.screen} tab", leadingIcon = Icons.Filled.Add, onClick = { close(); onAddAnother() })
+                }
             }
         }
     }
@@ -585,6 +643,33 @@ private fun ScreenRow(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    OutlinedTextField(
+                        value = entry.id.orEmpty(),
+                        // An id is a word: no spaces, so it reads the same in the config
+                        onValueChange = { onChange(entry.copy(id = it.replace(Regex("\\s"), "-").ifEmpty { null })) },
+                        label = { Text("Id") },
+                        placeholder = { Text(entry.screen.lowercase()) },
+                        isError = repeatedId,
+                        supportingText = {
+                            Text(
+                                if (repeatedId) "Another tab has this id: give each its own, or only the first one shows."
+                                else "Tells this tab apart from others of its kind. Needed for a second one; left empty, it's ${entry.screen.lowercase()}."
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (screen == HostScreen.FILESYSTEM) {
+                        OutlinedTextField(
+                            value = entry.root.orEmpty(),
+                            onValueChange = { onChange(entry.copy(root = it.ifEmpty { null })) },
+                            label = { Text("Root folder") },
+                            placeholder = { Text("The whole host") },
+                            supportingText = { Text("The folder this tab opens at, under the host's own top, e.g. Media/Films. It can't go above it.") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     Text("Leave out on this tab", style = MaterialTheme.typography.labelLarge)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         HideableActions.forEach { (capability, label) ->

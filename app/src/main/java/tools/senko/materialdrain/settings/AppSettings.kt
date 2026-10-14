@@ -33,6 +33,7 @@ private const val HOLD_PREVIEWS_PREF = "data_saver_hold_previews"
 private const val HOLD_CONFIG_UPDATES_PREF = "data_saver_hold_config_updates"
 private const val HOLD_HOST_CHECKS_PREF = "data_saver_hold_host_checks"
 private const val LAST_SCREEN_PREF = "last_screen"
+private const val LAST_TAB_PREF = "last_tab"
 private const val FILESYSTEM_PATH_PREFIX = "filesystem_path_"
 private const val OPENED_LIST_ID_PREF = "opened_list_id"
 private const val OPENED_LIST_TITLE_PREF = "opened_list_title"
@@ -236,7 +237,7 @@ class AppSettings(context: Context) {
     }
 
     private val _holdPreviews = MutableStateFlow(prefs.getBoolean(HOLD_PREVIEWS_PREF, true))
-    /** With the data saver, a file's preview (picture, video, song, text, archive) waits to be asked for. */
+    /** With the data saver, a file's preview (picture, video, song, text, PDF, archive) waits to be asked for. */
     val holdPreviews: StateFlow<Boolean> = _holdPreviews.asStateFlow()
 
     fun setHoldPreviews(hold: Boolean) {
@@ -262,10 +263,13 @@ class AppSettings(context: Context) {
         _holdHostChecks.value = hold
     }
 
-    /** The folder last open on the Filesystem screen of [hostId], null when none is saved. */
-    fun filesystemPath(hostId: String): String? = prefs.getString(FILESYSTEM_PATH_PREFIX + hostId, null)
+    /**
+     * The folder last open on a Filesystem tab, null when none is saved. [tabKey] is the host's id for its usual tab, and
+     * the host's and the tab's for one of several (see FilesystemViewModel.bind), so each tab opens where it was left.
+     */
+    fun filesystemPath(tabKey: String): String? = prefs.getString(FILESYSTEM_PATH_PREFIX + tabKey, null)
 
-    fun setFilesystemPath(hostId: String, path: String) = prefs.edit { putString(FILESYSTEM_PATH_PREFIX + hostId, path) }
+    fun setFilesystemPath(tabKey: String, path: String) = prefs.edit { putString(FILESYSTEM_PATH_PREFIX + tabKey, path) }
 
     /** The list open on the Lists screen, kept across restarts. Set to null when the list is closed. */
     var openedList: SavedOpenedList?
@@ -316,6 +320,11 @@ class AppSettings(context: Context) {
     var lastScreen: Screen
         get() = enumPref(LAST_SCREEN_PREF, Screen.Upload)
         set(value) = prefs.edit { putString(LAST_SCREEN_PREF, value.name) }
+
+    /** The tab the app was last on (see ScreenConfig.tabId), for a host with several tabs of one kind; null for none yet. */
+    var lastTabId: String?
+        get() = prefs.getString(LAST_TAB_PREF, null)
+        set(value) = prefs.edit { if (value == null) remove(LAST_TAB_PREF) else putString(LAST_TAB_PREF, value) }
 
     /** Whether the app has asked for the notification permission (Android 13+) already: it asks only once. */
     var askedNotificationPermission: Boolean
