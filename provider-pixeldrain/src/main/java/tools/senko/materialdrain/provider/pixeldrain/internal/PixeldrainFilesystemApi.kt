@@ -82,14 +82,10 @@ class PixeldrainFilesystemApiImpl(private val http: PixeldrainHttpClient) : Pixe
             .apply { if (apiKey.isNotBlank()) header(HttpHeaders.Authorization, http.basicAuth(apiKey)) }
             .get()
             .build()
-        // A blocking call: off the main thread, whichever thread asks (the file details ask from it)
+        // Off the main thread, and cancelled with the details. Read whatever the status: a file which can't be read says
+        // why in the body
         return try {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                http.okHttpClient.newCall(request).execute().use { response ->
-                    // Read whatever the status: a file which can't be read says why in the body
-                    ApiResponse.Success(response.body.string().orEmpty())
-                }
-            }
+            ApiResponse.Success(http.send(request).body)
         } catch (e: IOException) {
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_error", message = e.message ?: "The archive couldn't be read."))
         }

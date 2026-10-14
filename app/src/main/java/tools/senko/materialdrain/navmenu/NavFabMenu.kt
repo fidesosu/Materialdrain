@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.Screen
+import tools.senko.materialdrain.Tab
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -105,15 +106,17 @@ private const val GRID_COLUMNS = 4
  * opening a small bottom-anchored window of destinations above it. The FAB shows the current screen's icon,
  * and turns into a round close button while the window is open. Tapping outside the window closes it.
  *
- * Mock items (no [NavMenuItem.screen]) only get highlighted when tapped, there's nothing behind them.
+ * Mock items (no [NavMenuItem.tab]) only get highlighted when tapped, there's nothing behind them.
  */
 @Composable
 fun NavFabMenu(
     menu: NavMenu,
     currentScreen: Screen,
+    /** The tab shown, null on a screen that isn't one (a file's details, the settings) */
+    currentTab: Tab?,
     position: NavFabPosition,
     onPositionChange: (NavFabPosition) -> Unit,
-    onNavigate: (Screen) -> Unit,
+    onNavigate: (Tab) -> Unit,
     onFabHeightChanged: (Dp) -> Unit,
     /** How far the button rises above its corner, e.g. over the selection bar or a snackbar */
     lift: Dp = 0.dp,
@@ -130,7 +133,7 @@ fun NavFabMenu(
     BackHandler(enabled = open) { open = false }
 
     val reduceMotion = LocalReduceMotion.current
-    val isSelected: (NavMenuItem) -> Boolean = { item -> item.screen?.let { it == currentScreen } ?: (item.id == mockSelectedId) }
+    val isSelected: (NavMenuItem) -> Boolean = { item -> item.tab?.let { it == currentTab } ?: (item.id == mockSelectedId) }
     val allItems = menu.pinned + menu.sections.flatMap { it.items }
     val selectedItem = allItems.firstOrNull(isSelected)
 
@@ -174,14 +177,14 @@ fun NavFabMenu(
                 maxHeight = maxWindowHeight,
                 isSelected = isSelected,
                 onItemClick = { item ->
-                    if (item.screen != null) onNavigate(item.screen) else mockSelectedId = item.id
+                    if (item.tab != null) onNavigate(item.tab) else mockSelectedId = item.id
                     open = false
                 }
             )
         }
 
         val fabIcon: Painter = selectedItem?.icon?.painter()
-            ?: currentScreen.iconResId?.takeIf { allItems.any { it.screen != null } }?.let { painterResource(it) }
+            ?: currentScreen.iconResId?.takeIf { allItems.any { it.tab != null } }?.let { painterResource(it) }
             ?: rememberVectorPainter(Icons.Filled.Menu)
 
         if (hidden < 1f) NavFab(

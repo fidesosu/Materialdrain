@@ -168,7 +168,7 @@ class FilesystemViewModel(
     val treeIndex: StateFlow<FolderTreeIndex?> = _treeIndex.asStateFlow()
     private var treeIndexJob: Job? = null
     // The listings of the folders seen, by path: a search opened again (or from a folder already crawled) reuses them
-    // instead of listing everything again. Of the active host only, and dropped whenever something may have changed
+    // instead of listing everything again. Of this tab's host only, and dropped whenever something may have changed
     private val folderCache = ConcurrentHashMap<String, List<StorageNode>>()
     private val speedTracker = TransferSpeedTracker()
     private var nextTransferNumber = 0
@@ -202,7 +202,7 @@ class FilesystemViewModel(
     fun show() {
         shown = true
         when {
-            pendingReload -> loadActiveProviderAndRoot()
+            pendingReload -> loadHost()
             pendingRefresh -> refreshCurrentPath()
         }
         pendingReload = false
@@ -225,12 +225,12 @@ class FilesystemViewModel(
         // being made the active one changes nothing for this tab's own host
         viewModelScope.launch {
             configStore.changes.drop(1).collect {
-                if (shown && configStore.activeProviderId.value == hostId) loadActiveProviderAndRoot() else pendingReload = true
+                if (shown && configStore.activeProviderId.value == hostId) loadHost() else pendingReload = true
             }
         }
         // A login, a logout or a saved API key: the folders are listed again with it
         viewModelScope.launch {
-            sessionManager.apiKey.drop(1).collect { if (shown) loadActiveProviderAndRoot() else pendingReload = true }
+            sessionManager.apiKey.drop(1).collect { if (shown) loadHost() else pendingReload = true }
         }
         // Files deleted or added to a folder from another screen: the folder shown may have changed
         viewModelScope.launch {
@@ -253,8 +253,8 @@ class FilesystemViewModel(
         _uiState.update { it.copy(filterQuery = query) }
     }
 
-    /** The host of this tab (see [bind]). Named as before, when there was one browser for whichever host was active. */
-    private fun activeProvider(): StorageProvider = registry.resolve(hostId)
+    /** The host of this tab (see [bind]), which need not be the active one. */
+    private fun provider(): StorageProvider = registry.resolve(hostId)
 
     /**
      * The top of this tab: the provider's own root (Pixeldrain's "me" bucket, a config's browse_root) and, under it, the
@@ -270,9 +270,10 @@ class FilesystemViewModel(
     private fun isWithinRoot(path: String, root: String): Boolean =
         root.trim('/').isEmpty() || path == root || path.startsWith(root.trimEnd('/') + "/")
 
-    private fun loadActiveProviderAndRoot() {
+    /** Lists the host from scratch, at the folder last open in this tab: when it's first shown, or the host changed. */
+    private fun loadHost() {
         forgetFolderTree()
-        val provider = activeProvider()
+        val provider = provider()
         val apiKey = if (provider.kind == ProviderKind.PIXELDRAIN) sessionManager.currentApiKey() else ""
         _uiState.update {
             it.copy(
@@ -295,7 +296,7 @@ class FilesystemViewModel(
 
     fun refreshCurrentPath() {
         forgetFolderTree()
-        val provider = activeProvider()
+        val provider = provider()
         if (provider.kind == ProviderKind.PIXELDRAIN && sessionManager.currentApiKey().isBlank()) {
             _uiState.update { it.copy(apiKeyMissingError = true, errorMessage = API_KEY_MISSING, isLoading = false, children = emptyList()) }
             return
@@ -303,7 +304,7 @@ class FilesystemViewModel(
         fetchPathContent(uiState.value.currentPath)
     }
 
-    /** Called after the API key changed (settings saved, logged in or out). */
+    /** [path] without slashes around it, or [root] for the top. */
     private fun normalizePath(path: String, root: String): String = path.trim('/').ifEmpty { root }
 
     private fun generatePathSegments(fullPath: String, provider: StorageProvider): List<PathSegment> {
@@ -320,7 +321,7 @@ class FilesystemViewModel(
     }
 
     fun fetchPathContent(path: String, fallbackToRoot: Boolean = false) {
-        val provider = activeProvider()
+        val provider = provider()
         val browse = provider.browse ?: run {
             _uiState.update { it.copy(isLoading = false, errorMessage = "This host can't browse files.") }
             return
@@ -366,8 +367,8 @@ class FilesystemViewModel(
         }
     }
 
-    /** The preview image of a node, from the active provider; null when it has none. */
-    fun thumbnailFor(node: StorageNode): String? = activeProvider().thumbnailUrl(node)
+    /** The preview image of a node, from this tab's host; null when it has none. */
+    fun thumbnailFor(node: StorageNode): String? = provider().thumbnailUrl(node)
 
     fun navigateToChild(node: StorageNode) {
         if (node.isDirectory) fetchPathContent(node.ref.path)
@@ -379,7 +380,7 @@ class FilesystemViewModel(
 
     /** The folder above the current one, or null when the current one is the top of the host. */
     private fun parentPath(): String? {
-        val root = rootPath(activeProvider())
+        val root = rootPath(provider())
         val current = normalizePath(uiState.value.currentPath, root)
         if (current == root) return null
         // A folder right under a "" root has "" as its parent: that's the root, not "no parent"
@@ -405,7 +406,7 @@ class FilesystemViewModel(
      * another folder, or after a change, it starts over; for the same folder it carries on from what's known.
      */
     fun indexFolderTree() {
-        val browse = activeProvider().browse ?: return
+        val browse = provider().browse ?: return
         val root = currentDir()
         val known = _treeIndex.value
         if (known != null && known.root == root && (known.done || treeIndexJob?.isActive == true)) return
@@ -503,7 +504,7 @@ class FilesystemViewModel(
     }
 
     fun moveEntry(entry: StorageNode, destinationDirectory: String) {
-        val destination = normalizePath(destinationDirectory, rootPath(activeProvider()))
+        val destination = normalizePath(destinationDirectory, rootPath(provider()))
         val source = entry.ref.path.trim('/')
         if (destination == source || destination.startsWith("$source/")) {
             reportOperationError("A folder can't be moved into itself.")
@@ -524,7 +525,7 @@ class FilesystemViewModel(
     }
 
     fun moveEntries(entries: List<StorageNode>, destinationDirectory: String) {
-        val destination = normalizePath(destinationDirectory, rootPath(activeProvider()))
+        val destination = normalizePath(destinationDirectory, rootPath(provider()))
         runBulkModification(entries, "moved") { browse, entry ->
             val source = entry.ref.path.trim('/')
             when {
@@ -543,7 +544,7 @@ class FilesystemViewModel(
         operation: suspend (browse: BrowseOps, entry: StorageNode) -> ApiResponse<Unit>
     ) {
         if (entries.isEmpty()) return
-        val browse = activeProvider().browse ?: return
+        val browse = provider().browse ?: return
         if (_uiState.value.isModifying) return
         val dir = currentDir()
         _uiState.update { it.copy(isModifying = true) }
@@ -566,16 +567,16 @@ class FilesystemViewModel(
         }
     }
 
-    /** The top of the active host's folders, as the folder picker starts and stops at it (see StorageProvider.rootPath). */
-    val browseRootPath: String get() = rootPath(activeProvider())
+    /** The top of this tab's folders, as the folder picker starts and stops at it (see StorageProvider.rootPath). */
+    val browseRootPath: String get() = rootPath(provider())
 
     /** What the folder picker's path calls [browseRootPath]: its own name, or the host's name for its top (an SMB share's). */
     val browseRootName: String
-        get() = activeProvider().let { provider -> rootPath(provider).substringAfterLast('/').ifEmpty { provider.rootName } }
+        get() = provider().let { provider -> rootPath(provider).substringAfterLast('/').ifEmpty { provider.rootName } }
 
     /** The folders inside [path], for the folder picker. */
     suspend fun listSubdirectories(path: String): ApiResponse<List<StorageNode>> {
-        val provider = activeProvider()
+        val provider = provider()
         val browse = provider.browse ?: return ApiResponse.Error(ProviderError("not_browsable", "This host can't browse files."))
         return when (val response = browse.list(normalizePath(path, rootPath(provider)))) {
             is ApiResponse.Success -> ApiResponse.Success(
@@ -596,14 +597,14 @@ class FilesystemViewModel(
         runModification { browse -> browse?.importFiles(dir, ids) ?: notBrowsable() }
     }
 
-    private fun currentDir(): String = normalizePath(_uiState.value.currentPath, rootPath(activeProvider()))
+    private fun currentDir(): String = normalizePath(_uiState.value.currentPath, rootPath(provider()))
 
     private fun joinPath(dir: String, name: String) = if (dir.isEmpty()) name else "$dir/$name"
 
     private fun isValidNodeName(name: String) = name.isNotEmpty() && !name.contains('/') && name != "." && name != ".."
 
     private fun runModification(operation: suspend (browse: BrowseOps?) -> ApiResponse<Unit>) {
-        val browse = activeProvider().browse
+        val browse = provider().browse
         if (_uiState.value.isModifying) return
         val dir = currentDir()
         _uiState.update { it.copy(isModifying = true) }
@@ -707,7 +708,7 @@ class FilesystemViewModel(
     }
 
     private fun startUpload(items: List<FilesystemUploadItem>) {
-        val browse = activeProvider().browse ?: return
+        val browse = provider().browse ?: return
         val dir = currentDir()
         val totalBytes = items.sumOf { it.sizeBytes ?: 0L }.takeIf { it > 0 && items.all { item -> item.sizeBytes != null } }
         speedTracker.reset()

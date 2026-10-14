@@ -38,12 +38,12 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
-import tools.senko.materialdrain.Screen
+import tools.senko.materialdrain.Tab
 
 enum class NavFabPosition(val bias: Float) { START(-1f), CENTER(0f), END(1f) }
 
-/** Which provider's menu the FAB navigation prototype shows (Developer settings). */
-enum class NavMenuPreview(val label: String) { PIXELDRAIN("Pixeldrain"), TRUENAS_MOCK("TrueNAS (mock)") }
+/** Which menu the FAB navigation prototype shows (Developer settings): the active host's tabs, or a mock of a big one. */
+enum class NavMenuPreview(val label: String) { PIXELDRAIN("This host"), TRUENAS_MOCK("TrueNAS (mock)") }
 
 sealed interface NavIcon {
     data class Res(@param:DrawableRes val id: Int) : NavIcon
@@ -56,8 +56,8 @@ fun NavIcon.painter(): Painter = when (this) {
     is NavIcon.Vector -> rememberVectorPainter(image)
 }
 
-/** [screen] is null for mock destinations, which only exist to preview how a bigger menu looks. */
-data class NavMenuItem(val id: String, val label: String, val icon: NavIcon, val screen: Screen? = null)
+/** [tab] is null for mock destinations, which only exist to preview how a bigger menu looks. */
+data class NavMenuItem(val id: String, val label: String, val icon: NavIcon, val tab: Tab? = null)
 
 data class NavMenuSection(val title: String, val items: List<NavMenuItem>)
 
@@ -67,12 +67,13 @@ data class NavMenuSection(val title: String, val items: List<NavMenuItem>)
  */
 data class NavMenu(val pinned: List<NavMenuItem>, val sections: List<NavMenuSection> = emptyList())
 
-private fun Screen.menuItem() = NavMenuItem(id = name, label = title, icon = NavIcon.Res(requireNotNull(iconResId)), screen = this)
+private fun Tab.menuItem() = NavMenuItem(id = "${screen.name}:$id", label = title, icon = NavIcon.Res(requireNotNull(screen.iconResId)), tab = this)
 
-/** Settings isn't a tile: it's the gear at the top right of the screen, out of the thumb zone because it's rarely used. */
-val PixeldrainNavMenu = NavMenu(
-    pinned = listOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem).map { it.menuItem() }
-)
+/**
+ * The tabs of the active host, as its bottom bar has them. Settings isn't a tile: it's the gear at the top right of the
+ * screen, out of the thumb zone because it's rarely used.
+ */
+private fun tabsNavMenu(tabs: List<Tab>) = NavMenu(pinned = tabs.map { it.menuItem() })
 
 private fun mock(label: String, icon: ImageVector) = NavMenuItem(id = "truenas:$label", label = label, icon = NavIcon.Vector(icon))
 
@@ -145,7 +146,7 @@ val TrueNasMockNavMenu = NavMenu(
     )
 )
 
-fun NavMenuPreview.menu(): NavMenu = when (this) {
-    NavMenuPreview.PIXELDRAIN -> PixeldrainNavMenu
+fun NavMenuPreview.menu(tabs: List<Tab>): NavMenu = when (this) {
+    NavMenuPreview.PIXELDRAIN -> tabsNavMenu(tabs)
     NavMenuPreview.TRUENAS_MOCK -> TrueNasMockNavMenu
 }

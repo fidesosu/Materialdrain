@@ -83,9 +83,7 @@ object ScreenEntrySerializer : JsonTransformingSerializer<ScreenConfig>(ScreenCo
         val obj = element as? JsonObject ?: return element
         val unset = { key: String -> obj[key].let { it == null || it is JsonNull } }
         val nothingDisabled = (obj["disabled_capabilities"] as? JsonArray)?.isEmpty() ?: true
-        // Unset fields aren't written either way, so a screen with a name stays as short as it can
-        val written = JsonObject(obj.filterValues { it !is JsonNull })
-        return if (unset("id") && unset("name") && unset("root") && nothingDisabled) obj.getValue("screen") else written
+        return if (unset("id") && unset("name") && unset("root") && nothingDisabled) obj.getValue("screen") else obj
     }
 }
 

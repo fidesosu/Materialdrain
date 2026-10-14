@@ -183,6 +183,7 @@ fun FileInfoDetailsCard(
                     if (canPreview) HeldPreview(fileInfo, previewType, withArchive, mediaPadding, onLoad = fileInfoViewModel::loadPreview)
                 }
             } else if (showPreviews) {
+                val pdfPreview = uiState.pdfPreview
                 // An archive shows its contents where a preview would be
                 if (uiState.archive != null) {
                     uiState.archive?.let { archive ->
@@ -228,10 +229,13 @@ fun FileInfoDetailsCard(
                         durationHintMillis = null,
                         outerPadding = mediaPadding
                     )
-                } else if (uiState.pdfPreview != null) {
-                    uiState.pdfPreview?.let { pdf ->
-                        InlinePdfPreview(pdf, outerPadding = mediaPadding, onFullScreen = { fullScreenPdf = it })
-                    }
+                } else if (pdfPreview != null) {
+                    InlinePdfPreview(
+                        pdfPreview,
+                        outerPadding = mediaPadding,
+                        onLoad = fileInfoViewModel::loadPdfPreview,
+                        onFullScreen = { fullScreenPdf = it }
+                    )
                 } else if (uiState.isLoadingTextPreview) {
                     Box(modifier = Modifier.fillMaxWidth().height(100.dp).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()

@@ -283,6 +283,8 @@ fun MaterialdrainScreen() {
     )
     // The scroll position of each Filesystem tab, kept across visits to other screens
     val filesystemListStates = rememberSaveable(saver = TabScrollStates.Saver) { TabScrollStates() }
+    // The page the main content shows now (see Shown)
+    val shownNow = Shown(currentScreen, currentTab, activeHostId)
     var showFileDetailMenu by remember { mutableStateOf(false) }
     // While items are selected the bar is at the bottom, so the FAB and the snackbars move up over it
     var selectingItems by remember { mutableStateOf(false) }
@@ -818,12 +820,13 @@ fun MaterialdrainScreen() {
             }
         ) { paddingValues ->
             AnimatedContent(
-                // The tab too: two tabs of one kind (two Filesystem tabs) are two pages, moved between like any tabs
-                targetState = Shown(currentScreen, currentTab?.id),
+                targetState = shownNow,
+                // The tab too: two tabs of one kind (two Filesystem tabs) are two pages, moved between like any tabs. Not
+                // the host: switching hosts on the same tab changes the page in place instead of sliding
+                contentKey = { it.screen to it.tab?.id },
                 transitionSpec = {
-                    fun Shown.index() = navBarOrder.indexOfFirst { it.screen == screen && it.id == tabId }
-                    val initialIndex = initialState.index()
-                    val targetIndex = targetState.index()
+                    val initialIndex = navBarOrder.indexOf(initialState.tab)
+                    val targetIndex = navBarOrder.indexOf(targetState.tab)
                     val forward = when {
                         // Between two tabs: the way they lie in the navigation bar
                         initialIndex != -1 && targetIndex != -1 -> targetIndex > initialIndex
@@ -836,8 +839,9 @@ fun MaterialdrainScreen() {
                 },
                 label = "screenTransition"
             ) { shown ->
+                // A page sliding out keeps its own host and tab, so it goes on showing what it showed (and its browser)
                 val targetScreen = shown.screen
-                val targetTab = navBarOrder.firstOrNull { it.screen == targetScreen && it.id == shown.tabId } ?: tabOf(targetScreen)
+                val targetTab = shown.tab
                 // Without the app's bottom bar, the file screens and the details go on under the system's navigation bar
                 // (the lists add room for it after their last item, see LocalBottomInset) instead of being cut off above it.
                 // The upload and settings screens keep their buttons clear of it.
@@ -872,7 +876,7 @@ fun MaterialdrainScreen() {
                             // A Filesystem tab has its own browser, loading only while it's on screen; the other tabs use
                             // the host's first one, for picking a folder in it
                             val tabFilesystem = if (targetScreen == Screen.Filesystem) {
-                                filesystemViewModelFor(activeHostId, targetTab, transferOwner, viewModelFactory).also { browser ->
+                                filesystemViewModelFor(shown.hostId, targetTab, transferOwner, viewModelFactory).also { browser ->
                                     DisposableEffect(browser) {
                                         browser.show()
                                         onDispose { browser.hide() }
@@ -893,13 +897,13 @@ fun MaterialdrainScreen() {
                                 appSettings = appContainer.appSettings,
                                 disabledCapabilities = targetTab?.config?.disabledCapabilities ?: emptySet(),
                                 // Only the screen being shown, not one still animating out
-                                showSearchModal = showSearchModal && shown == Shown(currentScreen, currentTab?.id),
+                                showSearchModal = showSearchModal && shown == shownNow,
                                 onDismissSearchModal = { showSearchModal = false },
                                 onSelectingChange = { selectingItems = it },
                                 scrollState = when (targetScreen) {
                                     Screen.Files -> filesListState
                                     Screen.Lists -> if (listOpened) listContentsListState else listsListState
-                                    else -> filesystemListStates.of("$activeHostId:${targetTab?.id}")
+                                    else -> filesystemListStates.of("${shown.hostId}:${targetTab?.id}")
                                 },
                                 onFileSelected = { navigateTo(Screen.FileDetail) },
                                 fabHeight = fabHeightDp,
@@ -950,11 +954,12 @@ fun MaterialdrainScreen() {
         // Kept while the navigation prototype is on: it slides out of the screen when hidden (see NavFabMenu)
         if (navPrototype) {
             NavFabMenu(
-                menu = navMenuPreview.menu(),
+                menu = navMenuPreview.menu(navBarOrder),
                 currentScreen = currentScreen,
+                currentTab = currentTab,
                 position = navFabPosition,
                 onPositionChange = appContainer.appSettings::setNavFabPosition,
-                onNavigate = navigateTo,
+                onNavigate = selectTab,
                 onFabHeightChanged = { fabHeightDp = it },
                 lift = navLift,
                 visible = showNavFab,
@@ -1015,8 +1020,8 @@ fun MaterialdrainScreen() {
 }
 
 
-/** What the main content shows: a [screen], and for a tab of the host, which of its tabs ([Tab.id]). */
-private data class Shown(val screen: Screen, val tabId: String?)
+/** What the main content shows: a [screen], and for a tab of the host [hostId], which of its tabs. */
+private data class Shown(val screen: Screen, val tab: Tab?, val hostId: String)
 
 /**
  * The browser of the Filesystem [tab] on the host [hostId]: one per tab (and root), so each keeps its own folder and

@@ -55,19 +55,7 @@ fun FullScreenMediaPreviewDialog(
         // instead of the screen behind showing through there; the buttons keep clear of the bars themselves
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
-        // The bars over the preview: no lightened strip behind the navigation buttons, and light icons, as the preview
-        // is always dark
-        val view = LocalView.current
-        val dialogWindow = (view.parent as? DialogWindowProvider)?.window
-        SideEffect {
-            dialogWindow?.let { window ->
-                if (Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
-                WindowCompat.getInsetsController(window, view).apply {
-                    isAppearanceLightStatusBars = false
-                    isAppearanceLightNavigationBars = false
-                }
-            }
-        }
+        DarkDialogBars()
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -131,6 +119,25 @@ fun FullScreenMediaPreviewDialog(
                     modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp),
                     container = Color.Black.copy(alpha = 0.5f)
                 )
+            }
+        }
+    }
+}
+
+/**
+ * The bars over a full screen dialog whose content is always dark (a picture, a video, a PDF): light icons, and no
+ * lightened strip behind the navigation buttons. Called inside the dialog's content.
+ */
+@Composable
+internal fun DarkDialogBars() {
+    val view = LocalView.current
+    val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+    SideEffect {
+        dialogWindow?.let { window ->
+            if (Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = false
+                isAppearanceLightNavigationBars = false
             }
         }
     }

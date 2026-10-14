@@ -509,15 +509,14 @@ private fun freeTabId(screen: String, entries: List<ScreenEntry>): String {
 
 /**
  * The tabs: left to the app (every one the host can back), or chosen, each ticked one in the order shown. A tab's ⋮
- * menu (or a tap on it) gives its own name, id, root and the actions it leaves out, moves it, and adds another tab of its
- * kind (with an id of its own, so both show).
+ * menu (or a tap on it) gives its own name, id, root and the actions it leaves out, moves it, and for a Filesystem tab
+ * adds another one (with an id of its own, so both show). What's wrong with a tab is said on its row.
  */
 @Composable
 private fun ScreensField(spec: FieldSpec, value: JsonElement?, onValue: (JsonElement?) -> Unit) {
     val entries = (value as? JsonArray)?.mapNotNull { ScreenEntry.of(it) }
     val chosen = entries != null
     fun write(list: List<ScreenEntry>) = onValue(JsonArray(list.map { it.toJson() }))
-    val problems = screenEntryProblems(value)
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
@@ -550,20 +549,18 @@ private fun ScreensField(spec: FieldSpec, value: JsonElement?, onValue: (JsonEle
                         onChange = { changed -> write(entries.toMutableList().also { it[index] = changed }) },
                         onUp = if (index > 0) ({ write(entries.toMutableList().also { java.util.Collections.swap(it, index, index - 1) }) }) else null,
                         onDown = if (index < entries.lastIndex) ({ write(entries.toMutableList().also { java.util.Collections.swap(it, index, index + 1) }) }) else null,
-                        // Right under this one, with its own id so both show
-                        onAddAnother = {
+                        // Right under this one, with its own id so both show. Only the filesystem: another tab of the other
+                        // kinds would show the very same thing, while a Filesystem tab can have a root of its own
+                        onAddAnother = if (entry.screen == HostScreen.FILESYSTEM.name) ({
                             val another = ScreenEntry(entry.screen, null, emptyList(), JsonObject(emptyMap()), id = freeTabId(entry.screen, entries))
                             write(entries.toMutableList().also { it.add(index + 1, another) })
-                        }
+                        }) else null
                     )
                 }
                 unticked.forEach { screen ->
                     val entry = ScreenEntry(screen.name, null, emptyList(), JsonObject(emptyMap()))
                     ScreenRow(entry = entry, ticked = false, repeatedId = false, onTick = { write(entries + entry) }, onChange = {}, onUp = null, onDown = null, onAddAnother = null)
                 }
-            }
-            problems.forEach { problem ->
-                Text(problem, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -609,13 +606,13 @@ private fun ScreenRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (repeatedId) {
-                Text(
-                    "Another tab has the id \"$tabId\": only the first one shows.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
+            // What's wrong with the tab, on the tab itself (see screenProblems)
+            val problem = when {
+                repeatedId -> "Another tab has the id \"$tabId\": only the first one shows."
+                screen != HostScreen.FILESYSTEM && !entry.root.isNullOrBlank() -> "A root folder does nothing here, only on a Filesystem tab."
+                else -> null
             }
+            problem?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
         }
         if (ticked) {
             OverflowMenuButton(contentDescription = "${entry.title()} options") { close ->

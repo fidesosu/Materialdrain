@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -23,6 +22,7 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.FilterOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import kotlin.coroutines.cancellation.CancellationException
@@ -68,32 +68,8 @@ fun StorageNode.previewMimeType(): String? {
     return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: mimeType
 }
 
-/** Takes at most [limit] bytes: writing more stops the copy with an IOException, and sets [overflowed]. */
-private class LimitedByteArrayOutputStream(private val limit: Int) : ByteArrayOutputStream() {
-    @Volatile
-    var overflowed = false
-        private set
-
-    override fun write(b: Int) {
-        ensureRoom(1)
-        super.write(b)
-    }
-
-    override fun write(b: ByteArray, off: Int, len: Int) {
-        ensureRoom(len)
-        super.write(b, off, len)
-    }
-
-    private fun ensureRoom(len: Int) {
-        if (size() + len > limit) {
-            overflowed = true
-            throw IOException("More than $limit bytes")
-        }
-    }
-}
-
-/** A file that takes at most [limit] bytes, as [LimitedByteArrayOutputStream] does. */
-private class LimitedFileOutputStream(file: File, private val limit: Long) : FileOutputStream(file) {
+/** Passes at most [limit] bytes on to [target]: writing more stops the copy with an IOException, and sets [overflowed]. */
+private class LimitedOutputStream(target: OutputStream, private val limit: Long) : FilterOutputStream(target) {
     @Volatile
     var overflowed = false
         private set
@@ -101,12 +77,13 @@ private class LimitedFileOutputStream(file: File, private val limit: Long) : Fil
 
     override fun write(b: Int) {
         ensureRoom(1)
-        super.write(b)
+        out.write(b)
     }
 
+    // FilterOutputStream's own would pass an array on one byte at a time
     override fun write(b: ByteArray, off: Int, len: Int) {
         ensureRoom(len)
-        super.write(b, off, len)
+        out.write(b, off, len)
     }
 
     private fun ensureRoom(len: Int) {
@@ -140,8 +117,15 @@ fun isPdf(name: String, mimeType: String?): Boolean =
 /** The most of a PDF that's loaded for its preview: Android draws the pages from a whole file on the device. */
 internal const val MAX_PDF_PREVIEW_BYTES = 64L * 1024 * 1024
 
-/** A PDF's preview: loading into the app's cache, ready to be drawn from [file], or why it can't be shown. */
+/** The most of a PDF that's loaded without being asked for: a bigger one waits for a tap (see PdfPreviewState.Large). */
+private const val MAX_PDF_AUTO_LOAD_BYTES = 16L * 1024 * 1024
+
+/**
+ * A PDF's preview: too big to load without being asked for, loading into the app's cache, ready to be drawn from [file],
+ * or why it can't be shown.
+ */
 sealed interface PdfPreviewState {
+    data class Large(val totalBytes: Long) : PdfPreviewState
     data class Loading(val loadedBytes: Long, val totalBytes: Long?) : PdfPreviewState
     data class Ready(val file: File) : PdfPreviewState
     data class Failed(val message: String) : PdfPreviewState
@@ -349,18 +333,20 @@ class FileInfoViewModel(
     /**
      * Loads a PDF into the app's cache for its preview: Android draws a PDF's pages from a file on the device (see
      * PdfPreview). One already there from before is used again; the cache holds only the last few, see [trimPdfCache].
+     * A big one waits to be [asked] for, see [loadPdfPreview].
      */
-    private fun fetchPdfPreview(node: StorageNode) {
+    private fun fetchPdfPreview(node: StorageNode, asked: Boolean = false) {
         pdfJob?.cancel()
         if (!isPdf(node.name, node.previewMimeType())) {
             _uiState.update { it.copy(pdfPreview = null) }
             return
         }
         val size = node.size
+        val tooBig = PdfPreviewState.Failed(
+            "Too big to preview (${size?.let { "${formatSize(it)}, " }.orEmpty()}at most ${formatSize(MAX_PDF_PREVIEW_BYTES)}). Download it to read it."
+        )
         if (size != null && size > MAX_PDF_PREVIEW_BYTES) {
-            _uiState.update {
-                it.copy(pdfPreview = PdfPreviewState.Failed("Too big to preview (${formatSize(size)}, at most ${formatSize(MAX_PDF_PREVIEW_BYTES)}). Download it to read it."))
-            }
+            _uiState.update { it.copy(pdfPreview = tooBig) }
             return
         }
         val folder = File(application.cacheDir, PDF_CACHE_FOLDER)
@@ -372,60 +358,59 @@ class FileInfoViewModel(
             _uiState.update { it.copy(pdfPreview = PdfPreviewState.Ready(file)) }
             return
         }
+        if (!asked && size != null && size > MAX_PDF_AUTO_LOAD_BYTES) {
+            _uiState.update { it.copy(pdfPreview = PdfPreviewState.Large(size)) }
+            return
+        }
         _uiState.update { it.copy(pdfPreview = PdfPreviewState.Loading(0L, size)) }
         pdfJob = viewModelScope.launch {
-            val partial = File(folder, "$name.part")
-            var lastShown = 0L
-            var overflowed = false
-            val response = try {
-                withContext(Dispatchers.IO) {
+            val outcome = withContext(Dispatchers.IO) {
+                val partial = File(folder, "$name.part")
+                var lastShown = 0L
+                try {
                     folder.mkdirs()
                     // Capped as well: a host which doesn't tell the size mustn't fill the device with a huge file
-                    val out = LimitedFileOutputStream(partial, MAX_PDF_PREVIEW_BYTES)
-                    try {
-                        downloadNodeTo(node, out) { read, total ->
-                            // Often enough to move the bar, not on every buffer
-                            if (read - lastShown >= 256 * 1024 || read == total) {
-                                lastShown = read
-                                _uiState.update { it.copy(pdfPreview = PdfPreviewState.Loading(read, total ?: size)) }
+                    val out = LimitedOutputStream(FileOutputStream(partial), MAX_PDF_PREVIEW_BYTES)
+                    val response = try {
+                        out.use {
+                            downloadNodeTo(node, it) { read, total ->
+                                // Often enough to move the bar, not on every buffer
+                                if (read - lastShown >= 256 * 1024 || read == total) {
+                                    lastShown = read
+                                    _uiState.update { state -> state.copy(pdfPreview = PdfPreviewState.Loading(read, total ?: size)) }
+                                }
                             }
                         }
-                    } finally {
-                        overflowed = out.overflowed
-                        out.close()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // The cap stops the copy by throwing, whichever way the host passes that on
+                        ApiResponse.Error(ProviderError("preview_failed", e.message.orEmpty()))
                     }
-                }
-            } catch (e: CancellationException) {
-                withContext(NonCancellable + Dispatchers.IO) { partial.delete() }
-                throw e
-            } catch (e: Exception) {
-                // The cap stops the copy by throwing, whichever way the host passes that on
-                ApiResponse.Error(ProviderError("preview_failed", e.message.orEmpty()))
-            }
-            if (overflowed) {
-                withContext(Dispatchers.IO) { partial.delete() }
-                _uiState.update {
-                    it.copy(pdfPreview = PdfPreviewState.Failed("Too big to preview (at most ${formatSize(MAX_PDF_PREVIEW_BYTES)}). Download it to read it."))
-                }
-                return@launch
-            }
-            val outcome = withContext(Dispatchers.IO) {
-                when (response) {
-                    is ApiResponse.Success -> if (partial.renameTo(file)) {
-                        trimPdfCache(folder, keep = file)
-                        PdfPreviewState.Ready(file)
-                    } else {
-                        partial.delete()
-                        PdfPreviewState.Failed("The PDF couldn't be kept for its preview.")
+                    when {
+                        out.overflowed -> tooBig
+                        response is ApiResponse.Error -> PdfPreviewState.Failed(response.error.message.ifBlank { "The PDF couldn't be loaded." })
+                        partial.renameTo(file) -> {
+                            trimPdfCache(folder, keep = file)
+                            PdfPreviewState.Ready(file)
+                        }
+                        else -> PdfPreviewState.Failed("The PDF couldn't be kept for its preview.")
                     }
-                    is ApiResponse.Error -> {
-                        partial.delete()
-                        PdfPreviewState.Failed(response.error.message.ifBlank { "The PDF couldn't be loaded." })
-                    }
+                } catch (e: IOException) {
+                    // The cache can't be written to, e.g. the device is full
+                    PdfPreviewState.Failed("The PDF couldn't be kept for its preview.")
+                } finally {
+                    // Gone already once it's renamed; otherwise what was loaded is of no use, cancelled or not
+                    partial.delete()
                 }
             }
             _uiState.update { it.copy(pdfPreview = outcome) }
         }
+    }
+
+    /** Loads the PDF's preview whatever its size (up to the most): tapped while it waited, or its copy left the cache. */
+    fun loadPdfPreview() {
+        uiState.value.fileInfo?.let { fetchPdfPreview(it, asked = true) }
     }
 
     /** Keeps the cache of PDFs to the last few opened, [keep] (the one just loaded) among them. */
@@ -462,7 +447,8 @@ class FileInfoViewModel(
         _uiState.update { it.copy(isLoadingTextPreview = true, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = null) }
         previewJob = viewModelScope.launch {
             // Capped as well: a host which doesn't tell the size (or tells it wrong) mustn't fill the memory with a huge file
-            val buffer = LimitedByteArrayOutputStream(MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES)
+            val bytes = ByteArrayOutputStream()
+            val buffer = LimitedOutputStream(bytes, MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES.toLong())
             val response = try {
                 downloadNodeTo(fileInfo, buffer) { _, _ -> }
             } catch (e: CancellationException) {
@@ -477,7 +463,7 @@ class FileInfoViewModel(
             }
             when (response) {
                 is ApiResponse.Success -> {
-                    val content = buffer.toString(Charsets.UTF_8.name())
+                    val content = bytes.toString(Charsets.UTF_8.name())
                     // The preview on the page shows the start, cut at a line; the fullscreen view the whole file
                     val start = if (content.length > MAX_TEXT_PREVIEW_DISPLAY_LENGTH) {
                         content.substring(0, MAX_TEXT_PREVIEW_DISPLAY_LENGTH).substringBeforeLast('\n')
@@ -650,7 +636,8 @@ class FileInfoViewModel(
         val node = uiState.value.fileInfo ?: return
         _uiState.update { it.copy(previewHeld = false) }
         fetchTextFilePreviewContent(node)
-        fetchPdfPreview(node)
+        // The held preview said how big the PDF is, and was tapped anyway
+        fetchPdfPreview(node, asked = true)
         if (previewWithArchive) loadArchive(node.ref, "")
     }
 

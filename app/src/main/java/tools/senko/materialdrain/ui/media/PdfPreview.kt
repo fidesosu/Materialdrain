@@ -2,10 +2,10 @@ package tools.senko.materialdrain.ui.media
 
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
-import android.os.Build
 import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -44,7 +44,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -61,13 +60,11 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
-import androidx.core.view.WindowCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -103,9 +100,17 @@ private class PdfDocument(file: File) {
     private val lock = Mutex()
     private var closed = false
 
-    /** Each page's width over its height. */
-    val pageRatios: List<Float> = (0 until renderer.pageCount).map { index ->
-        renderer.openPage(index).use { page -> page.width.toFloat() / page.height.coerceAtLeast(1) }
+    /** Each page's width over its height; a damaged page without a width or height is taken as square. */
+    val pageRatios: List<Float> = try {
+        (0 until renderer.pageCount).map { index ->
+            renderer.openPage(index).use { page ->
+                (page.width.toFloat() / page.height).takeIf { it.isFinite() && it > 0f }?.coerceIn(0.05f, 20f) ?: 1f
+            }
+        }
+    } catch (e: Exception) {
+        renderer.close()
+        descriptor.close()
+        throw e
     }
 
     /** Page [index] drawn [widthPx] wide (less for a huge page, see [MAX_PAGE_PIXELS]), on white as on paper; null once closed. */
@@ -137,12 +142,18 @@ private class PdfDocument(file: File) {
     }
 }
 
-/** What opening a PDF came to: the document, or why it can't be shown (a damaged or password-protected file). */
+/**
+ * What opening a PDF came to: the document, or why it can't be shown: a damaged or password-protected file, or one that
+ * isn't on the device any more (the app's cache was cleared while it was shown).
+ */
 private sealed interface OpenedPdf {
     data object Opening : OpenedPdf
     class Open(val document: PdfDocument) : OpenedPdf
     data object Unreadable : OpenedPdf
+    data object Gone : OpenedPdf
 }
+
+private const val UNREADABLE_PDF = "This PDF can't be shown: it's damaged, or locked with a password."
 
 /** [file] opened for as long as the caller is shown, and closed when it leaves. */
 @Composable
@@ -157,8 +168,8 @@ private fun rememberPdf(file: File): OpenedPdf {
             val result = try {
                 OpenedPdf.Open(PdfDocument(file).also { document = it })
             } catch (_: Exception) {
-                // Damaged, or locked with a password, which Android's renderer can't open
-                OpenedPdf.Unreadable
+                // Damaged, or locked with a password, which Android's renderer can't open; or not there any more
+                if (file.isFile) OpenedPdf.Unreadable else OpenedPdf.Gone
             }
             withContext(Dispatchers.Main) { opened = result }
         }
@@ -196,35 +207,42 @@ private fun PdfPage(document: PdfDocument, index: Int, widthPx: Int, modifier: M
 
 /**
  * A PDF's preview in a file's details, a card like the other previews: the top of its first page, how many pages it
- * has, and a tap opens it full screen. While the PDF loads into the app it shows how far along that is.
+ * has, and a tap opens it full screen. While the PDF loads into the app it shows how far along that is; a big one waits
+ * for a tap on [onLoad], which also loads it again when its copy left the cache.
  */
 @Composable
-fun InlinePdfPreview(state: PdfPreviewState, outerPadding: PaddingValues, onFullScreen: (File) -> Unit) {
+fun InlinePdfPreview(state: PdfPreviewState, outerPadding: PaddingValues, onLoad: () -> Unit, onFullScreen: (File) -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).padding(outerPadding),
         shape = MediaCardShape
     ) {
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .then(if (state is PdfPreviewState.Large) Modifier.clickable(onClickLabel = "Load the PDF", onClick = onLoad) else Modifier),
+            contentAlignment = Alignment.Center
+        ) {
+            val bottomBar = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
             when (state) {
+                is PdfPreviewState.Large -> PdfMessage("Tap to load the PDF · About ${formatSize(state.totalBytes)}")
                 is PdfPreviewState.Loading -> {
-                    PdfMessage(
-                        if (state.totalBytes != null) "Loading the PDF · ${formatSize(state.loadedBytes)} of ${formatSize(state.totalBytes)}"
-                        else "Loading the PDF · ${formatSize(state.loadedBytes)}"
-                    )
-                    val total = state.totalBytes
-                    if (total != null && total > 0) {
-                        LinearProgressIndicator(
-                            progress = { (state.loadedBytes.toFloat() / total).coerceIn(0f, 1f) },
-                            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                        )
+                    val total = state.totalBytes?.takeIf { it > 0 }
+                    PdfMessage("Loading the PDF · ${formatSize(state.loadedBytes)}" + total?.let { " of ${formatSize(it)}" }.orEmpty())
+                    if (total != null) {
+                        LinearProgressIndicator(progress = { (state.loadedBytes.toFloat() / total).coerceIn(0f, 1f) }, modifier = bottomBar)
                     } else {
-                        LinearProgressIndicator(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth())
+                        LinearProgressIndicator(modifier = bottomBar)
                     }
                 }
                 is PdfPreviewState.Failed -> PdfMessage(state.message)
                 is PdfPreviewState.Ready -> when (val opened = rememberPdf(state.file)) {
-                    OpenedPdf.Opening -> LinearProgressIndicator(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth())
-                    OpenedPdf.Unreadable -> PdfMessage("This PDF can't be shown: it's damaged, or locked with a password.")
+                    OpenedPdf.Opening -> LinearProgressIndicator(modifier = bottomBar)
+                    OpenedPdf.Gone -> {
+                        LinearProgressIndicator(modifier = bottomBar)
+                        LaunchedEffect(Unit) { onLoad() }
+                    }
+                    OpenedPdf.Unreadable -> PdfMessage(UNREADABLE_PDF)
                     is OpenedPdf.Open -> {
                         val pages = opened.document.pageRatios.size
                         if (pages == 0) {
@@ -243,11 +261,7 @@ fun InlinePdfPreview(state: PdfPreviewState, outerPadding: PaddingValues, onFull
                                 if (pages == 1) "1 page" else "$pages pages",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = Color.White,
-                                modifier = Modifier
-                                    .align(Alignment.BottomStart)
-                                    .padding(8.dp)
-                                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp).labelOverPage()
                             )
                             ClickablePreviewOverlay { onFullScreen(state.file) }
                         }
@@ -257,6 +271,10 @@ fun InlinePdfPreview(state: PdfPreviewState, outerPadding: PaddingValues, onFull
         }
     }
 }
+
+/** A label over the pages: white text on a dark see-through chip, readable on any page. */
+private fun Modifier.labelOverPage(): Modifier =
+    background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 4.dp)
 
 @Composable
 private fun PdfMessage(text: String) {
@@ -283,23 +301,14 @@ fun FullScreenPdfDialog(file: File, title: String, onDismissRequest: () -> Unit)
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
-        // Light icons on the dark background, and no lightened strip behind the navigation buttons (as for a picture)
-        val view = LocalView.current
-        val dialogWindow = (view.parent as? DialogWindowProvider)?.window
-        SideEffect {
-            dialogWindow?.let { window ->
-                if (Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
-                WindowCompat.getInsetsController(window, view).apply {
-                    isAppearanceLightStatusBars = false
-                    isAppearanceLightNavigationBars = false
-                }
-            }
-        }
+        DarkDialogBars()
         Box(modifier = Modifier.fillMaxSize().background(Color(0xFF202124))) {
             when (val opened = rememberPdf(file)) {
                 OpenedPdf.Opening -> LinearProgressIndicator(modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth())
+                // Its copy left the cache: the preview in the details loads it again, to be opened from there
+                OpenedPdf.Gone -> LaunchedEffect(Unit) { onDismissRequest() }
                 OpenedPdf.Unreadable -> Text(
-                    "This PDF can't be shown: it's damaged, or locked with a password.",
+                    UNREADABLE_PDF,
                     color = Color.White,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.align(Alignment.Center).padding(24.dp)
@@ -318,12 +327,13 @@ fun FullScreenPdfDialog(file: File, title: String, onDismissRequest: () -> Unit)
                 color = Color.White,
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                // Clear of the back button on one side and the page number on the other, centred between them
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(start = 76.dp, end = 76.dp, top = 28.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .padding(start = 112.dp, end = 112.dp, top = 28.dp)
+                    .labelOverPage()
             )
         }
     }
@@ -397,11 +407,7 @@ private fun ZoomablePages(document: PdfDocument) {
             "$current / $pages",
             color = Color.White,
             style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 26.dp, end = 16.dp)
-                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 26.dp, end = 16.dp).labelOverPage()
         )
     }
 }
