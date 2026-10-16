@@ -23,7 +23,8 @@ import tools.senko.materialdrain.ui.LocalReduceMotion
 /**
  * Text of any length (a file's name, a link, a hash) kept to [collapsedLines] lines, so a long one can't take over the
  * page. Only when it's cut off does a tap show all of it, and another tap folds it again. On one line it's cut in the
- * middle, so both its start and its end (a name's extension, a link's id) stay in sight. It stays selectable.
+ * middle, so both its start and its end (a name's extension, a hash's last digits) stay in sight, unless [cutInMiddle]
+ * is off. It stays selectable.
  */
 @Composable
 fun ExpandableText(
@@ -32,7 +33,8 @@ fun ExpandableText(
     collapsedLines: Int = 2,
     style: TextStyle = LocalTextStyle.current,
     color: Color = Color.Unspecified,
-    fontFamily: FontFamily? = null
+    fontFamily: FontFamily? = null,
+    cutInMiddle: Boolean = true
 ) {
     var expanded by remember(text) { mutableStateOf(false) }
     // Only a collapsed layout says whether the text fits; expanded, nothing is cut off but it can still be folded
@@ -50,7 +52,7 @@ fun ExpandableText(
             color = color,
             fontFamily = fontFamily,
             maxLines = if (expanded) Int.MAX_VALUE else lines,
-            overflow = if (!expanded && lines == 1) TextOverflow.MiddleEllipsis else TextOverflow.Ellipsis,
+            overflow = if (!expanded && lines == 1 && cutInMiddle) TextOverflow.MiddleEllipsis else TextOverflow.Ellipsis,
             onTextLayout = { if (!expanded) cutOff = it.hasVisualOverflow }
         )
     }

@@ -33,10 +33,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,10 +52,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.decode.DataSource
 import coil.request.ImageRequest
 import tools.senko.materialdrain.settings.LocalDataSaver
 import tools.senko.materialdrain.ui.media.HostRequestAuth
 import tools.senko.materialdrain.util.formatSize
+
+/** How long a thumbnail fades in over its tile (Coil's own default). */
+private const val THUMBNAIL_CROSSFADE_MS = 100
 
 /**
  * A row of a file or folder. This is a plain row instead of a Material ListItem, whose trailing area
@@ -122,7 +134,8 @@ fun FileListItem(
  * The picture of a file or folder: a soft tile in the colour of its kind (folder, image, video, audio, archive,
  * document...) with a small glyph of it, and the file's thumbnail over it when it has one. The thumbnail fades in over
  * the tile, so a row looks the same while it loads, and a file whose thumbnail fails just keeps its tile. The
- * thumbnail is decoded at [size], not at the size of the original image.
+ * thumbnail is decoded at [size], not at the size of the original image. Once it's there the tile goes, so a picture
+ * with transparent parts shows the row's background through them.
  *
  * A thumbnail the data saver holds back (see DataSaver) isn't loaded: the tile looks as it does without one, and loads
  * the thumbnail when tapped, unless [loadOnTap] is off (while files are being selected, a tap selects).
@@ -134,11 +147,22 @@ fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp
     val (container, content) = kind.colors()
     val dataSaver = LocalDataSaver.current
     val held = thumbnailUrl != null && !isDirectory && !dataSaver.showsThumbnail(thumbnailUrl)
+    // Once the thumbnail is there the tile underneath goes, so a picture with transparent parts shows the page through
+    // them. Until then (held back, loading, failed) the tile is the picture. One faded in leaves it until it has covered
+    // it; one from memory, which Coil doesn't fade in, at once
+    var thumbnailLoaded by remember(thumbnailUrl) { mutableStateOf(false) }
+    var thumbnailInstant by remember(thumbnailUrl) { mutableStateOf(false) }
+    val tileAlpha = animateFloatAsState(
+        targetValue = if (thumbnailLoaded && !held) 0f else 1f,
+        animationSpec = if (thumbnailInstant) snap() else tween(150, delayMillis = THUMBNAIL_CROSSFADE_MS),
+        label = "tileAlpha"
+    )
     Box(
         modifier = Modifier
             .size(size)
             .clip(shape)
-            .background(container)
+            // Read while drawing, so the fade only draws again rather than recomposing the list
+            .drawBehind { drawRect(container, alpha = tileAlpha.value) }
             .then(
                 if (held && loadOnTap) Modifier.clickable(onClickLabel = "Load the thumbnail") { dataSaver.loadThumbnail(thumbnailUrl!!) }
                 else Modifier
@@ -149,7 +173,7 @@ fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp
             imageVector = kind.icon,
             contentDescription = kind.label,
             tint = content,
-            modifier = Modifier.size(size * 0.46f)
+            modifier = Modifier.size(size * 0.46f).graphicsLayer { alpha = tileAlpha.value }
         )
         if (!held && thumbnailUrl != null && !isDirectory) {
             val context = LocalContext.current
@@ -160,7 +184,7 @@ fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp
                 ImageRequest.Builder(context)
                     .data(thumbnailUrl)
                     .size(thumbnailPx)
-                    .crossfade(true)
+                    .crossfade(THUMBNAIL_CROSSFADE_MS)
                     .apply { headers.forEach { (name, value) -> addHeader(name, value) } }
                     .build()
             }
@@ -169,7 +193,11 @@ fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp
                 model = request,
                 contentDescription = "$name thumbnail",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(size)
+                modifier = Modifier.size(size),
+                onSuccess = { success ->
+                    thumbnailInstant = success.result.dataSource == DataSource.MEMORY_CACHE
+                    thumbnailLoaded = true
+                }
             )
         }
     }

@@ -379,6 +379,7 @@ fun FileInfoDetailsCard(
                                     label = "Link",
                                     value = link.removePrefix("https://"),
                                     collapsedLines = 1,
+                                    cutInMiddle = false,
                                     onCopy = { copy("Link", link) },
                                     onOpen = {
                                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, link.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
@@ -799,6 +800,9 @@ private fun RowDivider() {
 /**
  * One detail: its icon, its name over its value (selectable), an optional line under the value, and buttons to copy or
  * open it. The value shows [collapsedLines] lines at most, and all of it when tapped (see [ExpandableText]).
+ *
+ * Everything is placed from the top, where a one-line row centred it: a value unfolding only grows the row downwards,
+ * its name and value and the icons staying where they are, as far down as centring put them when the value was one line.
  */
 @Composable
 private fun DetailRow(
@@ -808,24 +812,33 @@ private fun DetailRow(
     supporting: String? = null,
     monospace: Boolean = false,
     collapsedLines: Int = 3,
+    cutInMiddle: Boolean = true,
     onCopy: (() -> Unit)? = null,
     onOpen: (() -> Unit)? = null
 ) {
+    val hasButtons = onCopy != null || onOpen != null
     Row(
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            // Where centring put it beside a one-line value (and line under it)
+            modifier = Modifier.padding(top = if (hasButtons) 12.dp else if (supporting != null) 16.dp else 8.dp).size(24.dp)
+        )
         Spacer(Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+        Column(modifier = Modifier.weight(1f).padding(top = if (hasButtons) 4.dp else 0.dp, end = 8.dp)) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             ExpandableText(
                 value,
                 style = MaterialTheme.typography.bodyLarge,
                 fontFamily = if (monospace) FontFamily.Monospace else null,
-                collapsedLines = collapsedLines
+                collapsedLines = collapsedLines,
+                cutInMiddle = cutInMiddle
             )
             supporting?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
