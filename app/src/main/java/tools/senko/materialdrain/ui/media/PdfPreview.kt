@@ -328,11 +328,12 @@ fun FullScreenPdfDialog(file: File, title: String, onDismissRequest: () -> Unit)
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                // Clear of the back button on one side and the page number on the other, centred between them
+                // Clear of the back button on one side and the page number on the other, centred between them and level
+                // with the page number (the same top, at the same height)
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(start = 112.dp, end = 112.dp, top = 28.dp)
+                    .padding(start = 112.dp, end = 112.dp, top = 26.dp)
                     .labelOverPage()
             )
         }

@@ -62,10 +62,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import coil.compose.AsyncImage
+import coil.imageLoader
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import tools.senko.materialdrain.provider.api.PixeldrainRichDetails
 import tools.senko.materialdrain.provider.api.StorageNode
+import tools.senko.materialdrain.settings.LocalDataSaver
+import tools.senko.materialdrain.ui.LocalBlurredBackdrop
 import tools.senko.materialdrain.ui.LocalBottomInset
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.components.CodePreview
@@ -76,6 +79,7 @@ import tools.senko.materialdrain.ui.components.NumberOdometer
 import tools.senko.materialdrain.ui.components.OdometerText
 import tools.senko.materialdrain.ui.components.fileKindLabel
 import tools.senko.materialdrain.ui.media.AudioPlayerPreview
+import tools.senko.materialdrain.ui.media.BlurredBackdrop
 import tools.senko.materialdrain.ui.media.FullScreenMediaPreviewDialog
 import tools.senko.materialdrain.ui.media.FullScreenPdfDialog
 import tools.senko.materialdrain.ui.media.InlineImagePreview
@@ -180,7 +184,9 @@ fun FileInfoDetailsCard(
                     val withArchive = fileInfoViewModel.showsArchive(fileInfo)
                     val canPreview = withArchive || isTextFile(fileInfo.name, previewType) || isPdf(fileInfo.name, previewType) ||
                         actualThumbnailUrl != null || listOf("image/", "video/").any { previewType?.startsWith(it) == true }
-                    if (canPreview) HeldPreview(fileInfo, previewType, withArchive, mediaPadding, onLoad = fileInfoViewModel::loadPreview)
+                    if (canPreview) {
+                        HeldPreview(fileInfo, previewType, withArchive, actualThumbnailUrl, previewApiKey, mediaPadding, onLoad = fileInfoViewModel::loadPreview)
+                    }
                 }
             } else if (showPreviews) {
                 val pdfPreview = uiState.pdfPreview
@@ -430,12 +436,25 @@ private fun FileHeader(file: StorageNode, showTile: Boolean) {
 private val HeldPreviewHeight = 200.dp
 
 /**
- * A preview the data saver holds back (see DataSaver): the frame the preview would have, the same size and shape, in a
- * plain colour, saying what it would show and (where it's known) about how much that loads. A tap anywhere on it loads it.
+ * A preview the data saver holds back (see DataSaver): the frame the preview would have, the same size and shape, saying
+ * what it would show and (where it's known) about how much that loads. A tap anywhere on it loads it.
+ *
+ * Its background is the file's thumbnail, blurred as behind a loading preview (see BlurredBackdrop), when the data saver
+ * lets thumbnails show: the file list has loaded it already then, so it costs nothing. Otherwise a plain colour.
  */
 @Composable
-private fun HeldPreview(file: StorageNode, previewType: String?, withArchive: Boolean, mediaPadding: PaddingValues, onLoad: () -> Unit) {
+private fun HeldPreview(
+    file: StorageNode,
+    previewType: String?,
+    withArchive: Boolean,
+    thumbnailUrl: String?,
+    apiKey: String?,
+    mediaPadding: PaddingValues,
+    onLoad: () -> Unit
+) {
     val scheme = MaterialTheme.colorScheme
+    val dataSaver = LocalDataSaver.current
+    val backdrop = thumbnailUrl?.takeIf { LocalBlurredBackdrop.current && dataSaver.showsThumbnail(it) }
     val size = file.size
     val media = RoundedCornerShape(8.dp)
     // What it would show, what that loads, and the preview's own frame: its size, shape and colour
@@ -468,17 +487,25 @@ private fun HeldPreview(file: StorageNode, previewType: String?, withArchive: Bo
             .fillMaxWidth()
             .then(held.frame)
             .clip(held.shape)
-            .background(held.color)
+            // Black under the thumbnail, as around a fullscreen picture: before Android 12 it's only made faint, not blurred
+            .background(if (backdrop != null) Color.Black else held.color)
             .clickable(onClickLabel = "Load the preview", onClick = onLoad)
     ) {
+        if (backdrop != null) {
+            BlurredBackdrop(backdrop, apiKey, LocalContext.current.imageLoader, Modifier.matchParentSize())
+            // Darkened, so the white text reads on a light picture too
+            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)))
+        }
+        val text = if (backdrop != null) Color.White else scheme.onSurface
+        val subtext = if (backdrop != null) Color.White.copy(alpha = 0.8f) else scheme.onSurfaceVariant
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
-            Icon(Icons.Filled.DataSaverOn, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+            Icon(Icons.Filled.DataSaverOn, contentDescription = null, tint = subtext, modifier = Modifier.size(28.dp))
             Spacer(Modifier.height(8.dp))
-            Text("Tap to load ${held.what}", style = MaterialTheme.typography.labelLarge, color = scheme.onSurface)
+            Text("Tap to load ${held.what}", style = MaterialTheme.typography.labelLarge, color = text)
             Text(
                 listOfNotNull("Data saver", held.cost).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
-                color = scheme.onSurfaceVariant
+                color = subtext
             )
         }
     }
