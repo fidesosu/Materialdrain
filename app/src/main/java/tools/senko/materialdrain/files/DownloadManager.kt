@@ -157,13 +157,16 @@ class DownloadManager(
         _downloads.update { it.copy(active = it.active - keys.toSet()) }
     }
 
-    private suspend fun prepareDownloadTargetUriAndStream(fileName: String, mimeType: String?): Pair<Uri?, OutputStream?> {
+    private suspend fun prepareDownloadTargetUriAndStream(fileName: String): Pair<Uri?, OutputStream?> {
         return withContext(Dispatchers.IO) {
             val context = application.applicationContext
             val contentResolver = context.contentResolver
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                put(MediaStore.MediaColumns.MIME_TYPE, mimeType ?: "application/octet-stream")
+                // Never the host's type: when the name's extension doesn't match the type MediaStore adds the type's own
+                // (a .rmbak the host calls a zip became .rmbak.zip). A generic type keeps the name as it is, extension
+                // or not, and the media scan gives the file its type from the name once it's finished
+                put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
                 put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
@@ -248,7 +251,7 @@ class DownloadManager(
                     targetUri = it.targetUri
                 }
                 if (targetUri == null) {
-                    val (uri, stream) = prepareDownloadTargetUriAndStream(node.name, node.mimeType)
+                    val (uri, stream) = prepareDownloadTargetUriAndStream(node.name)
                     targetUri = uri
                     outputStream = stream
                 } else {
@@ -354,12 +357,13 @@ class DownloadManager(
                     withContext(NonCancellable) { finalizeMediaStoreEntry(it, downloadSuccessful) }
                 }
                 // Reported after the file was finalized, so the notification (and the snackbar's Open) can open it
-                if (batchId == null) transfers.finish(transferId, outcome, outcomeMessage, if (downloadSuccessful) targetUri else null, node.mimeType)
+                val openMimeType = downloadedFileMimeType(node.name)
+                if (batchId == null) transfers.finish(transferId, outcome, outcomeMessage, if (downloadSuccessful) targetUri else null, openMimeType)
                 if (downloadSuccessful) {
                     messages.show(
                         outcomeMessage.orEmpty(),
                         long = true,
-                        action = targetUri?.let { UiMessageAction.OpenDownload(OpenableDownload(it, node.previewMimeType() ?: "*/*")) }
+                        action = targetUri?.let { UiMessageAction.OpenDownload(OpenableDownload(it, openMimeType)) }
                     )
                 }
             }
