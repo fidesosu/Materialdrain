@@ -500,12 +500,20 @@ class FileInfoViewModel(
         neighboursByNode = byNode
     }
 
+    /** The file after (or, not [next], before) the one shown, in the list it was opened from; null when there's none. */
+    private fun neighbour(next: Boolean): StorageNode? {
+        val shown = _uiState.value.fileInfo ?: return null
+        val index = neighbours.indexOfFirst { it.key == shown.key }
+        if (index == -1) return null
+        return neighbours.getOrNull(if (next) index + 1 else index - 1)
+    }
+
+    /** Whether there's a file to swipe to, see [openNeighbour]. */
+    fun hasNeighbour(next: Boolean): Boolean = neighbour(next) != null
+
     /** Opens the file after (or, not [next], before) the one shown, in the list it was opened from. False when there's none. */
     fun openNeighbour(next: Boolean): Boolean {
-        val shown = _uiState.value.fileInfo ?: return false
-        val index = neighbours.indexOfFirst { it.key == shown.key }
-        if (index == -1) return false
-        val target = neighbours.getOrNull(if (next) index + 1 else index - 1) ?: return false
+        val target = neighbour(next) ?: return false
         if (neighboursByNode) setFileInfoFromNode(target) else fetchFileInfo(target.key)
         return true
     }

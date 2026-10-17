@@ -17,7 +17,7 @@ import androidx.compose.animation.togetherWith
 const val PAGE_TRANSITION_MS = 250
 
 /** How long the page that's left takes to fade, shorter so the two don't blur into each other. */
-private const val PAGE_FADE_OUT_MS = 150
+const val PAGE_FADE_OUT_MS = 150
 
 /**
  * One page making way for another: the new one comes in from a quarter of the width away while fading in, and the old

@@ -43,6 +43,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -523,9 +524,11 @@ fun BrowserScreen(
             add(selectAll)
         }
         BrowserMode.FILES, BrowserMode.LISTS -> buildList {
+            // Each file on its own, or all of them in one archive
+            add(SelectionAction("Download", Icons.Filled.Download, { fileInfoViewModel.downloadFilesSequentially(files); exitSelection() }, enabled = files.isNotEmpty()))
             add(SelectionAction("Download as ZIP", Icons.Filled.FolderZip, { fileInfoViewModel.downloadFilesAsZip(files, openedList?.title ?: "Pixeldrain files"); exitSelection() }, enabled = files.isNotEmpty()))
-            add(SelectionAction("Add to list", Icons.AutoMirrored.Filled.PlaylistAdd, { actionRequest = FileActionRequest.AddToList(files) }, enabled = files.isNotEmpty()))
             if (canDelete) add(SelectionAction("Delete", Icons.Filled.Delete, { actionRequest = FileActionRequest.Delete(files) }, enabled = files.isNotEmpty(), destructive = true))
+            add(SelectionAction("Add to list", Icons.AutoMirrored.Filled.PlaylistAdd, { actionRequest = FileActionRequest.AddToList(files) }, enabled = files.isNotEmpty()))
             add(SelectionAction("Add to filesystem", Icons.Filled.FolderCopy, { actionRequest = FileActionRequest.AddToFilesystem(files) }, enabled = files.isNotEmpty()))
             openedList?.takeIf { it.canEdit }?.let { list ->
                 // The list's own file count, not the filtered entries (see the single-item action below)
@@ -572,6 +575,7 @@ fun BrowserScreen(
         listHasFiles = listState.listFiles.isNotEmpty(),
         onCloseList = { listViewModel.closeList() },
         onDownloadList = { openedList?.let { fileInfoViewModel.downloadFilesAsZip(listState.listFiles, it.title) } },
+        onDownloadListFiles = { fileInfoViewModel.downloadFilesSequentially(listState.listFiles) },
         selectionMode = selectionMode,
         selectedKeys = selectedKeys,
         selectedCount = selectedEntries.size,
@@ -649,6 +653,7 @@ fun BrowserContent(
     listHasFiles: Boolean,
     onCloseList: () -> Unit,
     onDownloadList: () -> Unit,
+    onDownloadListFiles: () -> Unit,
     selectionMode: Boolean,
     selectedKeys: Set<String>,
     selectedCount: Int,
@@ -706,8 +711,12 @@ fun BrowserContent(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            // Always the whole list, even while a filter narrows what's shown below
+                            // Always the whole list, even while a filter narrows what's shown below: each file on its own,
+                            // or all of them in one archive
                             if (listHasFiles) {
+                                FilledTonalIconButton(onClick = onDownloadListFiles) {
+                                    Icon(Icons.Filled.Download, contentDescription = "Download all, each file on its own")
+                                }
                                 Button(
                                     onClick = onDownloadList,
                                     contentPadding = ButtonDefaults.ButtonWithIconContentPadding
@@ -1048,6 +1057,7 @@ internal fun SampleBrowserContent(
         listHasFiles = entries.isNotEmpty(),
         onCloseList = {},
         onDownloadList = {},
+        onDownloadListFiles = {},
         selectionMode = selecting,
         selectedKeys = selectedKeys.orEmpty(),
         selectedCount = selectedKeys?.size ?: 0,
@@ -1090,7 +1100,7 @@ private fun BrowserListsPreview() = BrowserPreview(
     listOf("Holiday 2026", "Shared with Sam", "Wallpapers").map { StorageNode(StorageRef(id = it), it, isDirectory = true) }
 )
 
-/** A list opened: its title, Back, and All (ZIP). */
+/** A list opened: its title, Back, and its downloads (each file, and All (ZIP)). */
 @ScreenPreviews
 @Composable
 private fun BrowserOpenedListPreview() = BrowserPreview(

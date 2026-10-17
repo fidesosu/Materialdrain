@@ -1,6 +1,7 @@
 package tools.senko.materialdrain.ui.media
 
 import android.net.Uri
+import android.os.Bundle
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -101,9 +102,10 @@ fun AudioPlayerPreview(
             onDispose { controller?.removeListener(listener) }
         }
         val id = audioUri.toString()
+        val placeholderArt = rememberPlaceholderArt()
         card(controller, controller != null && currentId == id) { startAt ->
             controller?.run {
-                setMediaItem(songItem(id, audioUri, title, artist, album, albumArtSource))
+                setMediaItem(songItem(id, audioUri, title, artist, album, albumArtSource, placeholderArt))
                 setPlaybackSpeed(settings.defaultSpeed)
                 prepare()
                 if (startAt > 0) seekTo(startAt)
@@ -116,8 +118,11 @@ fun AudioPlayerPreview(
     }
 }
 
-/** The background player's item of a song: its address as its id too, and what the notification shows of it. */
-private fun songItem(id: String, uri: Uri, title: String?, artist: String?, album: String?, art: Any?): MediaItem {
+/**
+ * The background player's item of a song: its address as its id too, and what the notification shows of it. Its picture
+ * is [art], or [placeholderArt] (see rememberPlaceholderArt) without one, or when it can't be loaded (see PlaybackService).
+ */
+private fun songItem(id: String, uri: Uri, title: String?, artist: String?, album: String?, art: Any?, placeholderArt: ByteArray): MediaItem {
     val metadata = MediaMetadata.Builder()
         .setTitle(title ?: uri.lastPathSegment)
         .setArtist(artist)
@@ -127,8 +132,10 @@ private fun songItem(id: String, uri: Uri, title: String?, artist: String?, albu
                 is ByteArray -> setArtworkData(art, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
                 is Uri -> setArtworkUri(art)
                 is String -> setArtworkUri(Uri.parse(art))
+                else -> setArtworkData(placeholderArt, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
             }
         }
+        .setExtras(Bundle().apply { putByteArray(EXTRA_FALLBACK_ART, placeholderArt) })
         .build()
     return MediaItem.Builder().setMediaId(id).setUri(uri).setMediaMetadata(metadata).build()
 }
