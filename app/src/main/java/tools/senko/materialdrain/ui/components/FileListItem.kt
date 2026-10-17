@@ -56,6 +56,9 @@ import coil.decode.DataSource
 import coil.request.ImageRequest
 import tools.senko.materialdrain.settings.LocalDataSaver
 import tools.senko.materialdrain.ui.media.HostRequestAuth
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.util.formatSize
 
 /** How long a thumbnail fades in over its tile (Coil's own default). */
@@ -272,3 +275,54 @@ fun fileDetails(name: String, isDirectory: Boolean, fileSize: Long?, modified: S
 /** The file extension in capitals ("PDF"), for the details line. Null when the name has none or it is not a short one. */
 private fun extensionLabel(name: String): String? =
     name.substringAfterLast('.', "").takeIf { it.isNotEmpty() && it.length <= 5 && it != name }?.uppercase()
+
+// ---- Previews ----
+
+@ThemePreviews
+@Composable
+private fun FileListItemPreview() {
+    PreviewTheme {
+        Column {
+            PreviewSamples.files.forEach { file ->
+                FileListItem(
+                    name = file.name,
+                    type = if (file.isDirectory) "dir" else "file",
+                    fileSize = file.size,
+                    modified = "3 days ago",
+                    trailingContent = { OverflowMenuButton(contentDescription = "More") { } },
+                    onClick = {}
+                )
+            }
+        }
+    }
+}
+
+@ThemePreviews
+@Composable
+private fun FileListItemSelectingPreview() {
+    PreviewTheme {
+        Column {
+            PreviewSamples.files.take(4).forEachIndexed { index, file ->
+                FileListItem(
+                    name = file.name,
+                    type = if (file.isDirectory) "dir" else "file",
+                    fileSize = file.size,
+                    selectionMode = true,
+                    selected = index % 2 == 1,
+                    onClick = {}
+                )
+            }
+        }
+    }
+}
+
+/** The tile of each kind of file, as a file without a thumbnail (or with one not loaded yet) has it. */
+@ThemePreviews
+@Composable
+private fun FileIconPreview() {
+    PreviewTheme(padding = 16.dp) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PreviewSamples.files.forEach { file -> FileIcon(file.name, file.isDirectory, thumbnailUrl = null, size = 40.dp) }
+        }
+    }
+}

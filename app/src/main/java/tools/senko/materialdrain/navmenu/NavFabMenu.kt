@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.navmenu
 
+import tools.senko.materialdrain.ui.components.keepsMenusAbove
 import android.os.Build
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
@@ -85,6 +86,9 @@ import tools.senko.materialdrain.Tab
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
+import tools.senko.materialdrain.ui.preview.ThemePreviews
 
 private val FabMargin = 8.dp
 private val FabClosedCorner = 16.dp
@@ -198,6 +202,7 @@ fun NavFabMenu(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .offset(y = -lift)
+                .keepsMenusAbove()
                 .graphicsLayer {
                     translationY = hidden * hiddenPx
                     alpha = 1f - hidden
@@ -404,5 +409,39 @@ private fun Tile(item: NavMenuItem, selected: Boolean, onClick: () -> Unit, modi
             overflow = TextOverflow.Ellipsis,
             color = if (selected) colors.onSurface else colors.onSurfaceVariant
         )
+    }
+}
+
+// ---- Previews ----
+
+/** The tabs of the preview's host, as the bottom bar has them. */
+private val PreviewTabs = listOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem).map { Tab(it) }
+
+/** The navigation prototype's button, closed, at the end of the screen; in the interactive preview it opens. */
+@ScreenPreviews
+@Composable
+private fun NavFabMenuPreview() {
+    PreviewTheme {
+        NavFabMenu(
+            menu = NavMenuPreview.PIXELDRAIN.menu(PreviewTabs),
+            currentScreen = Screen.Files,
+            currentTab = PreviewTabs[1],
+            position = NavFabPosition.END,
+            onPositionChange = {},
+            onNavigate = {},
+            onFabHeightChanged = {}
+        )
+    }
+}
+
+/** Its window, open: the host's tabs, and a host with dozens of screens (the TrueNAS mock). */
+@ThemePreviews
+@Composable
+private fun NavMenuWindowPreview() {
+    PreviewTheme(padding = 16.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            NavMenuWindow(NavMenuPreview.PIXELDRAIN.menu(PreviewTabs), maxHeight = 200.dp, isSelected = { it.tab == PreviewTabs[1] }, onItemClick = {})
+            NavMenuWindow(TrueNasMockNavMenu, maxHeight = 420.dp, isSelected = { it.label == "Datasets" }, onItemClick = {})
+        }
     }
 }

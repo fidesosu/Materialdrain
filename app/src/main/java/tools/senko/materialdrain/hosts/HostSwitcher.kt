@@ -66,6 +66,12 @@ import tools.senko.materialdrain.ui.components.MenuEdge
 import tools.senko.materialdrain.ui.components.MenuSide
 import tools.senko.materialdrain.ui.components.floatingCardBorder
 import tools.senko.materialdrain.ui.components.floatingCardColor
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.components.AppMenuPreview
+import tools.senko.materialdrain.ui.icons.filled.Storage
+import tools.senko.materialdrain.ui.icons.filled.Dns
+import tools.senko.materialdrain.ui.icons.filled.CloudSync
 
 /** Whether a host has a sign-in, shown next to its name in the switcher. */
 enum class HostStatus(val label: String) {
@@ -239,33 +245,51 @@ fun HostSwitcher(
             edge = MenuEdge.Center,
             minWidth = MenuWidth
         ) {
-            MenuHeader(checks.values, onRefresh)
-            hosts.forEach { host ->
-                HostRow(
-                    host = host,
-                    check = checks[host.id],
-                    active = host.id == activeId,
-                    onClick = {
-                        expanded = false
-                        onSelect(host.id)
-                    },
-                    onOpenSettings = {
-                        expanded = false
-                        onOpenHostSettings(host.id)
-                    }
-                )
-            }
-            Spacer(Modifier.height(4.dp))
-            AppMenuItem(
-                text = "Manage hosts",
-                leadingIcon = Icons.Filled.Settings,
-                onClick = {
+            HostMenuEntries(
+                hosts = hosts,
+                activeId = activeId,
+                checks = checks,
+                onSelect = {
+                    expanded = false
+                    onSelect(it)
+                },
+                onOpenHostSettings = {
+                    expanded = false
+                    onOpenHostSettings(it)
+                },
+                onManage = {
                     expanded = false
                     onManage()
-                }
+                },
+                onRefresh = onRefresh
             )
         }
     }
+}
+
+/** The entries of the switcher's menu: when the hosts were checked, each host, and Manage hosts. */
+@Composable
+private fun HostMenuEntries(
+    hosts: List<HostOption>,
+    activeId: String,
+    checks: Map<String, HostCheck>,
+    onSelect: (String) -> Unit,
+    onOpenHostSettings: (String) -> Unit,
+    onManage: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    MenuHeader(checks.values, onRefresh)
+    hosts.forEach { host ->
+        HostRow(
+            host = host,
+            check = checks[host.id],
+            active = host.id == activeId,
+            onClick = { onSelect(host.id) },
+            onOpenSettings = { onOpenHostSettings(host.id) }
+        )
+    }
+    Spacer(Modifier.height(4.dp))
+    AppMenuItem(text = "Manage hosts", leadingIcon = Icons.Filled.Settings, onClick = onManage)
 }
 
 /** "Hosts", when they were last checked, and a button to check them all again now. */
@@ -424,6 +448,45 @@ private fun StatusBadge(check: HostCheck?, modifier: Modifier = Modifier) {
         }
         if (check == null || check.checking) {
             CircularProgressIndicator(strokeWidth = 1.5.dp, modifier = Modifier.matchParentSize())
+        }
+    }
+}
+
+// ---- Previews ----
+
+/** Made-up hosts: the built-in Pixeldrain, a NAS that answers, one that doesn't and isn't signed in, one being checked. */
+private val PreviewHosts = listOf(
+    HostOption("pixeldrain", "Pixeldrain", "Pixeldrain", Icons.Filled.Cloud, HostStatus.SIGNED_IN, "Signed in as sam", "pixeldrain.com"),
+    HostOption("nas", "Home NAS", "SMB", Icons.Filled.Storage, HostStatus.SIGNED_IN, "Signed in as sam", "192.168.1.20"),
+    HostOption("dav", "Work files", "WebDAV", Icons.Filled.Dns, HostStatus.NOT_SIGNED_IN, HostStatus.NOT_SIGNED_IN.label, "dav.example.com"),
+    HostOption("s3", "Backups", "S3", Icons.Filled.CloudSync, HostStatus.NO_SIGN_IN_NEEDED, HostStatus.NO_SIGN_IN_NEEDED.label, null)
+)
+private val PreviewChecks = mapOf(
+    "pixeldrain" to HostCheck(Reachability.REACHABLE, latencyMillis = 84, checkedAtMillis = 1),
+    "nas" to HostCheck(Reachability.REACHABLE, latencyMillis = 3, checkedAtMillis = 1),
+    "dav" to HostCheck(Reachability.UNREACHABLE, message = "Address not found", checkedAtMillis = 1),
+    "s3" to HostCheck(checking = true)
+)
+
+/** The switcher in the top bar: for a host that answers, and one that doesn't. In the interactive preview it opens. */
+@ThemePreviews
+@Composable
+private fun HostSwitcherPreview() {
+    PreviewTheme(padding = 8.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            HostSwitcher(PreviewHosts, "pixeldrain", PreviewChecks, onSelect = {}, onOpenHostSettings = {}, onManage = {}, onOpened = {}, onRefresh = {})
+            HostSwitcher(PreviewHosts, "dav", PreviewChecks, onSelect = {}, onOpenHostSettings = {}, onManage = {}, onOpened = {}, onRefresh = {})
+        }
+    }
+}
+
+/** Its menu, open: each host with whether it answers and is signed in. */
+@ThemePreviews
+@Composable
+private fun HostMenuPreview() {
+    PreviewTheme(padding = 8.dp) {
+        AppMenuPreview {
+            HostMenuEntries(PreviewHosts, "nas", PreviewChecks, onSelect = {}, onOpenHostSettings = {}, onManage = {}, onRefresh = {})
         }
     }
 }

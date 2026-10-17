@@ -60,6 +60,8 @@ import coil.size.Size
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 import tools.senko.materialdrain.ui.LocalBlurredBackdrop
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
 
 internal const val TAG_COIL = "CoilImageLoaderShared"
 internal fun imageRequest(context: Context, data: Any, configure: ImageRequest.Builder.() -> Unit = {}): ImageRequest {
@@ -319,4 +321,18 @@ internal fun ZoomableBox(
             },
         content = content
     )
+}
+
+// ---- Previews ----
+
+/**
+ * The picture's frame while it loads, with the badge which opens it fullscreen. Pictures from a host don't load in a
+ * preview (the image loader shows nothing there), so this is all of it the preview can show.
+ */
+@ThemePreviews
+@Composable
+private fun InlineImagePreviewPreview() {
+    PreviewTheme(padding = 16.dp) {
+        InlineImagePreview(imageSource = "https://example.com/beach-sunset.jpg", contentDescription = "Picture", apiKey = null, onFullScreenClick = {})
+    }
 }

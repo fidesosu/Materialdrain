@@ -74,6 +74,8 @@ import tools.senko.materialdrain.provider.api.screenProblems
 import tools.senko.materialdrain.ui.components.AppMenu
 import tools.senko.materialdrain.ui.components.AppMenuItem
 import tools.senko.materialdrain.ui.components.OverflowMenuButton
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
 
 /*
  * The editors of the config editor's form, one per kind of field (see FieldKind): text, numbers, switches, choices,
@@ -782,4 +784,31 @@ private fun AddEndpointDialog(missing: List<EndpointInfo>, onPick: (EndpointInfo
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
+}
+
+// ---- Previews ----
+
+/** Changing a header of a request: its name and value, and Remove. */
+@ThemePreviews
+@Composable
+private fun KeyValueDialogPreview() {
+    PreviewTheme {
+        KeyValueDialog(
+            title = "Header",
+            kind = FieldKind.KeyValues(valueHint = "{placeholder} or a fixed value"),
+            initialKey = "Authorization",
+            initialValue = "Bearer {api_key}",
+            taken = setOf("Accept"),
+            onSave = { _, _ -> },
+            onRemove = {},
+            onDismiss = {}
+        )
+    }
+}
+
+/** The endpoints a config hasn't got yet, by what they unlock. */
+@ThemePreviews
+@Composable
+private fun AddEndpointDialogPreview() {
+    PreviewTheme { AddEndpointDialog(missing = KnownEndpoints.take(6), onPick = {}, onDismiss = {}) }
 }

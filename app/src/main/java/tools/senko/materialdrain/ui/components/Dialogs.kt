@@ -54,6 +54,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.provider.api.ApiResponse
 import tools.senko.materialdrain.provider.api.StorageNode
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import tools.senko.materialdrain.provider.api.StorageRef
 
 @Composable
 fun TextInputDialog(
@@ -300,6 +304,61 @@ private fun PickerFolderRow(name: String, onClick: () -> Unit) {
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = "Open",
             tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+// ---- Previews ----
+
+@ThemePreviews
+@Composable
+private fun TextInputDialogPreview() {
+    PreviewTheme {
+        TextInputDialog(
+            title = "Rename",
+            label = "Name",
+            confirmLabel = "Rename",
+            initialValue = PreviewSamples.image.name,
+            supportingText = "The extension stays as it is.",
+            onConfirm = {},
+            onDismiss = {}
+        )
+    }
+}
+
+@ThemePreviews
+@Composable
+private fun ConfirmDialogPreview() {
+    PreviewTheme {
+        ConfirmDialog(
+            title = "Delete file?",
+            text = "\"${PreviewSamples.image.name}\" will be deleted for good.",
+            confirmLabel = "Delete",
+            isDestructive = true,
+            onConfirm = {},
+            onDismiss = {}
+        )
+    }
+}
+
+/** Inside a folder of the made-up files; in the interactive preview its folders and its path can be tapped. */
+@ThemePreviews
+@Composable
+private fun FolderPickerDialogPreview() {
+    PreviewTheme {
+        FolderPickerDialog(
+            title = "Move to",
+            confirmLabel = "Move here",
+            initialPath = "me/Photos",
+            loadFolders = { path ->
+                ApiResponse.Success(
+                    listOf("2024", "2025", "2026", "Screenshots", "Wallpapers").map {
+                        StorageNode(StorageRef(path = "$path/$it"), name = it, isDirectory = true)
+                    }
+                )
+            },
+            onConfirm = {},
+            onDismiss = {}
         )
     }
 }

@@ -6,7 +6,11 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.roborazzi)
 }
+
+// Every @Preview of the app drawn to a picture on the computer, without a device: ./gradlew :app:recordRoborazziDebug
+// puts them in app/build/outputs/roborazzi (see PreviewImagesTest)
 
 /*
  * The version, made from the time of the commit being built, so it never has to be changed by hand for a release:
@@ -86,6 +90,16 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        unitTests {
+            // Robolectric draws the previews with the app's resources (see roborazzi above)
+            isIncludeAndroidResources = true
+            all {
+                it.systemProperties["robolectric.pixelCopyRenderMode"] = "hardware"
+                it.maxHeapSize = "4096m"
+            }
+        }
+    }
     packaging {
         resources {
             // BouncyCastle's tables for what the SMB provider never uses: post-quantum Picnic (over 1 MB) and the
@@ -150,6 +164,11 @@ dependencies {
     implementation(libs.androidx.media3.datasource.okhttp) // Streams media over the same OkHttp client as the API
 
     testImplementation(libs.junit)
+    // Draws the previews in a test (see roborazzi above)
+    testImplementation(libs.roborazzi.compose.preview.scanner.support)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.composable.preview.scanner)
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

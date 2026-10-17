@@ -1,6 +1,7 @@
 package tools.senko.materialdrain
 
 import androidx.annotation.DrawableRes
+import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -10,6 +11,8 @@ import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.R
 import tools.senko.materialdrain.provider.api.HostScreen
 import tools.senko.materialdrain.provider.api.ScreenConfig
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
 
 // Define the screens in the app
 enum class Screen(val title: String, @DrawableRes val iconResId: Int?) {
@@ -58,9 +61,10 @@ data class FabDetails(
 fun BottomNavigationBar(
     currentTab: Tab?,
     tabs: List<Tab>,
-    onTabSelected: (Tab) -> Unit
+    onTabSelected: (Tab) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    NavigationBar {
+    NavigationBar(modifier = modifier) {
         tabs.forEach { tab ->
             tab.screen.iconResId?.let { // Ensure iconResId is not null before using
                 NavigationBarItem(
@@ -71,5 +75,17 @@ fun BottomNavigationBar(
                 )
             }
         }
+    }
+}
+
+// ---- Previews ----
+
+/** The bottom bar with the tabs of the built-in Pixeldrain, Files chosen. */
+@ThemePreviews
+@Composable
+private fun BottomNavigationBarPreview() {
+    PreviewTheme {
+        val tabs = listOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem).map { Tab(it) }
+        BottomNavigationBar(currentTab = tabs[1], tabs = tabs, onTabSelected = {})
     }
 }

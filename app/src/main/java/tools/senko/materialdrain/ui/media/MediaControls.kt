@@ -44,6 +44,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.ui.LocalReduceMotion
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import tools.senko.materialdrain.ui.icons.filled.Replay10
+import tools.senko.materialdrain.ui.icons.filled.PlayArrow
+import tools.senko.materialdrain.ui.icons.filled.Forward10
+import tools.senko.materialdrain.ui.icons.filled.Fullscreen
 
 /** Buttons of the media players are rectangles with slightly rounded corners, no pills and no circles. */
 internal val MediaControlShape = RoundedCornerShape(6.dp)
@@ -217,3 +228,33 @@ fun MediaSeekBar(
 
 /** Media cards and buttons are rectangles with slightly rounded corners. */
 internal val MediaCardShape = RoundedCornerShape(8.dp)
+
+// ---- Previews ----
+
+/** The players' buttons and seek bar, over the dark of a video. */
+@ThemePreviews
+@Composable
+private fun MediaControlsPreview() {
+    PreviewTheme {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.background(Color.Black).padding(16.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                MediaIconButton(Icons.Filled.Replay10, "Back 10 seconds", onClick = {})
+                MediaIconButton(Icons.Filled.PlayArrow, "Play", onClick = {}, size = 56.dp)
+                MediaIconButton(Icons.Filled.Forward10, "Forward 10 seconds", onClick = {})
+                MediaIconButton(Icons.Filled.Fullscreen, "Fullscreen", onClick = {}, enabled = false)
+                MediaTextButton("1.5×", onClick = {})
+            }
+            MediaSeekBar(
+                positionMs = 74_000,
+                durationMs = 213_000,
+                bufferedMs = 120_000,
+                onSeekStarted = {},
+                onSeekPreview = {},
+                onSeekFinished = {}
+            )
+        }
+    }
+}

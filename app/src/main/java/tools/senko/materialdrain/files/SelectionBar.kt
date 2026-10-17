@@ -34,6 +34,13 @@ import tools.senko.materialdrain.ui.LocalBottomInset
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.components.AppMenu
 import tools.senko.materialdrain.ui.components.AppMenuItem
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.icons.filled.Download
+import tools.senko.materialdrain.ui.icons.filled.Share
+import tools.senko.materialdrain.ui.icons.filled.Delete
+import tools.senko.materialdrain.ui.icons.filled.SelectAll
+import tools.senko.materialdrain.ui.icons.automirrored.filled.PlaylistAdd
 
 /** One action on the selected items. [destructive] actions are tinted red. */
 data class SelectionAction(
@@ -139,5 +146,27 @@ private fun OverflowMenu(actions: List<SelectionAction>) {
                 )
             }
         }
+    }
+}
+
+// ---- Previews ----
+
+/** Three files selected: the first actions as icons, the rest in its ⋮ menu (Delete among them, in red). */
+@ThemePreviews
+@Composable
+private fun SelectionActionBarPreview() {
+    PreviewTheme {
+        SelectionActionBar(
+            visible = true,
+            selectedCount = 3,
+            onClose = {},
+            actions = listOf(
+                SelectionAction("Download", Icons.Filled.Download, {}),
+                SelectionAction("Share", Icons.Filled.Share, {}, enabled = false),
+                SelectionAction("Delete", Icons.Filled.Delete, {}, destructive = true),
+                SelectionAction("Add to list", Icons.AutoMirrored.Filled.PlaylistAdd, {}),
+                SelectionAction("Select all", Icons.Filled.SelectAll, {})
+            )
+        )
     }
 }

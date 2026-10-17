@@ -104,6 +104,11 @@ import tools.senko.materialdrain.ui.components.DotScrollbar
 import tools.senko.materialdrain.ui.components.PAGE_TRANSITION_MS
 import tools.senko.materialdrain.ui.components.pageTransition
 import tools.senko.materialdrain.ui.components.rememberCodeHighlighting
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
+import androidx.compose.ui.tooling.preview.PreviewParameter
+import androidx.compose.ui.tooling.preview.PreviewParameterProvider
+import androidx.compose.ui.platform.LocalContext
 
 /** The two ways of editing a config: field by field, or its text. */
 private enum class EditorMode(val label: String) { FORM("Form"), JSON("JSON") }
@@ -863,3 +868,88 @@ internal fun initialValue(spec: FieldSpec): JsonElement = spec.default ?: when (
 /** The help under a field, with its default when it has one. */
 internal fun helpText(spec: FieldSpec, defaultText: String? = spec.default?.displayText()): String =
     listOfNotNull(spec.help.takeIf { it.isNotEmpty() }, defaultText?.let { "Default: $it." }).joinToString(" ")
+
+// ---- Previews ----
+
+/** The bundled example config of each kind the form knows (docs/provider-configs, which are the app's assets). */
+private val ExampleConfigFiles = mapOf("webdav" to "nextcloud.json", "s3" to "minio.json", "smb" to "smb.json", "generic_rest" to "pixeldrain.json")
+
+/** The text of the example [file]; an empty object when the preview can't read it. */
+@Composable
+private fun exampleConfigText(file: String): String {
+    val context = LocalContext.current
+    return remember(file) { runCatching { context.assets.open(file).bufferedReader().use { it.readText() } }.getOrDefault("{}") }
+}
+
+@Composable
+private fun ConfigEditorPreview(kind: String, error: String? = null) {
+    PreviewTheme {
+        ConfigEditor(
+            title = "Edit host",
+            initialText = exampleConfigText(ExampleConfigFiles.getValue(kind)),
+            saveLabel = "Save",
+            error = error,
+            onSave = {},
+            onDismiss = {}
+        )
+    }
+}
+
+/** The first page of a WebDAV host's config (Nextcloud): its basics, and a row for each of its other parts. */
+@ScreenPreviews
+@Composable
+private fun ConfigEditorWebDavPreview() = ConfigEditorPreview("webdav")
+
+@ScreenPreviews
+@Composable
+private fun ConfigEditorS3Preview() = ConfigEditorPreview("s3")
+
+@ScreenPreviews
+@Composable
+private fun ConfigEditorSmbPreview() = ConfigEditorPreview("smb")
+
+/** A REST host (Pixeldrain's own config), with why the last save was refused at the top. */
+@ScreenPreviews
+@Composable
+private fun ConfigEditorRestPreview() = ConfigEditorPreview("generic_rest", error = "The base URL has to use https.")
+
+/** Text which isn't a config the form can show opens as text. */
+@ScreenPreviews
+@Composable
+private fun ConfigEditorJsonPreview() {
+    PreviewTheme {
+        ConfigEditor(title = "Add host", initialText = "{\n  \"kind\": \"ftp\",\n  \"name\": \"Not a kind this app knows\"\n}", saveLabel = "Add", error = null, onSave = {}, onDismiss = {})
+    }
+}
+
+/** Every page the form opens, for each example config: each part of it (Sign-in, Endpoints, ...), and an endpoint. */
+private class ConfigPageProvider : PreviewParameterProvider<Pair<String, String>> {
+    override val values = ExampleConfigFiles.keys.asSequence().flatMap { kind ->
+        sectionsFor(kind).orEmpty().filterNot { it.startOpen }.map { kind to it.title }
+    } + sequenceOf("generic_rest" to "endpoint:upload", "generic_rest" to Page.OtherFields.title)
+}
+
+/** One page of the form, [page] being a config's kind and the title of the page (or "endpoint:" and an endpoint's name). */
+@ScreenPreviews
+@Composable
+private fun ConfigEditorPagePreview(@PreviewParameter(ConfigPageProvider::class) page: Pair<String, String>) {
+    PreviewTheme {
+        val (kind, title) = page
+        val text = exampleConfigText(ExampleConfigFiles.getValue(kind))
+        // The example, and a field the form doesn't know, for Other fields
+        val root = remember(text) {
+            (ProviderConfigCodec.parseObject(text) ?: JsonObject(emptyMap())).with("comment", JsonPrimitive("A field the form doesn't know"))
+        }
+        val sections = sectionsFor(kind).orEmpty()
+        val form = FormState(root = root, onChange = {}, open = {}, back = {}, stash = remember { mutableMapOf() })
+        val shown: Page = when {
+            title.startsWith("endpoint:") -> Page.OfEndpoint(title.removePrefix("endpoint:"))
+            title == Page.OtherFields.title -> Page.OtherFields
+            else -> Page.OfSection(sections.first { it.title == title })
+        }
+        Column {
+            PaneHeader(shown.title, trail = root.textOf("name").orEmpty(), canGoBack = true, onBack = {})
+            Box(Modifier.weight(1f)) { PageContent(shown, sections, form) }
+        }
+    }
+}

@@ -22,6 +22,9 @@ import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.util.formatEta
 import tools.senko.materialdrain.util.formatSize
 import tools.senko.materialdrain.util.formatSpeed
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.foundation.layout.Arrangement
 
 data class TransferProgress(
     val transferredBytes: Long,
@@ -108,6 +111,21 @@ fun TransferStatusBar(progress: TransferProgress, modifier: Modifier = Modifier)
             LinearProgressIndicator(progress = { animatedFraction }, modifier = Modifier.fillMaxWidth())
         } else {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+// ---- Previews ----
+
+/** Under way with its speed, of an unknown size, and finishing. */
+@ThemePreviews
+@Composable
+private fun TransferStatusBarPreview() {
+    PreviewTheme {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            TransferStatusBar(TransferProgress(97_517_568, 248_313_856, bytesPerSecond = 21_495_808, etaSeconds = 7, label = "drone-flight.mp4"))
+            TransferStatusBar(TransferProgress(4_194_304, null, label = "3 files"))
+            TransferStatusBar(TransferProgress(248_313_856, 248_313_856, label = "drone-flight.mp4"))
         }
     }
 }

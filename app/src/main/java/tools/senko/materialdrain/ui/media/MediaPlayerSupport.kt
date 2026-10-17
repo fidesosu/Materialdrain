@@ -36,6 +36,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import tools.senko.materialdrain.AppContainer
 import tools.senko.materialdrain.util.ExoPlayerCache
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.media3.common.SimpleBasePlayer
+import android.os.Looper
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 
 /**
  * The headers the active host needs for one of its URLs, installed by [AppContainer]. Images, thumbnails and media
@@ -100,9 +105,12 @@ internal fun createMediaPlayer(context: Context, uri: Uri, apiKey: String?, isVi
  * (see [PlayerUiState.togglePlayPause]), so a preview which is never played costs no data.
  */
 @Composable
-fun rememberManagedPlayer(uri: Uri, apiKey: String?, isVideo: Boolean, prepareNow: Boolean): ExoPlayer {
+fun rememberManagedPlayer(uri: Uri, apiKey: String?, isVideo: Boolean, prepareNow: Boolean): Player {
     val context = LocalContext.current
-    val player = remember(uri, apiKey) {
+    // A preview (in Android Studio) has no app around it to stream with, and plays nothing anyway
+    val inPreview = LocalInspectionMode.current
+    val player = remember<Player>(uri, apiKey) {
+        if (inPreview) return@remember PreviewPlayer()
         createMediaPlayer(context, uri, apiKey, isVideo).apply {
             if (prepareNow) {
                 prepare()
@@ -124,6 +132,24 @@ fun rememberManagedPlayer(uri: Uri, apiKey: String?, isVideo: Boolean, prepareNo
     return player
 }
 
+/**
+ * The player of a preview in Android Studio (see [rememberManagedPlayer]): paused at 1:14 of a 3:33 media, which it never
+ * loads. Whatever it's asked to do (play, seek, change the speed) it leaves as it is.
+ */
+@androidx.annotation.OptIn(UnstableApi::class)
+private class PreviewPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
+    private val state = State.Builder()
+        .setAvailableCommands(Player.Commands.Builder().addAll(Player.COMMAND_GET_CURRENT_MEDIA_ITEM, Player.COMMAND_GET_TIMELINE).build())
+        .setPlaylist(listOf(MediaItemData.Builder("preview").setDurationUs(213_000_000L).build()))
+        .setContentPositionMs(74_000L)
+        .setContentBufferedPositionMs { 120_000L }
+        .build()
+
+    override fun getState(): State = state
+
+    override fun handleRelease(): ListenableFuture<*> = Futures.immediateVoidFuture()
+}
+
 /** What the controls of a player show, kept up to date from the player. */
 @Stable
 class PlayerUiState(val player: Player) {
@@ -135,7 +161,8 @@ class PlayerUiState(val player: Player) {
     var bufferedMs by mutableLongStateOf(0L)
     var speed by mutableFloatStateOf(1f)
     var error by mutableStateOf<PlaybackException?>(null)
-    var firstFrameRendered by mutableStateOf(false)
+    // The preview's player shows no video, but is as one that has (see PreviewPlayer): paused, not loading
+    var firstFrameRendered by mutableStateOf(player is PreviewPlayer)
 
     val isBuffering: Boolean get() = playWhenReady && playbackState == Player.STATE_BUFFERING
     val isEnded: Boolean get() = playbackState == Player.STATE_ENDED

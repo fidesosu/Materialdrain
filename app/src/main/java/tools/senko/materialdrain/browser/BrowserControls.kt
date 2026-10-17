@@ -42,6 +42,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.automirrored.filled.ArrowForwardIos
+import tools.senko.materialdrain.ui.icons.automirrored.filled.KeyboardArrowLeft
 import tools.senko.materialdrain.ui.icons.filled.Add
 import tools.senko.materialdrain.ui.icons.filled.ArrowDownward
 import tools.senko.materialdrain.ui.icons.filled.ArrowUpward
@@ -90,12 +91,21 @@ import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.files.SortOptions
 import tools.senko.materialdrain.files.SortableField
 import tools.senko.materialdrain.ui.components.AppMenu
+import tools.senko.materialdrain.ui.components.AppMenuDivider
 import tools.senko.materialdrain.ui.components.AppMenuItem
+import tools.senko.materialdrain.ui.components.AppMenuPreview
 import tools.senko.materialdrain.ui.components.FloatingCardShape
 import tools.senko.materialdrain.ui.components.MenuEdge
 import tools.senko.materialdrain.ui.components.MenuSide
 import tools.senko.materialdrain.ui.components.floatingCardBorder
 import tools.senko.materialdrain.ui.components.floatingCardColor
+import androidx.compose.ui.platform.LocalInspectionMode
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import tools.senko.materialdrain.files.fileComparator
+import tools.senko.materialdrain.ui.icons.filled.Upload
 
 /** The path at the top of the filesystem: each folder is tappable, and the row scrolls to the end of it. */
 @Composable
@@ -228,17 +238,7 @@ fun SortControls(
                 }
                 // As wide as the card, however wide the row makes it
                 AppMenu(expanded = expanded, onDismiss = { expanded = false }, side = MenuSide.Below, matchAnchorWidth = true) {
-                    SortOptions.forEach { (name, field) ->
-                        val selected = field == sortField
-                        AppMenuItem(
-                            text = name,
-                            active = selected,
-                            trailingIcon = if (selected) directionIcon else null,
-                            trailingIconDescription = directionDescription,
-                            // The menu stays open, so the effect can be seen and the direction flipped again
-                            onClick = { onSortFieldSelected(field) }
-                        )
-                    }
+                    SortMenuEntries(sortField, sortAscending, onSortFieldSelected, onClose = { expanded = false })
                 }
             }
 
@@ -274,6 +274,31 @@ fun SortControls(
                 }
             }
         }
+    }
+}
+
+/**
+ * The entries of the sort menu: "Sort by" going back (it closes the menu), then the fields, the one sorted on with its
+ * direction. Choosing a field leaves the menu open, so the effect can be seen and the direction flipped again.
+ */
+@Composable
+private fun SortMenuEntries(
+    sortField: SortableField,
+    sortAscending: Boolean,
+    onSortFieldSelected: (SortableField) -> Unit,
+    onClose: () -> Unit
+) {
+    AppMenuItem("Sort by", onClick = onClose, leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
+    AppMenuDivider()
+    SortOptions.forEach { (name, field) ->
+        val selected = field == sortField
+        AppMenuItem(
+            text = name,
+            active = selected,
+            trailingIcon = if (!selected) null else if (sortAscending) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
+            trailingIconDescription = if (sortAscending) "Ascending" else "Descending",
+            onClick = { onSortFieldSelected(field) }
+        )
     }
 }
 
@@ -414,15 +439,16 @@ fun SearchModal(
     val keyboard = LocalSoftwareKeyboardController.current
     // Matched the same way the list filters, then sorted the way the list is. Off the main thread: a folder tree can
     // hold tens of thousands of files, and they keep coming in while it's being looked through
-    var matches by remember { mutableStateOf(emptyList<StorageNode>()) }
+    // A preview (in Android Studio) shows one frame: its matches are there at once
+    val inPreview = LocalInspectionMode.current
+    fun matching(text: String) = candidates.filter { it.name.contains(text, ignoreCase = true) }.sortedWith(order)
+    var matches by remember { mutableStateOf(if (inPreview && query.isNotBlank()) matching(query) else emptyList()) }
     LaunchedEffect(candidates, fieldValue.text, order) {
         val text = fieldValue.text
         matches = if (text.isBlank()) {
             emptyList()
         } else {
-            withContext(Dispatchers.Default) {
-                candidates.filter { it.name.contains(text, ignoreCase = true) }.sortedWith(order)
-            }
+            withContext(Dispatchers.Default) { matching(text) }
         }
     }
     val shown = if (resultLimit > 0) matches.take(resultLimit) else matches
@@ -546,5 +572,67 @@ fun SearchModal(
                 }
             }
         }
+    }
+}
+
+// ---- Previews ----
+
+/** The sort row: alone, with a transfer to cancel and held-back thumbnails, and with the filesystem's New menu. */
+@ThemePreviews
+@Composable
+private fun SortControlsPreview() {
+    PreviewTheme {
+        Column {
+            SortControls(SortableField.NAME, sortAscending = true, onSortFieldSelected = {})
+            SortControls(SortableField.UPLOAD_DATE, sortAscending = false, onSortFieldSelected = {}, onCancelTransfer = {}, onLoadThumbnails = {})
+            SortControls(
+                SortableField.SIZE,
+                sortAscending = false,
+                onSortFieldSelected = {},
+                actions = listOf(SortRowAction(Icons.Filled.Upload, "Upload") {}, SortRowAction(Icons.Filled.Add, "New folder") {})
+            )
+        }
+    }
+}
+
+/** The sort menu open, sorted on size, largest first. */
+@ThemePreviews
+@Composable
+private fun SortMenuPreview() {
+    PreviewTheme(padding = 8.dp) {
+        AppMenuPreview {
+            SortMenuEntries(SortableField.SIZE, sortAscending = false, onSortFieldSelected = {}, onClose = {})
+        }
+    }
+}
+
+@ThemePreviews
+@Composable
+private fun PathBreadcrumbPreview() {
+    PreviewTheme {
+        PathBreadcrumb(
+            pathSegments = listOf("me", "Photos", "2026", "Holiday").runningReduce { a, b -> "$a/$b" }.map { PathSegment(it.substringAfterLast('/'), it) },
+            onPathSegmentClick = {}
+        )
+    }
+}
+
+/** Searching "s": the search card and its matches under it, over the dimmed screen. */
+@ScreenPreviews
+@Composable
+private fun SearchModalPreview() {
+    PreviewTheme {
+        SearchModal(
+            query = "s",
+            onQueryChange = {},
+            candidates = PreviewSamples.files,
+            order = fileComparator(SortableField.NAME, ascending = true),
+            resultLimit = 0,
+            thumbnailFor = { null },
+            placeholder = "Search your files",
+            onResultClick = {},
+            onDismiss = {},
+            status = "Looking through subfolders… 12 so far"
+        )
     }
 }

@@ -39,6 +39,8 @@ import coil.compose.AsyncImagePainter
 import coil.imageLoader
 import coil.size.Size
 import tools.senko.materialdrain.ui.LocalBlurredBackdrop
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
 
 @Composable
 fun FullScreenMediaPreviewDialog(
@@ -140,5 +142,31 @@ internal fun DarkDialogBars() {
                 isAppearanceLightNavigationBars = false
             }
         }
+    }
+}
+
+// ---- Previews ----
+
+/** A picture fullscreen, while it loads (pictures from a host don't load in a preview). */
+@ScreenPreviews
+@Composable
+private fun FullScreenImagePreview() {
+    PreviewTheme {
+        FullScreenMediaPreviewDialog(
+            previewUri = Uri.parse("https://example.com/beach-sunset.jpg"),
+            previewMimeType = "image/jpeg",
+            thumbnailUrl = null,
+            apiKey = null,
+            onDismissRequest = {}
+        )
+    }
+}
+
+/** A video fullscreen: the video player, paused (see FullscreenVideoPlayer). */
+@ScreenPreviews
+@Composable
+private fun FullScreenVideoPreview() {
+    PreviewTheme {
+        FullScreenMediaPreviewDialog(previewUri = Uri.EMPTY, previewMimeType = "video/mp4", thumbnailUrl = null, apiKey = null, onDismissRequest = {})
     }
 }

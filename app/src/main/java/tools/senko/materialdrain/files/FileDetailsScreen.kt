@@ -90,9 +90,29 @@ import tools.senko.materialdrain.util.formatApiDateTimeString
 import tools.senko.materialdrain.util.formatSize
 import tools.senko.materialdrain.util.parseDateTime
 import java.text.NumberFormat
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.compose.foundation.layout.Arrangement
+import tools.senko.materialdrain.provider.api.StorageRef
+import androidx.compose.ui.platform.LocalInspectionMode
+import tools.senko.materialdrain.ui.preview.LongScreenPreviews
 
 /** The corners of the cards on this page, the same as the app's other floating cards. */
 private val DetailCardShape = RoundedCornerShape(20.dp)
+
+/** What a file's details do, handed to [FileInfoDetailsCard]: FileInfoViewModel's in the app, nothing in a preview. */
+class FileDetailsActions(
+    val loadPreview: () -> Unit = {},
+    val loadPdfPreview: () -> Unit = {},
+    val openArchiveFolder: (inside: String) -> Unit = {},
+    val downloadArchiveEntry: (StorageNode) -> Unit = {},
+    val download: () -> Unit = {},
+    val cancelDownload: () -> Unit = {},
+    val delete: () -> Unit = {}
+)
 
 @Composable
 @androidx.media3.common.util.UnstableApi
@@ -103,20 +123,68 @@ fun FileInfoDetailsCard(
     snackbarHostState: SnackbarHostState
 ) {
     val uiState by fileInfoViewModel.uiState.collectAsState()
+    val confirmDownload by fileInfoViewModel.confirmDownloadTap.collectAsState()
+    FileInfoDetailsCard(
+        fileInfo = fileInfo,
+        uiState = uiState,
+        thumbnailUrl = fileInfoViewModel.thumbnailFor(fileInfo),
+        rawFileUrl = fileInfoViewModel.rawUrlFor(fileInfo).orEmpty(),
+        shareUrl = fileInfoViewModel.shareUrlFor(fileInfo),
+        showsArchive = fileInfoViewModel.showsArchive(fileInfo),
+        canDelete = fileInfoViewModel.canDeleteFiles(),
+        downloads = fileInfoViewModel.downloads,
+        confirmDownload = confirmDownload,
+        actions = remember(fileInfoViewModel, fileInfo) {
+            FileDetailsActions(
+                loadPreview = fileInfoViewModel::loadPreview,
+                loadPdfPreview = fileInfoViewModel::loadPdfPreview,
+                openArchiveFolder = fileInfoViewModel::openArchiveFolder,
+                downloadArchiveEntry = fileInfoViewModel::downloadArchiveEntry,
+                download = { fileInfoViewModel.initiateDownloadFile(fileInfo) },
+                cancelDownload = { fileInfoViewModel.cancelDownload(fileInfo) },
+                delete = { fileInfoViewModel.initiateDeleteFile(fileInfo) }
+            )
+        },
+        context = context,
+        snackbarHostState = snackbarHostState
+    )
+}
+
+/**
+ * The details of [fileInfo] drawn from [uiState] and what's known of the file at the host ([thumbnailUrl] to [canDelete]),
+ * its download from [downloads]; what it does goes to [actions]. See the previews at the end of the file.
+ */
+@Composable
+@androidx.media3.common.util.UnstableApi
+fun FileInfoDetailsCard(
+    fileInfo: StorageNode,
+    uiState: FileInfoUiState,
+    thumbnailUrl: String?,
+    rawFileUrl: String,
+    shareUrl: String?,
+    showsArchive: Boolean,
+    canDelete: Boolean,
+    downloads: StateFlow<DownloadsState>,
+    confirmDownload: Boolean,
+    actions: FileDetailsActions,
+    context: Context,
+    snackbarHostState: SnackbarHostState
+) {
     val localContext = LocalContext.current
+    val inPreview = LocalInspectionMode.current
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager = localContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
     var fullScreenPreviewUri by remember { mutableStateOf<Uri?>(null) }
     var fullScreenPreviewMimeType by remember { mutableStateOf<String?>(null) }
-    var showPreviews by remember { mutableStateOf(false) }
+    // From the frame after the page opens; a preview (in Android Studio) shows one frame, so at once there
+    var showPreviews by remember { mutableStateOf(inPreview) }
 
     // A file without an id is a path in the filesystem, which is private: only that needs the login for previews
     val isFilesystemFile = fileInfo.ref.id == null
     val rich = fileInfo.richDetails as? PixeldrainRichDetails
-    val actualThumbnailUrl = fileInfoViewModel.thumbnailFor(fileInfo)
-    val rawFileApiUrl = fileInfoViewModel.rawUrlFor(fileInfo).orEmpty()
-    val shareUrl = fileInfoViewModel.shareUrlFor(fileInfo)
+    val actualThumbnailUrl = thumbnailUrl
+    val rawFileApiUrl = rawFileUrl
 
     LaunchedEffect(fileInfo.key) {
         showPreviews = true
@@ -177,15 +245,15 @@ fun FileInfoDetailsCard(
                         albumArtSource = null,
                         durationHintMillis = null,
                         outerPadding = mediaPadding,
-                        onLoadArt = fileInfoViewModel::loadPreview
+                        onLoadArt = actions.loadPreview
                     )
                 } else {
                     // Only an archive the host can look inside has its contents to load
-                    val withArchive = fileInfoViewModel.showsArchive(fileInfo)
+                    val withArchive = showsArchive
                     val canPreview = withArchive || isTextFile(fileInfo.name, previewType) || isPdf(fileInfo.name, previewType) ||
                         actualThumbnailUrl != null || listOf("image/", "video/").any { previewType?.startsWith(it) == true }
                     if (canPreview) {
-                        HeldPreview(fileInfo, previewType, withArchive, actualThumbnailUrl, previewApiKey, mediaPadding, onLoad = fileInfoViewModel::loadPreview)
+                        HeldPreview(fileInfo, previewType, withArchive, actualThumbnailUrl, previewApiKey, mediaPadding, onLoad = actions.loadPreview)
                     }
                 }
             } else if (showPreviews) {
@@ -195,8 +263,8 @@ fun FileInfoDetailsCard(
                     uiState.archive?.let { archive ->
                         ArchiveContents(
                             archive = archive,
-                            onOpenFolder = fileInfoViewModel::openArchiveFolder,
-                            onDownload = fileInfoViewModel::downloadArchiveEntry
+                            onOpenFolder = actions.openArchiveFolder,
+                            onDownload = actions.downloadArchiveEntry
                         )
                     }
                 } else if (previewType?.startsWith("image/") == true) {
@@ -239,7 +307,7 @@ fun FileInfoDetailsCard(
                     InlinePdfPreview(
                         pdfPreview,
                         outerPadding = mediaPadding,
-                        onLoad = fileInfoViewModel::loadPdfPreview,
+                        onLoad = actions.loadPdfPreview,
                         onFullScreen = { fullScreenPdf = it }
                     )
                 } else if (uiState.isLoadingTextPreview) {
@@ -297,16 +365,15 @@ fun FileInfoDetailsCard(
             }
 
             Spacer(Modifier.height(12.dp))
-            val confirmDownload by fileInfoViewModel.confirmDownloadTap.collectAsState()
-            WithDownload(fileInfoViewModel.downloads, fileInfo.key) { download ->
+            WithDownload(downloads, fileInfo.key) { download ->
             ActionRow(
                 download = download,
                 confirmDownload = confirmDownload,
                 canDownload = rich?.canDownload != false,
                 shareUrl = shareUrl,
-                canDelete = fileInfoViewModel.canDeleteFiles(),
-                onDownload = { fileInfoViewModel.initiateDownloadFile(fileInfo) },
-                onCancel = { fileInfoViewModel.cancelDownload(fileInfo) },
+                canDelete = canDelete,
+                onDownload = actions.download,
+                onCancel = actions.cancelDownload,
                 onOpen = { uri -> openDownloadedFile(context, OpenableDownload(uri, previewType ?: "*/*")) },
                 onShare = { link ->
                     val send = Intent(Intent.ACTION_SEND).apply {
@@ -315,8 +382,7 @@ fun FileInfoDetailsCard(
                     }
                     context.startActivity(Intent.createChooser(send, null))
                 },
-                onCopyLink = { link -> copy("Link", link) },
-                onDelete = { fileInfoViewModel.initiateDeleteFile(fileInfo) }
+                onDelete = actions.delete
             )
             }
 
@@ -548,8 +614,8 @@ private fun WithDownload(downloads: StateFlow<DownloadsState>, key: String, cont
 }
 
 /**
- * The file's actions in one row: the download button, which takes the room there is, then Share, Copy link and Delete
- * as buttons of their own icon.
+ * The file's actions in one row: the download button, which takes the room there is, then Share and Delete as buttons
+ * of their own icon.
  *
  * The download button goes through the download (see [DownloadButton]): with [confirmDownload], tapped once it asks to be
  * tapped again (a slip of the finger doesn't start a download of what may be gigabytes), while it runs it shows the
@@ -566,7 +632,6 @@ private fun ActionRow(
     onCancel: () -> Unit,
     onOpen: (Uri) -> Unit,
     onShare: (String) -> Unit,
-    onCopyLink: (String) -> Unit,
     onDelete: () -> Unit
 ) {
     var armed by remember { mutableStateOf(false) }
@@ -597,7 +662,6 @@ private fun ActionRow(
         )
         if (shareUrl != null) {
             IconAction(Icons.Filled.Share, "Share the link", onClick = { onShare(shareUrl) })
-            IconAction(Icons.Filled.Link, "Copy the link", onClick = { onCopyLink(shareUrl) })
         }
         if (canDelete) IconAction(Icons.Filled.Delete, "Delete", onClick = onDelete, destructive = true)
     }
@@ -875,4 +939,149 @@ private fun autoDeleteText(rich: PixeldrainRichDetails): String? {
         rich.deleteAfterDownloads?.takeIf { it > 0 }?.let { "after $it downloads" }
     )
     return parts.takeIf { it.isNotEmpty() }?.joinToString(", or ")?.replaceFirstChar { it.uppercase() }
+}
+
+// ---- Previews ----
+
+/** The details of [file] with [uiState], in the previews' theme. */
+@androidx.media3.common.util.UnstableApi
+@Composable
+private fun FileDetailsPreview(
+    file: StorageNode,
+    uiState: FileInfoUiState = FileInfoUiState(),
+    downloads: DownloadsState = DownloadsState(),
+    showsArchive: Boolean = false
+) {
+    PreviewTheme { SampleFileDetails(file, uiState, downloads, showsArchive) }
+}
+
+/**
+ * The details of [file] with [uiState], as they look when the page has opened, for a preview (here and in App.kt's
+ * previews of the whole screen); nothing happens when they're used. Not for the app itself.
+ */
+@androidx.media3.common.util.UnstableApi
+@Composable
+internal fun SampleFileDetails(
+    file: StorageNode,
+    uiState: FileInfoUiState = FileInfoUiState(),
+    downloads: DownloadsState = DownloadsState(),
+    showsArchive: Boolean = false
+) {
+    FileInfoDetailsCard(
+        fileInfo = file,
+        uiState = uiState.copy(fileInfo = file),
+        thumbnailUrl = null,
+        rawFileUrl = "https://example.com/${file.name}",
+        shareUrl = "https://pixeldrain.com/u/${file.ref.id}",
+        showsArchive = showsArchive,
+        canDelete = true,
+        downloads = remember(downloads) { MutableStateFlow(downloads) },
+        confirmDownload = true,
+        actions = FileDetailsActions(),
+        context = LocalContext.current,
+        snackbarHostState = remember { SnackbarHostState() }
+    )
+}
+
+/** A picture on Pixeldrain, with what only Pixeldrain tells: views, downloads, the hash, when it deletes itself. */
+@androidx.media3.common.util.UnstableApi
+@LongScreenPreviews
+@Composable
+private fun FileDetailsPicturePreview() = FileDetailsPreview(PreviewSamples.pixeldrainFile)
+
+/** A text file: its start, coloured. */
+@androidx.media3.common.util.UnstableApi
+@ScreenPreviews
+@Composable
+private fun FileDetailsTextPreview() = FileDetailsPreview(
+    PreviewSamples.text,
+    FileInfoUiState(textPreviewContent = PreviewSamples.CODE, textPreviewFullContent = PreviewSamples.CODE)
+)
+
+/** A PDF, with the previews' made-up pages (see PdfPreview.kt). */
+@androidx.media3.common.util.UnstableApi
+@ScreenPreviews
+@Composable
+private fun FileDetailsPdfPreview() = FileDetailsPreview(
+    PreviewSamples.pdf,
+    FileInfoUiState(pdfPreview = PdfPreviewState.Ready(java.io.File("sample.pdf")))
+)
+
+/** A song: its player, which streams only once it's played. */
+@androidx.media3.common.util.UnstableApi
+@ScreenPreviews
+@Composable
+private fun FileDetailsSongPreview() = FileDetailsPreview(PreviewSamples.song)
+
+/** An archive, what's inside it listed where a preview would be. */
+@androidx.media3.common.util.UnstableApi
+@ScreenPreviews
+@Composable
+private fun FileDetailsArchivePreview() = FileDetailsPreview(
+    PreviewSamples.archive,
+    FileInfoUiState(
+        archive = ArchiveView(
+            archive = PreviewSamples.archive.ref,
+            inside = "",
+            entries = PreviewSamples.files.take(6).map { it.copy(ref = StorageRef(path = it.name)) },
+            error = null
+        )
+    ),
+    showsArchive = true
+)
+
+/** The data saver holds the preview back: its frame, to tap. */
+@androidx.media3.common.util.UnstableApi
+@ScreenPreviews
+@Composable
+private fun FileDetailsHeldPreview() = FileDetailsPreview(PreviewSamples.video, FileInfoUiState(previewHeld = true))
+
+/** Downloading: the download button shows how far along it is. */
+@androidx.media3.common.util.UnstableApi
+@ScreenPreviews
+@Composable
+private fun FileDetailsDownloadingPreview() {
+    val file = PreviewSamples.app
+    FileDetailsPreview(
+        file,
+        downloads = DownloadsState(
+            active = mapOf(
+                file.key to FileDownloadState(
+                    fileId = file.key,
+                    fileName = file.name,
+                    totalBytes = file.size,
+                    downloadedBytes = (file.size ?: 0L) * 2 / 5,
+                    progressFraction = 0.4f,
+                    bytesPerSecond = 2_621_440,
+                    etaSeconds = 2,
+                    status = DownloadStatus.DOWNLOADING
+                )
+            )
+        )
+    )
+}
+
+/** The action row in each of its download button's looks: ready, asking for a second tap, saved, failed. */
+@ThemePreviews
+@Composable
+private fun ActionRowPreview() {
+    PreviewTheme(padding = 16.dp) {
+        val file = PreviewSamples.image
+        fun download(status: DownloadStatus) = FileDownloadState(
+            fileId = file.key, fileName = file.name, totalBytes = file.size, status = status,
+            targetUri = if (status == DownloadStatus.COMPLETED) Uri.EMPTY else null
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            listOf(null, null, download(DownloadStatus.COMPLETED), download(DownloadStatus.FAILED)).forEachIndexed { index, download ->
+                DownloadButton(
+                    download = download,
+                    running = false,
+                    saved = download?.targetUri,
+                    armed = index == 1,
+                    enabled = true,
+                    onClick = {}
+                )
+            }
+        }
+    }
 }

@@ -62,9 +62,33 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.layout.onGloballyPositioned
+import android.view.View
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionOnScreen
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.round
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import tools.senko.materialdrain.ui.LocalReduceMotion
+import tools.senko.materialdrain.ui.icons.automirrored.filled.DriveFileMove
+import tools.senko.materialdrain.ui.icons.automirrored.filled.KeyboardArrowLeft
+import tools.senko.materialdrain.ui.icons.automirrored.filled.KeyboardArrowRight
+import tools.senko.materialdrain.ui.icons.filled.Check
+import tools.senko.materialdrain.ui.icons.filled.Delete
+import tools.senko.materialdrain.ui.icons.filled.Edit
+import tools.senko.materialdrain.ui.icons.filled.Share
+import tools.senko.materialdrain.ui.icons.filled.Tune
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
 
 // The app's one menu: every menu (the ⋮ menus of files, Sort by, New, the host switcher, the players' settings, the
 // choices of the config editor) is an AppMenu with AppMenuItems, so they look and behave alike, and a change made here
@@ -86,7 +110,7 @@ object AppMenuDefaults {
     val ItemHeight = 44.dp
     /** An entry's highlight: the menu's corners less [Gap], so the two curves run alongside. */
     val ItemShape = RoundedCornerShape(14.dp)
-    /** Room around the menu for its shadow, which the popup would otherwise cut off. */
+    /** Room around a menu drawn in place (see [AppMenuPreview]) for its shadow. */
     val ShadowRoom = 8.dp
     const val ANIMATION_MS = 200
 }
@@ -126,7 +150,12 @@ fun BoxScope.AppMenu(
 ) {
     // As big as the box the menu is called in, which is its button's: how wide the button is
     var anchorWidthPx by remember { mutableIntStateOf(0) }
-    Spacer(Modifier.matchParentSize().onSizeChanged { anchorWidthPx = it.width })
+    // Where it is, to find the part of the window the menu may take (see visibleArea); not state, as it changes with every
+    // scroll of a list of buttons with menus, and is only read while one is open
+    val anchorCoordinates = remember { AnchorCoordinates() }
+    Spacer(Modifier.matchParentSize().onSizeChanged { anchorWidthPx = it.width }.onPlaced { anchorCoordinates.coordinates = it })
+    val hostView = LocalView.current
+    val menuFloor = LocalMenuFloor.current
 
     // The popup stays while the menu shrinks away; everything remembered after this is new for each opening
     var present by remember { mutableStateOf(false) }
@@ -140,20 +169,18 @@ fun BoxScope.AppMenu(
     val narrowest = (if (matchAnchorWidth) maxOf(minWidth, anchorWidth) else minWidth).coerceAtMost(widest)
     val tallest = if (maxHeight != Dp.Unspecified) maxHeight else configuration.screenHeightDp.dp * AppMenuDefaults.MAX_HEIGHT_FRACTION
 
-    // Where the menu ended up, so it grows out of the button's side of it. Only known once the popup is placed, a frame
-    // after it's first laid out: until then the menu isn't shown, and only then it starts growing. Grown from a guess, it
-    // would start out of the wrong corner and visibly move to the right one
+    // The popup covers the whole window and places the menu in it itself, instead of being as big as the menu and placed
+    // by the window manager: a popup window resized to a menu growing or shrinking (between the pages of AppMenuPages) is
+    // moved a frame after it's resized, so the menu's far edge jumped first and then the whole menu. Where the button and
+    // the window are is only known once the popup is placed, a frame after it's first laid out
+    var anchor by remember { mutableStateOf<MenuAnchor?>(null) }
+    val positionProvider = remember { WindowCoveringPosition { if (it != anchor) anchor = it } }
+    // Where the menu ended up, so it grows out of the button's side of it. Until it's placed the menu isn't shown, and only
+    // then it starts growing. Grown from a guess, it would start out of the wrong corner and visibly move to the right one
     var placement by remember { mutableStateOf<MenuPlacement?>(null) }
-    val positionProvider = remember(side, edge, density) {
-        AnchoredMenuPosition(
-            side = side,
-            edge = edge,
-            gapPx = with(density) { AppMenuDefaults.Gap.roundToPx() },
-            marginPx = with(density) { AppMenuDefaults.ScreenMargin.roundToPx() },
-            framePx = with(density) { AppMenuDefaults.ShadowRoom.roundToPx() },
-            onPlaced = { if (it != placement) placement = it }
-        )
-    }
+    val layoutState = remember { MenuLayoutState() }
+    val gapPx = with(density) { AppMenuDefaults.Gap.roundToPx() }
+    val marginPx = with(density) { AppMenuDefaults.ScreenMargin.roundToPx() }
     // 0 = gone, 1 = open
     val progress = remember { Animatable(0f) }
     val placed = placement != null
@@ -167,90 +194,222 @@ fun BoxScope.AppMenu(
         }
     }
 
-    Popup(popupPositionProvider = positionProvider, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
-        Box(modifier = Modifier.padding(AppMenuDefaults.ShadowRoom)) {
-            Surface(
-                shape = FloatingCardShape,
-                // Opaque, unlike a floating card button: a menu over a list would be hard to read with it showing through
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                border = floatingCardBorder(),
-                shadowElevation = 6.dp,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                modifier = modifier.graphicsLayer {
-                    val shown = placement
-                    val p = progress.value
-                    // Fades in during the first half of opening, out during the whole of closing
-                    alpha = if (shown == null) 0f else if (expanded) (p * 2f).coerceAtMost(1f) else p
-                    val scale = 0.85f + 0.15f * p
-                    scaleX = scale
-                    scaleY = scale
-                    if (shown != null) transformOrigin = TransformOrigin(shown.pivotX, if (shown.below) 0f else 1f)
-                }
-            ) {
-                Column(
-                    modifier = Modifier
-                        .width(IntrinsicSize.Max)
-                        .widthIn(min = narrowest, max = widest)
-                        .heightIn(max = tallest)
-                        .verticalScroll(rememberScrollState())
-                        .padding(AppMenuDefaults.Gap),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+    Popup(popupPositionProvider = positionProvider, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true, clippingEnabled = false)) {
+        val currentAnchor = anchor
+        Layout(
+            content = {
+                AppMenuPanel(
+                    minWidth = narrowest,
+                    maxWidth = widest,
+                    maxHeight = tallest,
+                    modifier = modifier.graphicsLayer {
+                        val shown = placement
+                        val p = progress.value
+                        // Fades in during the first half of opening, out during the whole of closing
+                        alpha = if (shown == null) 0f else if (expanded) (p * 2f).coerceAtMost(1f) else p
+                        val scale = 0.85f + 0.15f * p
+                        scaleX = scale
+                        scaleY = scale
+                        if (shown != null) transformOrigin = TransformOrigin(shown.pivotX, if (shown.below) 0f else 1f)
+                    },
                     content = content
                 )
+            },
+            // A press anywhere but on the menu closes it, as one outside a popup of the menu's own size did
+            modifier = Modifier.pointerInput(onDismiss) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    if (!layoutState.bounds.contains(down.position.round())) onDismiss()
+                }
+            }
+        ) { measurables, constraints ->
+            val windowWidth = (currentAnchor?.windowSize?.width ?: constraints.maxWidth).coerceAtMost(constraints.maxWidth)
+            val windowHeight = (currentAnchor?.windowSize?.height ?: constraints.maxHeight).coerceAtMost(constraints.maxHeight)
+            val menu = measurables.single().measure(Constraints(maxWidth = windowWidth, maxHeight = windowHeight))
+            layout(windowWidth, windowHeight) {
+                if (currentAnchor == null) return@layout
+                val position = placeMenu(
+                    anchorBounds = currentAnchor.bounds,
+                    area = visibleArea(hostView, anchorCoordinates.coordinates, currentAnchor.bounds, menuFloor),
+                    width = menu.width,
+                    height = menu.height,
+                    layoutDirection = layoutDirection,
+                    side = side,
+                    edge = edge,
+                    gapPx = gapPx,
+                    marginPx = marginPx,
+                    state = layoutState
+                )
+                if (position.placement != placement) placement = position.placement
+                menu.place(position.offset)
             }
         }
+    }
+}
+
+/** What an [AppMenu] looks like: its card, and its entries in it, scrolled when they're taller than [maxHeight]. */
+@Composable
+private fun AppMenuPanel(minWidth: Dp, maxWidth: Dp, maxHeight: Dp, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        shape = FloatingCardShape,
+        // Opaque, unlike a floating card button: a menu over a list would be hard to read with it showing through
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = floatingCardBorder(),
+        shadowElevation = 6.dp,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .width(IntrinsicSize.Max)
+                .widthIn(min = minWidth, max = maxWidth)
+                .heightIn(max = maxHeight)
+                .verticalScroll(rememberScrollState())
+                .padding(AppMenuDefaults.Gap),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            content = content
+        )
+    }
+}
+
+/**
+ * An open [AppMenu] where it's laid out, not in a popup of its own: for the previews of the menus (the preview doesn't
+ * draw popups until it's interactive). Not for the app itself.
+ */
+@Composable
+fun AppMenuPreview(content: @Composable ColumnScope.() -> Unit) {
+    Box(modifier = Modifier.padding(AppMenuDefaults.ShadowRoom)) {
+        AppMenuPanel(minWidth = AppMenuDefaults.MinWidth, maxWidth = AppMenuDefaults.MaxWidth, maxHeight = 600.dp, content = content)
     }
 }
 
 /** Where an [AppMenu] was placed: under its button or over it, and the button's middle across the menu (0 to 1). */
 private data class MenuPlacement(val below: Boolean, val pivotX: Float)
 
+/** The button an [AppMenu] belongs to, and the window it's in, in the window's coordinates. */
+private data class MenuAnchor(val bounds: IntRect, val windowSize: IntSize)
+
 /**
- * Places an [AppMenu] against its button's bounds: on the side and edge asked for, kept [marginPx] inside the window.
- * The popup is [framePx] bigger than the menu all round (room for its shadow), which is taken off here.
+ * What an [AppMenu] keeps between its layouts while it's open: the side it opened on, which it stays on (a page of
+ * [AppMenuPages] which would fit below the button, where the other didn't, still grows and shrinks over it), and where
+ * it is, to tell a press outside it.
  */
-private class AnchoredMenuPosition(
-    private val side: MenuSide,
-    private val edge: MenuEdge,
-    private val gapPx: Int,
-    private val marginPx: Int,
-    private val framePx: Int,
-    private val onPlaced: (MenuPlacement) -> Unit
-) : PopupPositionProvider {
+private class MenuLayoutState {
+    var below: Boolean? = null
+    var bounds: IntRect = IntRect.Zero
+}
+
+/** Where the button of an [AppMenu] is laid out, kept by its own layout. */
+private class AnchorCoordinates {
+    var coordinates: LayoutCoordinates? = null
+}
+
+/**
+ * The part of the screen an [AppMenu] may take, around its button at [anchorBounds]: the window less the system bars,
+ * the keyboard and the app's navigation ([floor]), in the popup's coordinates, which are the button's. Those are the window's, or the screen's for a
+ * menu in another popup; which one is told by where the button is on the screen ([anchor]).
+ */
+private fun visibleArea(hostView: View, anchor: LayoutCoordinates?, anchorBounds: IntRect, floor: MenuFloor): IntRect {
+    val frame = android.graphics.Rect().also { hostView.getWindowVisibleDisplayFrame(it) }
+    val onScreen = anchor?.takeIf { it.isAttached }?.positionOnScreen()?.round() ?: return IntRect(frame.left, frame.top, frame.right, frame.bottom)
+    val shiftX = onScreen.x - anchorBounds.left
+    val shiftY = onScreen.y - anchorBounds.top
+    // Above the app's navigation, for a button above it (a menu of the navigation itself may still open over it)
+    val bottom = floor.top?.takeIf { onScreen.y + anchorBounds.height <= it }?.let { minOf(frame.bottom, it.toInt()) } ?: frame.bottom
+    return IntRect(frame.left - shiftX, frame.top - shiftY, frame.right - shiftX, bottom - shiftY)
+}
+
+/**
+ * The top of the app's navigation at the bottom of the screen, which menus open above rather than over: the bottom bar,
+ * or the button of the navigation prototype. Each tells it with [keepsMenusAbove]; the highest one counts.
+ */
+class MenuFloor {
+    private val tops = mutableMapOf<Any, Float>()
+
+    /** On the screen, in pixels; null while there's no navigation at the bottom. */
+    val top: Float? get() = tops.values.minOrNull()
+
+    fun set(key: Any, top: Float) { tops[key] = top }
+
+    fun remove(key: Any) { tops.remove(key) }
+}
+
+/** Where the app keeps its [MenuFloor] (see App.kt); a menu outside it (a preview) has none. */
+val LocalMenuFloor = staticCompositionLocalOf { MenuFloor() }
+
+/** Makes this the navigation at the bottom of the screen, which menus open above (see [MenuFloor]) while it's there. */
+@Composable
+fun Modifier.keepsMenusAbove(): Modifier {
+    val floor = LocalMenuFloor.current
+    val key = remember { Any() }
+    DisposableEffect(floor) { onDispose { floor.remove(key) } }
+    return onGloballyPositioned { floor.set(key, it.positionOnScreen().y) }
+}
+
+/**
+ * Puts the popup of an [AppMenu] over the whole window, and tells where the button and the window are. The popup isn't
+ * kept inside the visible part of the window (clippingEnabled = false): kept in, it would start below the status bar,
+ * where the button's coordinates don't, and the menu would be drawn that much lower. [placeMenu] keeps the menu in it.
+ */
+private class WindowCoveringPosition(private val onAnchor: (MenuAnchor) -> Unit) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
         layoutDirection: LayoutDirection,
         popupContentSize: IntSize
     ): IntOffset {
-        val width = (popupContentSize.width - 2 * framePx).coerceAtLeast(0)
-        val height = (popupContentSize.height - 2 * framePx).coerceAtLeast(0)
-        val ltr = layoutDirection == LayoutDirection.Ltr
-        val resolvedEdge = if (edge != MenuEdge.Auto) edge else {
-            val inEndHalf = if (ltr) anchorBounds.center.x > windowSize.width / 2 else anchorBounds.center.x < windowSize.width / 2
-            if (inEndHalf) MenuEdge.End else MenuEdge.Start
-        }
-        val startAligned = if (ltr) anchorBounds.left else anchorBounds.right - width
-        val endAligned = if (ltr) anchorBounds.right - width else anchorBounds.left
-        val x = when (resolvedEdge) {
-            MenuEdge.Center -> anchorBounds.center.x - width / 2
-            MenuEdge.End -> endAligned
-            else -> startAligned
-        }.coerceIn(marginPx, (windowSize.width - marginPx - width).coerceAtLeast(marginPx))
-
-        val spaceBelow = windowSize.height - marginPx - (anchorBounds.bottom + gapPx)
-        val spaceAbove = anchorBounds.top - gapPx - marginPx
-        val below = when (side) {
-            MenuSide.Below -> true
-            MenuSide.Above -> false
-            MenuSide.Auto -> height <= spaceBelow || spaceBelow >= spaceAbove
-        }
-        val y = (if (below) anchorBounds.bottom + gapPx else anchorBounds.top - gapPx - height)
-            .coerceIn(marginPx, (windowSize.height - marginPx - height).coerceAtLeast(marginPx))
-
-        onPlaced(MenuPlacement(below, ((anchorBounds.center.x - x).toFloat() / width.coerceAtLeast(1)).coerceIn(0f, 1f)))
-        return IntOffset(x - framePx, y - framePx)
+        onAnchor(MenuAnchor(anchorBounds, windowSize))
+        return IntOffset.Zero
     }
+}
+
+/** Where [placeMenu] put an [AppMenu]: its top left corner in the window, and its [MenuPlacement]. */
+private class MenuPosition(val offset: IntOffset, val placement: MenuPlacement)
+
+/**
+ * Places an [AppMenu] of [width] by [height] against its button's bounds: on the side and edge asked for, kept [marginPx]
+ * inside the visible [area]. The side is chosen once, at the menu's first size, and kept in [state].
+ */
+private fun placeMenu(
+    anchorBounds: IntRect,
+    area: IntRect,
+    width: Int,
+    height: Int,
+    layoutDirection: LayoutDirection,
+    side: MenuSide,
+    edge: MenuEdge,
+    gapPx: Int,
+    marginPx: Int,
+    state: MenuLayoutState
+): MenuPosition {
+    val ltr = layoutDirection == LayoutDirection.Ltr
+    val resolvedEdge = if (edge != MenuEdge.Auto) edge else {
+        val inEndHalf = if (ltr) anchorBounds.center.x > area.center.x else anchorBounds.center.x < area.center.x
+        if (inEndHalf) MenuEdge.End else MenuEdge.Start
+    }
+    val startAligned = if (ltr) anchorBounds.left else anchorBounds.right - width
+    val endAligned = if (ltr) anchorBounds.right - width else anchorBounds.left
+    val x = when (resolvedEdge) {
+        MenuEdge.Center -> anchorBounds.center.x - width / 2
+        MenuEdge.End -> endAligned
+        else -> startAligned
+    }.coerceIn(area.left + marginPx, (area.right - marginPx - width).coerceAtLeast(area.left + marginPx))
+
+    val below = state.below ?: when (side) {
+        MenuSide.Below -> true
+        MenuSide.Above -> false
+        MenuSide.Auto -> {
+            val spaceBelow = area.bottom - marginPx - (anchorBounds.bottom + gapPx)
+            val spaceAbove = anchorBounds.top - gapPx - (area.top + marginPx)
+            height <= spaceBelow || spaceBelow >= spaceAbove
+        }
+    }.also { state.below = it }
+    val y = (if (below) anchorBounds.bottom + gapPx else anchorBounds.top - gapPx - height)
+        .coerceIn(area.top + marginPx, (area.bottom - marginPx - height).coerceAtLeast(area.top + marginPx))
+
+    state.bounds = IntRect(x, y, x + width, y + height)
+    val pivotX = ((anchorBounds.center.x - x).toFloat() / width.coerceAtLeast(1)).coerceIn(0f, 1f)
+    return MenuPosition(IntOffset(x, y), MenuPlacement(below, pivotX))
 }
 
 /**
@@ -367,5 +526,57 @@ fun OverflowMenuButton(
             Icon(Icons.Filled.MoreVert, contentDescription = contentDescription)
         }
         AppMenu(expanded = expanded, onDismiss = close) { content(close) }
+    }
+}
+
+// ---- Previews ----
+
+/** Every kind of entry: with an icon, a second line, a value at its end, the current choice, disabled, destructive. */
+@ThemePreviews
+@Composable
+private fun AppMenuPreviewEntries() {
+    PreviewTheme(padding = 8.dp) {
+        AppMenuPreview {
+            AppMenuItem("Rename", onClick = {}, leadingIcon = Icons.Filled.Edit)
+            AppMenuItem("Move", onClick = {}, leadingIcon = Icons.AutoMirrored.Filled.DriveFileMove, supportingText = "To another folder")
+            AppMenuItem("Sort by", onClick = {}, leadingIcon = Icons.Filled.Tune, trailingText = "Name", trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight)
+            AppMenuItem("Newest first", onClick = {}, trailingIcon = Icons.Filled.Check, active = true)
+            AppMenuItem("Share", onClick = {}, leadingIcon = Icons.Filled.Share, enabled = false)
+            AppMenuDivider()
+            AppMenuItem("Delete", onClick = {}, leadingIcon = Icons.Filled.Delete, destructive = true)
+        }
+    }
+}
+
+/** The second level of a menu with two (see AppMenuPages): its entries start with one going back. */
+@ThemePreviews
+@Composable
+private fun AppMenuPagesPreview() {
+    PreviewTheme(padding = 8.dp) {
+        AppMenuPreview {
+            AppMenuPages(
+                showSecondary = true,
+                primary = { AppMenuItem("Sort by", onClick = {}) },
+                secondary = {
+                    AppMenuItem("Sort by", onClick = {}, leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
+                    AppMenuDivider()
+                    AppMenuItem("Name", onClick = {}, active = true, trailingIcon = Icons.Filled.Check)
+                    AppMenuItem("Size", onClick = {})
+                    AppMenuItem("Date", onClick = {})
+                }
+            )
+        }
+    }
+}
+
+/** The ⋮ button; in the interactive preview a tap opens its menu. */
+@ThemePreviews
+@Composable
+private fun OverflowMenuButtonPreview() {
+    PreviewTheme(padding = 8.dp) {
+        OverflowMenuButton(contentDescription = "More") { close ->
+            AppMenuItem("Rename", onClick = close, leadingIcon = Icons.Filled.Edit)
+            AppMenuItem("Delete", onClick = close, leadingIcon = Icons.Filled.Delete, destructive = true)
+        }
     }
 }

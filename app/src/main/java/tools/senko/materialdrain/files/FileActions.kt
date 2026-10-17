@@ -1,10 +1,7 @@
 package tools.senko.materialdrain.files
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,9 +11,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.automirrored.filled.PlaylistAdd
+import tools.senko.materialdrain.ui.icons.automirrored.filled.KeyboardArrowLeft
+import tools.senko.materialdrain.ui.icons.automirrored.filled.KeyboardArrowRight
+import tools.senko.materialdrain.ui.icons.filled.Add
 import tools.senko.materialdrain.ui.icons.filled.Remove
-import tools.senko.materialdrain.ui.icons.filled.CheckBox
-import tools.senko.materialdrain.ui.icons.filled.ContentCopy
 import tools.senko.materialdrain.ui.icons.filled.Delete
 import tools.senko.materialdrain.ui.icons.filled.Download
 import tools.senko.materialdrain.ui.icons.filled.FolderCopy
@@ -48,16 +46,18 @@ import tools.senko.materialdrain.provider.api.FileList
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
 import tools.senko.materialdrain.ui.components.AppMenuDivider
 import tools.senko.materialdrain.ui.components.AppMenuItem
+import tools.senko.materialdrain.ui.components.AppMenuPages
 import tools.senko.materialdrain.ui.components.ConfirmDialog
 import tools.senko.materialdrain.ui.components.OverflowMenuButton
 import tools.senko.materialdrain.ui.components.TextInputDialog
 import tools.senko.materialdrain.ui.components.FolderPickerDialog
-
-fun copyLinkToClipboard(context: Context, url: String) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText("Pixeldrain URL", url))
-    Toast.makeText(context, "Link copied to clipboard", Toast.LENGTH_SHORT).show()
-}
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import tools.senko.materialdrain.ui.components.AppMenuPreview
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import tools.senko.materialdrain.provider.api.StorageRef
 
 fun shareLink(context: Context, url: String) {
     val sendIntent = Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_TEXT, url).setType("text/plain")
@@ -71,32 +71,65 @@ fun FileItemMenu(
     shareUrl: String?,
     canDelete: Boolean,
     onDownload: () -> Unit,
-    onSelect: () -> Unit,
     onAddToFilesystem: () -> Unit,
     onAddToList: () -> Unit,
     onDelete: () -> Unit,
     /** Only for the files of a list which can be changed. */
     onRemoveFromList: (() -> Unit)? = null
 ) {
+    OverflowMenuButton(contentDescription = "More options for ${file.name}") { close ->
+        FileItemMenuEntries(close, shareUrl, canDelete, onDownload, onAddToFilesystem, onAddToList, onDelete, onRemoveFromList)
+    }
+}
+
+/**
+ * The entries of [FileItemMenu]; each one closes the menu ([close]) before it acts. "Add to…" opens a second page with
+ * where to: the filesystem or a list. [addToOpen] starts on that page, for the previews.
+ */
+@Composable
+private fun FileItemMenuEntries(
+    close: () -> Unit,
+    shareUrl: String?,
+    canDelete: Boolean,
+    onDownload: () -> Unit,
+    onAddToFilesystem: () -> Unit,
+    onAddToList: () -> Unit,
+    onDelete: () -> Unit,
+    onRemoveFromList: (() -> Unit)?,
+    addToOpen: Boolean = false
+) {
     val context = LocalContext.current
     val url = shareUrl
-    OverflowMenuButton(contentDescription = "More options for ${file.name}") { close ->
-        AppMenuItem("Download", leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload() })
-        if (url != null) {
-            AppMenuItem("Copy link", leadingIcon = Icons.Filled.ContentCopy, onClick = { close(); copyLinkToClipboard(context, url) })
-            AppMenuItem("Share link", leadingIcon = Icons.Filled.Share, onClick = { close(); shareLink(context, url) })
-        }
-        AppMenuItem("Add to filesystem", leadingIcon = Icons.Filled.FolderCopy, onClick = { close(); onAddToFilesystem() })
-        AppMenuItem("Add to list", leadingIcon = Icons.AutoMirrored.Filled.PlaylistAdd, onClick = { close(); onAddToList() })
-        if (onRemoveFromList != null) {
-            AppMenuItem("Remove from this list", leadingIcon = Icons.Filled.Remove, onClick = { close(); onRemoveFromList() })
-        }
-        AppMenuItem("Select", leadingIcon = Icons.Filled.CheckBox, onClick = { close(); onSelect() })
-        if (canDelete) {
+    // Remembered in the menu's popup, so each opening starts on the first page
+    var addToPageOpen by remember { mutableStateOf(addToOpen) }
+    AppMenuPages(
+        showSecondary = addToPageOpen,
+        primary = {
+            AppMenuItem("Download", leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload() })
+            if (url != null) {
+                AppMenuItem("Share link", leadingIcon = Icons.Filled.Share, onClick = { close(); shareLink(context, url) })
+            }
+            AppMenuItem(
+                "Add to…",
+                leadingIcon = Icons.Filled.Add,
+                trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                onClick = { addToPageOpen = true }
+            )
+            if (onRemoveFromList != null) {
+                AppMenuItem("Remove from this list", leadingIcon = Icons.Filled.Remove, onClick = { close(); onRemoveFromList() })
+            }
+            if (canDelete) {
+                AppMenuDivider()
+                AppMenuItem("Delete", leadingIcon = Icons.Filled.Delete, destructive = true, onClick = { close(); onDelete() })
+            }
+        },
+        secondary = {
+            AppMenuItem("Add to", leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft, onClick = { addToPageOpen = false })
             AppMenuDivider()
-            AppMenuItem("Delete", leadingIcon = Icons.Filled.Delete, destructive = true, onClick = { close(); onDelete() })
+            AppMenuItem("Filesystem", leadingIcon = Icons.Filled.FolderCopy, onClick = { close(); onAddToFilesystem() })
+            AppMenuItem("List", leadingIcon = Icons.AutoMirrored.Filled.PlaylistAdd, onClick = { close(); onAddToList() })
         }
-    }
+    )
 }
 
 /** An action on one or more files, which is confirmed or configured in a dialog first. */
@@ -120,6 +153,47 @@ fun FileActionDialogs(
     /** Called when the list of a [FileActionRequest.RemoveFromList] loses all of its files and so is deleted. */
     onListDeleted: () -> Unit = {}
 ) {
+    FileActionDialogs(
+        request = request,
+        handlers = FileActionHandlers(
+            deleteFiles = fileInfoViewModel::deleteFiles,
+            folderRootPath = filesystemViewModel.browseRootPath,
+            folderRootName = filesystemViewModel.browseRootName,
+            listSubdirectories = filesystemViewModel::listSubdirectories,
+            addToFilesystem = fileInfoViewModel::addFilesToFilesystem,
+            createList = fileInfoViewModel::createListFromFiles,
+            loadLists = fileInfoViewModel::loadEditableLists,
+            addToList = fileInfoViewModel::addFilesToList,
+            removeFromList = fileInfoViewModel::removeFilesFromList
+        ),
+        onDismiss = onDismiss,
+        onStarted = onStarted,
+        onListDeleted = onListDeleted
+    )
+}
+
+/** What the dialogs of [FileActionDialogs] do once they're confirmed, and where the filesystem's folders come from. */
+class FileActionHandlers(
+    val deleteFiles: (List<StorageNode>) -> Unit,
+    val folderRootPath: String,
+    val folderRootName: String,
+    val listSubdirectories: suspend (path: String) -> ApiResponse<List<StorageNode>>,
+    val addToFilesystem: (fileIds: List<String>, path: String) -> Unit,
+    val createList: (fileIds: List<String>, title: String) -> Unit,
+    val loadLists: suspend () -> ApiResponse<List<FileList>>,
+    val addToList: (FileList, fileIds: List<String>) -> Unit,
+    val removeFromList: (FileList, fileIds: List<String>) -> Unit
+)
+
+/** The dialog of [request], which hands what it's confirmed for to [handlers]. See the previews at the end of the file. */
+@Composable
+fun FileActionDialogs(
+    request: FileActionRequest?,
+    handlers: FileActionHandlers,
+    onDismiss: () -> Unit,
+    onStarted: () -> Unit,
+    onListDeleted: () -> Unit = {}
+) {
     when (request) {
         null -> Unit
         is FileActionRequest.Delete -> {
@@ -132,7 +206,7 @@ fun FileActionDialogs(
                 confirmLabel = "Delete",
                 isDestructive = true,
                 onConfirm = {
-                    fileInfoViewModel.deleteFiles(request.files)
+                    handlers.deleteFiles(request.files)
                     onStarted()
                     onDismiss()
                 },
@@ -143,12 +217,12 @@ fun FileActionDialogs(
             FolderPickerDialog(
                 title = "Add to filesystem",
                 confirmLabel = "Add here",
-                initialPath = filesystemViewModel.browseRootPath,
-                rootPath = filesystemViewModel.browseRootPath,
-                rootName = filesystemViewModel.browseRootName,
-                loadFolders = { filesystemViewModel.listSubdirectories(it) },
+                initialPath = handlers.folderRootPath,
+                rootPath = handlers.folderRootPath,
+                rootName = handlers.folderRootName,
+                loadFolders = handlers.listSubdirectories,
                 onConfirm = { path ->
-                    fileInfoViewModel.addFilesToFilesystem(request.files.mapNotNull { it.ref.id }, path)
+                    handlers.addToFilesystem(request.files.mapNotNull { it.ref.id }, path)
                     onStarted()
                     onDismiss()
                 },
@@ -166,7 +240,7 @@ fun FileActionDialogs(
                     initialValue = "Pixeldrain List",
                     supportingText = "Creates a new list with " + (if (count == 1) "this file" else "these $count files") + ".",
                     onConfirm = { title ->
-                        fileInfoViewModel.createListFromFiles(request.files.mapNotNull { it.ref.id }, title)
+                        handlers.createList(request.files.mapNotNull { it.ref.id }, title)
                         onStarted()
                         onDismiss()
                     },
@@ -174,10 +248,10 @@ fun FileActionDialogs(
                 )
             } else {
                 ListPickerDialog(
-                    loadLists = { fileInfoViewModel.loadEditableLists() },
+                    loadLists = handlers.loadLists,
                     onNewList = { creatingNewList = true },
                     onPick = { list ->
-                        fileInfoViewModel.addFilesToList(list, request.files.mapNotNull { it.ref.id })
+                        handlers.addToList(list, request.files.mapNotNull { it.ref.id })
                         onStarted()
                         onDismiss()
                     },
@@ -199,7 +273,7 @@ fun FileActionDialogs(
                 confirmLabel = if (deletesList) "Delete list" else "Remove",
                 isDestructive = deletesList,
                 onConfirm = {
-                    fileInfoViewModel.removeFilesFromList(request.list, request.files.mapNotNull { it.ref.id })
+                    handlers.removeFromList(request.list, request.files.mapNotNull { it.ref.id })
                     if (deletesList) onListDeleted()
                     onStarted()
                     onDismiss()
@@ -263,3 +337,68 @@ private fun ListPickerDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
+
+// ---- Previews ----
+
+/** The ⋮ menu of a file, open: of the Files page, and of a list which can be changed (with Remove from this list). */
+@ThemePreviews
+@Composable
+private fun FileItemMenuPreview() {
+    PreviewTheme(padding = 8.dp) {
+        Row {
+            AppMenuPreview { FileItemMenuEntries({}, "https://pixeldrain.com/u/aBcD1234", true, {}, {}, {}, {}, null) }
+            AppMenuPreview { FileItemMenuEntries({}, "https://pixeldrain.com/u/aBcD1234", false, {}, {}, {}, {}, {}) }
+        }
+    }
+}
+
+/** The ⋮ menu of a file on its Add to page. */
+@ThemePreviews
+@Composable
+private fun FileItemMenuAddToPreview() {
+    PreviewTheme(padding = 8.dp) {
+        AppMenuPreview { FileItemMenuEntries({}, "https://pixeldrain.com/u/aBcD1234", true, {}, {}, {}, {}, null, addToOpen = true) }
+    }
+}
+
+/** Made-up lists, folders and nothing done, for the dialogs' previews. */
+private val PreviewHandlers = FileActionHandlers(
+    deleteFiles = {},
+    folderRootPath = "me",
+    folderRootName = "me",
+    listSubdirectories = { path ->
+        ApiResponse.Success(listOf("Photos", "Music", "Backups").map { StorageNode(StorageRef(path = "$path/$it"), it, isDirectory = true) })
+    },
+    addToFilesystem = { _, _ -> },
+    createList = { _, _ -> },
+    loadLists = {
+        ApiResponse.Success(listOf(FileList("a", "Holiday 2026", 48, true), FileList("b", "Wallpapers", 1, true), FileList("c", "Shared with Sam", 7, true)))
+    },
+    addToList = { _, _ -> },
+    removeFromList = { _, _ -> }
+)
+
+@Composable
+private fun FileActionDialogPreview(request: FileActionRequest) {
+    PreviewTheme { FileActionDialogs(request, PreviewHandlers, onDismiss = {}, onStarted = {}) }
+}
+
+@ThemePreviews
+@Composable
+private fun DeleteFilesDialogPreview() = FileActionDialogPreview(FileActionRequest.Delete(PreviewSamples.files.take(3)))
+
+@ThemePreviews
+@Composable
+private fun AddToFilesystemDialogPreview() = FileActionDialogPreview(FileActionRequest.AddToFilesystem(listOf(PreviewSamples.image)))
+
+/** The lists to pick from; New list… opens the dialog naming a new one. */
+@ThemePreviews
+@Composable
+private fun AddToListDialogPreview() = FileActionDialogPreview(FileActionRequest.AddToList(listOf(PreviewSamples.image)))
+
+/** Taking every file out of a list deletes it, which the dialog says. */
+@ThemePreviews
+@Composable
+private fun RemoveFromListDialogPreview() = FileActionDialogPreview(
+    FileActionRequest.RemoveFromList(listOf(PreviewSamples.image), FileList("b", "Wallpapers", 1, true), listFileCount = 1)
+)

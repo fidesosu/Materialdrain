@@ -30,6 +30,8 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.util.formatSize
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
 
 /** Like TextInputDialog, but an empty value can be saved too: it removes the setting. */
 @Composable
@@ -240,4 +242,40 @@ internal fun BrandingDialog(current: Map<String, String>, onConfirm: (Map<String
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
+}
+
+// ---- Previews ----
+
+@ThemePreviews
+@Composable
+private fun EditableTextDialogPreview() {
+    PreviewTheme {
+        EditableTextDialog(
+            title = "Embed domains",
+            label = "Domains",
+            initialValue = "example.com blog.example.com",
+            supportingText = "Separated by spaces. Empty, files can't be embedded anywhere.",
+            onConfirm = {},
+            onDismiss = {}
+        )
+    }
+}
+
+/** A cap of its own that's over the plan's, which the dialog says. */
+@ThemePreviews
+@Composable
+private fun TransferCapDialogPreview() {
+    PreviewTheme { TransferCapDialog(currentBytes = 3_000 * BYTES_PER_GB, planCapBytes = 2_000 * BYTES_PER_GB, onConfirm = {}, onDismiss = {}) }
+}
+
+@ThemePreviews
+@Composable
+private fun AddCreditDialogPreview() {
+    PreviewTheme { AddCreditDialog(initialCountry = "NLD", initialMethod = "", hasOpenInvoice = true, onConfirm = { _, _, _ -> }, onDismiss = {}) }
+}
+
+@ThemePreviews
+@Composable
+private fun BrandingDialogPreview() {
+    PreviewTheme { BrandingDialog(current = mapOf("disable_share_button" to "true"), onConfirm = {}, onDismiss = {}) }
 }

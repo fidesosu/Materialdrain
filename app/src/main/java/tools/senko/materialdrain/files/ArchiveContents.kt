@@ -30,6 +30,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.util.formatSize
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import tools.senko.materialdrain.provider.api.StorageRef
 
 /**
  * What's inside an archive, shown where the file's preview would be: folders to open, files to save, and a Back button
@@ -146,6 +150,27 @@ private fun ArchiveRow(
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)
             )
+        }
+    }
+}
+
+// ---- Previews ----
+
+/** Inside a folder of the archive (with Back), its folders and files; then loading, empty and failed. */
+@ThemePreviews
+@Composable
+private fun ArchiveContentsPreview() {
+    PreviewTheme(padding = 16.dp) {
+        val ref = PreviewSamples.archive.ref
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            ArchiveContents(
+                ArchiveView(ref, inside = "backup/2026", entries = PreviewSamples.files.take(5).map { it.copy(ref = StorageRef(path = "backup/2026/${it.name}")) }, error = null),
+                onOpenFolder = {},
+                onDownload = {}
+            )
+            ArchiveContents(ArchiveView(ref, inside = "", entries = null, error = null), onOpenFolder = {}, onDownload = {})
+            ArchiveContents(ArchiveView(ref, inside = "empty", entries = emptyList(), error = null), onOpenFolder = {}, onDownload = {})
+            ArchiveContents(ArchiveView(ref, inside = "", entries = null, error = "This archive is either not valid or has a password."), onOpenFolder = {}, onDownload = {})
         }
     }
 }

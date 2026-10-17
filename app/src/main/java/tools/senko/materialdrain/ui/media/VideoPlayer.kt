@@ -92,6 +92,10 @@ import tools.senko.materialdrain.ui.components.AppMenuPages
 import tools.senko.materialdrain.ui.components.MenuEdge
 import tools.senko.materialdrain.ui.components.MenuSide
 import tools.senko.materialdrain.util.formatDurationMillis
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
+import tools.senko.materialdrain.ui.components.AppMenuPreview
 
 private const val CONTROLS_HIDE_DELAY_MS = 3_000L
 /** Width of the three buttons in the middle of the video controls: 3 buttons of 44 dp with 8 dp between them. */
@@ -174,40 +178,53 @@ private fun BoxScope.VideoSettingsMenu(
 ) {
     // The controls are at the bottom of the screen: above the button, lined up with its end
     AppMenu(expanded = expanded, onDismiss = onDismiss, side = MenuSide.Above, edge = MenuEdge.End) {
-        AppMenuPages(
-            showSecondary = speedPageOpen,
-            primary = {
-                AppMenuItem(
-                    text = "Loop",
-                    active = loopEnabled,
-                    leadingIcon = Icons.Filled.Repeat,
-                    onClick = { onLoopChange(!loopEnabled) }
-                )
-                AppMenuItem(
-                    text = "Speed",
-                    leadingIcon = Icons.Filled.Speed,
-                    trailingText = speedLabel(speed),
-                    trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    onClick = { onSpeedPageOpenChange(true) }
-                )
-            },
-            secondary = {
-                AppMenuItem(
-                    text = "Speed",
-                    leadingIcon = Icons.AutoMirrored.Filled.ArrowBack,
-                    onClick = { onSpeedPageOpenChange(false) }
-                )
-                AppMenuDivider()
-                PlaybackSpeeds.forEach { option ->
-                    AppMenuItem(
-                        text = speedLabel(option),
-                        active = option == speed,
-                        onClick = { onSpeedChange(option) }
-                    )
-                }
-            }
-        )
+        VideoSettingsEntries(speedPageOpen, onSpeedPageOpenChange, loopEnabled, onLoopChange, speed, onSpeedChange)
     }
+}
+
+/** The entries of [VideoSettingsMenu]: Loop and Speed, or the speeds. */
+@Composable
+private fun VideoSettingsEntries(
+    speedPageOpen: Boolean,
+    onSpeedPageOpenChange: (Boolean) -> Unit,
+    loopEnabled: Boolean,
+    onLoopChange: (Boolean) -> Unit,
+    speed: Float,
+    onSpeedChange: (Float) -> Unit
+) {
+    AppMenuPages(
+        showSecondary = speedPageOpen,
+        primary = {
+            AppMenuItem(
+                text = "Loop",
+                active = loopEnabled,
+                leadingIcon = Icons.Filled.Repeat,
+                onClick = { onLoopChange(!loopEnabled) }
+            )
+            AppMenuItem(
+                text = "Speed",
+                leadingIcon = Icons.Filled.Speed,
+                trailingText = speedLabel(speed),
+                trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                onClick = { onSpeedPageOpenChange(true) }
+            )
+        },
+        secondary = {
+            AppMenuItem(
+                text = "Speed",
+                leadingIcon = Icons.AutoMirrored.Filled.ArrowBack,
+                onClick = { onSpeedPageOpenChange(false) }
+            )
+            AppMenuDivider()
+            PlaybackSpeeds.forEach { option ->
+                AppMenuItem(
+                    text = speedLabel(option),
+                    active = option == speed,
+                    onClick = { onSpeedChange(option) }
+                )
+            }
+        }
+    )
 }
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
@@ -446,6 +463,38 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
                     }
                 }
             }
+        }
+    }
+}
+
+// ---- Previews ----
+
+/** Without a thumbnail; with one, it's drawn as a picture is (see LayeredPreviewImage), which the preview can't load. */
+@ThemePreviews
+@Composable
+private fun InlineVideoPreviewPreview() {
+    PreviewTheme(padding = 16.dp) {
+        InlineVideoPreview(thumbnailSource = null, contentDescription = "Video", apiKey = null, onFullScreenClick = {})
+    }
+}
+
+/** Paused with its controls shown (the preview's player loads nothing, see rememberManagedPlayer). */
+@ScreenPreviews
+@Composable
+private fun FullscreenVideoPlayerPreview() {
+    PreviewTheme {
+        FullscreenVideoPlayer(videoUri = Uri.EMPTY, thumbnailUrl = null, apiKey = null, onBack = {})
+    }
+}
+
+/** The playback settings: Loop and Speed, and the speeds. */
+@ThemePreviews
+@Composable
+private fun VideoSettingsMenuPreview() {
+    PreviewTheme(padding = 8.dp) {
+        Row {
+            AppMenuPreview { VideoSettingsEntries(false, {}, loopEnabled = true, onLoopChange = {}, speed = 1.5f, onSpeedChange = {}) }
+            AppMenuPreview { VideoSettingsEntries(true, {}, loopEnabled = true, onLoopChange = {}, speed = 1.5f, onSpeedChange = {}) }
         }
     }
 }

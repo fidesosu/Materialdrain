@@ -44,6 +44,9 @@ import tools.senko.materialdrain.ui.media.InlineTextPreview
 import tools.senko.materialdrain.ui.media.InlineVideoPreview
 import tools.senko.materialdrain.util.formatDurationMillis
 import tools.senko.materialdrain.util.formatSize
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
 
 @Composable
 fun UploadScreenContent(
@@ -55,7 +58,39 @@ fun UploadScreenContent(
 ) {
     val uiState by uploadViewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    UploadScreenContent(
+        uiState = uiState,
+        fabHeight = fabHeight,
+        isFabVisible = isFabVisible,
+        inlineUploadButton = inlineUploadButton,
+        onFilesPicked = { uris -> uploadViewModel.onFilesSelected(uris, context) },
+        onClearPickedFile = { uploadViewModel.onFileSelected(null, context) },
+        onTextChange = uploadViewModel::onTextToUploadChanged,
+        onRemoveQueued = uploadViewModel::removeQueuedItem,
+        onClearQueued = uploadViewModel::clearQueuedItems,
+        onCancel = uploadViewModel::cancelUpload,
+        onUpload = uploadViewModel::upload
+    )
+}
+
+/** The Upload screen drawn from [uiState], what it does handed to the callbacks; see the previews at the end of the file. */
+@Composable
+fun UploadScreenContent(
+    uiState: UploadUiState,
+    fabHeight: Dp,
+    isFabVisible: Boolean,
+    inlineUploadButton: Boolean,
+    onFilesPicked: (List<Uri>) -> Unit,
+    onClearPickedFile: () -> Unit,
+    onTextChange: (String) -> Unit,
+    onRemoveQueued: (Int) -> Unit,
+    onClearQueued: () -> Unit,
+    onCancel: () -> Unit,
+    onUpload: () -> Unit,
+    /** The tab it opens on: 0 for a file, 1 for text */
+    initialTab: Int = 0
+) {
+    var selectedTabIndex by remember { mutableIntStateOf(initialTab) }
     val tabTitles = listOf("Upload File", "Upload Text")
 
 
@@ -78,9 +113,9 @@ fun UploadScreenContent(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents(),
         onResult = { uris: List<Uri> ->
-            uploadViewModel.onFilesSelected(uris, context)
+            onFilesPicked(uris)
             if (uris.isNotEmpty() && selectedTabIndex == 0) {
-                uploadViewModel.onTextToUploadChanged("")
+                onTextChange("")
             }
         }
     )
@@ -96,8 +131,8 @@ fun UploadScreenContent(
                     selected = selectedTabIndex == index,
                     onClick = {
                         selectedTabIndex = index
-                        if (index == 0) uploadViewModel.onTextToUploadChanged("")
-                        else uploadViewModel.onFileSelected(null, context)
+                        if (index == 0) onTextChange("")
+                        else onClearPickedFile()
                     },
                     text = { Text(title) }
                 )
@@ -145,8 +180,8 @@ fun UploadScreenContent(
                             QueuedFilesCard(
                                 items = uiState.queuedItems,
                                 isUploading = uiState.isLoading,
-                                onRemove = uploadViewModel::removeQueuedItem,
-                                onClear = uploadViewModel::clearQueuedItems
+                                onRemove = onRemoveQueued,
+                                onClear = onClearQueued
                             )
                         }
                         uiState.pickedFile?.let { file ->
@@ -258,7 +293,7 @@ fun UploadScreenContent(
                     1 -> {
                         OutlinedTextField(
                             value = uiState.textToUpload,
-                            onValueChange = uploadViewModel::onTextToUploadChanged,
+                            onValueChange = onTextChange,
                             label = { Text("Paste text here") },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -279,7 +314,7 @@ fun UploadScreenContent(
 
                 if (uiState.isLoading) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(onClick = uploadViewModel::cancelUpload, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Filled.Close, contentDescription = null)
                         Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                         Text("Cancel upload")
@@ -294,7 +329,7 @@ fun UploadScreenContent(
                 }
                 if (inlineUploadButton && uiState.hasUploadable && !uiState.isLoading) {
                     Button(
-                        onClick = { uploadViewModel.upload() },
+                        onClick = onUpload,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 8.dp)
@@ -517,3 +552,84 @@ private fun QueuedFileRow(item: UploadItem, isUploading: Boolean, onRemove: (Int
         }
     }
 }
+
+// ---- Previews ----
+
+/** The screen with [uiState], on tab [tab], doing nothing when used. */
+@Composable
+private fun UploadPreview(uiState: UploadUiState, tab: Int = 0) {
+    PreviewTheme {
+        UploadScreenContent(
+            uiState = uiState,
+            fabHeight = 56.dp,
+            isFabVisible = uiState.hasUploadable,
+            inlineUploadButton = false,
+            onFilesPicked = {},
+            onClearPickedFile = {},
+            onTextChange = {},
+            onRemoveQueued = {},
+            onClearQueued = {},
+            onCancel = {},
+            onUpload = {},
+            initialTab = tab
+        )
+    }
+}
+
+@ScreenPreviews
+@Composable
+private fun UploadEmptyPreview() = UploadPreview(UploadUiState())
+
+/** One file picked: its details and its preview (an audio file, whose player shows). */
+@ScreenPreviews
+@Composable
+private fun UploadPickedFilePreview() = UploadPreview(
+    UploadUiState(
+        uploadTotalSizeBytes = PreviewSamples.song.size,
+        pickedFile = PickedFile(
+            uri = Uri.EMPTY,
+            name = PreviewSamples.song.name,
+            sizeBytes = PreviewSamples.song.size,
+            mimeType = "audio/mpeg",
+            audioDurationMillis = 213_000,
+            audioBitrate = 320_000,
+            audioArtist = "Some Artist",
+            audioAlbum = "An Album (2026)"
+        )
+    )
+)
+
+/** Several files uploading: one done, one under way, one failed, one waiting. */
+@ScreenPreviews
+@Composable
+private fun UploadQueuePreview() {
+    val files = PreviewSamples.files.filter { !it.isDirectory }.take(4)
+    UploadPreview(
+        UploadUiState(
+            isLoading = true,
+            queuedItems = files.mapIndexed { index, file ->
+                val status = UploadItemStatus.entries[listOf(2, 1, 3, 0)[index]]
+                UploadItem(
+                    id = index,
+                    uri = Uri.EMPTY,
+                    name = file.name,
+                    sizeBytes = file.size,
+                    mimeType = file.mimeType,
+                    status = status,
+                    uploadedBytes = if (status == UploadItemStatus.UPLOADING) (file.size ?: 0L) / 3 else 0L,
+                    fileId = if (status == UploadItemStatus.DONE) "aBcD1234" else null,
+                    errorMessage = if (status == UploadItemStatus.FAILED) "The host refused the file: it's too big." else null
+                )
+            }
+        )
+    )
+}
+
+@ScreenPreviews
+@Composable
+private fun UploadTextPreview() = UploadPreview(UploadUiState(textToUpload = PreviewSamples.CODE), tab = 1)
+
+/** Uploaded: the result card with the file's link. */
+@ScreenPreviews
+@Composable
+private fun UploadDonePreview() = UploadPreview(UploadUiState(uploadResult = UploadResult(success = true, id = "aBcD1234")))

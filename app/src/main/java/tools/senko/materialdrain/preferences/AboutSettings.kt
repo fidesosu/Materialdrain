@@ -64,8 +64,9 @@ internal data class AppAbout(
 private val VERSION_PATTERN = Regex("""^\d+(?:\.\d+)*\.(\d{8})\.(\d{4})(-dev)?$""")
 
 internal fun readAbout(context: Context): AppAbout {
-    val info = context.packageManager.getPackageInfo(context.packageName, 0)
-    val versionName = info.versionName.orEmpty()
+    // Not there in a preview (in Android Studio), which has no app installed: no version then
+    val info = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
+    val versionName = info?.versionName.orEmpty()
     val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
     val match = VERSION_PATTERN.find(versionName)
     val kind = when {
@@ -81,7 +82,7 @@ internal fun readAbout(context: Context): AppAbout {
                 .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT))
         }.getOrNull()
     }
-    return AppAbout(versionName, info.longVersionCode, kind, committed, context.packageName)
+    return AppAbout(versionName, info?.longVersionCode ?: 0L, kind, committed, context.packageName)
 }
 
 /** The top of the About page: the app's icon, name and version, the details of this build, and a button to copy them. */
@@ -149,3 +150,6 @@ private fun AboutRow(label: String, value: String) {
         Text(value, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(0.55f))
     }
 }
+
+// ---- Previews ----
+// The About page is drawn by SettingsAboutPreview in SettingsScreen.kt.

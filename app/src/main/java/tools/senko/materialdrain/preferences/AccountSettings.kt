@@ -897,3 +897,7 @@ internal fun copyToClipboard(context: Context, label: String, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
 }
+
+// ---- Previews ----
+// What's here is drawn by the account page's previews, with a made-up account: SettingsAccountPreview (signed in, every
+// card) and SettingsAccountSignedOutPreview in SettingsScreen.kt, and the account's tile in SettingsHomePreview.

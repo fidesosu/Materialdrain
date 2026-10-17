@@ -88,6 +88,12 @@ import tools.senko.materialdrain.files.TokenKind
 import tools.senko.materialdrain.files.tokenize
 import tools.senko.materialdrain.ui.LocalTextWrap
 import java.text.NumberFormat
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import tools.senko.materialdrain.files.languageFor
+import androidx.compose.ui.platform.LocalInspectionMode
 
 /** How high the preview on the details page gets; the whole file is in the fullscreen view (see [CodeFullscreen]). */
 private val InlineMaxHeight = 200.dp
@@ -300,21 +306,10 @@ fun CodeFullscreen(title: String, content: String, language: SourceLanguage?, on
     val context = LocalContext.current
     var wrap by rememberSaveable { mutableStateOf(false) }
     val text = remember(content) { expandTabs(content) }
-    // The whole text coloured, then cut into lines: a comment or string over several lines keeps its colour
-    val lines by produceState<List<AnnotatedString>?>(null, text, language, colors) {
-        value = withContext(Dispatchers.Default) {
-            val highlighted = highlightedCode(text, language, colors)
-            val result = ArrayList<AnnotatedString>()
-            var start = 0
-            while (start <= text.length) {
-                val end = text.indexOf('\n', start).let { if (it < 0) text.length else it }
-                result += highlighted.subSequence(start, end)
-                if (end == text.length) break
-                start = end + 1
-            }
-            if (result.size > 1 && text.endsWith('\n')) result.removeAt(result.lastIndex)
-            result
-        }
+    // Worked out away from the main thread; a preview (see the end of the file) has them at once, as it shows one frame
+    val inPreview = LocalInspectionMode.current
+    val lines by produceState(if (inPreview) highlightedLines(text, language, colors) else null, text, language, colors) {
+        if (value == null) value = withContext(Dispatchers.Default) { highlightedLines(text, language, colors) }
     }
     val codeStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurface)
     val gutterStyle = codeStyle.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), textAlign = TextAlign.End)
@@ -356,6 +351,21 @@ fun CodeFullscreen(title: String, content: String, language: SourceLanguage?, on
             }
         }
     }
+}
+
+/** The whole [text] coloured, then cut into lines: a comment or string over several lines keeps its colour. */
+private fun highlightedLines(text: String, language: SourceLanguage?, colors: CodeColors): List<AnnotatedString> {
+    val highlighted = highlightedCode(text, language, colors)
+    val result = ArrayList<AnnotatedString>()
+    var start = 0
+    while (start <= text.length) {
+        val end = text.indexOf('\n', start).let { if (it < 0) text.length else it }
+        result += highlighted.subSequence(start, end)
+        if (end == text.length) break
+        start = end + 1
+    }
+    if (result.size > 1 && text.endsWith('\n')) result.removeAt(result.lastIndex)
+    return result
 }
 
 /** The numbered lines; without [wrap], all of them as wide as the longest, scrolling sideways together. */
@@ -408,5 +418,33 @@ private fun CodeLines(lines: List<AnnotatedString>, wrap: Boolean, codeStyle: Te
         Box(modifier = Modifier.fillMaxSize().horizontalScroll(rememberScrollState())) {
             list(Modifier.width(width).fillMaxSize())
         }
+    }
+}
+
+// ---- Previews ----
+
+@ThemePreviews
+@Composable
+private fun CodePreviewPreview() {
+    PreviewTheme(padding = 16.dp) {
+        CodePreview(content = PreviewSamples.CODE, language = languageFor(PreviewSamples.text.name), title = PreviewSamples.text.name)
+    }
+}
+
+/** Cut short: only the start is shown, the note under it says how much more there is. */
+@ThemePreviews
+@Composable
+private fun CodePreviewCutPreview() {
+    PreviewTheme(padding = 16.dp) {
+        val whole = (1..400).joinToString("\n") { "val line$it = \"$it\" // a comment" }
+        CodePreview(content = whole.lines().take(30).joinToString("\n"), language = languageFor("lines.kt"), fullContent = whole)
+    }
+}
+
+@ScreenPreviews
+@Composable
+private fun CodeFullscreenPreview() {
+    PreviewTheme {
+        CodeFullscreen(title = PreviewSamples.text.name, content = PreviewSamples.CODE.repeat(4), language = languageFor(PreviewSamples.text.name), onDismiss = {})
     }
 }

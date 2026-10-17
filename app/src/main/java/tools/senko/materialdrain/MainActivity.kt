@@ -16,9 +16,7 @@ import androidx.compose.ui.Modifier
 import tools.senko.materialdrain.auth.AppLockOverlay
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen // Added import
 import androidx.compose.foundation.LocalOverscrollFactory
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.tooling.preview.Preview
 import tools.senko.materialdrain.ui.theme.MaterialdrainTheme
 
 /** How long after the first back press at the top level a second one still closes the app. */
@@ -94,13 +92,5 @@ class MainActivity : FragmentActivity() {
         AppContainer.get(application).transferRegistry.appInForeground = false
         AppContainer.get(application).appLock.onStopped()
         super.onStop()
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DefaultPreview() {
-    MaterialdrainTheme {
-        MaterialdrainScreen()
     }
 }

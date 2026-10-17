@@ -49,6 +49,9 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlin.math.min
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
+import java.io.File
 
 /** How far the picture can be zoomed in: the square then shows this share of its shorter side. */
 private const val MAX_ZOOM = 6f
@@ -205,4 +208,19 @@ internal fun placementOf(picture: AvatarPicture, framePx: Float): Pair<Float, Of
         (image.height / 2f - (crop.top + crop.side / 2f)) * shownScale
     )
     return zoom to offset
+}
+
+// ---- Previews ----
+
+/**
+ * The cropper's square and buttons over a wide picture. The picture itself is a file on the device, which a preview
+ * hasn't got, so only what's around it shows.
+ */
+@ScreenPreviews
+@Composable
+private fun AvatarCropperPreview() {
+    PreviewTheme {
+        val image = AvatarImage(File("preview.png"), width = 1600, height = 900, animated = false)
+        AvatarCropper(AvatarPicture(image, AvatarCrop.centred(image.width, image.height)), onKeep = {}, onCancel = {})
+    }
 }

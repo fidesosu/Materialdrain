@@ -48,6 +48,11 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import tools.senko.materialdrain.navmenu.NavFabPosition
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.material3.SnackbarVisuals
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 
 /** The gap between the snackbar and the navigation button beside it. */
 private val EdgeGap = 8.dp
@@ -231,6 +236,39 @@ private fun SnackbarItem(
                 }
             }
             Spacer(Modifier.width(endGap))
+        }
+    }
+}
+
+// ---- Previews ----
+
+/** A made-up message for the previews, as the host hands one to [SnackbarItem]. */
+private class PreviewSnackbarData(message: String, actionLabel: String? = null) : SnackbarData {
+    override val visuals = object : SnackbarVisuals {
+        override val message = message
+        override val actionLabel = actionLabel
+        override val withDismissAction = false
+        override val duration = SnackbarDuration.Long
+    }
+    override fun performAction() {}
+    override fun dismiss() {}
+}
+
+/** A message alone, one with its action (Open), and one beside the navigation prototype's button at the edge. */
+@ThemePreviews
+@Composable
+private fun SnackbarPreview() {
+    PreviewTheme(padding = 8.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SnackbarItem(PreviewSnackbarData("Link copied"), edgeFab = null, fabSize = 56.dp, reduceMotion = false, onDismiss = {})
+            SnackbarItem(
+                PreviewSnackbarData("File 'beach-sunset.jpg' downloaded (3.3 MB).", actionLabel = "Open"),
+                edgeFab = null, fabSize = 56.dp, reduceMotion = false, onDismiss = {}
+            )
+            SnackbarItem(
+                PreviewSnackbarData("Download failed: the host couldn't be reached, it took longer than 30 seconds to answer."),
+                edgeFab = NavFabPosition.END, fabSize = 56.dp, reduceMotion = false, onDismiss = {}
+            )
         }
     }
 }

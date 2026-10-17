@@ -26,6 +26,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
 
 /**
  * Covers the app while it is locked, and asks for the fingerprint, face or screen lock straight away. The overlay
@@ -38,6 +40,12 @@ fun AppLockOverlay(activity: FragmentActivity, appLock: AppLock) {
 
     LaunchedEffect(Unit) { showUnlockPrompt(activity) { appLock.unlock() } }
 
+    LockedScreen(onUnlock = { showUnlockPrompt(activity) { appLock.unlock() } })
+}
+
+/** What covers the app while it's locked, taking every touch; [onUnlock] asks for the lock again. */
+@Composable
+fun LockedScreen(onUnlock: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -61,7 +69,7 @@ fun AppLockOverlay(activity: FragmentActivity, appLock: AppLock) {
             Spacer(Modifier.height(16.dp))
             Text("Materialdrain is locked", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(24.dp))
-            Button(onClick = { showUnlockPrompt(activity) { appLock.unlock() } }) { Text("Unlock") }
+            Button(onClick = onUnlock) { Text("Unlock") }
         }
     }
 }
@@ -79,4 +87,12 @@ fun showUnlockPrompt(activity: FragmentActivity, onUnlocked: () -> Unit) {
             .setAllowedAuthenticators(LOCK_AUTHENTICATORS)
             .build()
     )
+}
+
+// ---- Previews ----
+
+@ScreenPreviews
+@Composable
+private fun LockedScreenPreview() {
+    PreviewTheme { LockedScreen(onUnlock = {}) }
 }

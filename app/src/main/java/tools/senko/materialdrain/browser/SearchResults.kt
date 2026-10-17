@@ -47,6 +47,9 @@ import tools.senko.materialdrain.ui.components.floatingCardColor
 import tools.senko.materialdrain.ui.components.floatingCardBorder
 import tools.senko.materialdrain.ui.components.FloatingCardShape
 import kotlin.math.roundToInt
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
 
 // ---- The search results ----
 
@@ -292,5 +295,21 @@ private fun SearchResultCard(
             }
             Spacer(Modifier.width(6.dp))
         }
+    }
+}
+
+// ---- Previews ----
+
+/** The matches of a search as their cards, one of them from a subfolder. */
+@ThemePreviews
+@Composable
+private fun SearchResultStackPreview() {
+    PreviewTheme(padding = 16.dp) {
+        SearchResultStack(
+            results = PreviewSamples.files.take(5),
+            thumbnailFor = { null },
+            locationOf = { if (it == PreviewSamples.video) "Holiday photos/2026" else null },
+            onClick = {}
+        )
     }
 }

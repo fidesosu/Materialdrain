@@ -34,6 +34,15 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import tools.senko.materialdrain.ui.LocalReduceMotion
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.unit.dp
 
 private const val BLANK = -1
 private const val LETTERS = 26
@@ -552,4 +561,20 @@ private class GlyphCache(private val measurer: TextMeasurer, private val style: 
     fun width(code: Int): Float = layout(code)?.size?.width?.toFloat() ?: 0f
 
     val lineHeight: Float = measurer.measure("A", style).size.height.toFloat()
+}
+
+// ---- Previews ----
+
+/** In the interactive preview, + and − roll the number. */
+@ThemePreviews
+@Composable
+private fun OdometerTextPreview() {
+    PreviewTheme(padding = 16.dp) {
+        var value by remember { mutableIntStateOf(1_284) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { value -= 37 }) { Text("−") }
+            OdometerText("$value views", style = MaterialTheme.typography.titleLarge)
+            TextButton(onClick = { value += 37 }) { Text("+") }
+        }
+    }
 }

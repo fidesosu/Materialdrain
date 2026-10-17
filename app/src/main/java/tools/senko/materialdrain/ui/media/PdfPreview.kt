@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -76,6 +77,11 @@ import tools.senko.materialdrain.files.PdfPreviewState
 import tools.senko.materialdrain.util.formatSize
 import java.io.File
 import kotlin.math.roundToInt
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import androidx.compose.ui.platform.LocalInspectionMode
 
 /** The widest a page is drawn, and the most pixels it has: a zoomed page stays sharp without filling the memory. */
 private const val MAX_PAGE_WIDTH_PX = 2560
@@ -84,12 +90,24 @@ private const val MAX_PAGE_PIXELS = 8_000_000
 /** How far a PDF can be zoomed in, full screen. */
 private const val MAX_PDF_ZOOM = 5f
 
+/** The pages of an opened PDF: their shapes, and each one drawn as a picture. */
+private interface PdfPages {
+    /** Each page's width over its height. */
+    val pageRatios: List<Float>
+
+    /** Page [index] drawn [widthPx] wide, on white as on paper; null once it can't be any more. */
+    suspend fun render(index: Int, widthPx: Int): Bitmap?
+
+    /** The page drawn at once, without waiting: only the previews' made-up pages can (see [SamplePdfPages]). */
+    fun renderNow(index: Int, widthPx: Int): Bitmap? = null
+}
+
 /**
  * A PDF opened with Android's own [PdfRenderer] (which needs the whole file on the device, see FileInfoViewModel's
  * fetchPdfPreview). It draws one page at a time, so [render] waits its turn; the sizes of the pages are read once when
  * it's opened, so the pages take their place before they're drawn.
  */
-private class PdfDocument(file: File) {
+private class PdfDocument(file: File) : PdfPages {
     private val descriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
     private val renderer = try {
         PdfRenderer(descriptor)
@@ -101,7 +119,7 @@ private class PdfDocument(file: File) {
     private var closed = false
 
     /** Each page's width over its height; a damaged page without a width or height is taken as square. */
-    val pageRatios: List<Float> = try {
+    override val pageRatios: List<Float> = try {
         (0 until renderer.pageCount).map { index ->
             renderer.openPage(index).use { page ->
                 (page.width.toFloat() / page.height).takeIf { it.isFinite() && it > 0f }?.coerceIn(0.05f, 20f) ?: 1f
@@ -114,7 +132,7 @@ private class PdfDocument(file: File) {
     }
 
     /** Page [index] drawn [widthPx] wide (less for a huge page, see [MAX_PAGE_PIXELS]), on white as on paper; null once closed. */
-    suspend fun render(index: Int, widthPx: Int): Bitmap? = lock.withLock {
+    override suspend fun render(index: Int, widthPx: Int): Bitmap? = lock.withLock {
         if (closed) return@withLock null
         withContext(Dispatchers.IO) {
             renderer.openPage(index).use { page ->
@@ -148,7 +166,7 @@ private class PdfDocument(file: File) {
  */
 private sealed interface OpenedPdf {
     data object Opening : OpenedPdf
-    class Open(val document: PdfDocument) : OpenedPdf
+    class Open(val document: PdfPages) : OpenedPdf
     data object Unreadable : OpenedPdf
     data object Gone : OpenedPdf
 }
@@ -158,6 +176,8 @@ private const val UNREADABLE_PDF = "This PDF can't be shown: it's damaged, or lo
 /** [file] opened for as long as the caller is shown, and closed when it leaves. */
 @Composable
 private fun rememberPdf(file: File): OpenedPdf {
+    // A preview (in Android Studio) has no PDF on a device to open: it shows made-up pages
+    if (LocalInspectionMode.current) return remember { OpenedPdf.Open(SamplePdfPages) }
     var opened by remember(file) { mutableStateOf<OpenedPdf>(OpenedPdf.Opening) }
     DisposableEffect(file) {
         // Its own scope, not the composition's, which is gone by the time the document is closed. The document is the
@@ -185,8 +205,8 @@ private fun rememberPdf(file: File): OpenedPdf {
 
 /** Page [index] of [document], drawn [widthPx] wide; the page drawn before stays while a sharper one is drawn. */
 @Composable
-private fun PdfPage(document: PdfDocument, index: Int, widthPx: Int, modifier: Modifier = Modifier) {
-    var bitmap by remember(document, index) { mutableStateOf<Bitmap?>(null) }
+private fun PdfPage(document: PdfPages, index: Int, widthPx: Int, modifier: Modifier = Modifier) {
+    var bitmap by remember(document, index) { mutableStateOf(document.renderNow(index, widthPx)) }
     LaunchedEffect(document, index, widthPx) {
         // Zooming changes the width on every frame: only once it has settled is the page drawn again
         if (bitmap != null) delay(200)
@@ -319,29 +339,27 @@ fun FullScreenPdfDialog(file: File, title: String, onDismissRequest: () -> Unit)
                 icon = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
                 onClick = onDismissRequest,
-                modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp),
+                modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(PdfBarInset),
+                size = PdfBarHeight,
                 container = Color.Black.copy(alpha = 0.5f)
             )
-            Text(
-                title,
-                color = Color.White,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                // Clear of the back button on one side and the page number on the other, centred between them and level
-                // with the page number (the same top, at the same height)
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(start = 112.dp, end = 112.dp, top = 26.dp)
-                    .labelOverPage()
-            )
+            // Clear of the back button on one side and the page number on the other, centred between them
+            PdfBarSlot(Modifier.align(Alignment.TopCenter).padding(horizontal = 112.dp)) {
+                Text(
+                    title,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.labelOverPage()
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ZoomablePages(document: PdfDocument) {
+private fun ZoomablePages(document: PdfPages) {
     val pages = document.pageRatios.size
     var zoom by remember { mutableFloatStateOf(1f) }
     val listState = rememberLazyListState()
@@ -403,12 +421,85 @@ private fun ZoomablePages(document: PdfDocument) {
     }
     // Which page is at the top, out of how many
     val current = listState.firstVisibleItemIndex + 1
-    Box(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-        Text(
-            "$current / $pages",
-            color = Color.White,
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 26.dp, end = 16.dp).labelOverPage()
-        )
+    Box(modifier = Modifier.fillMaxSize()) {
+        PdfBarSlot(Modifier.align(Alignment.TopEnd).padding(end = PdfBarInset)) {
+            Text("$current / $pages", color = Color.White, style = MaterialTheme.typography.labelLarge, modifier = Modifier.labelOverPage())
+        }
+    }
+}
+
+/** How far the full screen PDF's back button sits from the top and the sides, and how tall it is. */
+private val PdfBarInset = 16.dp
+private val PdfBarHeight = 44.dp
+
+/**
+ * A place in the full screen PDF's top bar, as high as the back button and at its height: [content] is centred in it, so
+ * the title and the page number are level with the button whatever the size of their text.
+ */
+@Composable
+private fun PdfBarSlot(modifier: Modifier, content: @Composable () -> Unit) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(top = PdfBarInset).height(PdfBarHeight)
+    ) {
+        content()
+    }
+}
+
+// ---- Previews ----
+
+/**
+ * The pages of the previews' PDF (see [rememberPdf]): three made-up A4 pages, a heading and lines of "text" in grey, drawn
+ * at once so the preview has them in its one frame.
+ */
+private object SamplePdfPages : PdfPages {
+    override val pageRatios = listOf(210f / 297f, 210f / 297f, 210f / 297f)
+
+    override suspend fun render(index: Int, widthPx: Int): Bitmap? = renderNow(index, widthPx)
+
+    override fun renderNow(index: Int, widthPx: Int): Bitmap {
+        val width = widthPx.coerceIn(1, 1200)
+        val height = (width / pageRatios[index]).roundToInt()
+        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
+            bitmap.eraseColor(android.graphics.Color.WHITE)
+            val canvas = android.graphics.Canvas(bitmap)
+            val paint = android.graphics.Paint().apply { color = 0xFFBDBDBD.toInt() }
+            val margin = width * 0.1f
+            val line = width * 0.018f
+            // The heading, then lines of differing lengths down the page
+            canvas.drawRect(margin, margin, width * 0.6f, margin + line * 2, paint)
+            var top = margin + line * 5
+            var n = index
+            while (top < height - margin) {
+                val end = if (n % 7 == 6) width * 0.55f else width - margin
+                canvas.drawRect(margin, top, end, top + line, paint)
+                top += line * 2.2f
+                n++
+            }
+        }
+    }
+}
+
+/** Each state of the preview in a file's details: shown (with the made-up pages), waiting for a tap, loading, failed. */
+@ThemePreviews
+@Composable
+private fun InlinePdfPreviewPreview() {
+    PreviewTheme(padding = 16.dp) {
+        val padding = PaddingValues(vertical = 4.dp)
+        Column {
+            InlinePdfPreview(PdfPreviewState.Ready(File("sample.pdf")), padding, onLoad = {}, onFullScreen = {})
+            InlinePdfPreview(PdfPreviewState.Large(24_117_248), padding, onLoad = {}, onFullScreen = {})
+            InlinePdfPreview(PdfPreviewState.Loading(6_291_456, 24_117_248), padding, onLoad = {}, onFullScreen = {})
+            InlinePdfPreview(PdfPreviewState.Failed(UNREADABLE_PDF), padding, onLoad = {}, onFullScreen = {})
+        }
+    }
+}
+
+/** Full screen, with the made-up pages: the back button, the title and the page number in one line at the top. */
+@ScreenPreviews
+@Composable
+private fun FullScreenPdfDialogPreview() {
+    PreviewTheme {
+        FullScreenPdfDialog(File("sample.pdf"), title = PreviewSamples.pdf.name, onDismissRequest = {})
     }
 }

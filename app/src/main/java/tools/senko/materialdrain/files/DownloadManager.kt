@@ -2,8 +2,11 @@ package tools.senko.materialdrain.files
 
 import tools.senko.materialdrain.provider.api.ErrorCodes
 import android.app.Application
+import android.content.ContentResolver
 import android.content.ContentValues
 import android.net.Uri
+import android.os.Build
+import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
@@ -47,6 +50,32 @@ import tools.senko.materialdrain.util.formatSize
 private const val TAG = "DownloadManager"
 private const val DOWNLOAD_WRITE_BUFFER_BYTES = 256 * 1024
 private const val MAX_FILES_PER_ZIP = 100
+/** How many names a download tries when its own is taken, before MediaStore names it (see insertDownloadEntry). */
+private const val MAX_NAME_TRIES = 100
+
+/**
+ * The name a download tries next when [name] is taken in Downloads: the number in brackets at the end of the part before
+ * the first dot one up, or " (1)" put there when it has none. "senko.jpg" becomes "senko (1).jpg", "senko (2).jpg"
+ * "senko (3).jpg", "archive.tar.gz" "archive (1).tar.gz". Brackets anywhere else ("a (2) b.jpg") are left alone, and a
+ * dot the name starts with (".bashrc") isn't the first.
+ */
+internal fun nextDuplicateName(name: String): String {
+    val dot = name.indexOf('.', startIndex = 1).let { if (it < 0) name.length else it }
+    val base = name.substring(0, dot)
+    val extensions = name.substring(dot)
+    val number = DUPLICATE_NUMBER.find(base)
+    val next = number?.groupValues?.get(1)?.toLongOrNull()?.takeIf { it < Long.MAX_VALUE }?.plus(1)
+    return if (number != null && next != null) base.substring(0, number.range.first) + "($next)" + extensions else "$base (1)$extensions"
+}
+
+private val DUPLICATE_NUMBER = Regex("""\((\d+)\)$""")
+
+/**
+ * [name] with the characters MediaStore doesn't allow in a file name (those FAT doesn't) replaced by "_", as MediaStore
+ * would: the name tried is then the name saved, unless it's taken.
+ */
+private fun validFileName(name: String): String =
+    name.map { if (it.code < 0x20 || it.code == 0x7F || it in "\"*/:<>?\\|") '_' else it }.joinToString("")
 
 enum class DownloadStatus {
     PENDING,
@@ -161,20 +190,10 @@ class DownloadManager(
         return withContext(Dispatchers.IO) {
             val context = application.applicationContext
             val contentResolver = context.contentResolver
-            val contentValues = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                // Never the host's type: when the name's extension doesn't match the type MediaStore adds the type's own
-                // (a .rmbak the host calls a zip became .rmbak.zip). A generic type keeps the name as it is, extension
-                // or not, and the media scan gives the file its type from the name once it's finished
-                put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
-                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                put(MediaStore.MediaColumns.IS_PENDING, 1)
-            }
-
             var outputStream: OutputStream? = null
             var uri: Uri? = null
             try {
-                uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                uri = insertDownloadEntry(contentResolver, fileName)
                 uri?.let {
                     val rawOutputStream = contentResolver.openOutputStream(it)
                     if (rawOutputStream != null) {
@@ -195,6 +214,48 @@ class DownloadManager(
             }
             uri to outputStream
         }
+    }
+
+    /**
+     * Makes the entry in Downloads that a download is written to, named [fileName], or when that's taken the next name of
+     * [nextDuplicateName]. MediaStore would pick its own for a name that's taken, but puts the number after the last dot
+     * ("archive.tar (1).gz") and adds one to a name with a number already ("senko (2) (1).jpg"). Whether a name is taken
+     * can't be asked beforehand, as the app doesn't see the files other apps put in Downloads; so each name is tried, and
+     * an entry MediaStore renamed is deleted for the next name. After [MAX_NAME_TRIES] MediaStore's own name is kept.
+     */
+    private fun insertDownloadEntry(contentResolver: ContentResolver, fileName: String): Uri? {
+        var candidate = validFileName(fileName)
+        repeat(MAX_NAME_TRIES) {
+            val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, downloadEntryValues(candidate)) ?: return null
+            val savedName = displayNameOf(contentResolver, uri)
+            // Renamed for a name that's taken: MediaStore added " (n)" to it. Kept when it changed it otherwise, e.g. cut
+            // off a name too long, which another try wouldn't change
+            if (savedName == null || savedName == candidate || savedName.length <= candidate.length) return uri
+            contentResolver.delete(uri, null, null)
+            candidate = nextDuplicateName(candidate)
+        }
+        return contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, downloadEntryValues(validFileName(fileName)))
+    }
+
+    private fun downloadEntryValues(fileName: String) = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+        // The type of the name's extension, never the host's: when the extension doesn't match the type MediaStore adds
+        // the type's own (a .rmbak the host calls a zip became .rmbak.zip). An unknown extension gets the generic type
+        put(MediaStore.MediaColumns.MIME_TYPE, downloadedFileMimeType(fileName).takeIf { it != "*/*" } ?: "application/octet-stream")
+        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+        put(MediaStore.MediaColumns.IS_PENDING, 1)
+    }
+
+    /** The name MediaStore gave the entry at [uri], which is still pending (only its owner sees it, and only when asked). */
+    private fun displayNameOf(contentResolver: ContentResolver, uri: Uri): String? {
+        val projection = arrayOf(MediaStore.MediaColumns.DISPLAY_NAME)
+        val cursor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            contentResolver.query(uri, projection, Bundle().apply { putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_INCLUDE) }, null)
+        } else {
+            @Suppress("DEPRECATION")
+            contentResolver.query(MediaStore.setIncludePending(uri), projection, null, null, null)
+        }
+        return cursor?.use { if (it.moveToFirst()) it.getString(0) else null }
     }
 
     private suspend fun finalizeMediaStoreEntry(uri: Uri, success: Boolean) {

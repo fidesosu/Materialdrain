@@ -19,6 +19,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import tools.senko.materialdrain.ui.LocalReduceMotion
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.unit.dp
 
 /**
  * Text of any length (a file's name, a link, a hash) kept to [collapsedLines] lines, so a long one can't take over the
@@ -55,5 +61,20 @@ fun ExpandableText(
             overflow = if (!expanded && lines == 1 && cutInMiddle) TextOverflow.MiddleEllipsis else TextOverflow.Ellipsis,
             onTextLayout = { if (!expanded) cutOff = it.hasVisualOverflow }
         )
+    }
+}
+
+// ---- Previews ----
+
+/** Cut at the end on two lines, in the middle on one, at the end on one; in the interactive preview a tap unfolds each. */
+@ThemePreviews
+@Composable
+private fun ExpandableTextPreview() {
+    PreviewTheme(padding = 16.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            ExpandableText(PreviewSamples.longName.name + " " + PreviewSamples.longName.name, collapsedLines = 2)
+            ExpandableText("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", collapsedLines = 1, fontFamily = FontFamily.Monospace)
+            ExpandableText("pixeldrain.com/u/aBcD1234?with=a&long=query&that=goes&on=and&on", collapsedLines = 1, cutInMiddle = false)
+        }
     }
 }

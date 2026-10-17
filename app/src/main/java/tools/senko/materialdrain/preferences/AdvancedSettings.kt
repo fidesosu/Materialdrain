@@ -77,6 +77,11 @@ import tools.senko.materialdrain.provider.api.ProviderCapability
 import tools.senko.materialdrain.provider.api.passwordAuth
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.provider.api.ProviderConfigTemplates
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
+import tools.senko.materialdrain.provider.api.SensitiveChange
+import androidx.compose.foundation.verticalScroll
 
 /** "Custom host settings": the list of imported configs, their update state, and importing new ones. */
 @Composable
@@ -255,9 +260,11 @@ private const val FOCUS_SCROLL_DELAY_MS = 400L
 private fun HostCard(
     stored: StoredProvider,
     uiState: ProviderSettingsUiState,
-    viewModel: ProviderSettingsViewModel
+    viewModel: ProviderSettingsViewModel,
+    /** Opened at first: for the previews at the end of the file */
+    startExpanded: Boolean = false
 ) {
-    var expanded by rememberSaveable(stored.id) { mutableStateOf(false) }
+    var expanded by rememberSaveable(stored.id) { mutableStateOf(startExpanded) }
     // Asked for from the host switcher: opened, and scrolled to once the settings page has slid in and the card has grown
     val bringIntoView = remember { BringIntoViewRequester() }
     val focused = uiState.focusedHostId == stored.id
@@ -583,4 +590,57 @@ private fun EditNoticeDialog(notice: EditNotice, viewModel: ProviderSettingsView
         confirmButton = { TextButton(onClick = { viewModel.removeUpdateLink(notice.id) }) { Text("Stop updating") } },
         dismissButton = { TextButton(onClick = { viewModel.dismissEditNotice() }) { Text("Keep updates") } }
     )
+}
+
+// ---- Previews ----
+
+/** Each of the preview's example hosts (see rememberPreviewSettings) opened: its sign-in, its config and updates. */
+@ScreenPreviews
+@Composable
+private fun HostCardPreview() {
+    PreviewTheme {
+        val viewModel = rememberPreviewSettings().providerSettingsViewModel
+        val state by viewModel.uiState.collectAsState()
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
+            state.providers.forEach { HostCard(it, state, viewModel, startExpanded = true) }
+        }
+    }
+}
+
+@ThemePreviews
+@Composable
+private fun OtpDialogPreview() {
+    PreviewTheme {
+        OtpDialog(OtpPrompt("nas", "Home NAS", digits = 6, error = "That code didn't work. Try the next one.", rejectedCode = "123456"), busy = false, viewModel = rememberPreviewSettings().providerSettingsViewModel)
+    }
+}
+
+/** An update which sends the sign-in somewhere else: what changes, and that the saved sign-in goes. */
+@ThemePreviews
+@Composable
+private fun UpdateApprovalDialogPreview() {
+    PreviewTheme {
+        UpdateApprovalDialog(
+            UpdateApproval(
+                id = "nas",
+                hostName = "Home NAS",
+                fromVersion = 3,
+                toVersion = 4,
+                sensitiveChanges = listOf(
+                    SensitiveChange(SensitiveChange.Kind.DESTINATION, "Requests go to nas.example.org instead of 192.168.1.20"),
+                    SensitiveChange(SensitiveChange.Kind.AUTH, "The key is sent in the X-Api-Key header instead of Authorization")
+                ),
+                discardsEdits = true
+            ),
+            viewModel = rememberPreviewSettings().providerSettingsViewModel
+        )
+    }
+}
+
+@ThemePreviews
+@Composable
+private fun EditNoticeDialogPreview() {
+    PreviewTheme {
+        EditNoticeDialog(EditNotice("nas", "Home NAS", "example.com", autoUpdateTurnedOff = true), viewModel = rememberPreviewSettings().providerSettingsViewModel)
+    }
 }

@@ -52,6 +52,9 @@ import tools.senko.materialdrain.ui.components.AppMenu
 import tools.senko.materialdrain.ui.components.AppMenuItem
 import tools.senko.materialdrain.ui.components.MenuEdge
 import tools.senko.materialdrain.util.formatDurationMillis
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
 
 /**
  * An audio player in a card: art, what is playing, a seek bar and the controls. It loads nothing until play is
@@ -203,6 +206,37 @@ fun AudioPlayerPreview(
                     TextButton(onClick = { state.retry() }) { Text("Try again") }
                 }
             }
+        }
+    }
+}
+
+// ---- Previews ----
+
+/** Paused partway (the preview's player loads nothing, see rememberManagedPlayer); the second one's cover waits for a tap. */
+@ThemePreviews
+@Composable
+private fun AudioPlayerPreviewPreview() {
+    PreviewTheme(padding = 16.dp) {
+        Column {
+            AudioPlayerPreview(
+                audioUri = Uri.EMPTY,
+                apiKey = null,
+                title = "A Song",
+                artist = "Some Artist",
+                album = "An Album (2026)",
+                albumArtSource = null,
+                durationHintMillis = 213_000
+            )
+            AudioPlayerPreview(
+                audioUri = Uri.EMPTY,
+                apiKey = null,
+                title = PreviewSamples.song.name,
+                artist = null,
+                album = null,
+                albumArtSource = null,
+                durationHintMillis = null,
+                onLoadArt = {}
+            )
         }
     }
 }

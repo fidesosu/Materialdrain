@@ -65,6 +65,9 @@ import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.components.DotScrollbar
 import tools.senko.materialdrain.ui.components.pageTransition
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
+import tools.senko.materialdrain.ui.preview.LongScreenPreviews
 
 /** The corners of the settings' cards and tiles, the same as the app's other cards. */
 private val CardShape = RoundedCornerShape(20.dp)
@@ -496,3 +499,81 @@ private fun Explanation(text: String?, unfolded: Boolean, start: Dp) {
 private fun OneLine(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
+
+// ---- Previews ----
+
+/**
+ * The settings on [categoryId]'s page (null: the settings themselves), with the app's own settings and ViewModels and a
+ * made-up account (see rememberPreviewSettings): what's shown is worked out by the real code, only the account is made up.
+ */
+@Composable
+private fun SettingsPreview(categoryId: String?, signedIn: Boolean = true) {
+    PreviewTheme {
+        val environment = rememberPreviewSettings(signedIn)
+        SettingsScreenContent(
+            categoryId = categoryId,
+            onCategoryChange = {},
+            appSettings = environment.appSettings,
+            authViewModel = environment.authViewModel,
+            accountViewModel = environment.accountViewModel,
+            apiKeyInput = "",
+            onApiKeyInputChange = {},
+            providerSettingsViewModel = environment.providerSettingsViewModel,
+            fabHeight = 0.dp,
+            isFabVisible = false,
+            onNavigateBack = {}
+        )
+    }
+}
+
+/** The settings: the account's tile, then a tile per category. */
+@ScreenPreviews
+@Composable
+private fun SettingsHomePreview() = SettingsPreview(null)
+
+@ScreenPreviews
+@Composable
+private fun SettingsHomeSignedOutPreview() = SettingsPreview(null, signedIn = false)
+
+/** The account page, signed in to the made-up account: all of it, each card under the other. */
+@LongScreenPreviews
+@Composable
+private fun SettingsAccountPreview() = SettingsPreview(ACCOUNT_CATEGORY_ID)
+
+/** The account page signed out: the login. */
+@ScreenPreviews
+@Composable
+private fun SettingsAccountSignedOutPreview() = SettingsPreview(ACCOUNT_CATEGORY_ID, signedIn = false)
+
+/** The hosts: Pixeldrain and a few of the example configs. */
+@ScreenPreviews
+@Composable
+private fun SettingsHostsPreview() = SettingsPreview(HOSTS_CATEGORY_ID)
+
+@ScreenPreviews
+@Composable
+private fun SettingsDataSaverPreview() = SettingsPreview("data_saver")
+
+@ScreenPreviews
+@Composable
+private fun SettingsLookPreview() = SettingsPreview("look")
+
+@ScreenPreviews
+@Composable
+private fun SettingsFilesPreview() = SettingsPreview("files")
+
+@ScreenPreviews
+@Composable
+private fun SettingsNotificationsPreview() = SettingsPreview("notifications")
+
+@ScreenPreviews
+@Composable
+private fun SettingsSecurityPreview() = SettingsPreview("security")
+
+@ScreenPreviews
+@Composable
+private fun SettingsDeveloperPreview() = SettingsPreview("developer")
+
+@ScreenPreviews
+@Composable
+private fun SettingsAboutPreview() = SettingsPreview("about")

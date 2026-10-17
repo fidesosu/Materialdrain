@@ -42,6 +42,14 @@ import tools.senko.materialdrain.ui.LocalBottomInset
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 
 /** How tall the whole content is, how far down it is scrolled (in pixels), and whether it is taller than the view at all. */
 private class ScrollMetrics(val contentPx: Float, val offsetPx: Float, val scrollable: Boolean)
@@ -222,5 +230,22 @@ private fun BoxScope.DotScrollbarStrip(
                     }
                 }
         )
+    }
+}
+
+// ---- Previews ----
+
+/** A long list with its dot at the right edge, scrolled a little way down; it can be dragged in the interactive preview. */
+@ThemePreviews
+@Composable
+private fun DotScrollbarPreview() {
+    PreviewTheme {
+        val state = rememberLazyListState(initialFirstVisibleItemIndex = 12)
+        Box(Modifier.height(320.dp)) {
+            LazyColumn(state = state) {
+                items(60) { Text("Item ${it + 1}", modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) }
+            }
+            DotScrollbar(state)
+        }
     }
 }

@@ -284,3 +284,7 @@ private fun UsageChart(series: TimeSeries?, statistic: UsageStatistic, range: St
         }
     }
 }
+
+// ---- Previews ----
+// What's here is drawn by the account page's previews, with a made-up account: SettingsAccountPreview (signed in, every
+// card) and SettingsAccountSignedOutPreview in SettingsScreen.kt, and the account's tile in SettingsHomePreview.
