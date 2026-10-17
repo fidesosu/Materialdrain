@@ -6,11 +6,20 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import tools.senko.materialdrain.ui.LocalReduceMotion
+import tools.senko.materialdrain.ui.components.AppMenuPages
+import tools.senko.materialdrain.ui.icons.automirrored.filled.KeyboardArrowRight
+import tools.senko.materialdrain.ui.icons.filled.Tune
+import tools.senko.materialdrain.ui.icons.filled.Settings
+import tools.senko.materialdrain.ui.icons.filled.CreateNewFolder
+import tools.senko.materialdrain.ui.icons.filled.Link
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -21,6 +30,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -50,7 +60,6 @@ import tools.senko.materialdrain.ui.icons.filled.Clear
 import tools.senko.materialdrain.ui.icons.filled.Close
 import tools.senko.materialdrain.ui.icons.filled.Search
 import tools.senko.materialdrain.ui.icons.outlined.Image
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -90,13 +99,10 @@ import tools.senko.materialdrain.filesystem.PathSegment
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.files.SortOptions
 import tools.senko.materialdrain.files.SortableField
-import tools.senko.materialdrain.ui.components.AppMenu
 import tools.senko.materialdrain.ui.components.AppMenuDivider
 import tools.senko.materialdrain.ui.components.AppMenuItem
 import tools.senko.materialdrain.ui.components.AppMenuPreview
 import tools.senko.materialdrain.ui.components.FloatingCardShape
-import tools.senko.materialdrain.ui.components.MenuEdge
-import tools.senko.materialdrain.ui.components.MenuSide
 import tools.senko.materialdrain.ui.components.floatingCardBorder
 import tools.senko.materialdrain.ui.components.floatingCardColor
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -166,110 +172,82 @@ fun PathBreadcrumb(
 }
 
 /**
- * The sort field and direction — shared by every sortable list in the app, see `AppSettings.sortField` — and the
- * screen's actions (see [SortRowAction]). Searching opens as a modal over the screen (the magnifier at the top of the
- * screen), instead of living in this row.
+ * The cards above the list for what's going on: Cancel, which stops the transfer the bar above shows, and Thumbnails,
+ * which loads the ones the data saver holds back. The row is only there while one of them is, and grows out of the
+ * header and shrinks back into it as they come and go. The sorting and the screen's New actions are in the ⋮ menu at the
+ * top of the screen (see [ScreenMenuEntries]).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SortControls(
-    sortField: SortableField,
-    sortAscending: Boolean,
-    onSortFieldSelected: (SortableField) -> Unit,
-    /** Actions at the end of the row, behind a "New" menu, e.g. the filesystem's upload and new folder. */
-    actions: List<SortRowAction> = emptyList(),
+fun StatusCards(
     /** Stops the transfer shown in the bar above (a download, an upload); null while there's none. */
-    onCancelTransfer: (() -> Unit)? = null,
+    onCancelTransfer: (() -> Unit)?,
     /** Loads the thumbnails the data saver holds back (see DataSaver); null while there are none held back. */
-    onLoadThumbnails: (() -> Unit)? = null
+    onLoadThumbnails: (() -> Unit)?
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val currentSortName = SortOptions.find { it.second == sortField }?.first.orEmpty()
-    val directionIcon = if (sortAscending) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward
-    val directionDescription = if (sortAscending) "Ascending" else "Descending"
-
+    val reduceMotion = LocalReduceMotion.current
     // Kept while Cancel shrinks away, when there's no transfer left to cancel; the same for Thumbnails once they're loaded
     var lastCancel by remember { mutableStateOf(onCancelTransfer) }
     if (onCancelTransfer != null) lastCancel = onCancelTransfer
     var lastLoadThumbnails by remember { mutableStateOf(onLoadThumbnails) }
     if (onLoadThumbnails != null) lastLoadThumbnails = onLoadThumbnails
 
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxWidth()
-            // Lines up with the file rows below, which start at 16dp
-            .padding(horizontal = 16.dp, vertical = 4.dp)
+    val nowShown = listOf(onCancelTransfer != null, onLoadThumbnails != null)
+    // While the whole row shrinks away the cards it had stay as they were, rather than shrinking inside it
+    var lastShown by remember { mutableStateOf(nowShown) }
+    if (nowShown.any { it }) lastShown = nowShown
+
+    AnimatedVisibility(
+        visible = nowShown.any { it },
+        enter = if (reduceMotion) fadeIn(tween(100)) else expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+        exit = if (reduceMotion) fadeOut(tween(100)) else shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
     ) {
-        // Each card takes a share of the row as big as its share of what they all need, worked out from their own text:
-        // Sort by alone fills the row, beside New they split it by content, and a Cancel appearing during a transfer
-        // makes room for itself. On a narrow screen they all give way alike, their text ending in "…"
-        val needs = sortRowNeeds()
-        val shown = listOf(true, onCancelTransfer != null, actions.isNotEmpty(), onLoadThumbnails != null)
-        val visibleNeeds = needs.filterIndexed { i, _ -> shown[i] }
-        val room = maxWidth - SortRowGap * (visibleNeeds.size - 1)
-        val scale = room / visibleNeeds.fold(0.dp) { sum, need -> sum + need }
-        val firstShown = shown.indexOf(true)
-        val sizeSpring = spring<Dp>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
-        val widths = needs.mapIndexed { i, need ->
-            animateDpAsState(if (shown[i]) need * scale else 0.dp, sizeSpring, label = "sortRowWidth$i").value
-        }
-        val gaps = shown.mapIndexed { i, isShown ->
-            animateDpAsState(if (isShown && i != firstShown) SortRowGap else 0.dp, sizeSpring, label = "sortRowGap$i").value
-        }
-        val cancelAlpha by animateFloatAsState(if (shown[1]) 1f else 0f, label = "sortRowCancel")
-        val thumbnailsAlpha by animateFloatAsState(if (shown[3]) 1f else 0f, label = "sortRowThumbnails")
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // Sort: a floating card with a menu. Reselecting the field already sorted on flips its direction (see
-            // AppSettings.changeSortOrder); the direction shows by the field's name and in the menu
-            Box(modifier = Modifier.width(widths[0])) {
-                FloatingCardButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Sort by",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(currentSortName, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    Icon(directionIcon, contentDescription = directionDescription, modifier = Modifier.size(16.dp))
-                }
-                // As wide as the card, however wide the row makes it
-                AppMenu(expanded = expanded, onDismiss = { expanded = false }, side = MenuSide.Below, matchAnchorWidth = true) {
-                    SortMenuEntries(sortField, sortAscending, onSortFieldSelected, onClose = { expanded = false })
-                }
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                // Lines up with the file rows below, which start at 16dp
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+        ) {
+            // Each card takes a share of the row as big as its share of what they both need, worked out from their own
+            // text: one alone fills the row, and one appearing beside it makes room for itself
+            val needs = statusCardNeeds()
+            val shown = lastShown
+            val visibleNeeds = needs.filterIndexed { i, _ -> shown[i] }
+            val room = maxWidth - SortRowGap * (visibleNeeds.size - 1).coerceAtLeast(0)
+            val scale = room / visibleNeeds.fold(0.dp) { sum, need -> sum + need }.coerceAtLeast(1.dp)
+            val sizeSpring = spring<Dp>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+            val widths = needs.mapIndexed { i, need ->
+                animateDpAsState(if (shown[i]) need * scale else 0.dp, sizeSpring, label = "statusCardWidth$i").value
             }
+            val gap by animateDpAsState(if (shown.all { it }) SortRowGap else 0.dp, sizeSpring, label = "statusCardGap")
+            val cancelAlpha by animateFloatAsState(if (shown[0]) 1f else 0f, label = "statusCardCancel")
+            val thumbnailsAlpha by animateFloatAsState(if (shown[1]) 1f else 0f, label = "statusCardThumbnails")
 
-            // Stops the transfer in the bar above; there while one runs, and while it shrinks away after
-            if (shown[1] || widths[1] > 0.dp) {
-                Box(modifier = Modifier.padding(start = gaps[1]).width(widths[1]).graphicsLayer { alpha = cancelAlpha }) {
-                    FloatingCardButton(onClick = { lastCancel?.invoke() }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Filled.Close, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            "Cancel",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.error,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Stops the transfer in the bar above; there while one runs, and while it shrinks away after
+                if (shown[0] || widths[0] > 0.dp) {
+                    Box(modifier = Modifier.width(widths[0]).graphicsLayer { alpha = cancelAlpha }) {
+                        FloatingCardButton(onClick = { lastCancel?.invoke() }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Filled.Close, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "Cancel",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.error,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
-            }
 
-            if (actions.isNotEmpty() || widths[2] > 0.dp) {
-                SortRowActions(actions, modifier = Modifier.padding(start = gaps[2]).width(widths[2]))
-            }
-
-            // The thumbnails the data saver holds back, all at once; there while they're held back, and while it shrinks away
-            if (shown[3] || widths[3] > 0.dp) {
-                Box(modifier = Modifier.padding(start = gaps[3]).width(widths[3]).graphicsLayer { alpha = thumbnailsAlpha }) {
-                    FloatingCardButton(onClick = { lastLoadThumbnails?.invoke() }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Outlined.Image, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Thumbnails", style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // The thumbnails the data saver holds back, all at once; there while they're held back, and while it shrinks away
+                if (shown[1] || widths[1] > 0.dp) {
+                    Box(modifier = Modifier.padding(start = gap).width(widths[1]).graphicsLayer { alpha = thumbnailsAlpha }) {
+                        FloatingCardButton(onClick = { lastLoadThumbnails?.invoke() }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Outlined.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Thumbnails", style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }
@@ -277,18 +255,115 @@ fun SortControls(
     }
 }
 
+/** The sort order of a sortable list, for the ⋮ menu at the top of its screen (see [ScreenMenuEntries]). */
+class SortChoice(val field: SortableField, val ascending: Boolean, val onSelect: (SortableField) -> Unit)
+
+/** An action of a screen behind New in the ⋮ menu at its top (see [ScreenMenuEntries]), e.g. the filesystem's upload. */
+data class ScreenAction(
+    val icon: ImageVector,
+    val description: String,
+    val enabled: Boolean = true,
+    val onClick: () -> Unit
+)
+
+/** A page of the ⋮ menu at the top of a screen (see [ScreenMenuEntries]). */
+enum class ScreenMenuPage { Sort, New }
+
 /**
- * The entries of the sort menu: "Sort by" going back (it closes the menu), then the fields, the one sorted on with its
- * direction. Choosing a field leaves the menu open, so the effect can be seen and the direction flipped again.
+ * The entries of the ⋮ menu at the top of a screen: Sort by for a sortable list ([sort]), with the field it's sorted on,
+ * and New for the screen's own [actions], each opening a page of its own; then Settings, at the bottom. [close] closes
+ * the menu, which choosing a field doesn't (see [SortMenuEntries]). [startPage] is the page it opens on, for the
+ * previews.
+ */
+@Composable
+fun ScreenMenuEntries(
+    close: () -> Unit,
+    sort: SortChoice?,
+    actions: List<ScreenAction>,
+    onOpenSettings: () -> Unit,
+    startPage: ScreenMenuPage? = null
+) {
+    // Remembered in the menu's popup, so each opening starts on the first page
+    var page by remember { mutableStateOf(startPage) }
+    // The page shown on the second level, kept while going back so it slides out as it was
+    var secondPage by remember { mutableStateOf(startPage ?: ScreenMenuPage.Sort) }
+    fun open(to: ScreenMenuPage) {
+        secondPage = to
+        page = to
+    }
+    // The pages behind Sort by and New. Each one is measured even while another is shown, so the menu keeps one width
+    val sortPage: @Composable ColumnScope.() -> Unit = {
+        if (sort != null) SortMenuEntries(sort.field, sort.ascending, sort.onSelect, onBack = { page = null })
+    }
+    val newPage: @Composable ColumnScope.() -> Unit = {
+        if (actions.isNotEmpty()) {
+            AppMenuItem("New", onClick = { page = null }, leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
+            AppMenuDivider()
+            actions.forEach { action ->
+                AppMenuItem(
+                    text = action.description,
+                    leadingIcon = action.icon,
+                    enabled = action.enabled,
+                    onClick = {
+                        close()
+                        action.onClick()
+                    }
+                )
+            }
+        }
+    }
+    AppMenuPages(
+        showSecondary = page != null,
+        primary = {
+            if (sort != null) {
+                AppMenuItem(
+                    "Sort by",
+                    leadingIcon = Icons.Filled.Tune,
+                    trailingText = SortOptions.find { it.second == sort.field }?.first,
+                    trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    onClick = { open(ScreenMenuPage.Sort) }
+                )
+            }
+            if (actions.isNotEmpty()) {
+                AppMenuItem(
+                    "New",
+                    leadingIcon = Icons.Filled.Add,
+                    trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    enabled = actions.any { it.enabled },
+                    onClick = { open(ScreenMenuPage.New) }
+                )
+            }
+            if (sort != null || actions.isNotEmpty()) AppMenuDivider()
+            AppMenuItem("Settings", leadingIcon = Icons.Filled.Settings, onClick = { close(); onOpenSettings() })
+        },
+        secondary = {
+            when (secondPage) {
+                ScreenMenuPage.Sort -> sortPage()
+                ScreenMenuPage.New -> newPage()
+            }
+        },
+        otherPages = {
+            when (secondPage) {
+                ScreenMenuPage.Sort -> newPage()
+                ScreenMenuPage.New -> sortPage()
+            }
+        }
+    )
+}
+
+/**
+ * The entries of the sort page: "Sort by" going back ([onBack]), then the fields, the one sorted on with its direction.
+ * Choosing a field leaves the menu open, so the effect can be seen and the direction flipped again: reselecting the field
+ * already sorted on flips its direction (see AppSettings.changeSortOrder).
  */
 @Composable
 private fun SortMenuEntries(
     sortField: SortableField,
     sortAscending: Boolean,
     onSortFieldSelected: (SortableField) -> Unit,
-    onClose: () -> Unit
+    onBack: () -> Unit
 ) {
-    AppMenuItem("Sort by", onClick = onClose, leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
+    AppMenuItem("Sort by", onClick = onBack, leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
     AppMenuDivider()
     SortOptions.forEach { (name, field) ->
         val selected = field == sortField
@@ -302,66 +377,22 @@ private fun SortMenuEntries(
     }
 }
 
-/** The space between the cards of the sort row. */
+/** The space between the cards of the status row. */
 private val SortRowGap = 8.dp
 
 /**
- * What each card of the sort row needs to show all of itself, in the row's order: Sort by (wide enough for the longest
- * field name, so it doesn't change size between fields), Cancel, New and Thumbnails. From their text as it's drawn, plus
- * their icons and padding (see [FloatingCardButton]).
+ * What each card of the status row needs to show all of itself, in the row's order: Cancel and Thumbnails. From their
+ * text as it's drawn, plus their icon and padding (see [FloatingCardButton]).
  */
 @Composable
-private fun sortRowNeeds(): List<Dp> {
+private fun statusCardNeeds(): List<Dp> {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val small = MaterialTheme.typography.labelSmall
     val large = MaterialTheme.typography.labelLarge
-    return remember(measurer, density, small, large) {
-        fun textWidth(text: String, style: TextStyle): Dp = with(density) { measurer.measure(text, style, maxLines = 1).size.width.toDp() }
+    return remember(measurer, density, large) {
+        fun textWidth(text: String): Dp = with(density) { measurer.measure(text, large, maxLines = 1).size.width.toDp() }
         val padding = CardPadding * 2
-        val sortText = maxOf(textWidth("Sort by", small), SortOptions.maxOf { (name, _) -> textWidth(name, large) })
-        listOf(
-            padding + sortText + 8.dp + 16.dp,
-            padding + 18.dp + 6.dp + textWidth("Cancel", large),
-            padding + 18.dp + 6.dp + textWidth("New", large) + 4.dp,
-            padding + 18.dp + 6.dp + textWidth("Thumbnails", large)
-        )
-    }
-}
-
-/** An action in the sort row's "New" menu (see [SortControls]); [description] is its name there. */
-data class SortRowAction(
-    val icon: ImageVector,
-    val description: String,
-    val enabled: Boolean = true,
-    val onClick: () -> Unit
-)
-
-/** The sort row's actions behind one "New" card, the same floating card as "Sort by" beside it; its menu names each. */
-@Composable
-private fun SortRowActions(actions: List<SortRowAction>, modifier: Modifier = Modifier) {
-    var expanded by remember { mutableStateOf(false) }
-    Box(modifier = modifier) {
-        FloatingCardButton(onClick = { expanded = true }, enabled = actions.any { it.enabled }, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("New", style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.width(4.dp))
-        }
-        // At least as wide as the card, wider when its entries need it, lined up with the card's end
-        AppMenu(expanded = expanded, onDismiss = { expanded = false }, side = MenuSide.Below, edge = MenuEdge.End, matchAnchorWidth = true) {
-            actions.forEach { action ->
-                AppMenuItem(
-                    text = action.description,
-                    leadingIcon = action.icon,
-                    enabled = action.enabled,
-                    onClick = {
-                        expanded = false
-                        action.onClick()
-                    }
-                )
-            }
-        }
+        listOf(padding + 18.dp + 6.dp + textWidth("Cancel"), padding + 18.dp + 6.dp + textWidth("Thumbnails"))
     }
 }
 
@@ -577,34 +608,48 @@ fun SearchModal(
 
 // ---- Previews ----
 
-/** The sort row: alone, with a transfer to cancel and held-back thumbnails, and with the filesystem's New menu. */
+/** The row above the list: with a transfer to cancel, with held-back thumbnails, and with both. */
 @ThemePreviews
 @Composable
-private fun SortControlsPreview() {
+private fun StatusCardsPreview() {
     PreviewTheme {
         Column {
-            SortControls(SortableField.NAME, sortAscending = true, onSortFieldSelected = {})
-            SortControls(SortableField.UPLOAD_DATE, sortAscending = false, onSortFieldSelected = {}, onCancelTransfer = {}, onLoadThumbnails = {})
-            SortControls(
-                SortableField.SIZE,
-                sortAscending = false,
-                onSortFieldSelected = {},
-                actions = listOf(SortRowAction(Icons.Filled.Upload, "Upload") {}, SortRowAction(Icons.Filled.Add, "New folder") {})
-            )
+            StatusCards(onCancelTransfer = {}, onLoadThumbnails = null)
+            StatusCards(onCancelTransfer = null, onLoadThumbnails = {})
+            StatusCards(onCancelTransfer = {}, onLoadThumbnails = {})
         }
     }
 }
 
-/** The sort menu open, sorted on size, largest first. */
+/** The filesystem's ⋮ menu, open: Sort by (sorted on name), New, and Settings. */
 @ThemePreviews
 @Composable
-private fun SortMenuPreview() {
+private fun ScreenMenuPreview() {
     PreviewTheme(padding = 8.dp) {
-        AppMenuPreview {
-            SortMenuEntries(SortableField.SIZE, sortAscending = false, onSortFieldSelected = {}, onClose = {})
+        AppMenuPreview { ScreenMenuEntries({}, PreviewSort, PreviewActions, onOpenSettings = {}) }
+    }
+}
+
+/** Its pages: the sorting (on size, largest first) and New. */
+@ThemePreviews
+@Composable
+private fun ScreenMenuPagesPreview() {
+    PreviewTheme(padding = 8.dp) {
+        Row {
+            AppMenuPreview {
+                ScreenMenuEntries({}, SortChoice(SortableField.SIZE, ascending = false) {}, PreviewActions, onOpenSettings = {}, startPage = ScreenMenuPage.Sort)
+            }
+            AppMenuPreview { ScreenMenuEntries({}, PreviewSort, PreviewActions, onOpenSettings = {}, startPage = ScreenMenuPage.New) }
         }
     }
 }
+
+private val PreviewSort = SortChoice(SortableField.NAME, ascending = true) {}
+private val PreviewActions = listOf(
+    ScreenAction(Icons.Filled.Upload, "Upload") {},
+    ScreenAction(Icons.Filled.CreateNewFolder, "New folder") {},
+    ScreenAction(Icons.Filled.Link, "Import files by ID") {}
+)
 
 @ThemePreviews
 @Composable

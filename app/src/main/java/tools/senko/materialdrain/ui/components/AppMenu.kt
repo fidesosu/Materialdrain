@@ -62,6 +62,12 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.layout.IntrinsicMeasurable
+import androidx.compose.ui.layout.IntrinsicMeasureScope
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
+import androidx.compose.ui.layout.MeasurePolicy
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -74,6 +80,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.window.PopupPositionProvider
@@ -483,29 +490,68 @@ fun AppMenuDivider() {
  * The content of an [AppMenu] with two levels: the [primary] entries, and the [secondary] ones which replace them while
  * [showSecondary] is true (start it with an entry going back, it isn't added). The change slides the entries sideways
  * while the menu grows or shrinks to them.
+ *
+ * Both levels are as wide as the wider of the two, from the start: only the menu's height changes between them. A menu
+ * whose second level can be one of several pages gives the ones not shown as [otherPages], so it's as wide as those too
+ * and doesn't change width when another is opened. The
+ * menu takes its width from its widest entry before laying any out (IntrinsicSize.Max, see AppMenuPanel), which a level
+ * sliding in can't follow while it animates; asked then, the menu jumped to the new width at once.
  */
 @Composable
 fun AppMenuPages(
     showSecondary: Boolean,
     primary: @Composable ColumnScope.() -> Unit,
-    secondary: @Composable ColumnScope.() -> Unit
+    secondary: @Composable ColumnScope.() -> Unit,
+    otherPages: @Composable ColumnScope.() -> Unit = {}
 ) {
     val duration = if (LocalReduceMotion.current) 0 else AppMenuDefaults.ANIMATION_MS
-    AnimatedContent(
-        targetState = showSecondary,
-        transitionSpec = {
-            // Going deeper moves the entries to the left, coming back to the right
-            val direction = if (targetState) 1 else -1
-            (slideInHorizontally(tween(duration, easing = FastOutSlowInEasing)) { it * direction / 4 } +
-                fadeIn(tween(duration))) togetherWith
-                (slideOutHorizontally(tween(duration, easing = FastOutSlowInEasing)) { -it * direction / 4 } +
-                    fadeOut(tween(duration / 2))) using
-                SizeTransform(clip = true) { _, _ -> tween(duration, easing = FastOutSlowInEasing) }
-        },
-        label = "menuPage"
-    ) { secondaryPage ->
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) { if (secondaryPage) secondary() else primary() }
+    Box {
+        // Both levels' entries, only asked how wide they are: never placed, so never drawn nor tapped, and kept from
+        // screen readers, which would read them twice
+        Layout(
+            modifier = Modifier.clearAndSetSemantics {},
+            content = {
+                Column { primary() }
+                Column { secondary() }
+                Column { otherPages() }
+            },
+            measurePolicy = WidthOnly
+        )
+        AnimatedContent(
+            targetState = showSecondary,
+            modifier = Modifier.fillMaxWidth(),
+            transitionSpec = {
+                // Going deeper moves the entries to the left, coming back to the right
+                val direction = if (targetState) 1 else -1
+                (slideInHorizontally(tween(duration, easing = FastOutSlowInEasing)) { it * direction / 4 } +
+                    fadeIn(tween(duration))) togetherWith
+                    (slideOutHorizontally(tween(duration, easing = FastOutSlowInEasing)) { -it * direction / 4 } +
+                        fadeOut(tween(duration / 2))) using
+                    SizeTransform(clip = true) { _, _ -> tween(duration, easing = FastOutSlowInEasing) }
+            },
+            label = "menuPage"
+        ) { secondaryPage ->
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) { if (secondaryPage) secondary() else primary() }
+        }
     }
+}
+
+/**
+ * Lays out nothing (no size, nothing placed) but answers how wide its widest child is: what [AppMenuPages] makes the menu
+ * as wide as, with both its levels.
+ */
+private object WidthOnly : MeasurePolicy {
+    override fun MeasureScope.measure(measurables: List<Measurable>, constraints: Constraints): MeasureResult = layout(0, 0) {}
+
+    override fun IntrinsicMeasureScope.maxIntrinsicWidth(measurables: List<IntrinsicMeasurable>, height: Int): Int =
+        measurables.maxOfOrNull { it.maxIntrinsicWidth(height) } ?: 0
+
+    override fun IntrinsicMeasureScope.minIntrinsicWidth(measurables: List<IntrinsicMeasurable>, height: Int): Int =
+        measurables.maxOfOrNull { it.minIntrinsicWidth(height) } ?: 0
+
+    override fun IntrinsicMeasureScope.maxIntrinsicHeight(measurables: List<IntrinsicMeasurable>, width: Int): Int = 0
+
+    override fun IntrinsicMeasureScope.minIntrinsicHeight(measurables: List<IntrinsicMeasurable>, width: Int): Int = 0
 }
 
 /**

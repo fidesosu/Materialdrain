@@ -49,6 +49,7 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -99,7 +100,6 @@ import tools.senko.materialdrain.ui.components.FolderPickerDialog
 import tools.senko.materialdrain.ui.components.OverflowMenuButton
 import tools.senko.materialdrain.ui.components.TextInputDialog
 import tools.senko.materialdrain.util.formatRelativeDateTime
-import tools.senko.materialdrain.files.SortableField
 import tools.senko.materialdrain.filesystem.PathSegment
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ScreenPreviews
@@ -139,7 +139,9 @@ fun BrowserScreen(
     scrollState: LazyListState,
     fabHeight: Dp,
     isFabVisible: Boolean,
-    onSelectingChange: (Boolean) -> Unit
+    onSelectingChange: (Boolean) -> Unit,
+    /** Told the screen's actions for New in the ⋮ menu at the top (see App.kt), e.g. the filesystem's upload. */
+    onActionsChange: (List<ScreenAction>) -> Unit = {}
 ) {
     val fsState by filesystemViewModel.uiState.collectAsState()
     val fsDisplayedChildren by filesystemViewModel.displayedChildren.collectAsState()
@@ -529,12 +531,14 @@ fun BrowserScreen(
         }
     }
 
-    // The Filesystem's actions in the sort row: upload, new folder and import, while it can be written to
-    val headerActions = if (mode != BrowserMode.FILESYSTEM) emptyList() else if (fsState.canWrite && !selectionMode) buildList {
-            if (canUploadFs) add(SortRowAction(Icons.Filled.Upload, "Upload", enabled = !fsState.isModifying && fsUploadStatus == null) { filesystemUploadLauncher.launch("*/*") })
-            if (canMkdirFs) add(SortRowAction(Icons.Filled.CreateNewFolder, "New folder", enabled = !fsState.isModifying) { showNewFolderDialog = true })
-            if (fsState.canImport) add(SortRowAction(Icons.Filled.Link, "Import files by ID", enabled = !fsState.isModifying) { showImportDialog = true })
+    // The Filesystem's actions behind New in the ⋮ menu at the top: upload, new folder and import, while it can be written to
+    val screenActions = if (mode != BrowserMode.FILESYSTEM) emptyList() else if (fsState.canWrite && !selectionMode) buildList {
+            if (canUploadFs) add(ScreenAction(Icons.Filled.Upload, "Upload", enabled = !fsState.isModifying && fsUploadStatus == null) { filesystemUploadLauncher.launch("*/*") })
+            if (canMkdirFs) add(ScreenAction(Icons.Filled.CreateNewFolder, "New folder", enabled = !fsState.isModifying) { showNewFolderDialog = true })
+            if (fsState.canImport) add(ScreenAction(Icons.Filled.Link, "Import files by ID", enabled = !fsState.isModifying) { showImportDialog = true })
         } else emptyList()
+    val currentOnActionsChange by rememberUpdatedState(onActionsChange)
+    SideEffect { currentOnActionsChange(screenActions) }
     BrowserContent(
         mode = mode,
         entries = entries,
@@ -549,10 +553,6 @@ fun BrowserScreen(
         errorMessage = errorMessage,
         keyMissing = keyMissing,
         filterQuery = activeFilterQuery,
-        sortField = sortField,
-        sortAscending = sortAscending,
-        onSortFieldSelected = { appSettings.changeSortOrder(it) },
-        headerActions = headerActions,
         // What stops the transfer the bar above this screen shows (see App.kt's TransferBarSlot): the filesystem's upload
         // there, else the downloads. Offered as a Cancel card next to the sorting
         onCancelTransfer = when {
@@ -636,10 +636,6 @@ fun BrowserContent(
     errorMessage: String?,
     keyMissing: Boolean,
     filterQuery: String,
-    sortField: SortableField,
-    sortAscending: Boolean,
-    onSortFieldSelected: (SortableField) -> Unit,
-    headerActions: List<SortRowAction>,
     onCancelTransfer: (() -> Unit)?,
     pathSegments: List<PathSegment>,
     onPathSegmentClick: (PathSegment) -> Unit,
@@ -681,27 +677,14 @@ fun BrowserContent(
             // which is just titles), then right above the content the path (filesystem) or the list being shown (lists)
             when (mode) {
                 BrowserMode.FILESYSTEM -> {
-                    SortControls(
-                        sortField = sortField,
-                        sortAscending = sortAscending,
-                        onSortFieldSelected = onSortFieldSelected,
-                        actions = headerActions,
-                        onCancelTransfer = onCancelTransfer,
-                        onLoadThumbnails = loadThumbnails
-                    )
+                    StatusCards(onCancelTransfer = onCancelTransfer, onLoadThumbnails = loadThumbnails)
                     PathBreadcrumb(
                         pathSegments = pathSegments,
                         onPathSegmentClick = onPathSegmentClick
                     )
                 }
                 BrowserMode.LISTS -> if (openedList != null) {
-                    SortControls(
-                        sortField = sortField,
-                        sortAscending = sortAscending,
-                        onSortFieldSelected = onSortFieldSelected,
-                        onCancelTransfer = onCancelTransfer,
-                        onLoadThumbnails = loadThumbnails
-                    )
+                    StatusCards(onCancelTransfer = onCancelTransfer, onLoadThumbnails = loadThumbnails)
                     if (!selectionMode) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
@@ -733,13 +716,7 @@ fun BrowserContent(
                         }
                     }
                 }
-                BrowserMode.FILES -> SortControls(
-                    sortField = sortField,
-                    sortAscending = sortAscending,
-                    onSortFieldSelected = onSortFieldSelected,
-                    onCancelTransfer = onCancelTransfer,
-                    onLoadThumbnails = loadThumbnails
-                )
+                BrowserMode.FILES -> StatusCards(onCancelTransfer = onCancelTransfer, onLoadThumbnails = loadThumbnails)
             }
 
             if (isModifying && mode == BrowserMode.FILESYSTEM) {
@@ -956,7 +933,7 @@ private fun FilesystemMenu(
         }
         if (canWrite) {
             AppMenuItem("Rename", leadingIcon = Icons.Filled.Edit, onClick = { close(); onRename() })
-            AppMenuItem("Move", leadingIcon = Icons.AutoMirrored.Filled.DriveFileMove, onClick = { close(); onMove() })
+            AppMenuItem("Move", leadingIcon = Icons.AutoMirrored.Filled.DriveFileMove, supportingText = "To another folder", onClick = { close(); onMove() })
         }
         if (canDelete) {
             AppMenuDivider()
@@ -1012,12 +989,6 @@ internal fun SampleBrowserContent(
         errorMessage = errorMessage,
         keyMissing = keyMissing,
         filterQuery = "",
-        sortField = SortableField.NAME,
-        sortAscending = true,
-        onSortFieldSelected = {},
-        headerActions = if (mode == BrowserMode.FILESYSTEM && !selecting) {
-            listOf(SortRowAction(Icons.Filled.Upload, "Upload") {}, SortRowAction(Icons.Filled.CreateNewFolder, "New folder") {})
-        } else emptyList(),
         onCancelTransfer = if (uploadStatus != null) ({}) else null,
         pathSegments = listOf("me", "Holiday photos").runningReduce { a, b -> "$a/$b" }.map { PathSegment(it.substringAfterLast('/'), it) },
         onPathSegmentClick = {},

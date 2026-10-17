@@ -72,6 +72,7 @@ import tools.senko.materialdrain.ui.LocalBlurredBackdrop
 import tools.senko.materialdrain.ui.LocalBottomInset
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.components.CodePreview
+import tools.senko.materialdrain.ui.components.CodePreviewLoading
 import tools.senko.materialdrain.ui.components.DotScrollbar
 import tools.senko.materialdrain.ui.components.ExpandableText
 import tools.senko.materialdrain.ui.components.FileIcon
@@ -225,11 +226,11 @@ fun FileInfoDetailsCard(
         ) {
             // Only the private filesystem needs the login for previews
             val previewApiKey = uiState.apiKey.takeIf { isFilesystemFile && it.isNotBlank() }
-            // A picture, video or song preview starts just under the top bar, with a little room; anything else keeps more
-            // Held back by the data saver, a picture or video keeps its frame in the same place (see HeldPreview)
+            // A picture, video, song, PDF or text preview starts just under the top bar, with a little room; anything else
+            // keeps more. Held back by the data saver, a preview keeps its frame in the same place (see HeldPreview)
             val mediaPreviewFirst = showPreviews && uiState.archive == null &&
                 (previewType?.startsWith("image/") == true || previewType?.startsWith("video/") == true || previewType?.startsWith("audio/") == true ||
-                    isPdf(fileInfo.name, previewType))
+                    isPdf(fileInfo.name, previewType) || isTextFile(fileInfo.name, previewType))
             if (!mediaPreviewFirst) Spacer(Modifier.height(16.dp))
             val mediaPadding = PaddingValues(top = 8.dp, bottom = 8.dp)
             if (showPreviews && uiState.previewHeld) {
@@ -314,13 +315,12 @@ fun FileInfoDetailsCard(
                         onFullScreen = { fullScreenPdf = it }
                     )
                 } else if (uiState.isLoadingTextPreview) {
-                    Box(modifier = Modifier.fillMaxWidth().height(100.dp).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
+                    // The text's own card, so nothing below it moves once the text is in
+                    CodePreviewLoading(outerPadding = mediaPadding)
                 } else if (uiState.textPreviewContent != null) {
                     val content = uiState.textPreviewContent ?: ""
                     val language = remember(fileInfo.name, content) { languageFor(fileInfo.name, content.lineSequence().firstOrNull()) }
-                    CodePreview(content = content, language = language, fullContent = uiState.textPreviewFullContent, title = fileInfo.name)
+                    CodePreview(content = content, language = language, fullContent = uiState.textPreviewFullContent, title = fileInfo.name, outerPadding = mediaPadding)
                 } else if (uiState.textPreviewErrorMessage != null) {
                     Text(
                         uiState.textPreviewErrorMessage ?: "Error loading text preview.",
@@ -352,15 +352,8 @@ fun FileInfoDetailsCard(
                 Box(modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {}
             }
 
-            // Whether the preview above already shows the file's picture (the image, a video frame, a song's cover); then the
-            // header doesn't repeat it with the tile of its kind
-            val previewShowsPicture = !uiState.previewHeld && uiState.archive == null && when {
-                previewType?.startsWith("image/") == true || previewType?.startsWith("video/") == true || previewType?.startsWith("audio/") == true -> true
-                uiState.isLoadingTextPreview || uiState.textPreviewContent != null || uiState.textPreviewErrorMessage != null -> false
-                else -> actualThumbnailUrl != null
-            }
             Spacer(Modifier.height(12.dp))
-            FileHeader(fileInfo, showTile = !previewShowsPicture)
+            FileHeader(fileInfo)
 
             rich?.availabilityMessage?.takeIf { it.isNotBlank() }?.let { message ->
                 Spacer(Modifier.height(12.dp))
@@ -480,21 +473,19 @@ fun FileInfoDetailsCard(
 // ---- Header ----
 
 /**
- * The file's whole name (selectable, to copy it), with what it is in a line under it. [showTile] puts the tile of its
- * kind before it, for a file whose preview doesn't already show its picture (an archive, a text file).
+ * The file's whole name (selectable, to copy it), after the tile of its kind, with what it is in a line under it. The tile
+ * stays when the preview above shows the file's own picture, so what kind of file it is reads the same on every file.
  */
 @Composable
-private fun FileHeader(file: StorageNode, showTile: Boolean) {
+private fun FileHeader(file: StorageNode) {
     val summary = listOfNotNull(
         fileKindLabel(file.name, file.isDirectory),
         file.size?.let { formatSize(it) },
         file.createdAt?.let { relativeTime(it) }?.let { "uploaded $it" }
     ).joinToString(" · ")
     Row(verticalAlignment = Alignment.CenterVertically) {
-        if (showTile) {
-            FileIcon(name = file.name, isDirectory = file.isDirectory, thumbnailUrl = null, size = 44.dp)
-            Spacer(Modifier.width(12.dp))
-        }
+        FileIcon(name = file.name, isDirectory = file.isDirectory, thumbnailUrl = null, size = 44.dp)
+        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             ExpandableText(file.name, style = MaterialTheme.typography.titleMedium, collapsedLines = 2)
             Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -502,7 +493,7 @@ private fun FileHeader(file: StorageNode, showTile: Boolean) {
     }
 }
 
-/** How tall a held text or archive preview is: the most the text preview takes (see CodePreview). */
+/** How tall a held archive preview is: as tall as the archive's contents start out. */
 private val HeldPreviewHeight = 200.dp
 
 /**
@@ -541,8 +532,9 @@ private fun HeldPreview(
         isTextFile(file.name, previewType) && previewType?.startsWith("image/") != true -> Held(
             "the text",
             size?.let { "Up to ${formatSize(minOf(it, MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES.toLong()))}" },
-            Modifier.padding(top = 8.dp).height(HeldPreviewHeight),
-            RoundedCornerShape(16.dp),
+            // The text's own card (see CodePreview)
+            Modifier.aspectRatio(16f / 9f).padding(mediaPadding),
+            media,
             scheme.surfaceContainerHighest
         )
         previewType?.startsWith("image/") == true ->

@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -39,7 +38,6 @@ import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.automirrored.filled.WrapText
 import tools.senko.materialdrain.ui.icons.filled.Close
 import tools.senko.materialdrain.ui.icons.filled.ContentCopy
-import tools.senko.materialdrain.ui.icons.filled.OpenInFull
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -80,6 +78,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.material3.LinearProgressIndicator
+import tools.senko.materialdrain.ui.icons.filled.Fullscreen
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -94,9 +96,6 @@ import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import tools.senko.materialdrain.ui.preview.PreviewSamples
 import tools.senko.materialdrain.files.languageFor
 import androidx.compose.ui.platform.LocalInspectionMode
-
-/** How high the preview on the details page gets; the whole file is in the fullscreen view (see [CodeFullscreen]). */
-private val InlineMaxHeight = 200.dp
 
 /** Tabs as spaces, so columns line up in the monospaced text whatever the tab width would have been. */
 private fun expandTabs(text: String) = text.replace("\t", "    ")
@@ -207,11 +206,13 @@ fun rememberCodeHighlighting(language: SourceLanguage?): VisualTransformation {
 private fun lineCount(text: String) = text.count { it == '\n' } + if (text.isEmpty() || text.endsWith('\n')) 0 else 1
 
 /**
- * A text file, coloured for its language (null when it isn't known, then it's shown as it is), in a box of a few lines'
- * height; the fullscreen button opens the whole of it (see [CodeFullscreen]).
+ * A text file, coloured for its language (null when it isn't known, then it's shown as it is), in a card the size of the
+ * other previews (a picture, a PDF): 16:9, scrolling inside. Over its bottom corners, as on a PDF's preview, what it is
+ * and how long, and the badge that opens the whole of it fullscreen (see [CodeFullscreen]).
  *
  * @param content the start of the file, shown here
  * @param fullContent the whole file, for the fullscreen view; null when [content] is all of it
+ * @param outerPadding the space around the card, as around the other previews
  */
 @Composable
 fun CodePreview(
@@ -219,7 +220,8 @@ fun CodePreview(
     language: SourceLanguage?,
     modifier: Modifier = Modifier,
     fullContent: String? = null,
-    title: String = language?.name ?: "Text"
+    title: String = language?.name ?: "Text",
+    outerPadding: PaddingValues = PaddingValues(vertical = 8.dp)
 ) {
     val colors = codeColors()
     val wrap = LocalTextWrap.current
@@ -227,60 +229,85 @@ fun CodePreview(
     val highlighted = remember(shown, language, colors) { highlightedCode(shown, language, colors) }
     val whole = fullContent ?: content
     val totalLines = remember(whole) { lineCount(whole) }
+    val shownLines = remember(content) { lineCount(content) }
+    val cut = fullContent != null && fullContent.length > content.length
     var fullscreen by rememberSaveable { mutableStateOf(false) }
+    val count = NumberFormat.getIntegerInstance()
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+    CodePreviewFrame(modifier, outerPadding) {
+        val textScroll = rememberScrollState()
+        // Scrolling the text stops at its ends rather than carrying on into the page around it. Only while there's
+        // text to scroll: a short one leaves its drags to the page, as any other part of it
+        val keepScrollInside = remember(textScroll) { ScrollStopsAtEnds(textScroll) }
+        SelectionContainer {
             Text(
-                text = listOf(language?.name ?: "Text", "${NumberFormat.getIntegerInstance().format(totalLines)} lines").joinToString(" · "),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = { fullscreen = true }) {
-                Icon(Icons.Filled.OpenInFull, contentDescription = "Open the text fullscreen", modifier = Modifier.size(20.dp))
-            }
-        }
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            val textScroll = rememberScrollState()
-            // Scrolling the text stops at its ends rather than carrying on into the page around it. Only while there's
-            // text to scroll: a short one leaves its drags to the page, as any other part of it
-            val keepScrollInside = remember(textScroll) { ScrollStopsAtEnds(textScroll) }
-            SelectionContainer {
-                Text(
-                    text = highlighted,
-                    fontFamily = FontFamily.Monospace,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    // Without wrapping the lines keep their length, and the text scrolls sideways
-                    softWrap = wrap,
-                    modifier = Modifier
-                        .heightIn(max = InlineMaxHeight)
-                        .nestedScroll(keepScrollInside)
-                        .verticalScroll(textScroll)
-                        .then(if (wrap) Modifier else Modifier.horizontalScroll(rememberScrollState()))
-                        .padding(12.dp)
-                )
-            }
-        }
-        if (fullContent != null && fullContent.length > content.length) {
-            Text(
-                "Showing the start: ${NumberFormat.getIntegerInstance().format(lineCount(content))} of " +
-                    "${NumberFormat.getIntegerInstance().format(totalLines)} lines. Open it fullscreen for the rest.",
+                text = highlighted,
+                fontFamily = FontFamily.Monospace,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurface,
+                // Without wrapping the lines keep their length, and the text scrolls sideways
+                softWrap = wrap,
                 modifier = Modifier
-                    .padding(top = 6.dp)
-                    .clickable { fullscreen = true }
+                    .fillMaxSize()
+                    .nestedScroll(keepScrollInside)
+                    .verticalScroll(textScroll)
+                    .then(if (wrap) Modifier else Modifier.horizontalScroll(rememberScrollState()))
+                    // Room under the last line for the labels over the bottom, so it can be scrolled clear of them
+                    .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 44.dp)
             )
+        }
+        // A file cut short says how much of it is here; the rest is in the fullscreen view
+        Text(
+            listOf(
+                language?.name ?: "Text",
+                if (cut) "first ${count.format(shownLines)} of ${count.format(totalLines)} lines" else "${count.format(totalLines)} lines"
+            ).joinToString(" · "),
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 8.dp, bottom = 8.dp, end = 48.dp)
+                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        )
+        // The same badge as on a picture's or a PDF's preview, but only the badge opens it: the text is scrolled and
+        // selected where it is
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .size(44.dp)
+                .clickable(onClickLabel = "Open the text fullscreen") { fullscreen = true }
+        ) {
+            Surface(modifier = Modifier.size(28.dp), shape = RoundedCornerShape(4.dp), color = Color.Black.copy(alpha = 0.55f)) {
+                Icon(Icons.Filled.Fullscreen, contentDescription = "Open the text fullscreen", tint = Color.White, modifier = Modifier.padding(4.dp))
+            }
         }
     }
 
     if (fullscreen) CodeFullscreen(title = title, content = whole, language = language, onDismiss = { fullscreen = false })
+}
+
+/** [CodePreview] while its text loads: the same card, so nothing around it moves when the text comes in. */
+@Composable
+fun CodePreviewLoading(modifier: Modifier = Modifier, outerPadding: PaddingValues = PaddingValues(vertical = 8.dp)) {
+    CodePreviewFrame(modifier, outerPadding) {
+        LinearProgressIndicator(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth())
+    }
+}
+
+/** The card of [CodePreview]: as wide as the page, 16:9 and as round as the other previews, in the code's colour. */
+@Composable
+private fun CodePreviewFrame(modifier: Modifier, outerPadding: PaddingValues, content: @Composable BoxScope.() -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        shape = RoundedCornerShape(8.dp),
+        modifier = modifier.fillMaxWidth().aspectRatio(16f / 9f).padding(outerPadding)
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), content = content)
+    }
 }
 
 /**
@@ -431,7 +458,7 @@ private fun CodePreviewPreview() {
     }
 }
 
-/** Cut short: only the start is shown, the note under it says how much more there is. */
+/** Cut short: only the start is shown, its label says how much of it that is. */
 @ThemePreviews
 @Composable
 private fun CodePreviewCutPreview() {
@@ -439,6 +466,13 @@ private fun CodePreviewCutPreview() {
         val whole = (1..400).joinToString("\n") { "val line$it = \"$it\" // a comment" }
         CodePreview(content = whole.lines().take(30).joinToString("\n"), language = languageFor("lines.kt"), fullContent = whole)
     }
+}
+
+/** Loading: the same card, so nothing moves once the text is in. */
+@ThemePreviews
+@Composable
+private fun CodePreviewLoadingPreview() {
+    PreviewTheme(padding = 16.dp) { CodePreviewLoading() }
 }
 
 @ScreenPreviews
