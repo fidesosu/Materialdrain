@@ -48,7 +48,7 @@
             <!-- Pixeldrain's links of a file (/u/…) and of a list (/l/…) can open in the app. Not verified as the app's own
                  (that's for the site to declare), so Android asks, or the user turns them on in the app's settings under
                  "Open by default" -->
-            <intent-filter>
+            <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />

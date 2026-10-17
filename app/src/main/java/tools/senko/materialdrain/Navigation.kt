@@ -111,19 +111,7 @@ private const val MAX_BAR_TABS = 5
 
 /** Whether [tab] is the one shown. */
 private fun Tab.isCurrent(currentTab: Tab?): Boolean = currentTab?.id == id && currentTab.screen == screen
-data class FabDetails(
-    /** The button of one screen is a different button than that of another screen, they only share the widget. */
-    val screen: Screen,
-    val icon: ImageVector,
-    val text: String?,
-    val onClick: () -> Unit,
-    val isExtended: Boolean,
-    val yOffset: androidx.compose.ui.unit.Dp = 0.dp,
-    /** Other texts this button shows, its text area is as wide as the widest of them so it never changes size. */
-    val reserveTextWidthFor: List<String> = emptyList(),
-    /** The icon makes a full turn each time this value increases. */
-    val iconSpinTrigger: Int = 0
-)
+
 /**
  * The tabs at the bottom of the screen. Five fit: with more, the fifth place is More, which opens a menu of the rest (and
  * shows the one of them that's open). [alwaysShowLabels] off shows only the chosen tab's name (Look and feel).

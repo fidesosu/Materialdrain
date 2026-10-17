@@ -1,4 +1,4 @@
-package tools.senko.materialdrain.preferences
+package tools.senko.materialdrain.settings.ui
 
 import android.net.Uri
 import androidx.lifecycle.ViewModel

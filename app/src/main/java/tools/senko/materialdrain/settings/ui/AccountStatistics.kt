@@ -1,4 +1,4 @@
-package tools.senko.materialdrain.preferences
+package tools.senko.materialdrain.settings.ui
 
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.FastOutSlowInEasing

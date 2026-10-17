@@ -23,7 +23,8 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,7 +51,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.filled.Close
 import tools.senko.materialdrain.ui.icons.filled.Menu
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -73,7 +75,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -98,7 +103,7 @@ private val EntryAnimation = tween<Float>(durationMillis = 420, easing = FastOut
 private val MoveAnimation = tween<Float>(durationMillis = 300, easing = CubicBezierEasing(0.4f, 0f, 0.8f, 1f))
 /** A change of the button's size (its label growing or shrinking): it glides to its side with the size. */
 private val ResizeAnimation = tween<Float>(durationMillis = 260, easing = FastOutSlowInEasing)
-/** Minimum horizontal travel for a release to count as a swipe. */
+/** Minimum travel for a release to count as a swipe (sideways moves the button, upwards opens the window). */
 private val SwipeThreshold = 24.dp
 /** Measured from when the finger starts moving; releasing later than this cancels the swipe. */
 private const val SWIPE_TIMEOUT_MILLIS = 500L
@@ -106,8 +111,9 @@ private const val GRID_COLUMNS = 4
 
 /**
  * Navigation prototype: a FAB which sits bottom-left, -center or -right (swipe it sideways to move it),
- * opening a small bottom-anchored window of destinations above it. The FAB shows the current screen's icon,
- * and turns into a round close button while the window is open. Tapping outside the window closes it.
+ * opening a small bottom-anchored window of destinations above it, on a tap or a swipe up. A long press goes back to the
+ * tab shown before this one. The FAB shows the current screen's icon, and turns into a round close button while the
+ * window is open. Tapping outside the window closes it.
  *
  * Mock items (no [NavMenuItem.tab]) only get highlighted when tapped, there's nothing behind them.
  */
@@ -134,6 +140,15 @@ fun NavFabMenu(
     LaunchedEffect(open) { currentOnOpenChange(open) }
     var mockSelectedId by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(enabled = open) { open = false }
+    // The tab shown before this one, which a long press on the button goes back to
+    var shownTab by remember { mutableStateOf(currentTab) }
+    var previousTab by remember { mutableStateOf<Tab?>(null) }
+    LaunchedEffect(currentTab) {
+        if (currentTab != null && currentTab != shownTab) {
+            previousTab = shownTab
+            shownTab = currentTab
+        }
+    }
 
     val reduceMotion = LocalReduceMotion.current
     val isSelected: (NavMenuItem) -> Boolean = { item -> item.tab?.let { it == currentTab } ?: (item.id == mockSelectedId) }
@@ -196,6 +211,14 @@ fun NavFabMenu(
             position = position,
             containerWidth = constraints.maxWidth,
             onClick = { open = !open },
+            // Only to a tab this host still has (see menu)
+            onLongClick = previousTab?.takeIf { tab -> allItems.any { it.tab == tab } }?.let { tab ->
+                {
+                    open = false
+                    onNavigate(tab)
+                }
+            },
+            onSwipeUp = { open = true },
             onPositionChange = onPositionChange,
             onFabHeightChanged = onFabHeightChanged,
             modifier = Modifier
@@ -211,9 +234,10 @@ fun NavFabMenu(
 }
 
 /**
- * A swipe moves the FAB exactly one spot in its direction, however far the finger travels, and only once the
- * finger is lifted; it doesn't follow the finger while dragging. The swipe has to be released within
- * [SWIPE_TIMEOUT_MILLIS] of the finger starting to *move* (not of touching down), otherwise it doesn't count.
+ * A swipe sideways moves the FAB exactly one spot in its direction, however far the finger travels, and only once the
+ * finger is lifted; it doesn't follow the finger while dragging. A swipe up calls [onSwipeUp] instead, and a long press
+ * [onLongClick] (none: a long press is a tap). The swipe has to be released within [SWIPE_TIMEOUT_MILLIS] of the finger
+ * starting to *move* (not of touching down), otherwise it doesn't count.
  *
  * The FAB is laid out at the bottom-start and placed with an x offset ([offsetX]) so moving between spots
  * animates smoothly instead of jumping between alignments.
@@ -225,6 +249,8 @@ private fun NavFab(
     position: NavFabPosition,
     containerWidth: Int,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+    onSwipeUp: () -> Unit,
     onPositionChange: (NavFabPosition) -> Unit,
     onFabHeightChanged: (Dp) -> Unit,
     modifier: Modifier = Modifier
@@ -262,12 +288,17 @@ private fun NavFab(
 
     val currentPosition by rememberUpdatedState(position)
     val currentOnPositionChange by rememberUpdatedState(onPositionChange)
+    val currentOnSwipeUp by rememberUpdatedState(onSwipeUp)
+    val haptics = LocalHapticFeedback.current
 
     val corner by animateDpAsState(if (open) 28.dp else FabClosedCorner, label = "navFabCorner")
 
-    FloatingActionButton(
-        onClick = onClick,
+    // A FloatingActionButton's look, which has no long press of its own
+    Surface(
         shape = RoundedCornerShape(corner),
+        color = FloatingActionButtonDefaults.containerColor,
+        contentColor = contentColorFor(FloatingActionButtonDefaults.containerColor),
+        shadowElevation = 6.dp,
         modifier = modifier
             .windowInsetsPadding(WindowInsets.navigationBars)
             .padding(FabMargin)
@@ -280,32 +311,51 @@ private fun NavFab(
             }
             .pointerInput(Unit) {
                 val thresholdPx = SwipeThreshold.toPx()
-                var totalDrag = 0f
+                var totalDrag = Offset.Zero
                 var dragStartMillis = 0L
-                detectHorizontalDragGestures(
+                detectDragGestures(
                     onDragStart = {
-                        totalDrag = 0f
+                        totalDrag = Offset.Zero
                         dragStartMillis = SystemClock.uptimeMillis()
                     },
                     onDragEnd = {
                         val inTime = SystemClock.uptimeMillis() - dragStartMillis <= SWIPE_TIMEOUT_MILLIS
-                        if (inTime && abs(totalDrag) >= thresholdPx) {
+                        val upwards = -totalDrag.y > abs(totalDrag.x)
+                        if (inTime && upwards && -totalDrag.y >= thresholdPx) {
+                            currentOnSwipeUp()
+                        } else if (inTime && !upwards && abs(totalDrag.x) >= thresholdPx) {
                             val spots = NavFabPosition.entries
-                            val step = if (totalDrag > 0) 1 else -1
+                            val step = if (totalDrag.x > 0) 1 else -1
                             val next = spots[(currentPosition.ordinal + step).coerceIn(0, spots.lastIndex)]
                             if (next != currentPosition) currentOnPositionChange(next)
                         }
                     },
-                    onHorizontalDrag = { change, amount ->
+                    onDrag = { change, amount ->
                         change.consume()
                         totalDrag += amount
                     }
                 )
             }
     ) {
-        Crossfade(targetState = open, label = "navFabIcon") { isOpen ->
-            if (isOpen) Icon(Icons.Filled.Close, contentDescription = "Close navigation")
-            else Icon(icon, contentDescription = "Navigation")
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(56.dp)
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClickLabel = "Previous tab",
+                    onLongClick = onLongClick?.let { longClick ->
+                        {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            longClick()
+                        }
+                    }
+                )
+        ) {
+            Crossfade(targetState = open, label = "navFabIcon") { isOpen ->
+                if (isOpen) Icon(Icons.Filled.Close, contentDescription = "Close navigation")
+                else Icon(icon, contentDescription = "Navigation")
+            }
         }
     }
 }

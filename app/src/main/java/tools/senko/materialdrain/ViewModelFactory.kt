@@ -6,9 +6,9 @@ import androidx.lifecycle.ViewModelProvider
 import tools.senko.materialdrain.files.FileInfoViewModel
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
 import tools.senko.materialdrain.lists.ListViewModel
-import tools.senko.materialdrain.preferences.AccountViewModel
-import tools.senko.materialdrain.preferences.AuthViewModel
-import tools.senko.materialdrain.preferences.ProviderSettingsViewModel
+import tools.senko.materialdrain.settings.ui.AccountViewModel
+import tools.senko.materialdrain.settings.ui.AuthViewModel
+import tools.senko.materialdrain.settings.ui.ProviderSettingsViewModel
 import tools.senko.materialdrain.upload.UploadViewModel
 
 class ViewModelFactory(

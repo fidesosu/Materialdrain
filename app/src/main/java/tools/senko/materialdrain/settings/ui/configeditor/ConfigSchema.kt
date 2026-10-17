@@ -1,4 +1,4 @@
-package tools.senko.materialdrain.preferences.configeditor
+package tools.senko.materialdrain.settings.ui.configeditor
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement

@@ -35,6 +35,17 @@ class PlaybackService : MediaSessionService() {
         val player = createPlayer(this, isVideo = false)
         session = MediaSession.Builder(this, player)
             .setCallback(object : MediaSession.Callback {
+                // The service is exported for the system's media controls, which only play, pause and seek: only the
+                // app itself can choose what plays, so another app can't have it load an address of its choosing
+                override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
+                    if (controller.packageName == packageName) return super.onConnect(session, controller)
+                    val commands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon()
+                        .remove(Player.COMMAND_SET_MEDIA_ITEM)
+                        .remove(Player.COMMAND_CHANGE_MEDIA_ITEMS)
+                        .build()
+                    return MediaSession.ConnectionResult.AcceptedResultBuilder(session).setAvailablePlayerCommands(commands).build()
+                }
+
                 // An item sent by a controller may come without its address: it's its id
                 override fun onAddMediaItems(
                     mediaSession: MediaSession,

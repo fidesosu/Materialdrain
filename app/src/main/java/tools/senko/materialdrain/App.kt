@@ -16,10 +16,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -34,24 +30,18 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.automirrored.filled.ArrowBack
-import tools.senko.materialdrain.ui.icons.filled.Delete
 import tools.senko.materialdrain.ui.icons.filled.MoreVert
 import tools.senko.materialdrain.ui.icons.filled.Search
-import tools.senko.materialdrain.ui.icons.symbols.SettingsFilled
-import tools.senko.materialdrain.ui.icons.symbols.Symbols
-import tools.senko.materialdrain.ui.icons.symbols.Upload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.offset
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -80,25 +70,21 @@ import tools.senko.materialdrain.files.FileInfoDetailsCard
 import tools.senko.materialdrain.files.FileInfoViewModel
 import tools.senko.materialdrain.browser.BrowserMode
 import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
-import tools.senko.materialdrain.provider.api.ProviderCapability
-import tools.senko.materialdrain.provider.api.resolveScreens
 import tools.senko.materialdrain.browser.BrowserScreen
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
 import tools.senko.materialdrain.lists.ListViewModel
 import tools.senko.materialdrain.navmenu.NavFabMenu
 import tools.senko.materialdrain.ui.components.sidewaysSwipe
 import tools.senko.materialdrain.navmenu.menu
-import tools.senko.materialdrain.preferences.ACCOUNT_CATEGORY_ID
-import tools.senko.materialdrain.preferences.AccountViewModel
-import tools.senko.materialdrain.preferences.HOSTS_CATEGORY_ID
+import tools.senko.materialdrain.settings.ui.ACCOUNT_CATEGORY_ID
+import tools.senko.materialdrain.settings.ui.AccountViewModel
+import tools.senko.materialdrain.settings.ui.HOSTS_CATEGORY_ID
 import tools.senko.materialdrain.settings.DataSaverState
 import tools.senko.materialdrain.settings.LocalDataSaver
-import tools.senko.materialdrain.preferences.AuthViewModel
-import tools.senko.materialdrain.preferences.ProviderSettingsViewModel
-import tools.senko.materialdrain.preferences.SettingsScreenContent
-import tools.senko.materialdrain.preferences.settingsCategory
-import tools.senko.materialdrain.settings.SEARCH_INDEX_DELETE_WARNING
-import tools.senko.materialdrain.settings.isSearchIndex
+import tools.senko.materialdrain.settings.ui.AuthViewModel
+import tools.senko.materialdrain.settings.ui.ProviderSettingsViewModel
+import tools.senko.materialdrain.settings.ui.SettingsScreenContent
+import tools.senko.materialdrain.settings.ui.settingsCategory
 import tools.senko.materialdrain.files.key
 import tools.senko.materialdrain.ui.LocalBlurredBackdrop
 import tools.senko.materialdrain.ui.LocalBottomInset
@@ -124,7 +110,6 @@ import tools.senko.materialdrain.ui.components.pageTransition
 import tools.senko.materialdrain.ui.components.AppSnackbarHost
 import tools.senko.materialdrain.ui.components.CenteredTextMessage
 import tools.senko.materialdrain.ui.components.snackbarMotion
-import tools.senko.materialdrain.ui.components.OdometerText
 import tools.senko.materialdrain.ui.components.TransferProgress
 import tools.senko.materialdrain.ui.components.TransferStatusBar
 import tools.senko.materialdrain.upload.UploadItemStatus
@@ -141,7 +126,7 @@ import tools.senko.materialdrain.hosts.HostCheck
 import tools.senko.materialdrain.hosts.Reachability
 import tools.senko.materialdrain.ui.icons.filled.Cloud
 import tools.senko.materialdrain.upload.UploadUiState
-import tools.senko.materialdrain.preferences.rememberPreviewSettings
+import tools.senko.materialdrain.settings.ui.rememberPreviewSettings
 
 @androidx.annotation.OptIn(UnstableApi::class)
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalSharedTransitionApi::class)
@@ -249,39 +234,11 @@ fun MaterialdrainScreen() {
         }
     }
     LaunchedEffect(configChanges) { appContainer.hostHealth.checkAll() }
-    val activeCapabilities = remember(configChanges) {
-        appContainer.providerRegistry.resolve(appContainer.providerConfigStore.activeProviderId.value).capabilities
-    }
-    // The built-in Pixeldrain host isn't config-driven, so it keeps today's capability-based navigation. Every other
-    // host is a config, whose "screens" field picks what shows for it (or, left out, everything the host can back)
-    val activeConfig = remember(configChanges) {
-        if (activeHostId == PIXELDRAIN_PROVIDER_ID) {
-            null
-        } else {
-            appContainer.providerConfigStore.providers.value.firstOrNull { it.id == activeHostId }?.config
-        }
-    }
-    // The config's screens in its own order, so a config can put them in whichever order makes sense for that host
-    // (the tabs follow it), without those the host can't back (see resolveScreens)
-    val configScreens = remember(activeCapabilities, activeConfig) {
-        activeConfig?.let { resolveScreens(it.screens, activeCapabilities) }
-    }
-    // Each tab with its entry in the config, for its own name, root and the actions it takes away (see ScreenConfig). Not
-    // config-driven (the built-in Pixeldrain) means one tab of each kind the host can back, with nothing taken away
-    val navBarOrder = remember(activeCapabilities, configScreens) {
-        configScreens?.map { Tab(it.screen.toScreen(), it) } ?: buildList {
-            add(Tab(Screen.Upload))
-            if (ProviderCapability.ENUMERATE in activeCapabilities) add(Tab(Screen.Files))
-            if (ProviderCapability.LISTS in activeCapabilities) add(Tab(Screen.Lists))
-            if (ProviderCapability.BROWSE in activeCapabilities) add(Tab(Screen.Filesystem))
-        }
-    }
-    // A config with no screens to show (it chose none, or only ones the host can't back): nothing to fall back to, so
-    // the current screen shows a message instead (see the main content below)
-    val noScreensConfigured = activeConfig != null && navBarOrder.isEmpty()
-    /** The tab of [screen]'s kind that's shown for it: the one last chosen, else the first of that kind. */
-    fun tabOf(screen: Screen): Tab? =
-        navBarOrder.firstOrNull { it.screen == screen && it.id == currentTabId } ?: navBarOrder.firstOrNull { it.screen == screen }
+    val hostTabs = rememberHostTabs(appContainer, activeHostId, configChanges)
+    val navBarOrder = hostTabs.tabs
+    val activeConfig = hostTabs.config
+    val noScreensConfigured = hostTabs.noScreensConfigured
+    fun tabOf(screen: Screen): Tab? = hostTabs.tabOf(screen, currentTabId)
     val currentTab = if (currentScreen in BROWSE_SCREENS) tabOf(currentScreen) else null
     fun screenTitle(screen: Screen): String = tabOf(screen)?.title ?: screen.title
     LaunchedEffect(navBarOrder, currentScreen) {
@@ -437,7 +394,6 @@ fun MaterialdrainScreen() {
         // The next visit of the settings starts at the list of categories
         if (currentScreen != Screen.Settings) settingsCategoryId = null
         when (currentScreen) {
-            Screen.Filesystem -> { /* Placeholder for Filesystem specific logic if needed. ViewModel handles its own loading. */ }
             Screen.FileDetail -> fileInfoViewModel.setFilterInputVisible(false)
             else -> {
                 fileInfoViewModel.clearUserFilesError()
@@ -517,39 +473,23 @@ fun MaterialdrainScreen() {
         }
     }
 
+    // The navigation prototype has its own button in the corner, which takes the place of the screens' buttons; the
+    // upload screen keeps its upload button
     val fabState by remember {
         derivedStateOf {
-            // The navigation prototype takes the FAB's place (and its bottom padding), see NavFabMenu
-            // The navigation prototype has its own button in the corner; the upload screen keeps its upload button
-            if (navPrototype) null else when (currentScreen) {
-                // Nothing to upload yet (or already uploading): the upload screen offers its own actions instead
-                Screen.Upload -> if (uploadUiState.hasUploadable && !uploadUiState.isLoading) FabDetails(
-                    screen = Screen.Upload,
-                    icon = Symbols.Upload,
-                    text = "Upload",
-                    onClick = { if (uploadUiState.hasUploadable && !uploadUiState.isLoading) uploadViewModel.upload() },
-                    isExtended = true,
-                ) else null
-                // Only the categories whose settings are saved with the button (see SettingsCategory.hasSaveButton)
-                Screen.Settings -> if (settingsCategory(settingsCategoryId)?.hasSaveButton == true) FabDetails(
-                    screen = Screen.Settings,
-                    icon = Symbols.SettingsFilled, // The filled gear, as the save button
-                    text = if (settingsJustSaved) SETTINGS_SAVED_TEXT else SETTINGS_SAVE_TEXT,
-                    // Both texts take the same space, so the button doesn't change size when it confirms the save
-                    reserveTextWidthFor = listOf(SETTINGS_SAVE_TEXT, SETTINGS_SAVED_TEXT),
-                    iconSpinTrigger = settingsSaveCount,
-                    onClick = {
-                        // The ViewModels which use the key watch it themselves (see SessionManager.apiKey)
-                        sessionManager.saveManualApiKey(apiKeyInput)
-                        settingsSaveCount++
-                    },
-                    isExtended = true
-                ) else null
-                // The file screens have no button of their own: searching is the magnifier in the top bar, and the
-                // Filesystem's upload is an icon in its own header (see BrowserScreen), so it works the same whichever
-                // navigation style is on
-                Screen.Files, Screen.Lists, Screen.Filesystem, Screen.FileDetail -> null
-            }
+            if (navPrototype) null else screenFab(
+                screen = currentScreen,
+                canUpload = uploadUiState.hasUploadable && !uploadUiState.isLoading,
+                onUpload = { if (uploadUiState.hasUploadable && !uploadUiState.isLoading) uploadViewModel.upload() },
+                settingsHasSaveButton = settingsCategory(settingsCategoryId)?.hasSaveButton == true,
+                settingsJustSaved = settingsJustSaved,
+                settingsSaveCount = settingsSaveCount,
+                onSaveSettings = {
+                    // The ViewModels which use the key watch it themselves (see SessionManager.apiKey)
+                    sessionManager.saveManualApiKey(apiKeyInput)
+                    settingsSaveCount++
+                }
+            )
         }
     }
     // Like the old bottom bar, the navigation FAB stays out of the way on detail screens
@@ -569,8 +509,6 @@ fun MaterialdrainScreen() {
     // The navigation button sits in the same corner: it rises over the upload button when both are shown
     val navLiftTarget = fabLiftTarget + (if (navPrototype && fabState != null) fabHeightDp + 16.dp else 0.dp)
     val navLift by animateDpAsState(targetValue = navLiftTarget, animationSpec = snackbarMotion(reduceMotion), label = "navLift")
-    // How far below its corner a button starts before it slides up (see NavFabMenu)
-    val entryOffsetPx = with(localDensity) { 160.dp.toPx() }
     val isFabVisible = showNavFab || fabState != null
 
     // The thumbnails the data saver holds back, for every picture of a file in the app (see FileIcon)
@@ -689,89 +627,7 @@ fun MaterialdrainScreen() {
                 }
             },
             floatingActionButton = {
-                // Moved visually (an offset, not padding), so the FAB rises over the selection bar and a snackbar
-                Box(modifier = Modifier.offset(y = -fabLift)) {
-                // Keep the last button around so it can animate out instead of vanishing
-                var lastFab by remember { mutableStateOf<FabDetails?>(null) }
-                LaunchedEffect(fabState) { if (fabState != null) lastFab = fabState }
-
-                // 0 = shown, 1 = gone. Animated by its own state, so leaving slides it down instead of removing it at once
-                val fabHidden by animateFloatAsState(
-                    targetValue = if (fabState != null) 0f else 1f,
-                    animationSpec = tween(if (reduceMotion) 100 else 320, easing = FastOutSlowInEasing),
-                    label = "fabHidden"
-                )
-
-                // The icon makes a full turn whenever the trigger of the button counts up
-                val iconRotation = remember { Animatable(0f) }
-                var handledSpinTrigger by remember { mutableIntStateOf(0) }
-                val spinTrigger = (fabState ?: lastFab)?.iconSpinTrigger ?: 0
-                LaunchedEffect(spinTrigger) {
-                    if (spinTrigger > handledSpinTrigger) {
-                        handledSpinTrigger = spinTrigger
-                        // Reduced animations: no spinning
-                        if (!reduceMotion) {
-                            iconRotation.snapTo(0f)
-                            iconRotation.animateTo(360f, tween(durationMillis = 700, easing = FastOutSlowInEasing))
-                        }
-                    }
-                }
-
-                Box(modifier = Modifier.graphicsLayer {
-                    translationY = fabHidden * entryOffsetPx
-                    alpha = 1f - fabHidden
-                }) {
-                if (fabHidden < 1f) (fabState ?: lastFab)?.let { details ->
-                    ExtendedFloatingActionButton(
-                        onClick = details.onClick,
-                        expanded = details.isExtended,
-                        icon = {
-                            AnimatedContent(
-                                targetState = details.icon,
-                                transitionSpec = {
-                                    fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(200))
-                                },
-                                label = "fabIconAnimation"
-                            ) { targetIcon ->
-                                Icon(
-                                    targetIcon,
-                                    contentDescription = details.text ?: "FAB icon",
-                                    modifier = Modifier.rotate(iconRotation.value)
-                                )
-                            }
-                        },
-                        text = {
-                            // Moving to the button of another screen crossfades and animates the size of the button,
-                            // as it always did. Only when the button of the same screen changes its text the
-                            // characters cycle, and then the size stays as it is.
-                            AnimatedContent(
-                                targetState = details,
-                                contentKey = { it.screen },
-                                transitionSpec = {
-                                    val crossfade = fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(200))
-                                    // Reduced animations: the button takes its new size at once
-                                    if (reduceMotion) crossfade.using(SizeTransform(clip = false) { _, _ -> snap() }) else crossfade
-                                },
-                                label = "fabTextAnimation"
-                            ) { fab ->
-                                fab.text?.let { fabText ->
-                                    OdometerText(
-                                        text = fabText,
-                                        fixedWidth = true,
-                                        widthReferenceTexts = fab.reserveTextWidthFor
-                                    )
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .onSizeChanged {
-                                fabHeightDp = with(localDensity) { it.height.toDp() }
-                            }
-                            .then(if (details.yOffset != 0.dp) Modifier.offset(y = details.yOffset) else Modifier)
-                    )
-                }
-                }
-                }
+                AppFab(fabState, lift = fabLift, reduceMotion = reduceMotion, onHeightChanged = { fabHeightDp = it })
             },
             snackbarHost = {
                 // The snackbar stays at the bottom; while selecting it sits above the selection bar
@@ -959,57 +815,20 @@ fun MaterialdrainScreen() {
         }
         }
 
-        dialog?.let { shown ->
-            // Closing the dialog clears what it reported; OK on a missing API key goes to where it's set
-            fun close(confirmed: Boolean) {
-                dialog = null
-                when (shown) {
-                    is AppDialog.UploadFailed, is AppDialog.UploadError -> uploadViewModel.clearUploadResult()
-                    AppDialog.UploadApiKeyRequired -> uploadViewModel.clearApiKeyError()
-                    is AppDialog.FilesApiKeyRequired -> {
-                        fileInfoViewModel.clearUserFilesError()
-                        fileInfoViewModel.clearApiKeyMissingError()
-                    }
-                }
-                if (confirmed && shown.opensAccountSettings) {
-                    settingsCategoryId = ACCOUNT_CATEGORY_ID
-                    navigateTo(Screen.Settings)
-                }
-            }
-            AlertDialog(
-                onDismissRequest = { close(confirmed = false) },
-                title = { Text(shown.title) },
-                text = { Text(shown.text) },
-                confirmButton = { Button(onClick = { close(confirmed = true) }) { Text("OK") } }
-            )
-        }
-
-        if (fileInfoInitiateDelete) {
-            AlertDialog(
-                onDismissRequest = { fileInfoViewModel.cancelDeleteFile() },
-                title = { Text("Confirm Deletion") },
-                text = {
-                    val isSearchIndex = fileInfoUiState.nodeToDelete?.isSearchIndex() == true
-                    Text(
-                        if (isSearchIndex) SEARCH_INDEX_DELETE_WARNING
-                        else "Delete \"${fileInfoUiState.nodeToDelete?.name ?: fileInfoUiState.fileIdToDelete}\"? This can't be undone."
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = { fileInfoViewModel.confirmDeleteFile() },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    ) { Text("Delete") }
-                },
-                dismissButton = {
-                    Button(onClick = { fileInfoViewModel.cancelDeleteFile() }) { Text("Cancel") }
-                }
-            )
-        }
+        AppDialogs(
+            dialog = dialog,
+            onClosed = { dialog = null },
+            onOpenAccountSettings = {
+                settingsCategoryId = ACCOUNT_CATEGORY_ID
+                navigateTo(Screen.Settings)
+            },
+            confirmDelete = fileInfoInitiateDelete,
+            uploadViewModel = uploadViewModel,
+            fileInfoViewModel = fileInfoViewModel
+        )
     }
     }
 }
-
 
 /** The Media settings, as the players read them (see LocalPlayerSettings). */
 @Composable
@@ -1083,8 +902,6 @@ private val SEARCH_BLUR_RADIUS = 16.dp
 private val BROWSE_SCREENS = setOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem)
 /** How often the hosts are checked while the app is in front, see HostHealth. */
 private const val HOST_RECHECK_MILLIS = 3 * 60_000L
-private const val SETTINGS_SAVE_TEXT = "Save Settings"
-private const val SETTINGS_SAVED_TEXT = "Settings saved"
 private const val SETTINGS_SAVED_DISPLAY_MILLIS = 2000L
 
 
@@ -1260,26 +1077,6 @@ private fun ColumnScope.TransferBarSlot(
     ) {
         (activeTransfer ?: lastTransfer)?.let { TransferStatusBar(it) }
     }
-}
-
-/**
- * A problem the app shows in a dialog. Each kind decides its own title and text, and what closing it clears (see
- * MaterialdrainScreen), so neither depends on the wording of a message. [opensAccountSettings]: OK goes to the account,
- * where a missing API key is set.
- */
-private sealed class AppDialog(val title: String, val text: String, val opensAccountSettings: Boolean = false) {
-    data class UploadFailed(val message: String) : AppDialog("Upload Failed", "Error: $message")
-    data class UploadError(val message: String) : AppDialog("Upload Error", message)
-    data object UploadApiKeyRequired : AppDialog(
-        "API Key Required for Upload",
-        "Please set your API Key in the Settings screen to upload files.",
-        opensAccountSettings = true
-    )
-    data class FilesApiKeyRequired(val onDetails: Boolean, val message: String) : AppDialog(
-        if (onDetails) "API Key Required" else "API Key Required for Files",
-        message,
-        opensAccountSettings = true
-    )
 }
 
 /** A value computed from [calc]: a reader recomposes only when that value changes, not on every change of the state it reads. */

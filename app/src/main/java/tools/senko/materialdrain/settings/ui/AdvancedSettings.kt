@@ -1,4 +1,4 @@
-package tools.senko.materialdrain.preferences
+package tools.senko.materialdrain.settings.ui
 
 import tools.senko.materialdrain.ui.theme.AppShapes
 import android.content.ClipData
@@ -68,7 +68,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import kotlinx.coroutines.flow.filter
 import androidx.compose.ui.unit.dp
-import tools.senko.materialdrain.preferences.configeditor.ConfigEditor
+import tools.senko.materialdrain.settings.ui.configeditor.ConfigEditor
 import tools.senko.materialdrain.provider.StoredProvider
 import tools.senko.materialdrain.provider.hostTypeOf
 import tools.senko.materialdrain.provider.api.ConfigUpdates

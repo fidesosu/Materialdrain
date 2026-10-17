@@ -1,4 +1,4 @@
-package tools.senko.materialdrain.preferences
+package tools.senko.materialdrain.settings.ui
 
 import tools.senko.materialdrain.ui.theme.AppShapes
 import androidx.activity.compose.BackHandler

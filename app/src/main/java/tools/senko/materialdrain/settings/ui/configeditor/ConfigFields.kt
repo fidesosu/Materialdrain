@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 
-package tools.senko.materialdrain.preferences.configeditor
+package tools.senko.materialdrain.settings.ui.configeditor
 
 import tools.senko.materialdrain.ui.theme.AppShapes
 import androidx.compose.foundation.background

@@ -55,6 +55,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,8 +70,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import tools.senko.materialdrain.settings.LocalDataSaver
 import tools.senko.materialdrain.files.FileActionDialogs
 import tools.senko.materialdrain.files.FileActionRequest
@@ -157,12 +156,10 @@ fun BrowserScreen(
     val context = LocalContext.current
     // Only whether a transfer runs (and which file an upload is on), not each of its progress ticks: those would redraw the
     // whole screen several times a second. The progress itself is the bar above (see App.kt's TransferBarSlot)
-    val downloading by remember(fileInfoViewModel) {
-        fileInfoViewModel.downloads.map { it.isDownloading }.distinctUntilChanged()
-    }.collectAsState(initial = fileInfoViewModel.downloads.value.isDownloading)
-    val fsUploadStatus by remember(filesystemViewModel) {
-        filesystemViewModel.uploadProgress.map { it?.statusLine() }.distinctUntilChanged()
-    }.collectAsState(initial = filesystemViewModel.uploadProgress.value?.statusLine())
+    val downloads = fileInfoViewModel.downloads.collectAsState()
+    val downloading by remember(fileInfoViewModel) { derivedStateOf { downloads.value.isDownloading } }
+    val fsUploadProgress = filesystemViewModel.uploadProgress.collectAsState()
+    val fsUploadStatus by remember(filesystemViewModel) { derivedStateOf { fsUploadProgress.value?.statusLine() } }
 
     // The sort order: shared by every sortable list in the app (see AppSettings.sortField)
     val sortField by appSettings.sortField.collectAsState()

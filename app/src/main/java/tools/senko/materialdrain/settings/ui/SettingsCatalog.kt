@@ -1,4 +1,4 @@
-package tools.senko.materialdrain.preferences
+package tools.senko.materialdrain.settings.ui
 
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -176,8 +176,9 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
             SettingsItem.Header("Navigation"),
             SettingsItem.Choice(
                 title = "Navigation",
-                info = "The bottom bar has a tab for each screen. The floating button opens a small window of them and can " +
-                    "be swiped to the left, the middle or the right; it's still being tried out. Where the screen is wide " +
+                info = "The bottom bar has a tab for each screen. The floating button opens a small window of them when it's " +
+                    "tapped or swiped up, goes back to the tab before when it's held, and can be swiped to the left, the " +
+                    "middle or the right; it's still being tried out. Where the screen is wide " +
                     "(a tablet, a phone on its side) the bar's tabs go along the side.",
                 options = listOf("Bottom bar" to false, "Floating button" to true),
                 selected = { appSettings.navPrototype.collectAsState().value },
