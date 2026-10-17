@@ -75,9 +75,16 @@ class TransferNotifier(private val context: Context) {
         return PendingIntent.getService(context, 1, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
     }
 
+    /**
+     * The colour behind the notification's icon: the system accent on Android 12 and up, the pixeldrain green before
+     * (see pixeldrain_icon), instead of the system's dark default.
+     */
+    private fun iconColor(): Int = ContextCompat.getColor(context, R.color.pixeldrain_icon)
+
     /** The ongoing notification of the foreground service, summarising every running transfer. */
     fun buildProgressNotification(transfers: List<TransferInfo>): Notification {
         val builder = NotificationCompat.Builder(context, CHANNEL_TRANSFER_PROGRESS)
+            .setColor(iconColor())
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
@@ -150,6 +157,7 @@ class TransferNotifier(private val context: Context) {
         }
 
         val notification = NotificationCompat.Builder(context, if (failed) CHANNEL_TRANSFER_FAILED else CHANNEL_TRANSFER_COMPLETE)
+            .setColor(iconColor())
             .setSmallIcon(if (info.kind == TransferKind.UPLOAD) R.drawable.icon_upload else R.drawable.icon_download)
             .setContentTitle(if (failed) "$verb failed" else "$verb complete")
             .setContentText(message ?: info.title)

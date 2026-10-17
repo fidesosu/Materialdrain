@@ -5,7 +5,6 @@ import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.runtime.mutableFloatStateOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlin.math.abs
 import tools.senko.materialdrain.ui.theme.AppShapes
 import android.Manifest
 import android.app.Application
@@ -18,7 +17,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -62,6 +60,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import kotlin.time.Duration.Companion.milliseconds
 import tools.senko.materialdrain.files.DownloadStatus
 import tools.senko.materialdrain.navmenu.NavFabPosition
@@ -108,7 +108,7 @@ import tools.senko.materialdrain.ui.PlayerSettings
 import tools.senko.materialdrain.ui.LocalListLook
 import tools.senko.materialdrain.ui.ListLook
 import tools.senko.materialdrain.settings.AppSettings
-import tools.senko.materialdrain.ui.components.PAGE_FADE_OUT_MS
+import tools.senko.materialdrain.ui.components.PageSwap
 import tools.senko.materialdrain.ui.components.PAGE_TRANSITION_MS
 import tools.senko.materialdrain.ui.components.pageTransition
 import tools.senko.materialdrain.ui.components.AppSnackbarHost
@@ -392,14 +392,15 @@ fun MaterialdrainScreen() {
         }
     }
     LaunchedEffect(currentScreen) { if (currentScreen != Screen.FileDetail) detailsBackProgress = 0f }
-    // A swipe to the file beside this one in the details (Look and feel, Swipe between files): -1 to 1, how far the page
-    // is moved and faded on its way out or in, see the details below
-    val fileSwipe = remember { Animatable(0f) }
+    // A swipe to the file beside this one in the details (Look and feel, Swipe between files) moves like a change of page,
+    // see the details below
+    val fileSwap = remember { PageSwap() }
+    val detailsLayer = rememberGraphicsLayer()
     var fileSwipeJob by remember { mutableStateOf<Job?>(null) }
     LaunchedEffect(currentScreen) {
         if (currentScreen != Screen.FileDetail) {
             fileSwipeJob?.cancel()
-            fileSwipe.snapTo(0f)
+            fileSwap.reset()
         }
     }
 
@@ -764,22 +765,18 @@ fun MaterialdrainScreen() {
                                 .sidewaysSwipe(swipeFiles && shown == shownNow) { toNext ->
                                     if (fileSwipeJob?.isActive != true && fileInfoViewModel.hasNeighbour(toNext)) {
                                         fileSwipeJob = coroutineScope.launch {
-                                            // As pageTransition: the file goes a quarter of the width the way of the
-                                            // swipe while fading, and the next one comes in from the other side. One
-                                            // after the other, as the details show one file at a time
-                                            val direction = if (toNext) 1f else -1f
-                                            fileSwipe.animateTo(-direction, tween(if (reduceMotion) 100 else PAGE_FADE_OUT_MS))
+                                            // The page of this file stays as a picture while the next one is drawn
+                                            // behind it (shown at once from the list's entry, see openNeighbour), then
+                                            // the two cross as the screens do
+                                            fileSwap.capture(detailsLayer, forward = toNext, reduceMotion = reduceMotion)
                                             fileInfoViewModel.openNeighbour(toNext)
-                                            fileSwipe.snapTo(direction)
-                                            fileSwipe.animateTo(0f, tween(if (reduceMotion) 100 else PAGE_TRANSITION_MS))
+                                            withFrameNanos { }
+                                            fileSwap.run()
                                         }
                                     }
                                 }
                                 .graphicsLayer {
-                                    // Reduced animations: the page only fades, and stays as it is on the back gesture
-                                    // until it goes
-                                    if (!reduceMotion) translationX = fileSwipe.value * size.width / 4
-                                    alpha = 1f - abs(fileSwipe.value)
+                                    // Reduced animations: the page stays as it is on the back gesture until it goes
                                     val back = if (reduceMotion) 0f else detailsBackProgress
                                     scaleX = 1f - back * 0.1f
                                     scaleY = 1f - back * 0.1f
@@ -787,24 +784,27 @@ fun MaterialdrainScreen() {
                                     clip = back > 0f
                                 }
                         ) {
-                            fileInfoUiState.fileInfo?.let { info ->
-                                FileInfoDetailsCard(
-                                    fileInfo = info,
-                                    fileInfoViewModel = fileInfoViewModel,
-                                    context = LocalContext.current,
-                                    snackbarHostState = snackbarHostState
-                                )
-                            } ?: run {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    if (fileInfoUiState.isLoadingFileInfo) {
-                                        CircularProgressIndicator()
-                                    } else {
-                                        val errorMessage = fileInfoUiState.fileInfoErrorMessage ?: "File details not available."
-                                        Text(
-                                            text = "$errorMessage Please go back and select a different file.",
-                                            modifier = Modifier.padding(16.dp),
-                                            textAlign = TextAlign.Center
-                                        )
+                            with(fileSwap) { OutgoingPage() }
+                            Box(modifier = with(fileSwap) { Modifier.fillMaxSize().page(detailsLayer) }) {
+                                fileInfoUiState.fileInfo?.let { info ->
+                                    FileInfoDetailsCard(
+                                        fileInfo = info,
+                                        fileInfoViewModel = fileInfoViewModel,
+                                        context = LocalContext.current,
+                                        snackbarHostState = snackbarHostState
+                                    )
+                                } ?: run {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        if (fileInfoUiState.isLoadingFileInfo) {
+                                            CircularProgressIndicator()
+                                        } else {
+                                            val errorMessage = fileInfoUiState.fileInfoErrorMessage ?: "File details not available."
+                                            Text(
+                                                text = "$errorMessage Please go back and select a different file.",
+                                                modifier = Modifier.padding(16.dp),
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
                                     }
                                 }
                             }

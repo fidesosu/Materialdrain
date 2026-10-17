@@ -514,8 +514,26 @@ class FileInfoViewModel(
     /** Opens the file after (or, not [next], before) the one shown, in the list it was opened from. False when there's none. */
     fun openNeighbour(next: Boolean): Boolean {
         val target = neighbour(next) ?: return false
-        if (neighboursByNode) setFileInfoFromNode(target) else fetchFileInfo(target.key)
+        // At once from the list's own entry, so the page comes in without waiting for the host; a host's file has its
+        // full details (Pixeldrain's views and downloads) filled in once they come
+        setFileInfoFromNode(target)
+        if (!neighboursByNode) completeFileInfo(target)
         return true
+    }
+
+    /**
+     * Replaces [node], shown from a list's entry, with the host's full details of it, without a loading state in between.
+     * Its preview is only loaded again when the host gives it another type than the entry did.
+     */
+    private fun completeFileInfo(node: StorageNode) {
+        val id = node.ref.id ?: return
+        val store = provider().fileStore ?: return
+        fileInfoJob = viewModelScope.launch {
+            val full = (store.fileInfo(StorageRef(id = id)) as? ApiResponse.Success)?.data ?: return@launch
+            if (_uiState.value.fileInfo?.key != node.key) return@launch
+            _uiState.update { it.copy(fileInfo = full) }
+            if (full.previewMimeType() != node.previewMimeType()) showPreview(full, withArchive = showsArchive(full))
+        }
     }
 
     /** Shows the file that was open when the app was closed. False when there is none, or it belongs to another host. */

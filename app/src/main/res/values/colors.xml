@@ -7,7 +7,9 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="ic_launcher_background_color">#1C1C1E</color>
+    <!-- Behind the white logo of the launcher icon wherever Android shows it in colour (not as a themed icon, which
+         takes the system's colours on its own) -->
+    <color name="ic_launcher_background_color">#FF97B57C</color>
     <!-- The pixeldrain green of the icon; Android 12 and up use the system accent instead (values-v31) -->
     <color name="pixeldrain_icon">#FF97B57C</color>
 </resources>

@@ -293,8 +293,9 @@ private fun AudioPlayerCard(
                 }
             }
 
-            // Connecting to the background player, or loading
-            if (state == null || own?.isBuffering == true) {
+            // Loading. Not while the background player connects: that's a moment, in which the bar would only push what's
+            // under the card down and back up
+            if (own?.isBuffering == true) {
                 LinearProgressIndicator(modifier = Modifier.padding(top = 8.dp).fillMaxWidth())
             }
             own?.error?.let { error ->
