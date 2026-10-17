@@ -22,11 +22,21 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import tools.senko.materialdrain.navmenu.NavMenuPreview
+import tools.senko.materialdrain.ui.theme.ThemeMode
+import tools.senko.materialdrain.ui.theme.WallpaperColorsAvailable
 import tools.senko.materialdrain.settings.SEARCH_INDEX_FILE_NAME
 import tools.senko.materialdrain.settings.SEARCH_RESULT_LIMITS
+import tools.senko.materialdrain.settings.START_SCREENS
+import tools.senko.materialdrain.settings.SEEK_STEPS
+import tools.senko.materialdrain.settings.LOCK_TIMEOUTS
+import tools.senko.materialdrain.Screen
+import tools.senko.materialdrain.ui.icons.filled.Movie
 import tools.senko.materialdrain.transfer.CHANNEL_TRANSFER_COMPLETE
 import tools.senko.materialdrain.transfer.CHANNEL_TRANSFER_FAILED
 import tools.senko.materialdrain.transfer.CHANNEL_TRANSFER_PROGRESS
+
+/** The speeds offered to start media at (Media, Start at speed). */
+private val START_SPEEDS = listOf(0.75f, 1f, 1.25f, 1.5f, 2f)
 
 /**
  * Everything the settings screen shows, in the order it's shown. It is the one place to edit: to add a setting, add an
@@ -133,10 +143,104 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     SettingsCategory(
         id = "look",
         title = "Look and feel",
-        summary = "Previews and animations",
+        summary = "Theme, navigation, previews and animations",
         icon = Icons.Filled.Palette,
         tone = CategoryTone.SECONDARY,
-        items = listOf(
+        items = listOfNotNull(
+            SettingsItem.Header("Theme"),
+            SettingsItem.Choice(
+                title = "Light or dark",
+                options = ThemeMode.entries.map { it.label to it },
+                selected = { appSettings.theme.collectAsState().value.mode },
+                onSelect = { appSettings.setThemeMode(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Black background",
+                summary = "In the dark theme",
+                info = "The dark theme's background is black, and its cards darker, which saves power on an OLED screen.",
+                isChecked = { appSettings.theme.collectAsState().value.blackBackground },
+                onCheckedChange = { appSettings.setBlackBackground(it) }
+            ),
+            // Only where the system has the wallpaper's colours to give (Android 12 and up)
+            if (WallpaperColorsAvailable) SettingsItem.Toggle(
+                title = "Wallpaper colours",
+                summary = "The app's colours come from your wallpaper",
+                info = "Off, they are made from the colour chosen below instead.",
+                isChecked = { appSettings.theme.collectAsState().value.wallpaperColors },
+                onCheckedChange = { appSettings.setWallpaperColors(it) }
+            ) else null,
+            SettingsItem.Custom {
+                val theme = appSettings.theme.collectAsState().value
+                ThemeColorPicker(selected = theme.color, enabled = theme.usesColor, onSelect = { appSettings.setThemeColor(it) })
+            },
+            SettingsItem.Header("Navigation"),
+            SettingsItem.Choice(
+                title = "Navigation",
+                info = "The bottom bar has a tab for each screen. The floating button opens a small window of them and can " +
+                    "be swiped to the left, the middle or the right; it's still being tried out. Where the screen is wide " +
+                    "(a tablet, a phone on its side) the bar's tabs go along the side.",
+                options = listOf("Bottom bar" to false, "Floating button" to true),
+                selected = { appSettings.navPrototype.collectAsState().value },
+                onSelect = { appSettings.setNavPrototype(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Every tab's name",
+                summary = "Under its icon in the bar",
+                info = "Off, only the chosen tab has its name under its icon, the others only their icons.",
+                isChecked = { appSettings.barLabels.collectAsState().value },
+                onCheckedChange = { appSettings.setBarLabels(it) }
+            ),
+            SettingsItem.Choice(
+                title = "Open on",
+                summary = "The screen the app starts on",
+                options = listOf<Pair<String, Screen?>>("Last" to null) + START_SCREENS.map { it.title to it },
+                selected = { appSettings.startScreen.collectAsState().value },
+                onSelect = { appSettings.setStartScreen(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Press back twice to close",
+                summary = "So one press doesn't close the app",
+                isChecked = { appSettings.confirmExit.collectAsState().value },
+                onCheckedChange = { appSettings.setConfirmExit(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Swipe between files",
+                summary = "In a file's details",
+                info = "A swipe to the left in a file's details opens the next file of the list it was opened from, a swipe " +
+                    "to the right the one before. What scrolls sideways (a wide text, a zoomed picture) scrolls first.",
+                isChecked = { appSettings.swipeBetweenFiles.collectAsState().value },
+                onCheckedChange = { appSettings.setSwipeBetweenFiles(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Swipe between tabs",
+                summary = "Swipe sideways to go to the next tab",
+                info = "A swipe to the left goes to the tab to the right, as the tabs lie in the bottom bar, and a swipe " +
+                    "to the right to the one to the left. A swipe that starts at the very edge of the screen is the " +
+                    "system's back gesture, and what scrolls sideways (the folder path, a wide text) scrolls first.",
+                isChecked = { appSettings.swipeBetweenTabs.collectAsState().value },
+                onCheckedChange = { appSettings.setSwipeBetweenTabs(it) }
+            ),
+            SettingsItem.Header("File lists"),
+            SettingsItem.Toggle(
+                title = "Grid",
+                summary = "Big pictures instead of rows",
+                isChecked = { appSettings.gridView.collectAsState().value },
+                onCheckedChange = { appSettings.setGridView(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Compact rows",
+                summary = "Lower rows, so more of them fit",
+                isChecked = { appSettings.compactRows.collectAsState().value },
+                onCheckedChange = { appSettings.setCompactRows(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Dates as time ago",
+                summary = "\"3 days ago\" instead of the date",
+                info = "Off, the lists show the date and time a file was changed (or uploaded) instead.",
+                isChecked = { appSettings.relativeDates.collectAsState().value },
+                onCheckedChange = { appSettings.setRelativeDates(it) }
+            ),
+            SettingsItem.Header("Previews and animations"),
             SettingsItem.Toggle(
                 title = "Blurred backdrop",
                 summary = "The thumbnail, blurred, behind previews",
@@ -165,6 +269,60 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     ),
 
     SettingsCategory(
+        id = "media",
+        title = "Media",
+        summary = "Videos and songs",
+        icon = Icons.Filled.Movie,
+        tone = CategoryTone.TERTIARY,
+        items = listOf(
+            SettingsItem.Toggle(
+                title = "Play videos at once",
+                summary = "When the player opens",
+                isChecked = { appSettings.autoplay.collectAsState().value },
+                onCheckedChange = { appSettings.setAutoplay(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Resume videos",
+                summary = "From where they were left",
+                info = "A video opened again goes on from where it was stopped. Kept for the last 200 videos, on this " +
+                    "device only. One watched to its end starts from the beginning again.",
+                isChecked = { appSettings.resumeVideos.collectAsState().value },
+                onCheckedChange = { appSettings.setResumeVideos(it) }
+            ),
+            SettingsItem.Choice(
+                title = "Skip by",
+                summary = "The skip buttons and a double tap",
+                options = SEEK_STEPS.map { "$it s" to it },
+                selected = { appSettings.seekStepSeconds.collectAsState().value },
+                onSelect = { appSettings.setSeekStepSeconds(it) }
+            ),
+            SettingsItem.Choice(
+                title = "Start at speed",
+                summary = "Videos and songs",
+                options = START_SPEEDS.map { speed -> (speed.toString().removeSuffix(".0") + "×") to speed },
+                selected = { appSettings.defaultSpeed.collectAsState().value },
+                onSelect = { appSettings.setDefaultSpeed(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Brightness and volume swipes",
+                summary = "Up and down in the video player",
+                info = "In the video player, a swipe up or down on the left half changes the brightness of the screen (for " +
+                    "the video only), on the right half the volume.",
+                isChecked = { appSettings.playerGestures.collectAsState().value },
+                onCheckedChange = { appSettings.setPlayerGestures(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Play songs in the background",
+                summary = "With controls in the notification",
+                info = "A song goes on playing after you leave its details or the app, with its controls in the " +
+                    "notification and on the lock screen. Off, it stops with its details.",
+                isChecked = { appSettings.backgroundAudio.collectAsState().value },
+                onCheckedChange = { appSettings.setBackgroundAudio(it) }
+            )
+        )
+    ),
+
+    SettingsCategory(
         id = "files",
         title = "Files",
         summary = "Your filesystem, uploads, downloads and search",
@@ -178,6 +336,43 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                     "removed. Hiding it keeps you from deleting it by accident.",
                 isChecked = { appSettings.hideSearchIndex.collectAsState().value },
                 onCheckedChange = { appSettings.setHideSearchIndex(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Folders first",
+                summary = "In the filesystem, however it's sorted",
+                isChecked = { appSettings.foldersFirst.collectAsState().value },
+                onCheckedChange = { appSettings.setFoldersFirst(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Copy the link after uploading",
+                summary = "Of each file uploaded",
+                info = "When an upload is done, the links of the uploaded files are copied, one per line, ready to paste. " +
+                    "Only for hosts whose files have links, such as Pixeldrain.",
+                isChecked = { appSettings.copyLinkAfterUpload.collectAsState().value },
+                onCheckedChange = { appSettings.setCopyLinkAfterUpload(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Open downloads when done",
+                summary = "A file downloaded on its own",
+                info = "A file is opened with the app for its kind as soon as it's downloaded. Not the files of a download " +
+                    "of several.",
+                isChecked = { appSettings.openAfterDownload.collectAsState().value },
+                onCheckedChange = { appSettings.setOpenAfterDownload(it) }
+            ),
+            SettingsItem.Choice(
+                title = "Download into",
+                options = listOf("Download" to false, "Download/Materialdrain" to true),
+                selected = { appSettings.downloadSubfolder.collectAsState().value },
+                onSelect = { appSettings.setDownloadSubfolder(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Show hosts in the file picker",
+                summary = "So other apps can open their files",
+                info = "The hosts with folders show in Android's file picker and Files app, where other apps can open (not " +
+                    "change) their files. A file is fetched whole when it's opened. Not while the app is locked with " +
+                    "your fingerprint, which the picker doesn't ask for.",
+                isChecked = { appSettings.documentsProvider.collectAsState().value },
+                onCheckedChange = { appSettings.setDocumentsProvider(it) }
             ),
             SettingsItem.Toggle(
                 title = "Upload by last change",
@@ -251,7 +446,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     SettingsCategory(
         id = "security",
         title = "Privacy and security",
-        summary = "Locking the app",
+        summary = "Locking the app, screenshots",
         icon = Icons.Filled.Lock,
         tone = CategoryTone.SECONDARY,
         items = listOf(
@@ -261,7 +456,31 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                 info = "Asks for your fingerprint, face or screen lock each time the app is opened again, after it was in " +
                     "the background for a while. Needs a fingerprint, face or screen lock set up on this device.",
                 isChecked = { appSettings.biometricLock.collectAsState().value },
-                onCheckedChange = { if (appSettings.biometricLockAvailable()) appSettings.setBiometricLock(it) }
+                onCheckedChange = { if (appSettings.biometricLockAvailable()) appSettings.setBiometricLock(it) },
+                children = listOf(
+                    SettingsItem.Choice(
+                        title = "Ask again after",
+                        summary = "Away from the app",
+                        options = LOCK_TIMEOUTS.map { seconds ->
+                            val label = when {
+                                seconds == 0 -> "Always"
+                                seconds < 60 -> "$seconds s"
+                                else -> "${seconds / 60} min"
+                            }
+                            label to seconds
+                        },
+                        selected = { appSettings.lockTimeoutSeconds.collectAsState().value },
+                        onSelect = { appSettings.setLockTimeoutSeconds(it) }
+                    )
+                )
+            ),
+            SettingsItem.Toggle(
+                title = "Block screenshots",
+                summary = "And hide the app in recent apps",
+                info = "Screenshots and screen recordings of the app come out black, adb's included, and the recent apps " +
+                    "show it blank.",
+                isChecked = { appSettings.blockScreenshots.collectAsState().value },
+                onCheckedChange = { appSettings.setBlockScreenshots(it) }
             )
         )
     ),
@@ -273,22 +492,14 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         icon = Icons.Filled.Code,
         tone = CategoryTone.NEUTRAL,
         items = listOf(
-            SettingsItem.Toggle(
-                title = "FAB navigation prototype",
-                summary = "A navigation button instead of the bar",
-                info = "Replaces the bottom bar with a navigation button. Swipe the button sideways to move it left, " +
-                    "center or right. While this is on, the Upload and Save Settings buttons are hidden.",
-                isChecked = { appSettings.navPrototype.collectAsState().value },
-                onCheckedChange = { appSettings.setNavPrototype(it) },
-                children = listOf(
-                    SettingsItem.Choice(
-                        title = "Menu of",
-                        info = "Mock providers only show how their menu looks, their items don't open anything.",
-                        options = NavMenuPreview.entries.map { it.label to it },
-                        selected = { appSettings.navMenuPreview.collectAsState().value },
-                        onSelect = { appSettings.setNavMenuPreview(it) }
-                    )
-                )
+            SettingsItem.Choice(
+                title = "Navigation button's menu",
+                summary = "When the floating button is on",
+                info = "The floating button (Look and feel, Navigation) shows this host's tabs, or the menu of a made-up " +
+                    "host with dozens of screens, to see how a big one looks. The made-up items don't open anything.",
+                options = NavMenuPreview.entries.map { it.label to it },
+                selected = { appSettings.navMenuPreview.collectAsState().value },
+                onSelect = { appSettings.setNavMenuPreview(it) }
             )
         )
     ),

@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.preferences
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -25,7 +26,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -107,7 +107,7 @@ internal const val WEBSITE_SETTINGS_URL = "https://pixeldrain.com/user/settings"
 internal const val WEBSITE_API_KEYS_URL = "https://pixeldrain.com/user/api_keys"
 
 /** The corners of the account page's cards, the same as the file details' cards. */
-internal val AccountCardShape = RoundedCornerShape(20.dp)
+internal val AccountCardShape = AppShapes.Card
 
 /**
  * The Account page. Logged out (and without an API key) it's the login; with one it's the account itself: who it is and
@@ -289,7 +289,7 @@ private fun HeroSurface(glow: Color = Color.Transparent, content: @Composable Co
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
+            .clip(AppShapes.ExtraLarge)
             .background(base)
             .drawBehind {
                 if (glow.alpha == 0f) return@drawBehind
@@ -362,7 +362,7 @@ internal fun SettingsEnvironment.AccountTile(onOpen: () -> Unit) {
                     maxLines = 1,
                     modifier = Modifier
                         .padding(start = 8.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(AppShapes.Small)
                         .background(colors.secondaryContainer)
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 )
@@ -425,7 +425,7 @@ private fun HeroTag(text: String) {
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(AppShapes.Small)
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
             .padding(horizontal = 8.dp, vertical = 3.dp)
     )
@@ -504,7 +504,7 @@ private fun RowScope.CountTile(icon: ImageVector, value: String, label: String) 
     Column(
         modifier = Modifier
             .weight(1f)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(AppShapes.Large)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {

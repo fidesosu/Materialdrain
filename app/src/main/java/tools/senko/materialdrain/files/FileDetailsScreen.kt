@@ -1,5 +1,7 @@
 package tools.senko.materialdrain.files
 
+import tools.senko.materialdrain.ui.media.MediaScrim
+import tools.senko.materialdrain.ui.theme.AppShapes
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -20,7 +22,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
@@ -86,6 +87,8 @@ import tools.senko.materialdrain.ui.media.FullScreenPdfDialog
 import tools.senko.materialdrain.ui.media.InlineImagePreview
 import tools.senko.materialdrain.ui.media.InlinePdfPreview
 import tools.senko.materialdrain.ui.media.InlineVideoPreview
+import tools.senko.materialdrain.ui.media.MediaCardShape
+import androidx.compose.ui.graphics.Shape
 import tools.senko.materialdrain.ui.media.imageRequest
 import tools.senko.materialdrain.util.formatApiDateTimeString
 import tools.senko.materialdrain.util.formatSize
@@ -102,7 +105,7 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import tools.senko.materialdrain.ui.preview.LongScreenPreviews
 
 /** The corners of the cards on this page, the same as the app's other floating cards. */
-private val DetailCardShape = RoundedCornerShape(20.dp)
+private val DetailCardShape = AppShapes.Card
 
 /** What a file's details do, handed to [FileInfoDetailsCard]: FileInfoViewModel's in the app, nothing in a preview. */
 class FileDetailsActions(
@@ -212,7 +215,8 @@ fun FileInfoDetailsCard(
             onDismissRequest = {
                 fullScreenPreviewUri = null
                 fullScreenPreviewMimeType = null
-            }
+            },
+            title = fileInfo.name
         )
     }
 
@@ -336,7 +340,7 @@ fun FileInfoDetailsCard(
                             .fillMaxWidth()
                             .aspectRatio(16f / 9f)
                             .padding(vertical = 8.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = AppShapes.Medium
                     ) {
                         AsyncImage(
                             model = request,
@@ -517,11 +521,11 @@ private fun HeldPreview(
     val dataSaver = LocalDataSaver.current
     val backdrop = thumbnailUrl?.takeIf { LocalBlurredBackdrop.current && dataSaver.showsThumbnail(it) }
     val size = file.size
-    val media = RoundedCornerShape(8.dp)
+    val media = MediaCardShape
     // What it would show, what that loads, and the preview's own frame: its size, shape and colour
-    class Held(val what: String, val cost: String?, val frame: Modifier, val shape: RoundedCornerShape, val color: Color)
+    class Held(val what: String, val cost: String?, val frame: Modifier, val shape: Shape, val color: Color)
     val held = when {
-        withArchive -> Held("what's inside", null, Modifier.height(HeldPreviewHeight), RoundedCornerShape(12.dp), scheme.surfaceContainerHighest)
+        withArchive -> Held("what's inside", null, Modifier.height(HeldPreviewHeight), AppShapes.Medium, scheme.surfaceContainerHighest)
         isPdf(file.name, previewType) -> Held(
             "the PDF",
             size?.let { if (it > MAX_PDF_PREVIEW_BYTES) "Too big to preview" else "About ${formatSize(it)}" },
@@ -541,7 +545,7 @@ private fun HeldPreview(
             Held("the picture", size?.let { "About ${formatSize(it)}" }, Modifier.aspectRatio(16f / 9f).padding(mediaPadding), media, scheme.surfaceContainerHigh)
         previewType?.startsWith("video/") == true ->
             Held("the video", "Streams once it's played", Modifier.aspectRatio(16f / 9f).padding(mediaPadding), media, scheme.surfaceContainerHigh)
-        else -> Held("the thumbnail", null, Modifier.aspectRatio(16f / 9f).padding(vertical = 8.dp), RoundedCornerShape(12.dp), scheme.surfaceContainerHigh)
+        else -> Held("the thumbnail", null, Modifier.aspectRatio(16f / 9f).padding(vertical = 8.dp), AppShapes.Medium, scheme.surfaceContainerHigh)
     }
     Box(
         contentAlignment = Alignment.Center,
@@ -556,7 +560,7 @@ private fun HeldPreview(
         if (backdrop != null) {
             BlurredBackdrop(backdrop, apiKey, LocalContext.current.imageLoader, Modifier.matchParentSize())
             // Darkened, so the white text reads on a light picture too
-            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.35f)))
+            Box(Modifier.matchParentSize().background(MediaScrim.Backdrop))
         }
         val text = if (backdrop != null) Color.White else scheme.onSurface
         val subtext = if (backdrop != null) Color.White.copy(alpha = 0.8f) else scheme.onSurfaceVariant
@@ -596,7 +600,7 @@ private fun AvailabilityBanner(message: String) {
 private const val CONFIRM_WINDOW_MS = 3_000L
 
 private val ActionHeight = 48.dp
-private val ActionShape = RoundedCornerShape(16.dp)
+private val ActionShape = AppShapes.Large
 
 /**
  * The download of [key], read in a scope of its own: its progress ticks then redraw only [content], not the whole page

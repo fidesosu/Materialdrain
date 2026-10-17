@@ -48,7 +48,9 @@ fun FullScreenMediaPreviewDialog(
     previewMimeType: String?,
     thumbnailUrl: String?,
     apiKey: String?,
-    onDismissRequest: () -> Unit
+    onDismissRequest: () -> Unit,
+    /** The file's name, shown at the top of the video player */
+    title: String? = null
 ) {
     val isVideo = previewMimeType?.startsWith("video/") == true
     Dialog(
@@ -70,7 +72,8 @@ fun FullScreenMediaPreviewDialog(
                     videoUri = previewUri,
                     thumbnailUrl = thumbnailUrl,
                     apiKey = apiKey,
-                    onBack = onDismissRequest
+                    onBack = onDismissRequest,
+                    title = title
                 )
                 previewMimeType?.startsWith("image/") == true -> {
                     val context = LocalContext.current
@@ -81,7 +84,7 @@ fun FullScreenMediaPreviewDialog(
                     // the picture, and it gets a scrim so that the picture and the buttons stand out.
                     if (thumbnailUrl != null && LocalBlurredBackdrop.current) {
                         BlurredBackdrop(thumbnailUrl, apiKey, context.imageLoader, Modifier.fillMaxSize())
-                        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
+                        Box(modifier = Modifier.fillMaxSize().background(MediaScrim.Backdrop))
                     }
                     // Double tapping the picture zooms, tapping next to it closes the preview
                     var imageSize by remember(previewUri) { mutableStateOf<androidx.compose.ui.geometry.Size?>(null) }
@@ -119,7 +122,7 @@ fun FullScreenMediaPreviewDialog(
                     contentDescription = "Back",
                     onClick = onDismissRequest,
                     modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp),
-                    container = Color.Black.copy(alpha = 0.5f)
+                    container = MediaScrim.Button
                 )
             }
         }

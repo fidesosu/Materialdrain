@@ -12,4 +12,6 @@
     <!-- The plain copies of the settings which hold the API key and the provider config state are not backed up -->
     <exclude domain="sharedpref" path="pixeldrain_prefs.xml" />
     <exclude domain="sharedpref" path="provider_prefs.xml" />
+    <!-- Where videos were left: only of use on this device -->
+    <exclude domain="sharedpref" path="video_positions.xml" />
 </full-backup-content>

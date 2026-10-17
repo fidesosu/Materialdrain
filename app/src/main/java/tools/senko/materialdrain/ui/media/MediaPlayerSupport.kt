@@ -27,6 +27,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -63,21 +64,29 @@ private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 2_500
  * the API (one connection pool, HTTP/2) and cached on disk. The player is not prepared yet.
  */
 @androidx.annotation.OptIn(UnstableApi::class)
-internal fun createMediaPlayer(context: Context, uri: Uri, apiKey: String?, isVideo: Boolean): ExoPlayer {
-    val appContext = context.applicationContext
-    val isRemote = uri.scheme == "http" || uri.scheme == "https"
+internal fun createMediaPlayer(context: Context, uri: Uri, isVideo: Boolean): ExoPlayer =
+    createPlayer(context, isVideo).apply { setMediaItem(MediaItem.fromUri(uri)) }
 
-    val dataSourceFactory: DataSource.Factory = if (isRemote) {
-        val okHttpFactory = OkHttpDataSource.Factory(AppContainer.get(appContext as Application).okHttpClient)
-        val headers = HostRequestAuth.headersFor(uri.toString())
-        if (headers.isNotEmpty()) okHttpFactory.setDefaultRequestProperties(headers)
-        CacheDataSource.Factory()
-            .setCache(ExoPlayerCache.getInstance(appContext))
-            .setUpstreamDataSourceFactory(okHttpFactory)
-            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-    } else {
-        DefaultDataSource.Factory(appContext)
+/**
+ * A player without media yet, which plays local files directly and streams the rest over the OkHttp client of the API
+ * (one connection pool, HTTP/2), cached on disk. The login a URL needs (see [HostRequestAuth]) is added to each request
+ * when it's made, so one player can play the files of any host: the one of the background songs (PlaybackService) does.
+ */
+@androidx.annotation.OptIn(UnstableApi::class)
+internal fun createPlayer(context: Context, isVideo: Boolean): ExoPlayer {
+    val appContext = context.applicationContext
+
+    val okHttpFactory = OkHttpDataSource.Factory(AppContainer.get(appContext as Application).okHttpClient)
+    val withLogin = ResolvingDataSource.Factory(okHttpFactory) { spec ->
+        val headers = HostRequestAuth.headersFor(spec.uri.toString())
+        if (headers.isEmpty()) spec else spec.withAdditionalHeaders(headers)
     }
+    val remote = CacheDataSource.Factory()
+        .setCache(ExoPlayerCache.getInstance(appContext))
+        .setUpstreamDataSourceFactory(withLogin)
+        .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+    // Files and content URIs are read directly; the rest (http, https) goes through [remote]
+    val dataSourceFactory: DataSource.Factory = DefaultDataSource.Factory(appContext, remote)
 
     val loadControl = DefaultLoadControl.Builder()
         .setBufferDurationsMs(MIN_BUFFER_MS, MAX_BUFFER_MS, BUFFER_FOR_PLAYBACK_MS, BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS)
@@ -96,25 +105,36 @@ internal fun createMediaPlayer(context: Context, uri: Uri, apiKey: String?, isVi
         )
         .setHandleAudioBecomingNoisy(true)
         .build()
-        .apply { setMediaItem(MediaItem.fromUri(uri)) }
 }
 
 /**
  * A player which lives as long as the composable: it pauses when the app goes to the background and is
  * released afterwards. With [prepareNow] false nothing is loaded before the user presses play
- * (see [PlayerUiState.togglePlayPause]), so a preview which is never played costs no data.
+ * (see [PlayerUiState.togglePlayPause]), so a preview which is never played costs no data. A prepared one plays at once
+ * when [autoplay] (see the Media settings). It starts at [speed].
  */
 @Composable
-fun rememberManagedPlayer(uri: Uri, apiKey: String?, isVideo: Boolean, prepareNow: Boolean): Player {
+fun rememberManagedPlayer(
+    uri: Uri,
+    apiKey: String?,
+    isVideo: Boolean,
+    prepareNow: Boolean,
+    autoplay: Boolean = true,
+    speed: Float = 1f,
+    /** Where it starts, e.g. where the video was left (see VideoPositions); 0 for the start */
+    startPositionMs: Long = 0L
+): Player {
     val context = LocalContext.current
     // A preview (in Android Studio) has no app around it to stream with, and plays nothing anyway
     val inPreview = LocalInspectionMode.current
     val player = remember<Player>(uri, apiKey) {
         if (inPreview) return@remember PreviewPlayer()
-        createMediaPlayer(context, uri, apiKey, isVideo).apply {
+        createMediaPlayer(context, uri, isVideo).apply {
+            if (speed != 1f) playbackParameters = PlaybackParameters(speed)
+            if (startPositionMs > 0) seekTo(startPositionMs)
             if (prepareNow) {
                 prepare()
-                playWhenReady = true
+                playWhenReady = autoplay
             }
         }
     }
@@ -250,7 +270,6 @@ fun PlaybackException.userMessage(): String = when (errorCode) {
     else -> "Playback failed."
 }
 
-// Shared by the controls of the video and audio players
-internal const val SEEK_STEP_MS = 10_000L
+// Shared by the controls of the video and audio players; how far they skip is a setting (PlayerSettings.seekStepMs)
 internal val PlaybackSpeeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 internal fun speedLabel(speed: Float) = speed.toString().removeSuffix(".0") + "×"

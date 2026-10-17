@@ -244,7 +244,7 @@ class FilesystemViewModel(
                 uiState.map { it.filterQuery },
                 appSettings.sortField,
                 appSettings.sortAscending,
-                directoriesFirst = true
+                directoriesFirst = appSettings.foldersFirst
             ).collect { sortedAndFiltered -> _displayedChildren.value = sortedAndFiltered }
         }
     }

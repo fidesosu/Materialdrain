@@ -10,12 +10,10 @@ import tools.senko.materialdrain.settings.AppSettings
 /** A fingerprint or face, or the device's screen lock when there is no biometric. Used by the lock prompt. */
 const val LOCK_AUTHENTICATORS = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
 
-/** Short absences (switching to another app and back) don't ask again, a longer one does. */
-private const val LOCK_AFTER_BACKGROUND_MS = 30_000L
-
 /**
  * Whether the app is locked behind the biometric prompt. It locks when opened, and again when it comes back from the
- * background after [LOCK_AFTER_BACKGROUND_MS]. Nothing is locked while the setting is off.
+ * background after the lock timeout (AppSettings.lockTimeoutSeconds: short absences, switching to another app and back,
+ * don't ask again unless it's 0). Nothing is locked while the setting is off.
  */
 class AppLock(private val settings: AppSettings) {
 
@@ -25,7 +23,8 @@ class AppLock(private val settings: AppSettings) {
     private var stoppedAt: Long? = null
 
     fun onStarted() {
-        val wasAway = stoppedAt?.let { SystemClock.elapsedRealtime() - it > LOCK_AFTER_BACKGROUND_MS } ?: true
+        val timeoutMs = settings.lockTimeoutSeconds.value * 1000L
+        val wasAway = stoppedAt?.let { SystemClock.elapsedRealtime() - it >= timeoutMs } ?: true
         if (settings.biometricLock.value && wasAway) _locked.value = true
         if (!settings.biometricLock.value) _locked.value = false
     }

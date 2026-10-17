@@ -1,9 +1,9 @@
 package tools.senko.materialdrain.upload
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
@@ -15,9 +15,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.res.painterResource
-import tools.senko.materialdrain.R
+import tools.senko.materialdrain.ui.icons.symbols.Symbols
+import tools.senko.materialdrain.ui.icons.symbols.Upload
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.filled.*
@@ -26,7 +25,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -42,6 +40,7 @@ import tools.senko.materialdrain.ui.media.FullScreenMediaPreviewDialog
 import tools.senko.materialdrain.ui.media.InlineImagePreview
 import tools.senko.materialdrain.ui.media.InlineTextPreview
 import tools.senko.materialdrain.ui.media.InlineVideoPreview
+import tools.senko.materialdrain.ui.media.rememberDecodedBitmap
 import tools.senko.materialdrain.util.formatDurationMillis
 import tools.senko.materialdrain.util.formatSize
 import tools.senko.materialdrain.ui.preview.PreviewTheme
@@ -69,7 +68,9 @@ fun UploadScreenContent(
         onRemoveQueued = uploadViewModel::removeQueuedItem,
         onClearQueued = uploadViewModel::clearQueuedItems,
         onCancel = uploadViewModel::cancelUpload,
-        onUpload = uploadViewModel::upload
+        onUpload = uploadViewModel::upload,
+        // Text shared from another app (see PendingOpen.Text) is on the text tab
+        initialTab = if (uiState.textToUpload.isNotBlank() && uiState.pickedFile == null && uiState.queuedItems.isEmpty()) 1 else 0
     )
 }
 
@@ -235,7 +236,7 @@ fun UploadScreenContent(
                                         .fillMaxWidth()
                                         .height(100.dp)
                                         .padding(vertical = 8.dp),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = AppShapes.Medium
                                 ) {
                                     Box(
                                         modifier = Modifier.fillMaxSize(),
@@ -252,16 +253,15 @@ fun UploadScreenContent(
                                         .fillMaxWidth()
                                         .heightIn(min = 80.dp)
                                         .padding(vertical = 8.dp),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = AppShapes.Medium
                                 ) {
                                     Box(
                                         modifier = Modifier.fillMaxSize().padding(16.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        file.apkIcon?.let {
-                                            val bitmap = remember(it) { BitmapFactory.decodeByteArray(it, 0, it.size) }
+                                        file.apkIcon?.let { rememberDecodedBitmap(it) }?.let { bitmap ->
                                             Image(
-                                                bitmap = bitmap.asImageBitmap(),
+                                                bitmap = bitmap,
                                                 contentDescription = "APK icon preview",
                                                 modifier = Modifier.size(64.dp),
                                                 contentScale = ContentScale.Fit
@@ -334,10 +334,10 @@ fun UploadScreenContent(
                             .fillMaxWidth()
                             .padding(top = 8.dp)
                             .height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = AppShapes.Medium,
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
                     ) {
-                        Icon(painterResource(R.drawable.icon_upload), contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Symbols.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Upload", style = MaterialTheme.typography.labelLarge)
                     }
@@ -364,7 +364,7 @@ private fun UploadDropZone(enabled: Boolean, onClick: () -> Unit) {
         onClick = onClick,
         enabled = enabled,
         color = Color.Transparent,
-        shape = RoundedCornerShape(8.dp),
+        shape = AppShapes.Small,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = contentAlpha)),
         modifier = Modifier
             .fillMaxWidth()

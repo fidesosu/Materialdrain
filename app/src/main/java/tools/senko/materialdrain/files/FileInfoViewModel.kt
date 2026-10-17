@@ -489,6 +489,27 @@ class FileInfoViewModel(
         }
     }
 
+    // The files of the list the details were opened from, in its order, for a swipe to the next or previous one (Look and
+    // feel, Swipe between files); [neighboursByNode] when they're shown from the node itself, as the filesystem's are
+    private var neighbours: List<StorageNode> = emptyList()
+    private var neighboursByNode = false
+
+    /** The files beside the one about to be opened, see [openNeighbour]. */
+    fun setNeighbours(files: List<StorageNode>, byNode: Boolean) {
+        neighbours = files
+        neighboursByNode = byNode
+    }
+
+    /** Opens the file after (or, not [next], before) the one shown, in the list it was opened from. False when there's none. */
+    fun openNeighbour(next: Boolean): Boolean {
+        val shown = _uiState.value.fileInfo ?: return false
+        val index = neighbours.indexOfFirst { it.key == shown.key }
+        if (index == -1) return false
+        val target = neighbours.getOrNull(if (next) index + 1 else index - 1) ?: return false
+        if (neighboursByNode) setFileInfoFromNode(target) else fetchFileInfo(target.key)
+        return true
+    }
+
     /** Shows the file that was open when the app was closed. False when there is none, or it belongs to another host. */
     fun restoreOpenedFile(): Boolean {
         val saved = appSettings.openedFile ?: return false

@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.preferences
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.filled.ContentCopy
@@ -98,7 +98,7 @@ fun SettingsEnvironment.AboutSection() {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             icon?.let {
-                Image(it, contentDescription = null, modifier = Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)))
+                Image(it, contentDescription = null, modifier = Modifier.size(64.dp).clip(AppShapes.Large))
                 Spacer(Modifier.width(16.dp))
             }
             Column {
@@ -110,7 +110,7 @@ fun SettingsEnvironment.AboutSection() {
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(AppShapes.Small)
                         .background(MaterialTheme.colorScheme.secondaryContainer)
                         .padding(horizontal = 8.dp, vertical = 2.dp)
                 )

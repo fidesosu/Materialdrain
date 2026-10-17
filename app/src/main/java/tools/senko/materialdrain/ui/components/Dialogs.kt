@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.ui.components
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -29,7 +30,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
@@ -167,7 +167,7 @@ fun FolderPickerDialog(
         // Back goes up a folder before it closes the dialog
         BackHandler(enabled = hasParent) { goUp() }
         Surface(
-            shape = RoundedCornerShape(28.dp),
+            shape = AppShapes.ExtraLarge,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 6.dp,
             modifier = Modifier.fillMaxWidth()
@@ -270,7 +270,7 @@ private fun PickerPath(crumbs: List<Pair<String, String>>, onCrumbClick: (String
                 color = if (last) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(AppShapes.Small)
                     .clickable(enabled = !last) { onCrumbClick(crumbPath) }
                     .padding(horizontal = 4.dp, vertical = 6.dp)
             )
@@ -292,7 +292,7 @@ private fun PickerFolderRow(name: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(AppShapes.Large)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically

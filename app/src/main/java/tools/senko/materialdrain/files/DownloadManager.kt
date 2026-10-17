@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.files
 
+import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.provider.api.ErrorCodes
 import android.app.Application
 import android.content.ContentResolver
@@ -50,6 +51,9 @@ import tools.senko.materialdrain.util.formatSize
 private const val TAG = "DownloadManager"
 private const val DOWNLOAD_WRITE_BUFFER_BYTES = 256 * 1024
 private const val MAX_FILES_PER_ZIP = 100
+/** The folder of the app's own in Download, when downloads go there (AppSettings.downloadSubfolder). */
+const val DOWNLOAD_SUBFOLDER = "Materialdrain"
+
 /** How many names a download tries when its own is taken, before MediaStore names it (see insertDownloadEntry). */
 private const val MAX_NAME_TRIES = 100
 
@@ -164,7 +168,8 @@ class DownloadManager(
     private val registry: ProviderRegistry,
     private val configStore: ProviderConfigStore,
     private val transfers: TransferRegistry,
-    private val messages: UiMessages
+    private val messages: UiMessages,
+    private val appSettings: AppSettings
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -242,7 +247,11 @@ class DownloadManager(
         // The type of the name's extension, never the host's: when the extension doesn't match the type MediaStore adds
         // the type's own (a .rmbak the host calls a zip became .rmbak.zip). An unknown extension gets the generic type
         put(MediaStore.MediaColumns.MIME_TYPE, downloadedFileMimeType(fileName).takeIf { it != "*/*" } ?: "application/octet-stream")
-        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+        // Download itself, or its folder of the app's own (Files and transfers, Download folder)
+        put(
+            MediaStore.MediaColumns.RELATIVE_PATH,
+            if (appSettings.downloadSubfolder.value) "${Environment.DIRECTORY_DOWNLOADS}/$DOWNLOAD_SUBFOLDER" else Environment.DIRECTORY_DOWNLOADS
+        )
         put(MediaStore.MediaColumns.IS_PENDING, 1)
     }
 
@@ -426,6 +435,13 @@ class DownloadManager(
                         long = true,
                         action = targetUri?.let { UiMessageAction.OpenDownload(OpenableDownload(it, openMimeType)) }
                     )
+                    // A file on its own, not one of several, opens when it's done (Files and transfers, Open when done)
+                    val saved = targetUri
+                    if (batchId == null && saved != null && appSettings.openAfterDownload.value) {
+                        withContext(Dispatchers.Main + NonCancellable) {
+                            openDownloadedFile(application, OpenableDownload(saved, openMimeType))
+                        }
+                    }
                 }
             }
         }

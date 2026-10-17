@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.ui.media
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import android.content.Context
 import android.os.Build
 import android.util.Log
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.filled.BrokenImage
 import tools.senko.materialdrain.ui.icons.filled.Fullscreen
@@ -182,8 +182,8 @@ fun ClickablePreviewOverlay(onClick: () -> Unit) {
     ) {
         Surface(
             modifier = Modifier.size(28.dp),
-            shape = RoundedCornerShape(4.dp),
-            color = Color.Black.copy(alpha = 0.55f)
+            shape = AppShapes.ExtraSmall,
+            color = MediaScrim.Play
         ) {
             Icon(
                 imageVector = Icons.Filled.Fullscreen,

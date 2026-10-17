@@ -162,6 +162,8 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.datasource.okhttp) // Streams media over the same OkHttp client as the API
+    // Songs which go on in the background, with their controls in the notification (see PlaybackService)
+    implementation(libs.androidx.media3.session)
 
     testImplementation(libs.junit)
     // Draws the previews in a test (see roborazzi above)

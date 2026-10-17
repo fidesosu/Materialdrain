@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.navmenu
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import tools.senko.materialdrain.ui.components.keepsMenusAbove
 import android.os.Build
 import android.os.SystemClock
@@ -71,12 +72,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -92,10 +91,10 @@ import tools.senko.materialdrain.ui.preview.ThemePreviews
 
 private val FabMargin = 8.dp
 private val FabClosedCorner = 16.dp
-/** Moving between spots: a quick move with a mild ease-in and a lighter ease-out. */
 /** How far below its corner the button starts, enough to be off the screen; it slides up from there. */
 private val EntryOffset = 160.dp
 private val EntryAnimation = tween<Float>(durationMillis = 420, easing = FastOutSlowInEasing)
+/** Moving between spots: a quick move with a mild ease-in and a lighter ease-out. */
 private val MoveAnimation = tween<Float>(durationMillis = 300, easing = CubicBezierEasing(0.4f, 0f, 0.8f, 1f))
 /** A change of the button's size (its label growing or shrinking): it glides to its side with the size. */
 private val ResizeAnimation = tween<Float>(durationMillis = 260, easing = FastOutSlowInEasing)
@@ -187,9 +186,9 @@ fun NavFabMenu(
             )
         }
 
-        val fabIcon: Painter = selectedItem?.icon?.painter()
-            ?: currentScreen.iconResId?.takeIf { allItems.any { it.tab != null } }?.let { painterResource(it) }
-            ?: rememberVectorPainter(Icons.Filled.Menu)
+        val fabIcon: ImageVector = selectedItem?.icon
+            ?: currentScreen.icon?.takeIf { allItems.any { it.tab != null } }
+            ?: Icons.Filled.Menu
 
         if (hidden < 1f) NavFab(
             open = open,
@@ -222,7 +221,7 @@ fun NavFabMenu(
 @Composable
 private fun NavFab(
     open: Boolean,
-    icon: Painter,
+    icon: ImageVector,
     position: NavFabPosition,
     containerWidth: Int,
     onClick: () -> Unit,
@@ -321,7 +320,7 @@ private fun NavMenuWindow(
     // A floating card like the ones above the file list and in the search: slightly see-through, with a hairline edge and
     // a soft shadow, rather than a heavy sheet
     Surface(
-        shape = RoundedCornerShape(24.dp),
+        shape = AppShapes.Card,
         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         shadowElevation = 3.dp
@@ -383,7 +382,7 @@ private fun Tile(item: NavMenuItem, selected: Boolean, onClick: () -> Unit, modi
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(AppShapes.Large)
             .clickable(onClick = onClick)
             .padding(vertical = 6.dp, horizontal = 2.dp)
     ) {
@@ -391,11 +390,11 @@ private fun Tile(item: NavMenuItem, selected: Boolean, onClick: () -> Unit, modi
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(width = 56.dp, height = 32.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(AppShapes.Large)
                 .background(indicator)
         ) {
             Icon(
-                item.icon.painter(),
+                item.icon,
                 contentDescription = null,
                 tint = if (selected) colors.onSecondaryContainer else colors.onSurfaceVariant,
                 modifier = Modifier.size(22.dp)

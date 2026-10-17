@@ -1,11 +1,15 @@
 package tools.senko.materialdrain
 
+import tools.senko.materialdrain.provider.api.FileList
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.runtime.mutableFloatStateOf
+import kotlinx.coroutines.CancellationException
+import tools.senko.materialdrain.ui.theme.AppShapes
 import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -33,6 +37,9 @@ import tools.senko.materialdrain.ui.icons.automirrored.filled.ArrowBack
 import tools.senko.materialdrain.ui.icons.filled.Delete
 import tools.senko.materialdrain.ui.icons.filled.MoreVert
 import tools.senko.materialdrain.ui.icons.filled.Search
+import tools.senko.materialdrain.ui.icons.symbols.SettingsFilled
+import tools.senko.materialdrain.ui.icons.symbols.Symbols
+import tools.senko.materialdrain.ui.icons.symbols.Upload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -48,7 +55,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,7 +65,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.util.UnstableApi
-import tools.senko.materialdrain.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -81,6 +86,7 @@ import tools.senko.materialdrain.browser.BrowserScreen
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
 import tools.senko.materialdrain.lists.ListViewModel
 import tools.senko.materialdrain.navmenu.NavFabMenu
+import tools.senko.materialdrain.ui.components.sidewaysSwipe
 import tools.senko.materialdrain.navmenu.menu
 import tools.senko.materialdrain.preferences.ACCOUNT_CATEGORY_ID
 import tools.senko.materialdrain.preferences.AccountViewModel
@@ -108,6 +114,11 @@ import tools.senko.materialdrain.ui.LocalTextWrap
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.LocalVideoLoop
 import tools.senko.materialdrain.ui.VideoLoopSetting
+import tools.senko.materialdrain.ui.LocalPlayerSettings
+import tools.senko.materialdrain.ui.PlayerSettings
+import tools.senko.materialdrain.ui.LocalListLook
+import tools.senko.materialdrain.ui.ListLook
+import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.ui.components.PAGE_TRANSITION_MS
 import tools.senko.materialdrain.ui.components.pageTransition
 import tools.senko.materialdrain.ui.components.AppSnackbarHost
@@ -145,7 +156,10 @@ fun MaterialdrainScreen() {
     val context = LocalContext.current
     val appContainer = remember { AppContainer.get(application) }
     // The app opens on the screen it was last on, and of a host with several tabs of that kind, on the same one
-    var currentScreen by rememberSaveable { mutableStateOf(appContainer.appSettings.lastScreen) }
+    // ...unless it's set to open on one screen (Look and feel, Start screen)
+    var currentScreen by rememberSaveable {
+        mutableStateOf(appContainer.appSettings.startScreen.value ?: appContainer.appSettings.lastScreen)
+    }
     var currentTabId by rememberSaveable { mutableStateOf(appContainer.appSettings.lastTabId) }
     val sessionManager = appContainer.sessionManager
     val viewModelFactory = remember { ViewModelFactory(application, appContainer) }
@@ -191,6 +205,10 @@ fun MaterialdrainScreen() {
     val navPrototype by appContainer.appSettings.navPrototype.collectAsState()
     val navMenuPreview by appContainer.appSettings.navMenuPreview.collectAsState()
     val navFabPosition by appContainer.appSettings.navFabPosition.collectAsState()
+    val swipeTabs by appContainer.appSettings.swipeBetweenTabs.collectAsState()
+    // How the players behave and how the lists look, for the screens deep down (see LocalPlayerSettings, LocalListLook)
+    val playerSettings = rememberPlayerSettings(appContainer.appSettings)
+    val listLook = rememberListLook(appContainer.appSettings)
     val videoLoop = remember(loopVideos) { VideoLoopSetting(loopVideos, appContainer.appSettings::setLoopVideos) }
     LaunchedEffect(hasActiveTransfers) {
         if (hasActiveTransfers && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -366,18 +384,53 @@ fun MaterialdrainScreen() {
             appContainer.pendingShares.value = emptyList()
         }
     }
+    // A link, a shortcut or shared text (see PendingOpen), also once the app is unlocked. A Pixeldrain link opens on the
+    // built-in Pixeldrain, whichever host is active
+    val pendingOpen by appContainer.pendingOpen.collectAsState()
+    LaunchedEffect(pendingOpen, appLocked) {
+        val open = pendingOpen ?: return@LaunchedEffect
+        if (appLocked) return@LaunchedEffect
+        appContainer.pendingOpen.value = null
+        when (open) {
+            is PendingOpen.ToScreen -> tabOf(open.screen)?.let(selectTab) ?: navigateTo(open.screen)
+            is PendingOpen.PixeldrainFile -> {
+                appContainer.providerConfigStore.setActive(PIXELDRAIN_PROVIDER_ID)
+                fileInfoViewModel.setNeighbours(emptyList(), byNode = false)
+                fileInfoViewModel.fetchFileInfo(open.id)
+                navigateTo(Screen.FileDetail)
+            }
+            is PendingOpen.PixeldrainList -> {
+                appContainer.providerConfigStore.setActive(PIXELDRAIN_PROVIDER_ID)
+                // Its title and count come with its files
+                listViewModel.openList(FileList(id = open.id, title = "", fileCount = 0, canEdit = false))
+                navigateTo(Screen.Lists)
+            }
+            is PendingOpen.Text -> {
+                uploadViewModel.onTextToUploadChanged(open.text)
+                navigateTo(Screen.Upload)
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         Log.d("App", "Initial composition. Loading the manually entered API Key.")
         apiKeyInput = sessionManager.manualApiKey()
     }
 
-    if (currentScreen == Screen.FileDetail) {
-        BackHandler(enabled = true) {
+    // The back gesture out of a file's details (Android 14 and up shows it as it's made): the page shrinks back with the
+    // swipe, and goes when it's let go; a gesture given up on puts it back
+    var detailsBackProgress by remember { mutableFloatStateOf(0f) }
+    PredictiveBackHandler(enabled = currentScreen == Screen.FileDetail) { progress ->
+        try {
+            progress.collect { event -> detailsBackProgress = event.progress }
             fileInfoViewModel.setPreserveScrollPosition(previousScreen == Screen.Files)
             navigateTo(previousScreen)
+        } catch (e: CancellationException) {
+            detailsBackProgress = 0f
+            throw e
         }
     }
+    LaunchedEffect(currentScreen) { if (currentScreen != Screen.FileDetail) detailsBackProgress = 0f }
 
     LaunchedEffect(currentScreen) {
         Log.d("App", "currentScreen changed to: ${currentScreen.name}")
@@ -472,7 +525,7 @@ fun MaterialdrainScreen() {
                 // Nothing to upload yet (or already uploading): the upload screen offers its own actions instead
                 Screen.Upload -> if (uploadUiState.hasUploadable && !uploadUiState.isLoading) FabDetails(
                     screen = Screen.Upload,
-                    iconResId = R.drawable.icon_upload,
+                    icon = Symbols.Upload,
                     text = "Upload",
                     onClick = { if (uploadUiState.hasUploadable && !uploadUiState.isLoading) uploadViewModel.upload() },
                     isExtended = true,
@@ -480,7 +533,7 @@ fun MaterialdrainScreen() {
                 // Only the categories whose settings are saved with the button (see SettingsCategory.hasSaveButton)
                 Screen.Settings -> if (settingsCategory(settingsCategoryId)?.hasSaveButton == true) FabDetails(
                     screen = Screen.Settings,
-                    iconResId = R.drawable.icon_settings_filled, // Using filled settings as a save icon
+                    icon = Symbols.SettingsFilled, // The filled gear, as the save button
                     text = if (settingsJustSaved) SETTINGS_SAVED_TEXT else SETTINGS_SAVE_TEXT,
                     // Both texts take the same space, so the button doesn't change size when it confirms the save
                     reserveTextWidthFor = listOf(SETTINGS_SAVE_TEXT, SETTINGS_SAVED_TEXT),
@@ -501,6 +554,10 @@ fun MaterialdrainScreen() {
     }
     // Like the old bottom bar, the navigation FAB stays out of the way on detail screens
     // With one screen (or none) turned on there's nothing to navigate between, so the bar/FAB would only take up space
+    // A wide screen has the tabs at its side instead of the bottom bar, unless the navigation button is chosen
+    val useRail = isWideScreen() && !navPrototype && navBarOrder.size > 1
+    val barLabels by appContainer.appSettings.barLabels.collectAsState()
+    val swipeFiles by appContainer.appSettings.swipeBetweenFiles.collectAsState()
     val showNavFab = navPrototype && currentScreen != Screen.FileDetail && navBarOrder.size > 1
     // The snackbar shares the row of the navigation button at an edge, so the button doesn't rise over it. Where no button
     // sits beside it (hidden on detail screens, or in the middle) it takes the full width, and in the middle the button rises over it
@@ -535,6 +592,8 @@ fun MaterialdrainScreen() {
         LocalBlurredBackdrop provides blurredBackdrop,
         LocalTextWrap provides textWrap,
         LocalVideoLoop provides videoLoop,
+        LocalPlayerSettings provides playerSettings,
+        LocalListLook provides listLook,
         LocalDataSaver provides dataSaverState,
         // Menus open above the bottom bar or the navigation button (see MenuFloor)
         LocalMenuFloor provides remember { MenuFloor() }
@@ -547,9 +606,13 @@ fun MaterialdrainScreen() {
                 .fillMaxSize()
                 .then(if (searchBlur > 0.dp) Modifier.blur(searchBlur) else Modifier)
         ) {
+        Row(modifier = Modifier.fillMaxSize()) {
+        if (useRail) {
+            AppNavigationRail(currentTab, navBarOrder, onTabSelected = selectTab, alwaysShowLabels = barLabels)
+        }
         Scaffold(
             // Blurred behind the navigation window, which sits on top of it in this Box and so stays sharp
-            modifier = if (navMenuBlur > 0.dp) Modifier.blur(navMenuBlur) else Modifier,
+            modifier = Modifier.weight(1f).then(if (navMenuBlur > 0.dp) Modifier.blur(navMenuBlur) else Modifier),
             topBar = {
                 Column {
                     AppTopBar(
@@ -612,7 +675,7 @@ fun MaterialdrainScreen() {
                 AnimatedVisibility(
                     // The FAB navigation prototype (Developer settings) replaces the bar while it's on; with no
                     // screens to show there is nothing for the bar to hold either
-                    visible = !navPrototype && currentScreen != Screen.FileDetail && navBarOrder.size > 1,
+                    visible = !navPrototype && !useRail && currentScreen != Screen.FileDetail && navBarOrder.size > 1,
                     // Above the upload button, so the button slides down behind the bar
                     modifier = Modifier.zIndex(2f),
                     // The bar rises out of the bottom edge and sinks back into it, its icons with it: its top stays on the
@@ -620,7 +683,9 @@ fun MaterialdrainScreen() {
                     enter = if (reduceMotion) fadeIn(tween(100)) else fadeIn() + expandVertically(expandFrom = Alignment.Top),
                     exit = if (reduceMotion) fadeOut(tween(100)) else fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
                 ) {
-                    BottomNavigationBar(currentTab, navBarOrder, onTabSelected = selectTab, modifier = Modifier.keepsMenusAbove())
+                    BottomNavigationBar(
+                        currentTab, navBarOrder, onTabSelected = selectTab, modifier = Modifier.keepsMenusAbove(), alwaysShowLabels = barLabels
+                    )
                 }
             },
             floatingActionButton = {
@@ -662,14 +727,14 @@ fun MaterialdrainScreen() {
                         expanded = details.isExtended,
                         icon = {
                             AnimatedContent(
-                                targetState = details.iconResId,
+                                targetState = details.icon,
                                 transitionSpec = {
                                     fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(200))
                                 },
                                 label = "fabIconAnimation"
-                            ) { targetIconResId ->
+                            ) { targetIcon ->
                                 Icon(
-                                    painterResource(id = targetIconResId),
+                                    targetIcon,
                                     contentDescription = details.text ?: "FAB icon",
                                     modifier = Modifier.rotate(iconRotation.value)
                                 )
@@ -722,8 +787,16 @@ fun MaterialdrainScreen() {
                 )
             }
         ) { paddingValues ->
+            // A swipe sideways goes to the tab beside this one (Look and feel), while nothing else is open over the tab
+            val swipeEnabled = swipeTabs && currentTab != null && navBarOrder.size > 1 && !noScreensConfigured &&
+                !selectingItems && !showSearchModal && !navMenuOpen
             AnimatedContent(
                 targetState = shownNow,
+                modifier = Modifier.sidewaysSwipe(swipeEnabled) { toNext ->
+                    val index = navBarOrder.indexOf(currentTab)
+                    val next = if (index == -1) null else navBarOrder.getOrNull(if (toNext) index + 1 else index - 1)
+                    next?.let(selectTab)
+                },
                 // The tab too: two tabs of one kind (two Filesystem tabs) are two pages, moved between like any tabs. Not
                 // the host: switching hosts on the same tab changes the page in place instead of sliding
                 contentKey = { it.screen to it.tab?.id },
@@ -748,7 +821,7 @@ fun MaterialdrainScreen() {
                 // Without the app's bottom bar, the file screens and the details go on under the system's navigation bar
                 // (the lists add room for it after their last item, see LocalBottomInset) instead of being cut off above it.
                 // The upload and settings screens keep their buttons clear of it.
-                val bottomBarShown = !navPrototype && targetScreen != Screen.FileDetail && navBarOrder.size > 1
+                val bottomBarShown = !navPrototype && !useRail && targetScreen != Screen.FileDetail && navBarOrder.size > 1
                 val underNavigationBar = !bottomBarShown && targetScreen in setOf(Screen.FileDetail, Screen.Files, Screen.Lists, Screen.Filesystem)
                 val layoutDirection = LocalLayoutDirection.current
                 CompositionLocalProvider(
@@ -815,7 +888,19 @@ fun MaterialdrainScreen() {
                             )
                             DisposableEffect(shown.key) { onDispose { screenActions.remove(shown.key) } }
                         }
-                        Screen.FileDetail -> {
+                        Screen.FileDetail -> Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .sidewaysSwipe(swipeFiles && shown == shownNow) { toNext -> fileInfoViewModel.openNeighbour(toNext) }
+                                .graphicsLayer {
+                                    // Reduced animations: the page stays as it is until it goes
+                                    val back = if (reduceMotion) 0f else detailsBackProgress
+                                    scaleX = 1f - back * 0.1f
+                                    scaleY = 1f - back * 0.1f
+                                    shape = AppShapes.Card
+                                    clip = back > 0f
+                                }
+                        ) {
                             fileInfoUiState.fileInfo?.let { info ->
                                 FileInfoDetailsCard(
                                     fileInfo = info,
@@ -855,6 +940,7 @@ fun MaterialdrainScreen() {
                 }
                 }
             }
+        }
         }
         // Kept while the navigation prototype is on: it slides out of the screen when hidden (see NavFabMenu)
         if (navPrototype) {
@@ -924,6 +1010,29 @@ fun MaterialdrainScreen() {
     }
 }
 
+
+/** The Media settings, as the players read them (see LocalPlayerSettings). */
+@Composable
+private fun rememberPlayerSettings(settings: AppSettings): PlayerSettings {
+    val autoplay by settings.autoplay.collectAsState()
+    val resume by settings.resumeVideos.collectAsState()
+    val step by settings.seekStepSeconds.collectAsState()
+    val speed by settings.defaultSpeed.collectAsState()
+    val gestures by settings.playerGestures.collectAsState()
+    val background by settings.backgroundAudio.collectAsState()
+    return remember(autoplay, resume, step, speed, gestures, background) {
+        PlayerSettings(autoplay, resume, step * 1000L, speed, gestures, background)
+    }
+}
+
+/** The Look and feel settings of the file lists (see LocalListLook). */
+@Composable
+private fun rememberListLook(settings: AppSettings): ListLook {
+    val compact by settings.compactRows.collectAsState()
+    val grid by settings.gridView.collectAsState()
+    val relative by settings.relativeDates.collectAsState()
+    return remember(compact, grid, relative) { ListLook(compact, grid, relative) }
+}
 
 /** What the main content shows: a [screen], and for a tab of the host [hostId], which of its tabs. */
 private data class Shown(val screen: Screen, val tab: Tab?, val hostId: String) {

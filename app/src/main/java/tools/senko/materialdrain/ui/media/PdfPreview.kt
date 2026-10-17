@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.ui.media
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
@@ -33,7 +34,6 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.automirrored.filled.ArrowBack
 import tools.senko.materialdrain.ui.icons.filled.PictureAsPdf
@@ -294,7 +294,7 @@ fun InlinePdfPreview(state: PdfPreviewState, outerPadding: PaddingValues, onLoad
 
 /** A label over the pages: white text on a dark see-through chip, readable on any page. */
 private fun Modifier.labelOverPage(): Modifier =
-    background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 4.dp)
+    background(MediaScrim.Button, AppShapes.Small).padding(horizontal = 8.dp, vertical = 4.dp)
 
 @Composable
 private fun PdfMessage(text: String) {
@@ -341,7 +341,7 @@ fun FullScreenPdfDialog(file: File, title: String, onDismissRequest: () -> Unit)
                 onClick = onDismissRequest,
                 modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(PdfBarInset),
                 size = PdfBarHeight,
-                container = Color.Black.copy(alpha = 0.5f)
+                container = MediaScrim.Button
             )
             // Clear of the back button on one side and the page number on the other, centred between them
             PdfBarSlot(Modifier.align(Alignment.TopCenter).padding(horizontal = 112.dp)) {

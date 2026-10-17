@@ -2,6 +2,7 @@
 
 package tools.senko.materialdrain.preferences.configeditor
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -41,7 +42,6 @@ import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.automirrored.filled.ArrowBack
@@ -645,7 +645,7 @@ private fun ErrorBanner(message: String) {
                 .widthIn(max = ContentMaxWidth)
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 4.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(AppShapes.Medium)
                 .background(MaterialTheme.colorScheme.errorContainer)
                 .padding(12.dp)
         )
@@ -654,7 +654,7 @@ private fun ErrorBanner(message: String) {
 
 // ---- Building blocks ----
 
-internal val RowShape = RoundedCornerShape(16.dp)
+internal val RowShape = AppShapes.Large
 
 @Composable
 internal fun SectionTitle(title: String) {
@@ -728,7 +728,7 @@ private fun MainSwitch(label: String, checked: Boolean, onChange: (Boolean) -> U
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 64.dp)
-            .clip(RoundedCornerShape(28.dp))
+            .clip(AppShapes.ExtraLarge)
             .background(if (checked) colors.primaryContainer else colors.surfaceContainerHigh)
             .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
             .padding(horizontal = 20.dp, vertical = 12.dp)
@@ -828,7 +828,7 @@ private fun MoreOptions(fields: List<FieldSpec>, path: List<String>, obj: JsonOb
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(AppShapes.Medium)
                 .clickable { open = !open }
                 .padding(vertical = 12.dp)
         ) {

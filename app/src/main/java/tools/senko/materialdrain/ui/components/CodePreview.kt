@@ -1,5 +1,8 @@
 package tools.senko.materialdrain.ui.components
 
+import tools.senko.materialdrain.ui.media.MediaScrim
+import tools.senko.materialdrain.ui.theme.AppShapes
+import tools.senko.materialdrain.ui.media.MediaCardShape
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -31,7 +34,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -269,7 +271,7 @@ fun CodePreview(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(start = 8.dp, bottom = 8.dp, end = 48.dp)
-                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                .background(MediaScrim.Button, AppShapes.Small)
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         )
         // The same badge as on a picture's or a PDF's preview, but only the badge opens it: the text is scrolled and
@@ -281,7 +283,7 @@ fun CodePreview(
                 .size(44.dp)
                 .clickable(onClickLabel = "Open the text fullscreen") { fullscreen = true }
         ) {
-            Surface(modifier = Modifier.size(28.dp), shape = RoundedCornerShape(4.dp), color = Color.Black.copy(alpha = 0.55f)) {
+            Surface(modifier = Modifier.size(28.dp), shape = AppShapes.ExtraSmall, color = MediaScrim.Play) {
                 Icon(Icons.Filled.Fullscreen, contentDescription = "Open the text fullscreen", tint = Color.White, modifier = Modifier.padding(4.dp))
             }
         }
@@ -303,7 +305,7 @@ fun CodePreviewLoading(modifier: Modifier = Modifier, outerPadding: PaddingValue
 private fun CodePreviewFrame(modifier: Modifier, outerPadding: PaddingValues, content: @Composable BoxScope.() -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        shape = RoundedCornerShape(8.dp),
+        shape = MediaCardShape,
         modifier = modifier.fillMaxWidth().aspectRatio(16f / 9f).padding(outerPadding)
     ) {
         Box(modifier = Modifier.fillMaxSize(), content = content)

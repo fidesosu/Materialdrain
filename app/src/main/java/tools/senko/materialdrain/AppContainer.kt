@@ -62,6 +62,9 @@ class AppContainer private constructor(application: Application) {
     /** Files another app shared with Materialdrain, waiting for the upload screen to take them. */
     val pendingShares = kotlinx.coroutines.flow.MutableStateFlow<List<android.net.Uri>>(emptyList())
 
+    /** A link, a shortcut or shared text the app was opened with, waiting for the screen (and the unlock), see PendingOpen. */
+    val pendingOpen = kotlinx.coroutines.flow.MutableStateFlow<PendingOpen?>(null)
+
     /** The snackbar messages of the ViewModels, see UiMessages. */
     val uiMessages = UiMessages()
 
@@ -69,7 +72,7 @@ class AppContainer private constructor(application: Application) {
     val contentChanges = ContentChanges()
 
     /** Downloads into the device's Downloads folder, for every screen, see DownloadManager. */
-    val downloadManager = DownloadManager(application, providerRegistry, providerConfigStore, transferRegistry, uiMessages)
+    val downloadManager = DownloadManager(application, providerRegistry, providerConfigStore, transferRegistry, uiMessages, appSettings)
 
     /** What the app would load by itself waits to be asked for, when it's on, see DataSaver. */
     val dataSaver = tools.senko.materialdrain.settings.DataSaver(application, appSettings, appScope)

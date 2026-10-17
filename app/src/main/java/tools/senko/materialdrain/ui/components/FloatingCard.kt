@@ -1,7 +1,7 @@
 package tools.senko.materialdrain.ui.components
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -20,7 +20,7 @@ import androidx.compose.ui.graphics.Brush
 // menu (see AppMenu). Changed here, it changes everywhere.
 
 /** The corners of a floating card. */
-val FloatingCardShape = RoundedCornerShape(20.dp)
+val FloatingCardShape = AppShapes.Card
 
 /** A floating card's fill: translucent, so whatever is behind it (the blur, in the search) still shows through. */
 @Composable

@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.flowOf
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.util.parseDateTime
 import java.util.Collections
@@ -61,13 +62,15 @@ fun filteredAndSorted(
     filterQuery: Flow<String>,
     sortField: Flow<SortableField>,
     sortAscending: Flow<Boolean>,
-    directoriesFirst: Boolean = false
+    /** Folders before files (the filesystem's, AppSettings.foldersFirst) */
+    directoriesFirst: Flow<Boolean> = flowOf(false)
 ): Flow<List<StorageNode>> = combine(
     files.distinctUntilChanged(),
     filterQuery.distinctUntilChanged(),
     sortField,
-    sortAscending
-) { list, query, field, ascending ->
+    sortAscending,
+    directoriesFirst
+) { list, query, field, ascending, foldersFirst ->
     list.filter { it.name.contains(query, ignoreCase = true) }
-        .sortedWith(fileComparator(field, ascending, directoriesFirst))
+        .sortedWith(fileComparator(field, ascending, foldersFirst))
 }.flowOn(Dispatchers.Default)

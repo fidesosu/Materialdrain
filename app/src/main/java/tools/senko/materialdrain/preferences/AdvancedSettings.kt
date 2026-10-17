@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.preferences
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -22,7 +23,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -301,7 +301,7 @@ private fun HostCard(
     val pending = stored.pendingUpdate?.config
 
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = AppShapes.Large,
         colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh),
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).bringIntoViewRequester(bringIntoView)
     ) {

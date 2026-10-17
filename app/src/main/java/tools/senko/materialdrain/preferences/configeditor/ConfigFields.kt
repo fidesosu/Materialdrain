@@ -2,6 +2,7 @@
 
 package tools.senko.materialdrain.preferences.configeditor
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -226,7 +226,7 @@ private fun ChoiceField(spec: FieldSpec, kind: FieldKind.Choice, value: JsonElem
                         modifier = Modifier.fillMaxWidth()
                     )
                     // Over the field, so a tap anywhere on it opens the list
-                    Box(modifier = Modifier.matchParentSize().clip(RoundedCornerShape(4.dp)).clickable { open = true })
+                    Box(modifier = Modifier.matchParentSize().clip(AppShapes.ExtraSmall).clickable { open = true })
                     // As wide as the field, each choice with its help under it
                     AppMenu(expanded = open, onDismiss = { open = false }, matchAnchorWidth = true) {
                         kind.options.forEach { option ->
@@ -771,7 +771,7 @@ private fun AddEndpointDialog(missing: List<EndpointInfo>, onPick: (EndpointInfo
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(AppShapes.Medium)
                                 .clickable { onPick(info) }
                                 .padding(horizontal = 8.dp, vertical = 8.dp)
                         ) {

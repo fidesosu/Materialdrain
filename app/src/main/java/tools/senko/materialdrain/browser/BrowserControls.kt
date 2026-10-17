@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.browser
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import android.os.Build
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -155,7 +156,7 @@ fun PathBreadcrumb(
                 ),
                 fontWeight = if (index == pathSegments.lastIndex) FontWeight.Bold else FontWeight.Normal,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(AppShapes.ExtraSmall)
                     .clickable { onPathSegmentClick(segment) }
                     .padding(horizontal = 4.dp, vertical = 2.dp)
             )
@@ -513,7 +514,7 @@ fun SearchModal(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Surface(
-                    shape = RoundedCornerShape(28.dp),
+                    shape = AppShapes.ExtraLarge,
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     tonalElevation = 6.dp,
                     shadowElevation = 6.dp,

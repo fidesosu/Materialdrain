@@ -1,6 +1,32 @@
 package tools.senko.materialdrain.ui.media
 
-import android.graphics.BitmapFactory
+import tools.senko.materialdrain.ui.theme.AppShapes
+import tools.senko.materialdrain.ui.theme.DarkTheme
+import tools.senko.materialdrain.ui.components.floatingCardBorder
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.style.TextOverflow
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import tools.senko.materialdrain.ui.LocalPlayerSettings
+import tools.senko.materialdrain.util.VideoPositions
+import tools.senko.materialdrain.ui.icons.automirrored.filled.OpenInNew
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.media.AudioManager
+import android.provider.Settings
+import android.widget.Toast
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlin.math.roundToInt
 import android.net.Uri
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
@@ -33,19 +59,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.automirrored.filled.ArrowBack
 import tools.senko.materialdrain.ui.icons.automirrored.filled.KeyboardArrowRight
 import tools.senko.materialdrain.ui.icons.filled.BrokenImage
-import tools.senko.materialdrain.ui.icons.filled.Forward10
 import tools.senko.materialdrain.ui.icons.filled.Pause
 import tools.senko.materialdrain.ui.icons.filled.PlayArrow
 import tools.senko.materialdrain.ui.icons.filled.Repeat
 import tools.senko.materialdrain.ui.icons.filled.MoreVert
 import tools.senko.materialdrain.ui.icons.filled.Speed
 import tools.senko.materialdrain.ui.icons.filled.Replay
-import tools.senko.materialdrain.ui.icons.filled.Replay10
 import tools.senko.materialdrain.ui.icons.filled.Videocam
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -66,7 +89,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -120,12 +142,10 @@ fun InlineVideoPreview(
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             when (thumbnailSource) {
                 is ByteArray -> {
-                    val bitmap = remember(thumbnailSource) {
-                        try { BitmapFactory.decodeByteArray(thumbnailSource, 0, thumbnailSource.size) } catch (e: Exception) { Log.e(TAG_COIL, "Error decoding ByteArray to Bitmap", e); null }
-                    }
+                    val bitmap = rememberDecodedBitmap(thumbnailSource)
                     if (bitmap != null) {
                         Image(
-                            bitmap = bitmap.asImageBitmap(),
+                            bitmap = bitmap,
                             contentDescription = contentDescription,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
@@ -152,7 +172,7 @@ fun InlineVideoPreview(
             Box(modifier = Modifier.fillMaxSize().clickable(onClick = onFullScreenClick), contentAlignment = Alignment.Center) {
                 Surface(
                     shape = MediaControlShape,
-                    color = Color.Black.copy(alpha = 0.55f),
+                    color = MediaScrim.Play,
                     modifier = Modifier.size(56.dp)
                 ) {
                     Icon(Icons.Filled.PlayArrow, contentDescription = "Play video", tint = Color.White, modifier = Modifier.padding(12.dp))
@@ -174,15 +194,16 @@ private fun BoxScope.VideoSettingsMenu(
     loopEnabled: Boolean,
     onLoopChange: (Boolean) -> Unit,
     speed: Float,
-    onSpeedChange: (Float) -> Unit
+    onSpeedChange: (Float) -> Unit,
+    onOpenElsewhere: () -> Unit
 ) {
     // The controls are at the bottom of the screen: above the button, lined up with its end
     AppMenu(expanded = expanded, onDismiss = onDismiss, side = MenuSide.Above, edge = MenuEdge.End) {
-        VideoSettingsEntries(speedPageOpen, onSpeedPageOpenChange, loopEnabled, onLoopChange, speed, onSpeedChange)
+        VideoSettingsEntries(speedPageOpen, onSpeedPageOpenChange, loopEnabled, onLoopChange, speed, onSpeedChange, onOpenElsewhere)
     }
 }
 
-/** The entries of [VideoSettingsMenu]: Loop and Speed, or the speeds. */
+/** The entries of [VideoSettingsMenu]: Loop, Speed and Open in another app, or the speeds. */
 @Composable
 private fun VideoSettingsEntries(
     speedPageOpen: Boolean,
@@ -190,7 +211,8 @@ private fun VideoSettingsEntries(
     loopEnabled: Boolean,
     onLoopChange: (Boolean) -> Unit,
     speed: Float,
-    onSpeedChange: (Float) -> Unit
+    onSpeedChange: (Float) -> Unit,
+    onOpenElsewhere: () -> Unit = {}
 ) {
     AppMenuPages(
         showSecondary = speedPageOpen,
@@ -207,6 +229,13 @@ private fun VideoSettingsEntries(
                 trailingText = speedLabel(speed),
                 trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 onClick = { onSpeedPageOpenChange(true) }
+            )
+            AppMenuDivider()
+            // A player of its own may play what this one can't, or cast it
+            AppMenuItem(
+                text = "Open in another app",
+                leadingIcon = Icons.AutoMirrored.Filled.OpenInNew,
+                onClick = onOpenElsewhere
             )
         },
         secondary = {
@@ -226,20 +255,91 @@ private fun VideoSettingsEntries(
         }
     )
 }
+/** Which way the double taps skipped, and how far in all: taps one after another the same way add up. */
+private data class SeekFeedback(val forward: Boolean, val seconds: Int)
+
+/**
+ * This feedback with one more skip of [stepMs] [forward] or back, or a new one when this one went the other way (or there
+ * is none).
+ */
+private fun SeekFeedback?.plusSkip(forward: Boolean, stepMs: Long): SeekFeedback =
+    SeekFeedback(forward, (if (this?.forward == forward) seconds else 0) + (stepMs / 1000).toInt())
+
+/** What a swipe on the video changes (see PlayerSettings.gestures), and to how much of it, 0 to 1. */
+private data class GestureLevel(val brightness: Boolean, val level: Float)
+
+/** Hands the video to another app (a player of its own, or one that casts it), which may play what this one can't. */
+private fun openVideoElsewhere(context: Context, uri: Uri) {
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "video/*")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    try {
+        context.startActivity(Intent.createChooser(intent, "Open the video with"))
+    } catch (_: ActivityNotFoundException) {
+        Toast.makeText(context, "No other app on this device can play videos.", Toast.LENGTH_LONG).show()
+    }
+}
+
+/**
+ * The video full screen, in the app's dark colours whichever theme the app is in (see DarkTheme): the controls are
+ * floating cards like the app's own, with the theme's colour on the play button and the seek bar. [title] is the file's
+ * name, at the top beside the back button.
+ */
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
-internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey: String?, onBack: () -> Unit) {
-    val player = rememberManagedPlayer(videoUri, apiKey, isVideo = true, prepareNow = true)
-    val state = rememberPlayerUiState(player)
+internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey: String?, onBack: () -> Unit, title: String? = null) {
+    DarkTheme {
+        VideoPlayerContent(videoUri, thumbnailUrl, apiKey, onBack, title)
+    }
+}
+
+@androidx.annotation.OptIn(UnstableApi::class)
+@Composable
+private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: String?, onBack: () -> Unit, title: String?) {
     val context = LocalContext.current
+    val settings = LocalPlayerSettings.current
+    val inPreview = LocalInspectionMode.current
+    // Where this video was left, to go on from there (the Media settings' "Resume videos")
+    val positions = remember { VideoPositions(context) }
+    val positionKey = videoUri.toString()
+    val startPosition = remember(positionKey) { if (settings.resume && !inPreview) positions.positionOf(positionKey) else 0L }
+    val player = rememberManagedPlayer(
+        videoUri, apiKey, isVideo = true, prepareNow = true,
+        autoplay = settings.autoplay, speed = settings.defaultSpeed, startPositionMs = startPosition
+    )
+    val state = rememberPlayerUiState(player)
+    val stepMs = settings.seekStepMs
+    val currentStepMs by rememberUpdatedState(stepMs)
+    // Kept when the player closes, and when the app goes to the background (where it may be closed by the system). Before
+    // the player is released: this effect comes after the player's own, so it's disposed of first
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val resume = settings.resume && !inPreview
+    DisposableEffect(player, lifecycleOwner, resume) {
+        fun save() { if (resume) positions.save(positionKey, player.currentPosition, player.duration) }
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) save() }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            save()
+        }
+    }
+    val colors = MaterialTheme.colorScheme
+    // The cards of the controls, see-through like the app's floating cards, and the buttons on them
+    val panelColor = colors.surfaceContainer.copy(alpha = 0.82f)
+    val quietContainer = colors.onSurface.copy(alpha = 0.10f)
 
     var controlsVisible by remember { mutableStateOf(true) }
     var scrubbing by remember { mutableStateOf(false) }
     var scrubPositionMs by remember { mutableLongStateOf(0L) }
     var interactions by remember { mutableIntStateOf(0) }
-    var seekFeedback by remember { mutableStateOf<String?>(null) }
+    var seekFeedback by remember { mutableStateOf<SeekFeedback?>(null) }
+    // The last feedback, shown while it fades out once it's gone
+    var lastFeedback by remember { mutableStateOf(SeekFeedback(forward = true, seconds = 0)) }
     var settingsMenuOpen by remember { mutableStateOf(false) }
     var speedPageOpen by remember { mutableStateOf(false) }
+    // While a swipe changes the brightness or the volume, how much of it there is (see PlayerSettings.gestures)
+    var gestureLevel by remember { mutableStateOf<GestureLevel?>(null) }
 
     // One setting for all videos: when it is on, the player starts over by itself when the video ends
     val videoLoop = LocalVideoLoop.current
@@ -255,7 +355,9 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
             controlsVisible = false
         }
     }
+    // Each skip changes the feedback (its seconds add up), so each one keeps it a while longer
     LaunchedEffect(seekFeedback) {
+        seekFeedback?.let { lastFeedback = it }
         if (seekFeedback != null) {
             delay(700.milliseconds)
             seekFeedback = null
@@ -268,7 +370,7 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
         // controls stand out; with it off, the background stays black
         if (thumbnailUrl != null && LocalBlurredBackdrop.current) {
             BlurredBackdrop(thumbnailUrl, apiKey, context.imageLoader, Modifier.fillMaxSize())
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
+            Box(modifier = Modifier.fillMaxSize().background(MediaScrim.Backdrop))
         }
 
         AndroidView(
@@ -291,10 +393,44 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
             BlurredBackdrop(thumbnailUrl, apiKey, context.imageLoader, Modifier.fillMaxSize())
         }
 
-        // Tap to show or hide the controls, double tap on the sides to skip, in the middle to play or pause
+        // Tap to show or hide the controls, double tap on the sides to skip, in the middle to play or pause. With the
+        // gestures on, a swipe up or down changes the brightness (left half) or the volume (right half); a swipe is moved,
+        // so the tap underneath it doesn't count
+        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .then(if (settings.gestures) Modifier.pointerInput(window) {
+                    val audio = context.getSystemService(AudioManager::class.java)
+                    val maxVolume = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                    var brightness = false
+                    var level = 0f
+                    detectVerticalDragGestures(
+                        onDragStart = { start ->
+                            brightness = start.x < size.width / 2f
+                            level = if (brightness) {
+                                // -1 is the system's own brightness, which this window starts from
+                                window?.attributes?.screenBrightness?.takeIf { it >= 0f }
+                                    ?: (Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, 128) / 255f)
+                            } else {
+                                audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxVolume
+                            }
+                        },
+                        onDragEnd = { gestureLevel = null },
+                        onDragCancel = { gestureLevel = null },
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            // A swipe across most of the height goes from nothing to all
+                            level = (level - dragAmount / (size.height * 0.8f)).coerceIn(0f, 1f)
+                            if (brightness) {
+                                window?.let { w -> w.attributes = w.attributes.apply { screenBrightness = level.coerceAtLeast(0.01f) } }
+                            } else {
+                                audio.setStreamVolume(AudioManager.STREAM_MUSIC, (level * maxVolume).roundToInt(), 0)
+                            }
+                            gestureLevel = GestureLevel(brightness, level)
+                        }
+                    )
+                } else Modifier)
                 .pointerInput(Unit) {
                     // detectTapGestures only reports a single tap after the time in which a second tap could still
                     // follow, which made showing the controls feel slow. Here a tap is acted on right away, and a
@@ -310,12 +446,12 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
                             lastTapUptime = 0L
                             when {
                                 up.position.x < size.width / 3f -> {
-                                    state.seekBy(-SEEK_STEP_MS)
-                                    seekFeedback = "− 10 s"
+                                    state.seekBy(-currentStepMs)
+                                    seekFeedback = seekFeedback.plusSkip(forward = false, currentStepMs)
                                 }
                                 up.position.x > size.width * 2f / 3f -> {
-                                    state.seekBy(SEEK_STEP_MS)
-                                    seekFeedback = "+ 10 s"
+                                    state.seekBy(currentStepMs)
+                                    seekFeedback = seekFeedback.plusSkip(forward = true, currentStepMs)
                                 }
                                 else -> state.togglePlayPause()
                             }
@@ -329,39 +465,88 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
                 }
         )
 
-        seekFeedback?.let { text ->
-            Surface(
-                shape = MediaControlShape,
-                color = Color.Black.copy(alpha = 0.6f),
-                modifier = Modifier.align(Alignment.Center)
+        // A half oval against the side that was double tapped (a third of the width, as the taps are told apart), in
+        // the theme's colour, with how far it went
+        val reduceMotion = LocalReduceMotion.current
+        val feedback = seekFeedback ?: lastFeedback
+        val feedbackForward = feedback.forward
+        AnimatedVisibility(
+            visible = seekFeedback != null,
+            enter = fadeIn(tween(if (reduceMotion) 0 else 100)),
+            exit = fadeOut(tween(if (reduceMotion) 0 else 250)),
+            modifier = Modifier
+                .align(if (feedbackForward) Alignment.CenterEnd else Alignment.CenterStart)
+                .fillMaxHeight()
+                .fillMaxWidth(1f / 3f)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        colors.primary.copy(alpha = 0.18f),
+                        if (feedbackForward) RoundedCornerShape(topStartPercent = 50, bottomStartPercent = 50)
+                        else RoundedCornerShape(topEndPercent = 50, bottomEndPercent = 50)
+                    )
             ) {
-                Text(text, color = Color.White, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    SkipGlyph(feedbackForward, (stepMs / 1000).toInt(), colors.onSurface, size = 32.dp)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "${if (feedbackForward) "+" else "−"} ${feedback.seconds} s",
+                        color = colors.onSurface,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            }
+        }
+
+        gestureLevel?.let { gesture ->
+            Surface(
+                shape = AppShapes.Large,
+                color = colors.surfaceContainer.copy(alpha = 0.82f),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(top = 72.dp)
+            ) {
+                Text(
+                    "${if (gesture.brightness) "Brightness" else "Volume"} ${(gesture.level * 100).roundToInt()}%",
+                    color = colors.onSurface,
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
             }
         }
 
         if ((state.isBuffering || (!state.firstFrameRendered && state.error == null)) && state.error == null) {
             LinearProgressIndicator(
                 modifier = Modifier.align(Alignment.Center).width(120.dp),
-                color = Color.White,
-                trackColor = Color.White.copy(alpha = 0.25f)
+                color = colors.primary,
+                trackColor = colors.primary.copy(alpha = 0.24f)
             )
         }
 
         state.error?.let { error ->
             Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = Color.Black.copy(alpha = 0.75f),
+                shape = AppShapes.Card,
+                color = colors.errorContainer,
+                contentColor = colors.onErrorContainer,
                 modifier = Modifier.align(Alignment.Center).padding(24.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(error.userMessage(), color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                    Text(error.userMessage(), style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.height(12.dp))
-                    MediaTextButton("Try again", onClick = { state.retry() })
+                    MediaTextButton(
+                        "Try again",
+                        onClick = { state.retry() },
+                        container = colors.onErrorContainer.copy(alpha = 0.12f),
+                        contentColor = colors.onErrorContainer
+                    )
                 }
             }
         }
 
-        val reduceMotion = LocalReduceMotion.current
         AnimatedVisibility(
             visible = controlsVisible,
             enter = fadeIn(tween(if (reduceMotion) 0 else 150)),
@@ -369,14 +554,40 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
             modifier = Modifier.fillMaxSize()
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                // The preview goes under the status and navigation bars (see FullScreenPreview): the controls keep clear
-                MediaIconButton(
-                    icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    onClick = onBack,
-                    modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp),
-                    container = Color.Black.copy(alpha = 0.5f)
-                )
+                // The preview goes under the status and navigation bars (see FullScreenPreview): the controls keep clear.
+                // A shade from the top, so the name reads on a light video
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .background(Brush.verticalGradient(listOf(MediaScrim.Top, Color.Transparent)))
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp)
+                    ) {
+                        MediaIconButton(
+                            icon = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            onClick = onBack,
+                            container = panelColor,
+                            contentColor = colors.onSurface
+                        )
+                        title?.let {
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                it,
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
 
                 if (!state.isPlaying && !state.isBuffering && state.error == null) {
                     MediaIconButton(
@@ -385,13 +596,15 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
                         onClick = { state.togglePlayPause(); interactions++ },
                         modifier = Modifier.align(Alignment.Center),
                         size = 64.dp,
-                        container = Color.Black.copy(alpha = 0.55f)
+                        container = colors.primary,
+                        contentColor = colors.onPrimary
                     )
                 }
 
                 Surface(
-                    shape = MediaCardShape,
-                    color = Color.Black.copy(alpha = 0.6f),
+                    shape = AppShapes.Card,
+                    color = panelColor,
+                    border = floatingCardBorder(),
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
@@ -414,7 +627,7 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
 
                     Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                         if (!timeBelow) {
-                            Text(text = timeText, color = Color.White, style = timeStyle, maxLines = 1, softWrap = false)
+                            Text(text = timeText, color = colors.onSurface, style = timeStyle, maxLines = 1, softWrap = false)
                             Spacer(Modifier.height(2.dp))
                         }
                         MediaSeekBar(
@@ -427,26 +640,38 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
                                 state.seekTo(it)
                                 scrubbing = false
                                 interactions++
-                            }
+                            },
+                            trackColor = colors.onSurface.copy(alpha = 0.18f),
+                            bufferedColor = colors.onSurface.copy(alpha = 0.32f)
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                                 if (timeBelow) {
-                                    Text(text = timeText, color = Color.White, style = timeStyle, maxLines = 1, softWrap = false)
+                                    Text(text = timeText, color = colors.onSurface, style = timeStyle, maxLines = 1, softWrap = false)
                                 }
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                MediaIconButton(Icons.Filled.Replay10, "Back 10 seconds", { state.seekBy(-SEEK_STEP_MS); interactions++ })
+                                MediaSkipButton(
+                                    forward = false, stepMs = stepMs, onClick = { state.seekBy(-stepMs); interactions++ },
+                                    container = quietContainer, contentColor = colors.onSurface
+                                )
                                 MediaIconButton(
                                     icon = if (state.playWhenReady && !state.isEnded) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                     contentDescription = if (state.playWhenReady && !state.isEnded) "Pause" else "Play",
                                     onClick = { state.togglePlayPause(); interactions++ },
-                                    container = Color.White.copy(alpha = 0.28f)
+                                    container = colors.primary,
+                                    contentColor = colors.onPrimary
                                 )
-                                MediaIconButton(Icons.Filled.Forward10, "Forward 10 seconds", { state.seekBy(SEEK_STEP_MS); interactions++ })
+                                MediaSkipButton(
+                                    forward = true, stepMs = stepMs, onClick = { state.seekBy(stepMs); interactions++ },
+                                    container = quietContainer, contentColor = colors.onSurface
+                                )
                             }
                             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                                MediaIconButton(Icons.Filled.MoreVert, "Playback settings", { speedPageOpen = false; settingsMenuOpen = true })
+                                MediaIconButton(
+                                    Icons.Filled.MoreVert, "Playback settings", { speedPageOpen = false; settingsMenuOpen = true },
+                                    container = quietContainer, contentColor = colors.onSurface
+                                )
                                 VideoSettingsMenu(
                                     expanded = settingsMenuOpen,
                                     onDismiss = { settingsMenuOpen = false },
@@ -455,7 +680,12 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
                                     loopEnabled = videoLoop.enabled,
                                     onLoopChange = { videoLoop.onChange(it); interactions++ },
                                     speed = state.speed,
-                                    onSpeedChange = { state.changeSpeed(it); interactions++ }
+                                    onSpeedChange = { state.changeSpeed(it); interactions++ },
+                                    onOpenElsewhere = {
+                                        settingsMenuOpen = false
+                                        player.pause()
+                                        openVideoElsewhere(context, videoUri)
+                                    }
                                 )
                             }
                         }
@@ -483,7 +713,7 @@ private fun InlineVideoPreviewPreview() {
 @Composable
 private fun FullscreenVideoPlayerPreview() {
     PreviewTheme {
-        FullscreenVideoPlayer(videoUri = Uri.EMPTY, thumbnailUrl = null, apiKey = null, onBack = {})
+        FullscreenVideoPlayer(videoUri = Uri.EMPTY, thumbnailUrl = null, apiKey = null, onBack = {}, title = PreviewSamples.video.name)
     }
 }
 

@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.preferences
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -70,7 +71,7 @@ import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import tools.senko.materialdrain.ui.preview.LongScreenPreviews
 
 /** The corners of the settings' cards and tiles, the same as the app's other cards. */
-private val CardShape = RoundedCornerShape(20.dp)
+private val CardShape = AppShapes.Card
 
 /** The space between a row and the card's edge. */
 private val RowStart = 16.dp
@@ -554,11 +555,16 @@ private fun SettingsHostsPreview() = SettingsPreview(HOSTS_CATEGORY_ID)
 @Composable
 private fun SettingsDataSaverPreview() = SettingsPreview("data_saver")
 
-@ScreenPreviews
+// The pages too long for a phone's height, whole
+@LongScreenPreviews
 @Composable
 private fun SettingsLookPreview() = SettingsPreview("look")
 
 @ScreenPreviews
+@Composable
+private fun SettingsMediaPreview() = SettingsPreview("media")
+
+@LongScreenPreviews
 @Composable
 private fun SettingsFilesPreview() = SettingsPreview("files")
 

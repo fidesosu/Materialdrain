@@ -1,5 +1,11 @@
 package tools.senko.materialdrain.ui.components
 
+import tools.senko.materialdrain.ui.LocalListLook
+import tools.senko.materialdrain.ui.ListLook
+import tools.senko.materialdrain.ui.theme.AppShapes
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -82,18 +88,20 @@ fun FileListItem(
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
+    // Lower rows with smaller pictures, so more of them fit (Look and feel, Compact rows)
+    val compact = LocalListLook.current.compact
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .heightIn(min = 72.dp)
-            .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            .heightIn(min = if (compact) 56.dp else 72.dp)
+            .padding(start = 16.dp, end = 4.dp, top = if (compact) 4.dp else 8.dp, bottom = if (compact) 4.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        FileIcon(name = name, isDirectory = type == "dir", thumbnailUrl = thumbnailUrl, size = 56.dp, loadOnTap = !selectionMode)
+        FileIcon(name = name, isDirectory = type == "dir", thumbnailUrl = thumbnailUrl, size = if (compact) 40.dp else 56.dp, loadOnTap = !selectionMode)
 
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(if (compact) 12.dp else 16.dp))
 
         Column(
             modifier = Modifier.weight(1f),
@@ -129,6 +137,62 @@ fun FileListItem(
             trailingContent()
         } else {
             Spacer(modifier = Modifier.width(12.dp))
+        }
+    }
+}
+
+/**
+ * A file or folder as a tile of the grid (Look and feel, Grid view): its picture as big as the tile is wide, and under it
+ * its name and details, with [trailingContent] (its menu) or, while selecting, a checkbox beside them.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun FileGridItem(
+    name: String,
+    type: String,
+    fileSize: Long? = null,
+    modified: String? = null,
+    thumbnailUrl: String? = null,
+    trailingContent: (@Composable () -> Unit)? = null,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    Column(
+        modifier = modifier
+            .clip(AppShapes.Medium)
+            .background(if (selected) colors.secondaryContainer else Color.Transparent)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(6.dp)
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
+            FileIcon(
+                name = name,
+                isDirectory = type == "dir",
+                thumbnailUrl = thumbnailUrl,
+                size = maxWidth,
+                cornerRadius = 12.dp,
+                loadOnTap = !selectionMode
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+            Column(modifier = Modifier.weight(1f).padding(start = 2.dp)) {
+                Text(name, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val details = fileDetails(name, isDirectory = type == "dir", fileSize = fileSize, modified = modified)
+                if (details.isNotEmpty()) {
+                    Text(details, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            if (selectionMode) {
+                Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                    Checkbox(checked = selected, onCheckedChange = null)
+                }
+            } else {
+                trailingContent?.invoke()
+            }
         }
     }
 }
@@ -309,6 +373,49 @@ private fun FileListItemSelectingPreview() {
                     fileSize = file.size,
                     selectionMode = true,
                     selected = index % 2 == 1,
+                    onClick = {}
+                )
+            }
+        }
+    }
+}
+
+/** The rows lower, as Compact rows has them. */
+@ThemePreviews
+@Composable
+private fun FileListItemCompactPreview() {
+    PreviewTheme {
+        CompositionLocalProvider(LocalListLook provides ListLook(compact = true)) {
+            Column {
+                PreviewSamples.files.take(4).forEach { file ->
+                    FileListItem(
+                        name = file.name,
+                        type = if (file.isDirectory) "dir" else "file",
+                        fileSize = file.size,
+                        modified = "3 days ago",
+                        trailingContent = { OverflowMenuButton(contentDescription = "More") { } },
+                        onClick = {}
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** A row of the grid, the second tile selected. */
+@ThemePreviews
+@Composable
+private fun FileGridItemPreview() {
+    PreviewTheme(padding = 8.dp) {
+        Row {
+            PreviewSamples.files.take(3).forEachIndexed { index, file ->
+                FileGridItem(
+                    name = file.name,
+                    type = if (file.isDirectory) "dir" else "file",
+                    fileSize = file.size,
+                    selectionMode = true,
+                    selected = index == 1,
+                    modifier = Modifier.weight(1f),
                     onClick = {}
                 )
             }

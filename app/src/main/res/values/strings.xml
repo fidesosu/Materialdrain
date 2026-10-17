@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Materialdrain</string>
+    <string name="upload_tile_label">Upload</string>
 </resources>

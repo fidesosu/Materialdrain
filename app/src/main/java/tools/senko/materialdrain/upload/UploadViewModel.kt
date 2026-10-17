@@ -1,5 +1,9 @@
 package tools.senko.materialdrain.upload
 
+import tools.senko.materialdrain.provider.api.StorageRef
+import tools.senko.materialdrain.provider.api.StorageNode
+import android.content.ClipboardManager
+import android.content.ClipData
 import android.app.Application
 import android.content.Context
 import android.content.pm.PackageInfo
@@ -150,6 +154,21 @@ class UploadViewModel(
 ) : ViewModel() {
 
     private fun provider() = registry.resolve(configStore.activeProviderId.value)
+
+    /**
+     * Copies the links of the files just uploaded ([uploaded]: their ids and names), one per line, when the setting is on
+     * (Files and transfers, Copy the link after uploading). Hosts without links of their files copy nothing.
+     */
+    private fun copyLinksOf(uploaded: List<Pair<String, String>>) {
+        if (!appSettings.copyLinkAfterUpload.value || uploaded.isEmpty()) return
+        val provider = provider()
+        val links = uploaded.mapNotNull { (id, name) ->
+            provider.shareUrl(StorageNode(ref = StorageRef(id = id), name = name, isDirectory = false))
+        }
+        if (links.isEmpty()) return
+        application.getSystemService(ClipboardManager::class.java)
+            ?.setPrimaryClip(ClipData.newPlainText(if (links.size == 1) "Link" else "Links", links.joinToString("\n")))
+    }
 
     /** Pixeldrain uploads need the login; other hosts take their own credentials. */
     private fun missingKey(): Boolean = provider().kind == ProviderKind.PIXELDRAIN && sessionManager.apiKey.value.isBlank()
@@ -622,6 +641,11 @@ class UploadViewModel(
                     }
                 }.awaitAll()
 
+                copyLinksOf(
+                    _uiState.value.queuedItems
+                        .filter { it.id in batchIds && it.status == UploadItemStatus.DONE }
+                        .mapNotNull { item -> item.fileId?.let { it to item.name } }
+                )
                 val failed = _uiState.value.queuedItems.count { it.id in batchIds && it.status == UploadItemStatus.FAILED }
                 if (failed > 0) {
                     outcomeMessage = "$failed of ${batch.size} uploads failed."
@@ -765,6 +789,7 @@ class UploadViewModel(
 
             if (response != null) {
                 if (response.success) {
+                    response.id?.let { id -> copyLinksOf(listOf(id to (currentFileNameForUpload ?: "text.txt"))) }
                     _uiState.update {
                         val finalTotalBytes = it.uploadTotalSizeBytes
                         it.copy(

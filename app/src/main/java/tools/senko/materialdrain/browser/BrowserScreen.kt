@@ -1,5 +1,9 @@
 package tools.senko.materialdrain.browser
 
+import tools.senko.materialdrain.ui.LocalListLook
+import tools.senko.materialdrain.ui.components.FileGridItem
+import tools.senko.materialdrain.util.formatApiDateTimeString
+import androidx.compose.foundation.layout.BoxWithConstraints
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -163,6 +167,7 @@ fun BrowserScreen(
     // The sort order: shared by every sortable list in the app (see AppSettings.sortField)
     val sortField by appSettings.sortField.collectAsState()
     val sortAscending by appSettings.sortAscending.collectAsState()
+    val foldersFirst by appSettings.foldersFirst.collectAsState()
 
     // The lists as folders, sorted again only when the lists change
     val listFolders = remember(listState.lists) { listState.lists.sortedBy { it.title.lowercase() }.map { it.asFolder() } }
@@ -299,6 +304,8 @@ fun BrowserScreen(
             mode == BrowserMode.LISTS && openedList == null ->
                 listState.lists.firstOrNull { it.id == node.ref.id }?.let { listViewModel.openList(it) }
             else -> {
+                // The files beside it, in the order they're shown, for a swipe in the details (Look and feel)
+                fileInfoViewModel.setNeighbours(entries.filter { !it.isDirectory }, byNode = mode == BrowserMode.FILESYSTEM)
                 if (mode == BrowserMode.FILESYSTEM) fileInfoViewModel.setFileInfoFromNode(node)
                 else fileInfoViewModel.fetchFileInfo(node.key)
                 onFileSelected()
@@ -451,7 +458,7 @@ fun BrowserScreen(
                     query = searchQuery,
                     onQueryChange = { searchQuery = it },
                     candidates = tree?.nodes?.takeIf { it.isNotEmpty() } ?: fsState.visibleChildren,
-                    order = remember(sortField, sortAscending) { fileComparator(sortField, sortAscending, directoriesFirst = true) },
+                    order = remember(sortField, sortAscending, foldersFirst) { fileComparator(sortField, sortAscending, directoriesFirst = foldersFirst) },
                     resultLimit = resultLimit,
                     thumbnailFor = { fileInfoViewModel.thumbnailFor(it) },
                     placeholder = "Search this folder and its subfolders",
@@ -758,16 +765,13 @@ fun BrowserContent(
                 entries.isEmpty() && !isLoading -> PullableFill {
                     CenteredTextMessage(emptyText(mode, openedList != null, filterQuery))
                 }
-                else -> Box(modifier = Modifier.fillMaxSize()) {
-                    LazyColumn(
-                        state = scrollState,
-                        modifier = Modifier.fillMaxSize(),
-                        // Past the last file: room for the upload button, or the system's navigation bar (LocalBottomInset)
-                        contentPadding = PaddingValues(bottom = (if (isFabVisible) fabHeight + 16.dp else 16.dp) + LocalBottomInset.current)
-                    ) {
-                        items(entries, key = { it.key }) { node ->
+                else -> BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    // One entry, as a row or as a tile of the grid (Look and feel)
+                    val entry: @Composable (StorageNode, Boolean, Modifier) -> Unit = { node, asTile, entryModifier ->
                             BrowserEntry(
                                 node = node,
+                                asTile = asTile,
+                                modifier = entryModifier,
                                 mode = mode,
                                 openedList = openedList,
                                 selectionMode = selectionMode,
@@ -790,10 +794,32 @@ fun BrowserContent(
                                 onRemoveFromList = { rowActions.removeFromList(node) },
                                 onShareLink = { url -> shareLink(context, url) }
                             )
-                            HorizontalDivider(
-                                thickness = 0.5.dp,
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                            )
+                    }
+                    val grid = LocalListLook.current.grid
+                    // As many tiles to a row as fit at about 120dp each, two at the least
+                    val columns = (maxWidth / GRID_TILE_WIDTH).toInt().coerceAtLeast(2)
+                    LazyColumn(
+                        state = scrollState,
+                        modifier = Modifier.fillMaxSize(),
+                        // Past the last file: room for the upload button, or the system's navigation bar (LocalBottomInset)
+                        contentPadding = PaddingValues(bottom = (if (isFabVisible) fabHeight + 16.dp else 16.dp) + LocalBottomInset.current)
+                    ) {
+                        if (grid) {
+                            // The grid is rows of tiles, so it scrolls (and keeps its place) with the same state as the list
+                            items(entries.chunked(columns), key = { row -> "row:" + row.first().key }) { row ->
+                                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp)) {
+                                    row.forEach { node -> entry(node, true, Modifier.weight(1f)) }
+                                    repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+                                }
+                            }
+                        } else {
+                            items(entries, key = { it.key }) { node ->
+                                entry(node, false, Modifier)
+                                HorizontalDivider(
+                                    thickness = 0.5.dp,
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                )
+                            }
                         }
                     }
                     DotScrollbar(state = scrollState)
@@ -831,10 +857,15 @@ private fun emptyText(mode: BrowserMode, inList: Boolean, filter: String): Strin
     else -> "This folder is empty."
 }
 
-/** One row of the browser, with the menu and the actions its mode offers. */
+/** How wide a tile of the grid is about to be; the row gets as many as fit. */
+private val GRID_TILE_WIDTH = 120.dp
+
+/** One row (or, [asTile], one tile of the grid) of the browser, with the menu and the actions its mode offers. */
 @Composable
 private fun BrowserEntry(
     node: StorageNode,
+    asTile: Boolean,
+    modifier: Modifier,
     mode: BrowserMode,
     openedList: FileList?,
     selectionMode: Boolean,
@@ -859,17 +890,12 @@ private fun BrowserEntry(
 ) {
     // A list in the lists overview: its own page, when the host has one
     val folderLink = if (node.isDirectory && mode == BrowserMode.LISTS) shareUrl else null
-    val modified = remember(node.listDate) { formatRelativeDateTime(node.listDate) }
-    FileListItem(
-        name = node.name,
-        type = if (node.isDirectory) "dir" else "file",
-        fileSize = node.size,
-        modified = modified,
-        thumbnailUrl = thumbnailUrl,
-        selectionMode = selectionMode,
-        selected = selected,
-        onLongClick = onLongClick,
-        trailingContent = {
+    // How long ago, or the date and time itself (Look and feel, Relative dates)
+    val relative = LocalListLook.current.relativeDates
+    val modified = remember(node.listDate, relative) {
+        if (relative) formatRelativeDateTime(node.listDate) else node.listDate?.let { formatApiDateTimeString(it) }
+    }
+    val trailingContent: @Composable () -> Unit = {
             when {
                 // The lists overview: a folder per list, opened or linked
                 node.isDirectory && mode == BrowserMode.LISTS -> ListFolderMenu(node.name, folderLink, onOpen, onShareLink)
@@ -896,9 +922,36 @@ private fun BrowserEntry(
                     onRemoveFromList = if (mode == BrowserMode.LISTS && listCanEdit && openedList != null) onRemoveFromList else null
                 )
             }
-        },
-        onClick = { if (selectionMode) onToggleSelection() else onOpen() }
-    )
+    }
+    val onClick = { if (selectionMode) onToggleSelection() else onOpen() }
+    if (asTile) {
+        FileGridItem(
+            name = node.name,
+            type = if (node.isDirectory) "dir" else "file",
+            fileSize = node.size,
+            modified = modified,
+            thumbnailUrl = thumbnailUrl,
+            selectionMode = selectionMode,
+            selected = selected,
+            onLongClick = onLongClick,
+            trailingContent = trailingContent,
+            modifier = modifier,
+            onClick = onClick
+        )
+    } else {
+        FileListItem(
+            name = node.name,
+            type = if (node.isDirectory) "dir" else "file",
+            fileSize = node.size,
+            modified = modified,
+            thumbnailUrl = thumbnailUrl,
+            selectionMode = selectionMode,
+            selected = selected,
+            onLongClick = onLongClick,
+            trailingContent = trailingContent,
+            onClick = onClick
+        )
+    }
 }
 
 @Composable
