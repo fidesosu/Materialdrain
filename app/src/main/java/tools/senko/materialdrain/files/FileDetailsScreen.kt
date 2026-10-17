@@ -235,17 +235,20 @@ fun FileInfoDetailsCard(
             if (showPreviews && uiState.previewHeld) {
                 // The data saver holds it back: its frame, to load it, for a file that has something to preview
                 if (previewType?.startsWith("audio/") == true) {
-                    // A song only streams once it's played anyway: the player as always, but its cover waits to be tapped
+                    // A song only streams once it's played anyway: the player as always. Its cover is its thumbnail (read
+                    // out of the song, see MediaCovers), which the file list has loaded already when the data saver lets
+                    // thumbnails show, so it costs nothing; otherwise it waits to be tapped
+                    val cover = actualThumbnailUrl?.takeIf { LocalDataSaver.current.showsThumbnail(it) }
                     AudioPlayerPreview(
                         audioUri = rawFileApiUrl.toUri(),
                         apiKey = previewApiKey,
                         title = fileInfo.name,
                         artist = null,
                         album = null,
-                        albumArtSource = null,
+                        albumArtSource = cover,
                         durationHintMillis = null,
                         outerPadding = mediaPadding,
-                        onLoadArt = actions.loadPreview
+                        onLoadArt = if (cover == null) actions.loadPreview else null
                     )
                 } else {
                     // Only an archive the host can look inside has its contents to load
