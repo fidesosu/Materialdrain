@@ -206,9 +206,10 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
             ),
             SettingsItem.Toggle(
                 title = "Swipe between files",
-                summary = "In a file's details",
-                info = "A swipe to the left in a file's details opens the next file of the list it was opened from, a swipe " +
-                    "to the right the one before. What scrolls sideways (a wide text, a zoomed picture) scrolls first.",
+                summary = "In a file's details and its fullscreen preview",
+                info = "A swipe to the left in a file's details, or in a picture or video open fullscreen, opens the next " +
+                    "file of the list it was opened from, a swipe to the right the one before. What scrolls sideways (a " +
+                    "wide text, a zoomed picture, the video's seek bar) scrolls first.",
                 isChecked = { appSettings.swipeBetweenFiles.collectAsState().value },
                 onCheckedChange = { appSettings.setSwipeBetweenFiles(it) }
             ),

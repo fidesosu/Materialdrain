@@ -28,6 +28,12 @@ sealed interface PendingOpen {
     data class Text(val text: String) : PendingOpen
 }
 
+/**
+ * Files shared from another app on their way into a folder of the Filesystem tab [tabId] of the host [hostId], see
+ * AppContainer.filesystemShare: the tab shows a bar to upload them into the folder it's in (see SharedUploadBar).
+ */
+data class FilesystemShare(val uris: List<Uri>, val hostId: String, val tabId: String)
+
 private val PIXELDRAIN_HOSTS = setOf("pixeldrain.com", "www.pixeldrain.com", "pixeldrain.net", "www.pixeldrain.net")
 
 private val PIXELDRAIN_LINK = Regex("""https?://(?:www\.)?pixeldrain\.(?:com|net)/([ul])/([A-Za-z0-9]+)""")

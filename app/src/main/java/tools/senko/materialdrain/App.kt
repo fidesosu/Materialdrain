@@ -74,6 +74,7 @@ import tools.senko.materialdrain.files.FileInfoViewModel
 import tools.senko.materialdrain.browser.BrowserMode
 import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
 import tools.senko.materialdrain.browser.BrowserScreen
+import tools.senko.materialdrain.browser.SharedUpload
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
 import tools.senko.materialdrain.lists.ListViewModel
 import tools.senko.materialdrain.navmenu.NavFabMenu
@@ -334,16 +335,26 @@ fun MaterialdrainScreen() {
         if (currentScreen == Screen.FileDetail && !fileInfoViewModel.restoreOpenedFile()) navigateTo(Screen.Files)
     }
 
-    // Files shared from another app go to the upload screen, which queues them like picked files
+    // Files shared from another app go to the upload screen, which queues them like picked files, or into a folder of a
+    // Filesystem tab. Where the host has more than one of those places, the user picks one (see ShareTargetDialog)
     val pendingShares by appContainer.pendingShares.collectAsState()
+    val filesystemShare by appContainer.filesystemShare.collectAsState()
     val appLocked by appContainer.appLock.locked.collectAsState()
-    // A share waits for the unlock: nothing uploads while the app is locked
-    LaunchedEffect(pendingShares, appLocked) {
-        if (pendingShares.isNotEmpty() && !appLocked) {
-            navigateTo(Screen.Upload)
-            uploadViewModel.onFilesSelected(pendingShares, context)
-            appContainer.pendingShares.value = emptyList()
+    val shareTargets = remember(navBarOrder) { shareTargetsOf(navBarOrder) }
+    val sendShares = { uris: List<android.net.Uri>, target: Tab? ->
+        appContainer.pendingShares.value = emptyList()
+        if (target?.screen == Screen.Filesystem) {
+            // The tab shows a bar to upload them into the folder that's open (see SharedUploadBar)
+            appContainer.filesystemShare.value = FilesystemShare(uris, activeHostId, target.id)
+            selectTab(target)
+        } else {
+            target?.let(selectTab) ?: navigateTo(Screen.Upload)
+            uploadViewModel.onFilesSelected(uris, context)
         }
+    }
+    // A share waits for the unlock: nothing uploads while the app is locked
+    LaunchedEffect(pendingShares, appLocked, shareTargets) {
+        if (pendingShares.isNotEmpty() && !appLocked && shareTargets.size <= 1) sendShares(pendingShares, shareTargets.firstOrNull())
     }
     // A link, a shortcut or shared text (see PendingOpen), also once the app is unlocked. A Pixeldrain link opens on the
     // built-in Pixeldrain, whichever host is active
@@ -517,7 +528,10 @@ fun MaterialdrainScreen() {
     // The snackbar shares the row of the navigation button at an edge, so the button doesn't rise over it. Where no button
     // sits beside it (hidden on detail screens, or in the middle) it takes the full width, and in the middle the button rises over it
     val snackbarBesideFab = navPrototype && fabState == null && showNavFab && navFabPosition != NavFabPosition.CENTER
-    val fabLiftTarget = (if (selectingItems) SelectionBarHeight else 0.dp) +
+    // The bar of shared files waiting for a folder (see SharedUploadBar) is in the selection bar's place
+    val sharingHere = filesystemShare?.let { it.hostId == activeHostId && it.tabId == currentTab?.id && currentScreen == Screen.Filesystem } == true
+    val bottomBarRaised = selectingItems || sharingHere
+    val fabLiftTarget = (if (bottomBarRaised) SelectionBarHeight else 0.dp) +
         (if (!snackbarBesideFab && snackbarHeightDp > 0.dp) snackbarHeightDp + 8.dp else 0.dp)
     // The buttons lift with the snackbar, on the same motion as its size and the gap beside the button
     val fabLift by animateDpAsState(targetValue = fabLiftTarget, animationSpec = snackbarMotion(reduceMotion), label = "fabLift")
@@ -653,7 +667,7 @@ fun MaterialdrainScreen() {
                     reduceMotion = reduceMotion,
                     modifier = Modifier
                         .zIndex(1f)
-                        .offset(y = if (selectingItems) -SelectionBarHeight else 0.dp)
+                        .offset(y = if (bottomBarRaised) -SelectionBarHeight else 0.dp)
                         .onSizeChanged { snackbarHeightDp = with(localDensity) { it.height.toDp() } }
                 )
             }
@@ -755,7 +769,19 @@ fun MaterialdrainScreen() {
                                 onFileSelected = { navigateTo(Screen.FileDetail) },
                                 fabHeight = fabHeightDp,
                                 isFabVisible = isFabVisible,
-                                onActionsChange = { screenActions[shown.key] = it }
+                                onActionsChange = { screenActions[shown.key] = it },
+                                sharedUpload = filesystemShare
+                                    ?.takeIf { targetScreen == Screen.Filesystem && it.hostId == shown.hostId && it.tabId == targetTab?.id }
+                                    ?.let { share ->
+                                        SharedUpload(
+                                            count = share.uris.size,
+                                            onUpload = {
+                                                tabFilesystem.onFilesPickedForUpload(share.uris, context)
+                                                appContainer.filesystemShare.value = null
+                                            },
+                                            onCancel = { appContainer.filesystemShare.value = null }
+                                        )
+                                    }
                             )
                             DisposableEffect(shown.key) { onDispose { screenActions.remove(shown.key) } }
                         }
@@ -791,7 +817,8 @@ fun MaterialdrainScreen() {
                                         fileInfo = info,
                                         fileInfoViewModel = fileInfoViewModel,
                                         context = LocalContext.current,
-                                        snackbarHostState = snackbarHostState
+                                        snackbarHostState = snackbarHostState,
+                                        swipeBetweenFiles = swipeFiles
                                     )
                                 } ?: run {
                                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -843,6 +870,14 @@ fun MaterialdrainScreen() {
                 onOpenChange = { navMenuOpen = it }
             )
         }
+        }
+
+        if (pendingShares.isNotEmpty() && !appLocked && shareTargets.size > 1) {
+            ShareTargetDialog(
+                targets = shareTargets,
+                onChoose = { target -> sendShares(pendingShares, target) },
+                onCancel = { appContainer.pendingShares.value = emptyList() }
+            )
         }
 
         AppDialogs(

@@ -115,7 +115,9 @@ class FileDetailsActions(
     val downloadArchiveEntry: (StorageNode) -> Unit = {},
     val download: () -> Unit = {},
     val cancelDownload: () -> Unit = {},
-    val delete: () -> Unit = {}
+    val delete: () -> Unit = {},
+    /** Goes to the file beside this one from the fullscreen preview (false when there's none); null for no swiping there */
+    val openNeighbour: ((toNext: Boolean) -> Boolean)? = null
 )
 
 @Composable
@@ -124,7 +126,9 @@ fun FileInfoDetailsCard(
     fileInfo: StorageNode,
     fileInfoViewModel: FileInfoViewModel,
     context: Context,
-    snackbarHostState: SnackbarHostState
+    snackbarHostState: SnackbarHostState,
+    /** Look and feel, Swipe between files: also in the fullscreen preview */
+    swipeBetweenFiles: Boolean = false
 ) {
     val uiState by fileInfoViewModel.uiState.collectAsState()
     val confirmDownload by fileInfoViewModel.confirmDownloadTap.collectAsState()
@@ -138,7 +142,7 @@ fun FileInfoDetailsCard(
         canDelete = fileInfoViewModel.canDeleteFiles(),
         downloads = fileInfoViewModel.downloads,
         confirmDownload = confirmDownload,
-        actions = remember(fileInfoViewModel, fileInfo) {
+        actions = remember(fileInfoViewModel, fileInfo, swipeBetweenFiles) {
             FileDetailsActions(
                 loadPreview = fileInfoViewModel::loadPreview,
                 loadPdfPreview = fileInfoViewModel::loadPdfPreview,
@@ -146,7 +150,8 @@ fun FileInfoDetailsCard(
                 downloadArchiveEntry = fileInfoViewModel::downloadArchiveEntry,
                 download = { fileInfoViewModel.initiateDownloadFile(fileInfo) },
                 cancelDownload = { fileInfoViewModel.cancelDownload(fileInfo) },
-                delete = { fileInfoViewModel.initiateDeleteFile(fileInfo) }
+                delete = { fileInfoViewModel.initiateDeleteFile(fileInfo) },
+                openNeighbour = if (swipeBetweenFiles) fileInfoViewModel::openNeighbour else null
             )
         },
         context = context,
@@ -179,8 +184,8 @@ fun FileInfoDetailsCard(
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager = localContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
-    var fullScreenPreviewUri by remember { mutableStateOf<Uri?>(null) }
-    var fullScreenPreviewMimeType by remember { mutableStateOf<String?>(null) }
+    // Whether the picture or video is open fullscreen. It shows the file the page shows, which a swipe there changes
+    var fullScreenOpen by remember { mutableStateOf(false) }
     // From the frame after the page opens; a preview (in Android Studio) shows one frame, so at once there
     var showPreviews by remember { mutableStateOf(inPreview) }
 
@@ -206,17 +211,16 @@ fun FileInfoDetailsCard(
     var fullScreenPdf by remember { mutableStateOf<java.io.File?>(null) }
     fullScreenPdf?.let { file -> FullScreenPdfDialog(file, title = fileInfo.name, onDismissRequest = { fullScreenPdf = null }) }
 
-    if (fullScreenPreviewUri != null) {
+    if (fullScreenOpen) {
         FullScreenMediaPreviewDialog(
-            previewUri = fullScreenPreviewUri,
-            previewMimeType = fullScreenPreviewMimeType,
+            previewUri = rawFileApiUrl.toUri(),
+            previewMimeType = previewType,
             thumbnailUrl = actualThumbnailUrl,
             apiKey = uiState.apiKey,
-            onDismissRequest = {
-                fullScreenPreviewUri = null
-                fullScreenPreviewMimeType = null
-            },
-            title = fileInfo.name
+            onDismissRequest = { fullScreenOpen = false },
+            title = fileInfo.name,
+            fileKey = fileInfo.key,
+            onSwipe = actions.openNeighbour
         )
     }
 
@@ -284,10 +288,7 @@ fun FileInfoDetailsCard(
                         // This disables smooth filtering (nearest neighbor scaling), which removes the blur when scaling images.
                         filterQuality = FilterQuality.None,
                         outerPadding = mediaPadding,
-                        onFullScreenClick = {
-                            fullScreenPreviewUri = rawFileApiUrl.toUri()
-                            fullScreenPreviewMimeType = previewType
-                        }
+                        onFullScreenClick = { fullScreenOpen = true }
                     )
                 } else if (previewType?.startsWith("video/") == true) {
                     InlineVideoPreview(
@@ -295,10 +296,7 @@ fun FileInfoDetailsCard(
                         contentDescription = "Video thumbnail for ${fileInfo.name}",
                         apiKey = previewApiKey,
                         outerPadding = mediaPadding,
-                        onFullScreenClick = {
-                            fullScreenPreviewUri = rawFileApiUrl.toUri()
-                            fullScreenPreviewMimeType = previewType
-                        }
+                        onFullScreenClick = { fullScreenOpen = true }
                     )
                 } else if (previewType?.startsWith("audio/") == true) {
                     AudioPlayerPreview(

@@ -62,6 +62,9 @@ class AppContainer private constructor(application: Application) {
     /** Files another app shared with Materialdrain, waiting for the upload screen to take them. */
     val pendingShares = kotlinx.coroutines.flow.MutableStateFlow<List<android.net.Uri>>(emptyList())
 
+    /** Shared files the user chose to put in a folder of a Filesystem tab, until they're uploaded or dropped. */
+    val filesystemShare = kotlinx.coroutines.flow.MutableStateFlow<FilesystemShare?>(null)
+
     /** A link, a shortcut or shared text the app was opened with, waiting for the screen (and the unlock), see PendingOpen. */
     val pendingOpen = kotlinx.coroutines.flow.MutableStateFlow<PendingOpen?>(null)
 

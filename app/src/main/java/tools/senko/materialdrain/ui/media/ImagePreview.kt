@@ -7,7 +7,10 @@ import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculateCentroidSize
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -45,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -305,12 +309,38 @@ internal fun ZoomableBox(
                 }
             }
             .pointerInput(Unit) {
-                detectTransformGestures { centroid, pan, zoom, _ ->
-                    val newScale = (scale * zoom).coerceIn(1f, 8f)
-                    val fromCenter = centroid - Offset(size.width / 2f, size.height / 2f)
-                    // Zooming keeps the point between the fingers where it is
-                    offset = clamp((offset - fromCenter) * (newScale / scale) + fromCenter + pan, newScale)
-                    scale = newScale
+                // Like detectTransformGestures, but one finger on the picture as it fits the screen is left alone: there's
+                // nothing to move yet, and it may be a swipe to the file beside this one (see FullScreenMediaPreviewDialog)
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    var zoomSoFar = 1f
+                    var panSoFar = Offset.Zero
+                    var pastSlop = false
+                    do {
+                        val event = awaitPointerEvent()
+                        if (event.changes.any { it.isConsumed }) break
+                        val fingers = event.changes.count { it.pressed }
+                        if (fingers > 1 || scale > 1.001f) {
+                            val zoom = event.calculateZoom()
+                            val pan = event.calculatePan()
+                            if (!pastSlop) {
+                                zoomSoFar *= zoom
+                                panSoFar += pan
+                                val zoomMotion = abs(1f - zoomSoFar) * event.calculateCentroidSize(useCurrent = false)
+                                pastSlop = zoomMotion > viewConfiguration.touchSlop || panSoFar.getDistance() > viewConfiguration.touchSlop
+                            }
+                            if (pastSlop) {
+                                if (zoom != 1f || pan != Offset.Zero) {
+                                    val newScale = (scale * zoom).coerceIn(1f, 8f)
+                                    val fromCenter = event.calculateCentroid(useCurrent = false) - Offset(size.width / 2f, size.height / 2f)
+                                    // Zooming keeps the point between the fingers where it is
+                                    offset = clamp((offset - fromCenter) * (newScale / scale) + fromCenter + pan, newScale)
+                                    scale = newScale
+                                }
+                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                            }
+                        }
+                    } while (event.changes.any { it.pressed })
                 }
             }
             .graphicsLayer {

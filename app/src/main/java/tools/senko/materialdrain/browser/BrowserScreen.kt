@@ -145,7 +145,9 @@ fun BrowserScreen(
     isFabVisible: Boolean,
     onSelectingChange: (Boolean) -> Unit,
     /** Told the screen's actions for New in the ⋮ menu at the top (see App.kt), e.g. the filesystem's upload. */
-    onActionsChange: (List<ScreenAction>) -> Unit = {}
+    onActionsChange: (List<ScreenAction>) -> Unit = {},
+    /** Files shared from another app, waiting for a folder of this Filesystem tab (see App.kt) */
+    sharedUpload: SharedUpload? = null
 ) {
     val fsState by filesystemViewModel.uiState.collectAsState()
     val fsDisplayedChildren by filesystemViewModel.displayedChildren.collectAsState()
@@ -609,7 +611,11 @@ fun BrowserScreen(
         ),
         scrollState = scrollState,
         fabHeight = fabHeight,
-        isFabVisible = isFabVisible
+        isFabVisible = isFabVisible,
+        // The selection's bar takes its place while items are selected
+        sharedUpload = sharedUpload?.takeIf { mode == BrowserMode.FILESYSTEM && !selectionMode },
+        sharedUploadFolder = fsState.pathSegments.lastOrNull()?.name ?: fsState.hostName,
+        canUploadShared = fsState.canWrite && canUploadFs && !fsState.isModifying && fsUploadStatus == null
     )
 }
 
@@ -669,7 +675,10 @@ fun BrowserContent(
     rowActions: BrowserRowActions,
     scrollState: LazyListState,
     fabHeight: Dp,
-    isFabVisible: Boolean
+    isFabVisible: Boolean,
+    sharedUpload: SharedUpload? = null,
+    sharedUploadFolder: String = "",
+    canUploadShared: Boolean = false
 ) {
     val context = LocalContext.current
     val pullRefreshState = rememberPullToRefreshState()
@@ -838,6 +847,7 @@ fun BrowserContent(
                 onClose = onExitSelection,
                 actions = selectionActions
             )
+            SharedUploadBar(sharedUpload, folder = sharedUploadFolder, canUpload = canUploadShared)
         }
     }
 }
