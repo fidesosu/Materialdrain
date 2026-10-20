@@ -11,6 +11,8 @@
     <!-- Songs going on in the background (the Media setting), see PlaybackService -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- The app's own vibrations, with the strength chosen in the Feedback settings (see AppHaptics) -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Opening a downloaded APK hands it to the system installer, which quietly closes for an app without this -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 

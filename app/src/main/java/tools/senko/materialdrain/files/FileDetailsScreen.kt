@@ -88,6 +88,7 @@ import tools.senko.materialdrain.ui.media.InlineImagePreview
 import tools.senko.materialdrain.ui.media.InlinePdfPreview
 import tools.senko.materialdrain.ui.media.InlineVideoPreview
 import tools.senko.materialdrain.ui.media.MediaCardShape
+import tools.senko.materialdrain.ui.media.SongQueue
 import androidx.compose.ui.graphics.Shape
 import tools.senko.materialdrain.ui.media.imageRequest
 import tools.senko.materialdrain.util.formatApiDateTimeString
@@ -142,6 +143,7 @@ fun FileInfoDetailsCard(
         canDelete = fileInfoViewModel.canDeleteFiles(),
         downloads = fileInfoViewModel.downloads,
         confirmDownload = confirmDownload,
+        songQueue = remember(fileInfoViewModel, fileInfo) { fileInfoViewModel.songQueueFor(fileInfo) },
         actions = remember(fileInfoViewModel, fileInfo, swipeBetweenFiles) {
             FileDetailsActions(
                 loadPreview = fileInfoViewModel::loadPreview,
@@ -177,7 +179,9 @@ fun FileInfoDetailsCard(
     confirmDownload: Boolean,
     actions: FileDetailsActions,
     context: Context,
-    snackbarHostState: SnackbarHostState
+    snackbarHostState: SnackbarHostState,
+    /** A song's list, which the background player goes on with after it (see AudioPlayerPreview) */
+    songQueue: SongQueue? = null
 ) {
     val localContext = LocalContext.current
     val inPreview = LocalInspectionMode.current
@@ -257,7 +261,8 @@ fun FileInfoDetailsCard(
                         albumArtSource = cover,
                         durationHintMillis = null,
                         outerPadding = mediaPadding,
-                        onLoadArt = if (cover == null) actions.loadPreview else null
+                        onLoadArt = if (cover == null) actions.loadPreview else null,
+                        queue = songQueue
                     )
                 } else {
                     // Only an archive the host can look inside has its contents to load
@@ -307,7 +312,8 @@ fun FileInfoDetailsCard(
                         album = null,
                         albumArtSource = actualThumbnailUrl,
                         durationHintMillis = null,
-                        outerPadding = mediaPadding
+                        outerPadding = mediaPadding,
+                        queue = songQueue
                     )
                 } else if (pdfPreview != null) {
                     InlinePdfPreview(

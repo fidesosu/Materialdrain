@@ -13,6 +13,9 @@ import tools.senko.materialdrain.files.OpenableDownload
 sealed class UiMessageAction(val label: String) {
     /** Opens a finished download. */
     data class OpenDownload(val download: OpenableDownload) : UiMessageAction("Open")
+
+    /** Takes back what was just done, e.g. a song closed from the miniplayer. */
+    class Undo(val undo: () -> Unit) : UiMessageAction("Undo")
 }
 
 /** A message for the snackbar: the outcome of something the user did. [long]: it stays a while longer (errors, summaries). */

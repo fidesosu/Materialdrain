@@ -1,5 +1,9 @@
 package tools.senko.materialdrain.settings.ui
 
+import tools.senko.materialdrain.ui.AppHaptics
+import tools.senko.materialdrain.ui.HapticKind
+import tools.senko.materialdrain.ui.VibrationStrength
+import tools.senko.materialdrain.ui.icons.filled.Vibration
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -320,6 +324,83 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                     "notification and on the lock screen. Off, it stops with its details.",
                 isChecked = { appSettings.backgroundAudio.collectAsState().value },
                 onCheckedChange = { appSettings.setBackgroundAudio(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Tint the player",
+                summary = "With the colour of the song's cover",
+                info = "The miniplayer of a song playing in the background takes the colour of the song's cover, fading " +
+                    "into its own. A cover without much colour leaves it as it is.",
+                isChecked = { appSettings.tintPlayer.collectAsState().value },
+                onCheckedChange = { appSettings.setTintPlayer(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Compact player",
+                summary = "A third of the screen instead of all of it",
+                info = "The song player opened from the miniplayer is a card about a third of the screen high, which the " +
+                    "miniplayer grows into, with the page still showing above it. Off, the player covers the whole screen.",
+                isChecked = { appSettings.compactPlayer.collectAsState().value },
+                onCheckedChange = { appSettings.setCompactPlayer(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Undo closing a song",
+                summary = "An Undo after swiping the miniplayer down",
+                info = "Swiping the miniplayer down stops the song and empties the queue. With this on, the snackbar " +
+                    "offers an Undo for a few seconds, which puts the songs back where they were.",
+                isChecked = { appSettings.undoCloseSong.collectAsState().value },
+                onCheckedChange = { appSettings.setUndoCloseSong(it) }
+            )
+        )
+    ),
+
+    SettingsCategory(
+        id = "feedback",
+        title = "Feedback",
+        summary = "Vibrations, and how strong they are",
+        icon = Icons.Filled.Vibration,
+        tone = CategoryTone.SECONDARY,
+        status = {
+            if (!appSettings.vibration.collectAsState().value) "Off"
+            else appSettings.vibrationStrength.collectAsState().value.label
+        },
+        items = listOf(
+            SettingsItem.Toggle(
+                title = "Vibration",
+                summary = "Short taps when a gesture would do something",
+                info = "The app's own vibrations, played as touch feedback: the system's touch feedback setting turns them " +
+                    "down or off too. Choose below how strong they are and where they're used.",
+                isChecked = { appSettings.vibration.collectAsState().value },
+                onCheckedChange = { appSettings.setVibration(it) },
+                children = listOf(
+                    SettingsItem.Choice(
+                        title = "Strength",
+                        info = "On phones which can't play vibrations of different strengths, Light is the system's softest " +
+                            "tick and the others its click.",
+                        options = VibrationStrength.entries.map { it.label to it },
+                        selected = { appSettings.vibrationStrength.collectAsState().value },
+                        onSelect = { appSettings.setVibrationStrength(it) }
+                    ),
+                    SettingsItem.Action(
+                        title = "Try it",
+                        summary = "One vibration at this strength",
+                        onClick = { context ->
+                            AppHaptics.vibratorOf(context)?.let { AppHaptics.vibrate(it, HapticKind.THRESHOLD, appSettings.vibrationStrength.value) }
+                        }
+                    ),
+                    SettingsItem.Toggle(
+                        title = "Song player swipes",
+                        summary = "When letting go would open, skip or close",
+                        info = "The miniplayer vibrates once a swipe has gone far enough that letting go would open the " +
+                            "player, go to another song or close the song, and lighter when the finger goes back from there.",
+                        isChecked = { appSettings.vibratePlayer.collectAsState().value },
+                        onCheckedChange = { appSettings.setVibratePlayer(it) }
+                    ),
+                    SettingsItem.Toggle(
+                        title = "Navigation button",
+                        summary = "A long press going back a tab",
+                        isChecked = { appSettings.vibrateNavButton.collectAsState().value },
+                        onCheckedChange = { appSettings.setVibrateNavButton(it) }
+                    )
+                )
             )
         )
     ),

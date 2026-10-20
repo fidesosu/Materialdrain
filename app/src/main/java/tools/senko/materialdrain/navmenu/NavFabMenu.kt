@@ -76,9 +76,10 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import tools.senko.materialdrain.ui.HapticKind
+import tools.senko.materialdrain.ui.HapticPlace
+import tools.senko.materialdrain.ui.LocalAppHaptics
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -289,7 +290,7 @@ private fun NavFab(
     val currentPosition by rememberUpdatedState(position)
     val currentOnPositionChange by rememberUpdatedState(onPositionChange)
     val currentOnSwipeUp by rememberUpdatedState(onSwipeUp)
-    val haptics = LocalHapticFeedback.current
+    val haptics = LocalAppHaptics.current
 
     val corner by animateDpAsState(if (open) 28.dp else FabClosedCorner, label = "navFabCorner")
 
@@ -344,9 +345,11 @@ private fun NavFab(
                 .combinedClickable(
                     onClick = onClick,
                     onLongClickLabel = "Previous tab",
+                    // Its own vibration, with the Feedback settings' strength, instead of the system's
+                    hapticFeedbackEnabled = false,
                     onLongClick = onLongClick?.let { longClick ->
                         {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            haptics.perform(HapticKind.LONG_PRESS, HapticPlace.NAV_BUTTON)
                             longClick()
                         }
                     }

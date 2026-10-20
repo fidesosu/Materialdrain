@@ -75,6 +75,12 @@ import tools.senko.materialdrain.browser.BrowserMode
 import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
 import tools.senko.materialdrain.browser.BrowserScreen
 import tools.senko.materialdrain.browser.SharedUpload
+import tools.senko.materialdrain.ui.media.AudioPlayerView
+import tools.senko.materialdrain.ui.media.BackgroundMiniPlayer
+import tools.senko.materialdrain.ui.media.LocalOpenAudioPlayer
+import tools.senko.materialdrain.ui.media.rememberAudioPlayerSheetState
+import tools.senko.materialdrain.ui.media.rememberBackgroundSong
+import tools.senko.materialdrain.ui.media.rememberPlaybackController
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
 import tools.senko.materialdrain.lists.ListViewModel
 import tools.senko.materialdrain.navmenu.NavFabMenu
@@ -105,6 +111,8 @@ import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.LocalVideoLoop
 import tools.senko.materialdrain.ui.VideoLoopSetting
 import tools.senko.materialdrain.ui.LocalPlayerSettings
+import tools.senko.materialdrain.ui.LocalAppHaptics
+import tools.senko.materialdrain.ui.rememberAppHaptics
 import tools.senko.materialdrain.ui.PlayerSettings
 import tools.senko.materialdrain.ui.LocalListLook
 import tools.senko.materialdrain.ui.ListLook
@@ -198,6 +206,8 @@ fun MaterialdrainScreen() {
     val swipeTabs by appContainer.appSettings.swipeBetweenTabs.collectAsState()
     // How the players behave and how the lists look, for the screens deep down (see LocalPlayerSettings, LocalListLook)
     val playerSettings = rememberPlayerSettings(appContainer.appSettings)
+    // The app's vibrations, as the Feedback settings have them (see AppHaptics)
+    val appHaptics = rememberAppHaptics(appContainer.appSettings)
     val listLook = rememberListLook(appContainer.appSettings)
     val videoLoop = remember(loopVideos) { VideoLoopSetting(loopVideos, appContainer.appSettings::setLoopVideos) }
     LaunchedEffect(hasActiveTransfers) {
@@ -277,6 +287,15 @@ fun MaterialdrainScreen() {
     val screenActions = remember { mutableStateMapOf<String, List<ScreenAction>>() }
     // While items are selected the bar is at the bottom, so the FAB and the snackbars move up over it
     var selectingItems by remember { mutableStateOf(false) }
+    // The song player over the whole app (see AudioPlayerView), and the height of the miniplayer which opens it too
+    val audioPlayerSheet = rememberAudioPlayerSheetState()
+    val openAudioPlayer = remember(audioPlayerSheet) { { audioPlayerSheet.open() } }
+    // The background player and its song, for the miniplayer and the player over the app; only with background songs
+    val playbackController = if (playerSettings.backgroundAudio) rememberPlaybackController() else null
+    val backgroundSong = rememberBackgroundSong(playbackController)
+    var miniPlayerHeightDp by remember { mutableStateOf(0.dp) }
+    // Without background songs there's no miniplayer, which can't say so itself any more
+    LaunchedEffect(playerSettings.backgroundAudio) { if (!playerSettings.backgroundAudio) miniPlayerHeightDp = 0.dp }
     // The height of the snackbar while one is shown (0 when none is); the FAB rises above it
     var snackbarHeightDp by remember { mutableStateOf(0.dp) }
     // The scroll position of each list survives visits to other screens, so it's kept here rather than in the screen
@@ -462,6 +481,7 @@ fun MaterialdrainScreen() {
             if (result == SnackbarResult.ActionPerformed) {
                 when (val action = message.action) {
                     is UiMessageAction.OpenDownload -> openDownloadedFile(context, action.download)
+                    is UiMessageAction.Undo -> action.undo()
                     null -> Unit
                 }
             }
@@ -536,7 +556,9 @@ fun MaterialdrainScreen() {
     // The buttons lift with the snackbar, on the same motion as its size and the gap beside the button
     val fabLift by animateDpAsState(targetValue = fabLiftTarget, animationSpec = snackbarMotion(reduceMotion), label = "fabLift")
     // The navigation button sits in the same corner: it rises over the upload button when both are shown
-    val navLiftTarget = fabLiftTarget + (if (navPrototype && fabState != null) fabHeightDp + 16.dp else 0.dp)
+    val navLiftTarget = fabLiftTarget + (if (navPrototype && fabState != null) fabHeightDp + 16.dp else 0.dp) +
+        // And over the miniplayer, which the Scaffold below doesn't lift it over, as it sits outside it
+        (if (navPrototype) miniPlayerHeightDp else 0.dp)
     val navLift by animateDpAsState(targetValue = navLiftTarget, animationSpec = snackbarMotion(reduceMotion), label = "navLift")
     val isFabVisible = showNavFab || fabState != null
 
@@ -563,7 +585,10 @@ fun MaterialdrainScreen() {
         LocalListLook provides listLook,
         LocalDataSaver provides dataSaverState,
         // Menus open above the bottom bar or the navigation button (see MenuFloor)
-        LocalMenuFloor provides remember { MenuFloor() }
+        LocalMenuFloor provides remember { MenuFloor() },
+        // The song card's cover and title open the song player (see AudioPlayerView)
+        LocalOpenAudioPlayer provides openAudioPlayer.takeIf { playerSettings.backgroundAudio },
+        LocalAppHaptics provides appHaptics
     ) {
     SharedTransitionLayout {
         // The Box lets the FAB navigation prototype (Developer settings) sit on top of the Scaffold. Blurred as a
@@ -639,12 +664,26 @@ fun MaterialdrainScreen() {
                 }
             },
             bottomBar = {
+                // Above the upload button, so the button slides down behind the bar
+                Column(modifier = Modifier.zIndex(2f)) {
+                // The navigation bar's own visibility, which the miniplayer above it needs too
+                val navigationBarShown = !navPrototype && !useRail && currentScreen != Screen.FileDetail && navBarOrder.size > 1
+                // The song playing in the background, above the bar. Not while items are selected, whose bar has the
+                // bottom then, nor on the details of the song itself, which show its own card
+                if (playerSettings.backgroundAudio) {
+                    BackgroundMiniPlayer(
+                        song = backgroundSong,
+                        visible = !selectingItems,
+                        hiddenSongId = if (currentScreen == Screen.FileDetail) fileInfoUiState.fileInfo?.let { fileInfoViewModel.rawUrlFor(it) } else null,
+                        aboveSystemBar = !navigationBarShown,
+                        sheet = audioPlayerSheet,
+                        modifier = Modifier.onSizeChanged { miniPlayerHeightDp = with(localDensity) { it.height.toDp() } }
+                    )
+                }
                 AnimatedVisibility(
                     // The FAB navigation prototype (Developer settings) replaces the bar while it's on; with no
                     // screens to show there is nothing for the bar to hold either
-                    visible = !navPrototype && !useRail && currentScreen != Screen.FileDetail && navBarOrder.size > 1,
-                    // Above the upload button, so the button slides down behind the bar
-                    modifier = Modifier.zIndex(2f),
+                    visible = navigationBarShown,
                     // The bar rises out of the bottom edge and sinks back into it, its icons with it: its top stays on the
                     // growing or shrinking space, which the page above follows
                     enter = if (reduceMotion) fadeIn(tween(100)) else fadeIn() + expandVertically(expandFrom = Alignment.Top),
@@ -653,6 +692,7 @@ fun MaterialdrainScreen() {
                     BottomNavigationBar(
                         currentTab, navBarOrder, onTabSelected = selectTab, modifier = Modifier.keepsMenusAbove(), alwaysShowLabels = barLabels
                     )
+                }
                 }
             },
             floatingActionButton = {
@@ -707,10 +747,15 @@ fun MaterialdrainScreen() {
                 // (the lists add room for it after their last item, see LocalBottomInset) instead of being cut off above it.
                 // The upload and settings screens keep their buttons clear of it.
                 val bottomBarShown = !navPrototype && !useRail && targetScreen != Screen.FileDetail && navBarOrder.size > 1
-                val underNavigationBar = !bottomBarShown && targetScreen in setOf(Screen.FileDetail, Screen.Files, Screen.Lists, Screen.Filesystem)
+                val goesUnderBars = targetScreen in setOf(Screen.FileDetail, Screen.Files, Screen.Lists, Screen.Filesystem)
+                val underNavigationBar = !bottomBarShown && goesUnderBars
+                // The miniplayer floats over those screens, so what's behind it shows while it's swiped away; they still
+                // add room for it after their last item, so nothing stays out of reach under it
+                val bottomPadding = paddingValues.calculateBottomPadding()
+                val behindMiniPlayer = if (goesUnderBars) miniPlayerHeightDp.coerceAtMost(bottomPadding) else 0.dp
                 val layoutDirection = LocalLayoutDirection.current
                 CompositionLocalProvider(
-                    LocalBottomInset provides if (underNavigationBar) paddingValues.calculateBottomPadding() else 0.dp
+                    LocalBottomInset provides if (underNavigationBar) bottomPadding else behindMiniPlayer
                 ) {
                 Box(
                     modifier = Modifier
@@ -719,7 +764,7 @@ fun MaterialdrainScreen() {
                             start = paddingValues.calculateStartPadding(layoutDirection),
                             top = paddingValues.calculateTopPadding(),
                             end = paddingValues.calculateEndPadding(layoutDirection),
-                            bottom = if (underNavigationBar) 0.dp else paddingValues.calculateBottomPadding()
+                            bottom = if (underNavigationBar) 0.dp else bottomPadding - behindMiniPlayer
                         )
                 ) {
                     val noScreensMessage = "${activeConfig?.name ?: "This host"} has no screens to show: its config's " +
@@ -870,6 +915,8 @@ fun MaterialdrainScreen() {
                 onOpenChange = { navMenuOpen = it }
             )
         }
+        // Over everything of the app, the navigation button too
+        AudioPlayerView(audioPlayerSheet, backgroundSong, compact = playerSettings.compactPlayer)
         }
 
         if (pendingShares.isNotEmpty() && !appLocked && shareTargets.size > 1) {
@@ -904,8 +951,11 @@ private fun rememberPlayerSettings(settings: AppSettings): PlayerSettings {
     val speed by settings.defaultSpeed.collectAsState()
     val gestures by settings.playerGestures.collectAsState()
     val background by settings.backgroundAudio.collectAsState()
-    return remember(autoplay, resume, step, speed, gestures, background) {
-        PlayerSettings(autoplay, resume, step * 1000L, speed, gestures, background)
+    val tint by settings.tintPlayer.collectAsState()
+    val compact by settings.compactPlayer.collectAsState()
+    val undoClose by settings.undoCloseSong.collectAsState()
+    return remember(autoplay, resume, step, speed, gestures, background, tint, compact, undoClose) {
+        PlayerSettings(autoplay, resume, step * 1000L, speed, gestures, background, tint, compact, undoClose)
     }
 }
 

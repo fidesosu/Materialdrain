@@ -19,6 +19,7 @@ import tools.senko.materialdrain.ui.icons.filled.Delete
 import tools.senko.materialdrain.ui.icons.filled.Download
 import tools.senko.materialdrain.ui.icons.filled.FolderCopy
 import tools.senko.materialdrain.ui.icons.filled.Share
+import tools.senko.materialdrain.ui.icons.filled.QueueMusic
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -75,10 +76,12 @@ fun FileItemMenu(
     onAddToList: () -> Unit,
     onDelete: () -> Unit,
     /** Only for the files of a list which can be changed. */
-    onRemoveFromList: (() -> Unit)? = null
+    onRemoveFromList: (() -> Unit)? = null,
+    /** Only for a song, while songs play in the background (see SongQueue). */
+    onAddToQueue: (() -> Unit)? = null
 ) {
     OverflowMenuButton(contentDescription = "More options for ${file.name}") { close ->
-        FileItemMenuEntries(close, shareUrl, canDelete, onDownload, onAddToFilesystem, onAddToList, onDelete, onRemoveFromList)
+        FileItemMenuEntries(close, shareUrl, canDelete, onDownload, onAddToFilesystem, onAddToList, onDelete, onRemoveFromList, onAddToQueue)
     }
 }
 
@@ -96,6 +99,7 @@ private fun FileItemMenuEntries(
     onAddToList: () -> Unit,
     onDelete: () -> Unit,
     onRemoveFromList: (() -> Unit)?,
+    onAddToQueue: (() -> Unit)? = null,
     addToOpen: Boolean = false
 ) {
     val context = LocalContext.current
@@ -108,6 +112,9 @@ private fun FileItemMenuEntries(
             AppMenuItem("Download", leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload() })
             if (url != null) {
                 AppMenuItem("Share link", leadingIcon = Icons.Filled.Share, onClick = { close(); shareLink(context, url) })
+            }
+            if (onAddToQueue != null) {
+                AppMenuItem("Add to queue", leadingIcon = Icons.Filled.QueueMusic, onClick = { close(); onAddToQueue() })
             }
             AppMenuItem(
                 "Add to…",
@@ -346,7 +353,7 @@ private fun ListPickerDialog(
 private fun FileItemMenuPreview() {
     PreviewTheme(padding = 8.dp) {
         Row {
-            AppMenuPreview { FileItemMenuEntries({}, "https://pixeldrain.com/u/aBcD1234", true, {}, {}, {}, {}, null) }
+            AppMenuPreview { FileItemMenuEntries({}, "https://pixeldrain.com/u/aBcD1234", true, {}, {}, {}, {}, null, onAddToQueue = {}) }
             AppMenuPreview { FileItemMenuEntries({}, "https://pixeldrain.com/u/aBcD1234", false, {}, {}, {}, {}, {}) }
         }
     }

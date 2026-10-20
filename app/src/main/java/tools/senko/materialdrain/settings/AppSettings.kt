@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.settings
 
+import tools.senko.materialdrain.ui.VibrationStrength
 import android.content.Context
 import android.content.SharedPreferences
 import tools.senko.materialdrain.documents.HostDocumentsProvider
@@ -72,6 +73,13 @@ private const val SEEK_STEP_PREF = "seek_step_seconds"
 private const val DEFAULT_SPEED_PREF = "default_speed"
 private const val PLAYER_GESTURES_PREF = "player_gestures"
 private const val BACKGROUND_AUDIO_PREF = "background_audio"
+private const val TINT_PLAYER_PREF = "tint_player"
+private const val COMPACT_PLAYER_PREF = "compact_player"
+private const val UNDO_CLOSE_SONG_PREF = "undo_close_song"
+private const val VIBRATION_PREF = "vibration"
+private const val VIBRATION_STRENGTH_PREF = "vibration_strength"
+private const val VIBRATE_PLAYER_PREF = "vibrate_player"
+private const val VIBRATE_NAV_BUTTON_PREF = "vibrate_nav_button"
 private const val COPY_LINK_PREF = "copy_link_after_upload"
 private const val OPEN_AFTER_DOWNLOAD_PREF = "open_after_download"
 private const val DOWNLOAD_SUBFOLDER_PREF = "download_subfolder"
@@ -320,6 +328,53 @@ class AppSettings(context: Context) {
     val backgroundAudio: StateFlow<Boolean> = backgroundAudioPref.flow
 
     fun setBackgroundAudio(enabled: Boolean) = backgroundAudioPref.set(enabled)
+
+    private val tintPlayerPref = booleanSetting(TINT_PLAYER_PREF, false)
+    /** The miniplayer of a background song takes the colour of its cover, fading into its own. Off by default. */
+    val tintPlayer: StateFlow<Boolean> = tintPlayerPref.flow
+
+    fun setTintPlayer(enabled: Boolean) = tintPlayerPref.set(enabled)
+
+    private val compactPlayerPref = booleanSetting(COMPACT_PLAYER_PREF, false)
+    /**
+     * The song player opened from the miniplayer is a card about a third of the screen high, which the miniplayer grows
+     * into, instead of the whole screen. Off by default.
+     */
+    val compactPlayer: StateFlow<Boolean> = compactPlayerPref.flow
+
+    fun setCompactPlayer(enabled: Boolean) = compactPlayerPref.set(enabled)
+
+    private val undoCloseSongPref = booleanSetting(UNDO_CLOSE_SONG_PREF, false)
+    /** Swiping the miniplayer down offers an Undo on the snackbar, which puts the song and its queue back. Off by default. */
+    val undoCloseSong: StateFlow<Boolean> = undoCloseSongPref.flow
+
+    fun setUndoCloseSong(enabled: Boolean) = undoCloseSongPref.set(enabled)
+
+    // ---- Feedback ----
+
+    private val vibrationPref = booleanSetting(VIBRATION_PREF, true)
+    /** The app's vibrations (see AppHaptics), where each of the ones below is on. On by default. */
+    val vibration: StateFlow<Boolean> = vibrationPref.flow
+
+    fun setVibration(enabled: Boolean) = vibrationPref.set(enabled)
+
+    private val vibrationStrengthPref = enumSetting(VIBRATION_STRENGTH_PREF, VibrationStrength.LIGHT)
+    /** How strong the vibrations are. Light by default. */
+    val vibrationStrength: StateFlow<VibrationStrength> = vibrationStrengthPref.flow
+
+    fun setVibrationStrength(strength: VibrationStrength) = vibrationStrengthPref.set(strength)
+
+    private val vibratePlayerPref = booleanSetting(VIBRATE_PLAYER_PREF, true)
+    /** The miniplayer's swipes vibrate when letting go would open, skip or close, and again when the finger goes back. */
+    val vibratePlayer: StateFlow<Boolean> = vibratePlayerPref.flow
+
+    fun setVibratePlayer(enabled: Boolean) = vibratePlayerPref.set(enabled)
+
+    private val vibrateNavButtonPref = booleanSetting(VIBRATE_NAV_BUTTON_PREF, true)
+    /** The navigation button vibrates when a long press goes back a tab. */
+    val vibrateNavButton: StateFlow<Boolean> = vibrateNavButtonPref.flow
+
+    fun setVibrateNavButton(enabled: Boolean) = vibrateNavButtonPref.set(enabled)
 
     // ---- Files and transfers ----
 

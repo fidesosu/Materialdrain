@@ -60,6 +60,15 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import android.app.Application
+import androidx.compose.ui.platform.LocalInspectionMode
+import tools.senko.materialdrain.AppContainer
+import tools.senko.materialdrain.files.previewMimeType
+import tools.senko.materialdrain.ui.LocalPlayerSettings
+import tools.senko.materialdrain.ui.icons.filled.QueueMusic
+import tools.senko.materialdrain.ui.media.addToQueue
+import tools.senko.materialdrain.ui.media.rememberPlaceholderArt
+import tools.senko.materialdrain.ui.media.rememberPlaybackController
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -281,6 +290,11 @@ fun BrowserScreen(
     var showBulkDelete by remember { mutableStateOf(false) }
     // Files and list actions (delete, add to filesystem or to a list, remove from a list)
     var actionRequest by remember { mutableStateOf<FileActionRequest?>(null) }
+
+    // The background player, for a song's "Add to queue" (only while songs play in the background)
+    val playback = if (LocalPlayerSettings.current.backgroundAudio && !LocalInspectionMode.current) rememberPlaybackController() else null
+    val placeholderArt = rememberPlaceholderArt()
+    val messages = remember { AppContainer.get(context.applicationContext as Application).uiMessages }
 
     // The Filesystem screen's own upload button, scoped here (not a FAB) so it works the same whichever navigation
     // style is on — the classic bottom bar and the FAB navigation prototype don't always have a FAB of their own
@@ -607,7 +621,16 @@ fun BrowserScreen(
             addToList = { node -> actionRequest = FileActionRequest.AddToList(listOf(node)) },
             // The list's own file count, not the filtered entries: removing the last matching file mustn't look like the
             // list itself went empty when a filter just hides the rest
-            removeFromList = { node -> openedList?.let { actionRequest = FileActionRequest.RemoveFromList(listOf(node), it, listState.listFiles.size) } }
+            removeFromList = { node -> openedList?.let { actionRequest = FileActionRequest.RemoveFromList(listOf(node), it, listState.listFiles.size) } },
+            addToQueue = playback?.let { player ->
+                { node ->
+                    fileInfoViewModel.queueSongOf(node)?.let { song ->
+                        val wasEmpty = player.mediaItemCount == 0
+                        player.addToQueue(song, placeholderArt)
+                        messages.show(if (wasEmpty) "Playing ${node.name}" else "Added to the queue")
+                    }
+                }
+            }
         ),
         scrollState = scrollState,
         fabHeight = fabHeight,
@@ -629,7 +652,9 @@ class BrowserRowActions(
     val delete: (StorageNode) -> Unit = {},
     val addToFilesystem: (StorageNode) -> Unit = {},
     val addToList: (StorageNode) -> Unit = {},
-    val removeFromList: (StorageNode) -> Unit = {}
+    val removeFromList: (StorageNode) -> Unit = {},
+    /** Puts a song at the end of the background player's queue; null while songs don't play in the background. */
+    val addToQueue: ((StorageNode) -> Unit)? = null
 )
 
 /**
@@ -807,7 +832,11 @@ fun BrowserContent(
                                 onAddToFilesystem = { rowActions.addToFilesystem(node) },
                                 onAddToList = { rowActions.addToList(node) },
                                 onRemoveFromList = { rowActions.removeFromList(node) },
-                                onShareLink = { url -> shareLink(context, url) }
+                                onShareLink = { url -> shareLink(context, url) },
+                                // Only a song: the rest can't be played in the background
+                                onAddToQueue = rowActions.addToQueue
+                                    ?.takeIf { !node.isDirectory && node.previewMimeType()?.startsWith("audio/") == true }
+                                    ?.let { add -> { add(node) } }
                             )
                     }
                     val grid = LocalListLook.current.grid
@@ -902,7 +931,8 @@ private fun BrowserEntry(
     onAddToFilesystem: () -> Unit,
     onAddToList: () -> Unit,
     onRemoveFromList: () -> Unit,
-    onShareLink: (String) -> Unit
+    onShareLink: (String) -> Unit,
+    onAddToQueue: (() -> Unit)? = null
 ) {
     // A list in the lists overview: its own page, when the host has one
     val folderLink = if (node.isDirectory && mode == BrowserMode.LISTS) shareUrl else null
@@ -924,7 +954,8 @@ private fun BrowserEntry(
                     onDownload = onDownload,
                     onRename = onRename,
                     onMove = onMove,
-                    onDelete = onDelete
+                    onDelete = onDelete,
+                    onAddToQueue = onAddToQueue
                 )
                 // Files and the files of a list: the shared file menu
                 else -> FileItemMenu(
@@ -935,7 +966,8 @@ private fun BrowserEntry(
                     onAddToFilesystem = onAddToFilesystem,
                     onAddToList = onAddToList,
                     onDelete = onDelete,
-                    onRemoveFromList = if (mode == BrowserMode.LISTS && listCanEdit && openedList != null) onRemoveFromList else null
+                    onRemoveFromList = if (mode == BrowserMode.LISTS && listCanEdit && openedList != null) onRemoveFromList else null,
+                    onAddToQueue = onAddToQueue
                 )
             }
     }
@@ -994,11 +1026,15 @@ private fun FilesystemMenu(
     onDownload: () -> Unit,
     onRename: () -> Unit,
     onMove: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onAddToQueue: (() -> Unit)? = null
 ) {
     OverflowMenuButton(contentDescription = "More options for ${node.name}") { close ->
         if (!node.isDirectory) {
             AppMenuItem("Download", leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload() })
+        }
+        if (onAddToQueue != null) {
+            AppMenuItem("Add to queue", leadingIcon = Icons.Filled.QueueMusic, onClick = { close(); onAddToQueue() })
         }
         if (canWrite) {
             AppMenuItem("Rename", leadingIcon = Icons.Filled.Edit, onClick = { close(); onRename() })

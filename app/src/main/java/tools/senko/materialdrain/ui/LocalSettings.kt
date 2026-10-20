@@ -52,7 +52,13 @@ data class PlayerSettings(
     /** Swipes up and down on the video change the brightness (left) and the volume (right) */
     val gestures: Boolean = false,
     /** Songs play in the background, through PlaybackService */
-    val backgroundAudio: Boolean = false
+    val backgroundAudio: Boolean = false,
+    /** The miniplayer takes the colour of the song's cover (see MiniPlayer) */
+    val tintPlayer: Boolean = false,
+    /** The song player is a card a third of the screen high, which the miniplayer grows into, not the whole screen */
+    val compactPlayer: Boolean = false,
+    /** Closing a song from the miniplayer offers an Undo on the snackbar */
+    val undoCloseSong: Boolean = false
 )
 
 val LocalPlayerSettings = compositionLocalOf { PlayerSettings() }

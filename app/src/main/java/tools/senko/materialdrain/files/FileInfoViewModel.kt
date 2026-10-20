@@ -44,6 +44,9 @@ import tools.senko.materialdrain.provider.api.ProviderKind
 import tools.senko.materialdrain.provider.api.ProviderLog
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.ui.media.MediaCovers
+import tools.senko.materialdrain.ui.media.QueueSong
+import tools.senko.materialdrain.ui.media.SongQueue
+import android.net.Uri
 import tools.senko.materialdrain.provider.api.StorageProvider
 import tools.senko.materialdrain.provider.api.StorageRef
 import tools.senko.materialdrain.util.formatSize
@@ -506,6 +509,26 @@ class FileInfoViewModel(
         val index = neighbours.indexOfFirst { it.key == shown.key }
         if (index == -1) return null
         return neighbours.getOrNull(if (next) index + 1 else index - 1)
+    }
+
+    /** [node] as a song of the background player's queue, or null when it isn't a song (or has no address). */
+    fun queueSongOf(node: StorageNode): QueueSong? {
+        if (node.isDirectory || node.previewMimeType()?.startsWith("audio/") != true) return null
+        val url = rawUrlFor(node) ?: return null
+        return QueueSong(Uri.parse(url), node.name, thumbnailFor(node))
+    }
+
+    /**
+     * The songs of the list [node] was opened from, in its order, to go on with after it when it's played in the
+     * background (see AudioPlayerPreview); null when it wasn't opened from a list.
+     */
+    fun songQueueFor(node: StorageNode): SongQueue? {
+        val songs = neighbours.filter { it.previewMimeType()?.startsWith("audio/") == true }
+        val start = songs.indexOfFirst { it.key == node.key }
+        if (start == -1) return null
+        val queue = songs.mapNotNull { queueSongOf(it) }
+        // A song without an address would shift the others: then it's played on its own
+        return if (queue.size == songs.size) SongQueue(queue, start) else null
     }
 
     /** Whether there's a file to swipe to, see [openNeighbour]. */

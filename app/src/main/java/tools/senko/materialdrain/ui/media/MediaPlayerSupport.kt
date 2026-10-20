@@ -170,6 +170,9 @@ private class PreviewPlayer : SimpleBasePlayer(Looper.getMainLooper()) {
     override fun handleRelease(): ListenableFuture<*> = Futures.immediateVoidFuture()
 }
 
+/** A player for previews in Android Studio, see [PreviewPlayer]. */
+internal fun previewPlayer(): Player = PreviewPlayer()
+
 /** What the controls of a player show, kept up to date from the player. */
 @Stable
 class PlayerUiState(val player: Player) {
