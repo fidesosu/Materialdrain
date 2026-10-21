@@ -184,18 +184,27 @@ fun ClickablePreviewOverlay(onClick: () -> Unit) {
             .padding(8.dp),
         contentAlignment = Alignment.BottomEnd
     ) {
-        Surface(
-            modifier = Modifier.size(28.dp),
-            shape = AppShapes.ExtraSmall,
-            color = MediaScrim.Play
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Fullscreen,
-                contentDescription = "View Fullscreen",
-                tint = Color.White,
-                modifier = Modifier.padding(4.dp)
-            )
-        }
+        FullscreenBadge("View Fullscreen")
+    }
+}
+
+/**
+ * The badge of a preview which opens something bigger: a picture, a video, a PDF or a text fullscreen, a song's player.
+ * Only the badge itself; what's tapped is up to the preview (all of a picture, only the badge of a text).
+ */
+@Composable
+fun FullscreenBadge(contentDescription: String?, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.size(28.dp),
+        shape = AppShapes.ExtraSmall,
+        color = MediaScrim.Play
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Fullscreen,
+            contentDescription = contentDescription,
+            tint = Color.White,
+            modifier = Modifier.padding(4.dp)
+        )
     }
 }
 @Composable

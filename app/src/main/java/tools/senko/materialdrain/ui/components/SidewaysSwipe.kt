@@ -32,8 +32,8 @@ private const val SIDEWAYS_RATIO = 2f
 /**
  * A swipe sideways across what this modifies, for going to the tab beside the one shown, or the file beside the one in
  * the details ([onSwipe] with true for the next one: the one to the right, or to the left in a right-to-left language).
- * Like the navigation button's swipe, it's one step per swipe, on release, and the page doesn't follow the finger: it
- * changes with the usual page transition.
+ * It's one step per swipe, on release, and the page doesn't follow the finger: it changes with the usual page
+ * transition.
  *
  * What's inside comes first: a swipe whose touches something else takes (a row that scrolls sideways, such as the folder
  * path, or the list scrolling up and down) is left to it. Nor does one that starts in the system's back gesture area at

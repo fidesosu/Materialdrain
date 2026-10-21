@@ -2,41 +2,22 @@ package tools.senko.materialdrain.ui.media
 
 import android.net.Uri
 import android.os.Bundle
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material.icons.Icons
-import tools.senko.materialdrain.ui.icons.filled.MusicNote
+import tools.senko.materialdrain.ui.icons.filled.ExpandLess
 import tools.senko.materialdrain.ui.icons.filled.Pause
 import tools.senko.materialdrain.ui.icons.filled.PlayArrow
 import androidx.compose.material3.Card
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -49,12 +30,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.clickable
-import tools.senko.materialdrain.ui.icons.outlined.Image
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,13 +41,25 @@ import androidx.media3.common.Player
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.style.TextAlign
+import tools.senko.materialdrain.settings.ui.accentContainer
+import tools.senko.materialdrain.ui.icons.automirrored.filled.ArrowBack
 import tools.senko.materialdrain.ui.LocalPlayerSettings
-import coil.compose.AsyncImage
-import tools.senko.materialdrain.ui.components.AppMenu
-import tools.senko.materialdrain.ui.components.AppMenuItem
-import tools.senko.materialdrain.ui.components.MenuEdge
+import tools.senko.materialdrain.ui.theme.AppShapes
 import tools.senko.materialdrain.util.formatDurationMillis
 import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.ui.preview.PreviewSamples
 
@@ -102,6 +91,54 @@ fun AudioPlayerPreview(
     /** The songs of the list it was opened from, which the background player goes on with after it */
     queue: SongQueue? = null
 ) {
+    SongPlayerHost(audioUri, apiKey, title, artist, album, albumArtSource, queue) { texts, player, isThisSong, start ->
+        AudioPlayerCard(
+            player, isThisSong, start, texts.title, texts.artist, texts.album, albumArtSource, durationHintMillis, apiKey,
+            modifier, outerPadding, onLoadArt
+        )
+    }
+}
+
+/**
+ * A song over the whole screen, as the player over the app shows the song playing (see AudioPlayerView): the big cover,
+ * what it is, the seek bar and the controls, under a bar with [onBack]. For the fullscreen view of a file's details, so a
+ * song swiped to there is a player, not the details' card. It plays the way [AudioPlayerPreview] does (in the background
+ * or on its own), and loads nothing until play is pressed.
+ */
+@Composable
+fun AudioPlayerFullscreen(
+    audioUri: Uri,
+    apiKey: String?,
+    title: String?,
+    albumArtSource: Any?,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    queue: SongQueue? = null
+) {
+    SongPlayerHost(audioUri, apiKey, title, artist = null, album = null, albumArtSource, queue) { texts, player, isThisSong, start ->
+        AudioPlayerFullContent(player, isThisSong, start, texts, albumArtSource, onBack, modifier)
+    }
+}
+
+/** A song's title, artist and album as it's shown: from its tags once they're read (see SongTags), else as given. */
+private data class SongTexts(val title: String?, val artist: String?, val album: String?)
+
+/**
+ * Plays the song at [audioUri] for what [content] shows of it: through the background player with the Media setting
+ * "Play songs in the background" on, which has one song at a time (while it has another one, [content] isn't
+ * isThisSong, and its startThisSong takes the player over, with the songs of [queue] after it), else a player of its own.
+ */
+@Composable
+private fun SongPlayerHost(
+    audioUri: Uri,
+    apiKey: String?,
+    title: String?,
+    artist: String?,
+    album: String?,
+    albumArtSource: Any?,
+    queue: SongQueue?,
+    content: @Composable (texts: SongTexts, player: Player?, isThisSong: Boolean, startThisSong: ((Long) -> Unit)?) -> Unit
+) {
     val settings = LocalPlayerSettings.current
     // The song's own title, artist and album from its tags, once they're read (see SongTags); the file name until then
     val context = LocalContext.current
@@ -111,10 +148,9 @@ fun AudioPlayerPreview(
     val title = tags?.title ?: title
     val artist = artist ?: tags?.artist
     val album = album ?: tags?.album
+    val texts = SongTexts(title, artist, album)
     val card: @Composable (player: Player?, isThisSong: Boolean, startThisSong: ((Long) -> Unit)?) -> Unit = { player, isThisSong, start ->
-        AudioPlayerCard(
-            player, isThisSong, start, title, artist, album, albumArtSource, durationHintMillis, apiKey, modifier, outerPadding, onLoadArt
-        )
+        content(texts, player, isThisSong, start)
     }
     if (settings.backgroundAudio && !LocalInspectionMode.current) {
         val controller = rememberPlaybackController()
@@ -191,14 +227,12 @@ private fun AudioPlayerCard(
     onLoadArt: (() -> Unit)?
 ) {
     val state = player?.let { rememberPlayerUiState(it) }
-    val context = LocalContext.current
     val stepMs = LocalPlayerSettings.current.seekStepMs
     // What it shows: the player's, when it plays this song
     val own = state?.takeIf { isThisSong }
 
     var scrubbing by remember { mutableStateOf(false) }
     var scrubPositionMs by remember { mutableLongStateOf(0L) }
-    var speedMenuOpen by remember { mutableStateOf(false) }
 
     val duration = own?.durationMs?.takeIf { it > 0 } ?: durationHintMillis ?: 0L
     val shownPosition = if (scrubbing) scrubPositionMs else own?.positionMs ?: 0L
@@ -210,82 +244,34 @@ private fun AudioPlayerCard(
     val onSurface = MaterialTheme.colorScheme.onSurface
     val quietContainer = onSurface.copy(alpha = 0.08f)
 
+    // Whether at least half of it is on the screen, for the miniplayer to stay away until it's scrolled off (see
+    // LocalSongCardShown); not any more once it's gone
+    val onShown = LocalSongCardShown.current
+    var shownNow by remember { mutableStateOf<Boolean?>(null) }
+    DisposableEffect(onShown) { onDispose { onShown?.invoke(false) } }
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(outerPadding),
-        shape = MediaCardShape
-    ) {
-        // The cover and the title open the player over the whole app, where there's one to open: their area has the
-        // corner marks which say so, and reaches into the card's padding so the card keeps its size
-        val openPlayer = LocalOpenAudioPlayer.current
-        // Quiet until the area is pressed, when they take the theme's colour for as long as it's held
-        val openInteractions = remember { MutableInteractionSource() }
-        val openPressed by openInteractions.collectIsPressedAsState()
-        val markColor by animateColorAsState(
-            targetValue = if (openPressed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-            animationSpec = tween(150),
-            label = "openMarks"
-        )
-        Column(modifier = Modifier.padding(6.dp)) {
-            // As wide as the card, so the marks frame the cover and the title from edge to edge
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (openPlayer == null) Modifier
-                        else Modifier
-                            .clip(OpenAreaShape)
-                            .clickable(
-                                interactionSource = openInteractions,
-                                indication = LocalIndication.current,
-                                onClickLabel = "Open the player",
-                                // The player shows the song the background player has: this one, started if it isn't
-                                onClick = {
-                                    if (own == null) startThisSong?.invoke(0L)
-                                    openPlayer()
-                                }
-                            )
-                            .cornerMarks { markColor }
-                    )
-                    .padding(6.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(MediaControlShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .then(if (onLoadArt != null) Modifier.clickable(onClickLabel = "Load the cover", onClick = onLoadArt) else Modifier),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val artModifier = Modifier.fillMaxSize()
-                    if (onLoadArt != null) {
-                        Icon(Icons.Outlined.Image, contentDescription = "Load the cover", modifier = Modifier.size(28.dp))
-                    } else when (albumArtSource) {
-                        is ByteArray -> {
-                            val bitmap = rememberDecodedBitmap(albumArtSource)
-                            if (bitmap != null) {
-                                Image(bitmap, "Album art", artModifier.clip(MediaControlShape), contentScale = ContentScale.Crop)
-                            } else {
-                                Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(32.dp))
-                            }
-                        }
-                        is Uri, is String -> {
-                            val artRequest = remember(albumArtSource, apiKey) {
-                                imageRequest(context, albumArtSource) { crossfade(true) }
-                            }
-                            AsyncImage(
-                                model = artRequest,
-                                contentDescription = "Album art",
-                                modifier = artModifier.clip(MediaControlShape),
-                                contentScale = ContentScale.Crop,
-                                error = rememberVectorPainter(Icons.Filled.MusicNote)
-                            )
-                        }
-                        else -> Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(32.dp))
+            .padding(outerPadding)
+            .then(
+                if (onShown == null) Modifier
+                else Modifier.onGloballyPositioned { coordinates ->
+                    // The part of it the scrolling page around it leaves on the screen
+                    val visible = coordinates.boundsInWindow().height
+                    val shown = coordinates.size.height > 0 && visible >= coordinates.size.height / 2f
+                    if (shown != shownNow) {
+                        shownNow = shown
+                        onShown(shown)
                     }
                 }
+            ),
+        shape = MediaCardShape
+    ) {
+        // The player over the whole app, where there's one to open: the badge the other previews open theirs with
+        val openPlayer = LocalOpenAudioPlayer.current
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MiniCover(albumArtSource, size = 72.dp, onLoad = onLoadArt, contentDescription = "Album art")
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     title?.let { Text(it, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis) }
@@ -297,7 +283,6 @@ private fun AudioPlayerCard(
                 }
             }
 
-            Column(modifier = Modifier.padding(start = 6.dp, end = 6.dp, bottom = 6.dp)) {
             Spacer(Modifier.height(4.dp))
             MediaSeekBar(
                 positionMs = shownPosition,
@@ -342,17 +327,21 @@ private fun AudioPlayerCard(
                         container = quietContainer, contentColor = onSurface
                     )
                 }
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                    MediaTextButton(speedLabel(own?.speed ?: LocalPlayerSettings.current.defaultSpeed), onClick = { speedMenuOpen = true }, container = quietContainer, contentColor = onSurface)
-                    // Lined up with the button at the end of the row; below it, or above when there's no room
-                    AppMenu(expanded = speedMenuOpen, onDismiss = { speedMenuOpen = false }, edge = MenuEdge.End, minWidth = 120.dp) {
-                        PlaybackSpeeds.forEach { speed ->
-                            AppMenuItem(
-                                text = speedLabel(speed),
-                                active = speed == (own?.speed ?: LocalPlayerSettings.current.defaultSpeed),
-                                onClick = { state?.changeSpeed(speed) }
-                            )
-                        }
+                // As wide as the time before the buttons, so they're in the very middle; at its end, where there's one,
+                // the button which opens the player over the whole app, in the card's own quiet look like the skips
+                Box(contentAlignment = Alignment.CenterEnd, modifier = Modifier.weight(1f)) {
+                    if (openPlayer != null) {
+                        MediaIconButton(
+                            icon = Icons.Filled.ExpandLess,
+                            contentDescription = "Open the player",
+                            // The player shows the song the background player has: this one, started if it isn't
+                            onClick = {
+                                if (own == null) startThisSong?.invoke(0L)
+                                openPlayer()
+                            },
+                            container = quietContainer,
+                            contentColor = onSurface
+                        )
                     }
                 }
             }
@@ -368,50 +357,132 @@ private fun AudioPlayerCard(
                     TextButton(onClick = { own?.retry() }) { Text("Try again") }
                 }
             }
-            }
         }
     }
 }
 
-/** The corners of the song card's area which opens the player, those of the cover and the buttons; [cornerMarks] follows them. */
-private val OpenAreaCorner = 8.dp
-private val OpenAreaShape = RoundedCornerShape(OpenAreaCorner)
-
 /**
- * Two opposite corners of the outline of what this modifies ([OpenAreaShape], the card's width), the top left and the
- * bottom right: its rounded corners, with the edges from them going on a part of its width ([MARK_WIDTH_FRACTION]) and
- * of its height ([MARK_HEIGHT_FRACTION]), so they grow with the area. The mark of an area that opens something bigger. [color] is
- * read as they're drawn, so a change of it only draws them again.
+ * What [AudioPlayerFullscreen] shows, laid out as the player over the app's whole screen (see FullPlayer): [player] as
+ * [AudioPlayerCard] has it, and the same way of starting the song when the background player has another one.
  */
-private fun Modifier.cornerMarks(color: () -> Color): Modifier = drawBehind {
-    val stroke = 2.dp.toPx()
-    val radius = OpenAreaCorner.toPx()
-    val inset = stroke / 2f
-    val across = size.width * MARK_WIDTH_FRACTION
-    val down = size.height * MARK_HEIGHT_FRACTION
-    val left = inset
-    val right = size.width - inset
-    val top = inset
-    val bottom = size.height - inset
-    val arc = Size(radius * 2f, radius * 2f)
-    val marks = Path().apply {
-        // Top left: up the side, around the corner, along the top
-        moveTo(left, top + radius + down)
-        lineTo(left, top + radius)
-        arcTo(Rect(Offset(left, top), arc), startAngleDegrees = 180f, sweepAngleDegrees = 90f, forceMoveTo = false)
-        lineTo(left + radius + across, top)
-        // Bottom right: down the side, around the corner, along the bottom
-        moveTo(right, bottom - radius - down)
-        lineTo(right, bottom - radius)
-        arcTo(Rect(Offset(right - arc.width, bottom - arc.height), arc), startAngleDegrees = 0f, sweepAngleDegrees = 90f, forceMoveTo = false)
-        lineTo(right - radius - across, bottom)
+@Composable
+private fun AudioPlayerFullContent(
+    player: Player?,
+    isThisSong: Boolean,
+    startThisSong: ((Long) -> Unit)?,
+    texts: SongTexts,
+    albumArtSource: Any?,
+    onBack: () -> Unit,
+    modifier: Modifier
+) {
+    val state = player?.let { rememberPlayerUiState(it) }
+    val stepMs = LocalPlayerSettings.current.seekStepMs
+    val own = state?.takeIf { isThisSong }
+    var scrubbing by remember { mutableStateOf(false) }
+    var scrubPositionMs by remember { mutableLongStateOf(0L) }
+    val duration = own?.durationMs?.takeIf { it > 0 } ?: 0L
+    val shownPosition = if (scrubbing) scrubPositionMs else own?.positionMs ?: 0L
+    val failed = own?.error != null
+    fun startOr(positionMs: Long, action: () -> Unit) {
+        if (own == null) startThisSong?.invoke(positionMs) else action()
     }
-    drawPath(marks, color(), style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    val colors = MaterialTheme.colorScheme
+    val onSurface = colors.onSurface
+    val surface = colors.surface
+    // The cover's colour (Tint the player) fading down into the page's, as on the player over the app
+    val accent = rememberCoverAccent(albumArtSource, enabled = LocalPlayerSettings.current.tintPlayer)
+    val tint by animateColorAsState(accent?.let { accentContainer(it, colors.primaryContainer, colors.primary) } ?: surface, label = "songTint")
+    Surface(color = surface, modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(listOf(tint, surface)))
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(horizontal = 24.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                IconButton(onClick = onBack, modifier = Modifier.offset(x = (-12).dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            }
+            // The cover up near the top, as big as fits, square; what room is left over goes under it
+            BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                val side = minOf(maxWidth, maxHeight - 20.dp).coerceAtLeast(0.dp)
+                MiniCover(
+                    albumArtSource,
+                    size = side,
+                    shape = AppShapes.Card,
+                    contentDescription = "Album art",
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            Text(
+                texts.title ?: "Audio",
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            val details = listOfNotNull(texts.artist, texts.album).joinToString(" · ")
+            if (details.isNotEmpty()) {
+                Text(details, style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.height(16.dp))
+            MediaSeekBar(
+                positionMs = shownPosition,
+                durationMs = duration,
+                bufferedMs = own?.bufferedMs ?: 0L,
+                onSeekStarted = { scrubbing = true },
+                onSeekPreview = { scrubPositionMs = it },
+                onSeekFinished = { target ->
+                    startOr(target) {
+                        player?.let { if (it.playbackState == Player.STATE_IDLE) it.prepare() }
+                        state?.seekTo(target)
+                    }
+                    scrubbing = false
+                },
+                activeColor = colors.primary,
+                trackColor = onSurface.copy(alpha = 0.15f),
+                bufferedColor = onSurface.copy(alpha = 0.25f)
+            )
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text(formatDurationMillis(shownPosition), style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                Text(if (duration > 0) formatDurationMillis(duration) else "--:--", style = MaterialTheme.typography.labelMedium)
+            }
+            Spacer(Modifier.height(8.dp))
+            val quietContainer = onSurface.copy(alpha = 0.08f)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                MediaSkipButton(
+                    forward = false, stepMs = stepMs, onClick = { startOr(0L) { state?.seekBy(-stepMs) } },
+                    container = quietContainer, contentColor = onSurface
+                )
+                PlayPauseButton(
+                    playing = own != null && own.playWhenReady && !own.isEnded,
+                    buffering = own?.isBuffering == true,
+                    failed = failed,
+                    onClick = { if (failed) own?.retry() else startOr(0L) { state?.togglePlayPause() } },
+                    size = 72.dp
+                )
+                MediaSkipButton(
+                    forward = true, stepMs = stepMs, onClick = { startOr(stepMs) { state?.seekBy(stepMs) } },
+                    container = quietContainer, contentColor = onSurface
+                )
+            }
+            // Why it can't be played; the play button tries again
+            Text(
+                own?.error?.userMessage().orEmpty(),
+                color = colors.error,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+                minLines = 2,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+            )
+        }
+    }
 }
-
-/** How far the corner marks go along the top and bottom, of the area's width, and along its sides, of its height. */
-private const val MARK_WIDTH_FRACTION = 0.12f
-private const val MARK_HEIGHT_FRACTION = 0.2f
 
 // ---- Previews ----
 
@@ -441,5 +512,14 @@ private fun AudioPlayerPreviewPreview() {
                 onLoadArt = {}
             )
         }
+    }
+}
+
+/** A song over the whole screen, as the fullscreen view of a file's details shows one swiped to; not started yet. */
+@ScreenPreviews
+@Composable
+private fun AudioPlayerFullscreenPreview() {
+    PreviewTheme {
+        AudioPlayerFullscreen(audioUri = Uri.EMPTY, apiKey = null, title = PreviewSamples.song.name, albumArtSource = null, onBack = {})
     }
 }

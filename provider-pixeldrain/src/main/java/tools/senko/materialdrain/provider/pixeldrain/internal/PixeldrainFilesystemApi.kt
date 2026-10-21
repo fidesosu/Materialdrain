@@ -45,6 +45,14 @@ interface PixeldrainFilesystemApi {
         onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit
     ): ApiResponse<Long>
 
+    /** ?bulk_download: the directory at [fsPath] and everything in it as one zip archive. */
+    suspend fun downloadDirectoryZip(
+        apiKey: String,
+        fsPath: String,
+        outputStream: OutputStream,
+        onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit
+    ): ApiResponse<Long>
+
     /** PUT: writes (or overwrites) the file at [fsPath], the last path component being the file name. */
     suspend fun uploadFileFromUri(
         apiKey: String,
@@ -150,6 +158,24 @@ class PixeldrainFilesystemApiImpl(private val http: PixeldrainHttpClient) : Pixe
         }
         val request = Request.Builder()
             .url(http.filesystemUrl(fsPath).addQueryParameter("attach", "").build())
+            .header(HttpHeaders.AcceptEncoding, "identity")
+            .apply { if (apiKey.isNotBlank()) header(HttpHeaders.Authorization, http.basicAuth(apiKey)) }
+            .get()
+            .build()
+        return http.downloadToStream(request, outputStream, onProgress)
+    }
+
+    override suspend fun downloadDirectoryZip(
+        apiKey: String,
+        fsPath: String,
+        outputStream: OutputStream,
+        onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit
+    ): ApiResponse<Long> {
+        if (fsPath.isBlank()) {
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "path_missing", message = "A path is required to download a folder."))
+        }
+        val request = Request.Builder()
+            .url(http.filesystemUrl(fsPath).addQueryParameter("bulk_download", "").build())
             .header(HttpHeaders.AcceptEncoding, "identity")
             .apply { if (apiKey.isNotBlank()) header(HttpHeaders.Authorization, http.basicAuth(apiKey)) }
             .get()

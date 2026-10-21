@@ -40,8 +40,8 @@ enum class HapticPlace {
     /** The miniplayer's swipes */
     PLAYER,
 
-    /** The navigation button's long press */
-    NAV_BUTTON
+    /** A swipe along the tab strip going to another tab (see TabStrip), or a swipe across the page doing so */
+    NAV_SWIPE
 }
 
 /**
@@ -103,7 +103,7 @@ class AppHaptics internal constructor(
     }
 }
 
-/** The app's vibrations for the screens deep down (the miniplayer, the navigation button), see [AppHaptics]. */
+/** The app's vibrations for the screens deep down (the miniplayer, the tab strip), see [AppHaptics]. */
 val LocalAppHaptics = staticCompositionLocalOf { AppHaptics.None }
 
 /** [AppHaptics] as the Feedback settings have them now. */
@@ -113,12 +113,12 @@ fun rememberAppHaptics(settings: AppSettings): AppHaptics {
     val enabled by settings.vibration.collectAsState()
     val strength by settings.vibrationStrength.collectAsState()
     val player by settings.vibratePlayer.collectAsState()
-    val navButton by settings.vibrateNavButton.collectAsState()
+    val navSwipe by settings.vibrateNavSwipe.collectAsState()
     val vibrator = remember(context) { AppHaptics.vibratorOf(context) }
-    return remember(vibrator, enabled, strength, player, navButton) {
+    return remember(vibrator, enabled, strength, player, navSwipe) {
         val places = buildSet {
             if (player) add(HapticPlace.PLAYER)
-            if (navButton) add(HapticPlace.NAV_BUTTON)
+            if (navSwipe) add(HapticPlace.NAV_SWIPE)
         }
         AppHaptics(vibrator, enabled, strength, places)
     }

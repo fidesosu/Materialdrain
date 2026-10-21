@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -30,6 +31,36 @@ class BackgroundSong(val player: Player) {
         private set
     var index by mutableIntStateOf(player.currentMediaItemIndex)
         private set
+
+    /** The player's repeat mode (Player.REPEAT_MODE_OFF, _ALL or _ONE) and whether it shuffles the queue. */
+    var repeatMode by mutableIntStateOf(player.repeatMode)
+        private set
+    var shuffle by mutableStateOf(player.shuffleModeEnabled)
+        private set
+
+    /** The indexes of [queue] in the order they play: as they are, or shuffled while [shuffle] is on. */
+    var playOrder by mutableStateOf(orderOf(player))
+        private set
+
+    /** Whether there's a song to skip to: after the last one too, with the queue repeating, and in the shuffled order. */
+    val hasNext: Boolean get() {
+        // Read so what shows it is drawn again when any of them changes; the player itself is no state
+        index; queue; repeatMode; shuffle
+        return player.hasNextMediaItem()
+    }
+
+    /** Off, then the whole queue, then the one song, then off again. */
+    fun cycleRepeat() {
+        player.repeatMode = when (player.repeatMode) {
+            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+            else -> Player.REPEAT_MODE_OFF
+        }
+    }
+
+    fun toggleShuffle() {
+        player.shuffleModeEnabled = !player.shuffleModeEnabled
+    }
 
     /** The song's title from its tags (see SongTags), else its file name. */
     val title: String? get() = SongTags.titleOf(songId, metadata.title)
@@ -59,11 +90,30 @@ class BackgroundSong(val player: Player) {
             songId = player.currentMediaItem?.mediaId
             queue = itemsOf(player)
             index = player.currentMediaItemIndex
+            playOrder = orderOf(player)
+        }
+        override fun onRepeatModeChanged(repeatMode: Int) { this@BackgroundSong.repeatMode = repeatMode }
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            shuffle = shuffleModeEnabled
+            playOrder = orderOf(player)
         }
     }
 
     private companion object {
         fun itemsOf(player: Player): List<MediaItem> = List(player.mediaItemCount) { player.getMediaItemAt(it) }
+
+        /** The order the player goes through its queue in, shuffled or not, from the first song to the last. */
+        fun orderOf(player: Player): List<Int> {
+            val timeline = player.currentTimeline
+            val shuffled = player.shuffleModeEnabled
+            val order = ArrayList<Int>(timeline.windowCount)
+            var at = if (timeline.isEmpty) C.INDEX_UNSET else timeline.getFirstWindowIndex(shuffled)
+            while (at != C.INDEX_UNSET && order.size < timeline.windowCount) {
+                order += at
+                at = timeline.getNextWindowIndex(at, Player.REPEAT_MODE_OFF, shuffled)
+            }
+            return order
+        }
     }
 }
 

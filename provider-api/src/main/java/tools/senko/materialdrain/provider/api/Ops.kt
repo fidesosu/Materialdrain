@@ -79,6 +79,16 @@ interface BrowseOps {
         onProgress: (read: Long, total: Long?) -> Unit
     ): ApiResponse<Long>
 
+    /**
+     * The folder at [path] and everything in it as one zip archive, made by the host, written to [outputStream]. Only
+     * hosts with [ProviderCapability.FOLDER_ARCHIVE_DOWNLOAD] implement it; the others report that it isn't supported.
+     */
+    suspend fun downloadFolderArchive(
+        path: String,
+        outputStream: OutputStream,
+        onProgress: (read: Long, total: Long?) -> Unit
+    ): ApiResponse<Long> = ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't download a folder as one archive."))
+
     suspend fun createDirectory(path: String, makeParents: Boolean): ApiResponse<Unit>
 
     suspend fun rename(path: String, targetPath: String, makeParents: Boolean): ApiResponse<StorageNode>

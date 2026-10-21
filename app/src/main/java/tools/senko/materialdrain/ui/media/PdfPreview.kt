@@ -45,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -64,8 +65,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -232,6 +231,7 @@ private fun PdfPage(document: PdfPages, index: Int, widthPx: Int, modifier: Modi
  */
 @Composable
 fun InlinePdfPreview(state: PdfPreviewState, outerPadding: PaddingValues, onLoad: () -> Unit, onFullScreen: (File) -> Unit) {
+    val reload = rememberReloadOnce()
     Card(
         modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).padding(outerPadding),
         shape = MediaCardShape
@@ -258,9 +258,11 @@ fun InlinePdfPreview(state: PdfPreviewState, outerPadding: PaddingValues, onLoad
                 is PdfPreviewState.Failed -> PdfMessage(state.message)
                 is PdfPreviewState.Ready -> when (val opened = rememberPdf(state.file)) {
                     OpenedPdf.Opening -> LinearProgressIndicator(modifier = bottomBar)
-                    OpenedPdf.Gone -> {
+                    OpenedPdf.Gone -> if (reload.used) {
+                        PdfMessage(PDF_GONE)
+                    } else {
                         LinearProgressIndicator(modifier = bottomBar)
-                        LaunchedEffect(Unit) { onLoad() }
+                        LaunchedEffect(Unit) { reload.use(onLoad) }
                     }
                     OpenedPdf.Unreadable -> PdfMessage(UNREADABLE_PDF)
                     is OpenedPdf.Open -> {
@@ -292,6 +294,28 @@ fun InlinePdfPreview(state: PdfPreviewState, outerPadding: PaddingValues, onLoad
     }
 }
 
+/** Said of a PDF whose copy left the cache again right after it was loaded again (see [ReloadOnce]). */
+private const val PDF_GONE = "The PDF couldn't be kept on the device. Go back and open it again."
+
+/**
+ * Loads a PDF again whose copy left the cache, but only once: if the copy is gone again at once (the cache full, the
+ * storage failing), it says so rather than loading it over and over.
+ */
+@Stable
+private class ReloadOnce {
+    var used by mutableStateOf(false)
+        private set
+
+    fun use(load: () -> Unit) {
+        if (used) return
+        used = true
+        load()
+    }
+}
+
+@Composable
+private fun rememberReloadOnce(): ReloadOnce = remember { ReloadOnce() }
+
 /** A label over the pages: white text on a dark see-through chip, readable on any page. */
 private fun Modifier.labelOverPage(): Modifier =
     background(MediaScrim.Button, AppShapes.Small).padding(horizontal = 8.dp, vertical = 4.dp)
@@ -311,49 +335,79 @@ private fun PdfMessage(text: String) {
 }
 
 /**
- * A PDF full screen, edge to edge like a fullscreen picture: its pages one under the other, scrolled with a finger,
- * zoomed with two (or a double tap), and moved sideways while zoomed. Zooming lays the pages out wider rather than
- * stretching them, so scrolling keeps up with the finger and the pages are drawn again, sharp, at their new size.
+ * A PDF full screen (a page of the fullscreen view of a file's details, see FullScreenFileDialog), edge to edge like a
+ * fullscreen picture: its pages one under the other, scrolled with a finger, zoomed with two (or a double tap), and moved
+ * sideways while zoomed. Zooming lays the pages out wider rather than stretching them, so scrolling keeps up with the
+ * finger and the pages are drawn again, sharp, at their new size.
+ *
+ * Until it's [PdfPreviewState.Ready] it says how far it has loaded into the app, or why it can't be shown. A big one is
+ * loaded at once ([onLoad]), unlike in the details: being opened (or swiped to) here is asking for it. So is one whose
+ * copy has left the cache.
  */
 @Composable
-fun FullScreenPdfDialog(file: File, title: String, onDismissRequest: () -> Unit) {
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
-    ) {
-        DarkDialogBars()
-        Box(modifier = Modifier.fillMaxSize().background(Color(0xFF202124))) {
-            when (val opened = rememberPdf(file)) {
-                OpenedPdf.Opening -> LinearProgressIndicator(modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth())
-                // Its copy left the cache: the preview in the details loads it again, to be opened from there
-                OpenedPdf.Gone -> LaunchedEffect(Unit) { onDismissRequest() }
-                OpenedPdf.Unreadable -> Text(
-                    UNREADABLE_PDF,
-                    color = Color.White,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp)
-                )
+fun PdfFullscreenContent(state: PdfPreviewState?, title: String, onBack: () -> Unit, onLoad: () -> Unit) {
+    val reload = rememberReloadOnce()
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF202124))) {
+        val top = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).fillMaxWidth()
+        when (state) {
+            null -> LinearProgressIndicator(modifier = top)
+            is PdfPreviewState.Large -> {
+                FullscreenPdfMessage("Loading the PDF · About ${formatSize(state.totalBytes)}")
+                LinearProgressIndicator(modifier = top)
+                LaunchedEffect(Unit) { onLoad() }
+            }
+            is PdfPreviewState.Loading -> {
+                val total = state.totalBytes?.takeIf { it > 0 }
+                FullscreenPdfMessage("Loading the PDF · ${formatSize(state.loadedBytes)}" + total?.let { " of ${formatSize(it)}" }.orEmpty())
+                if (total != null) {
+                    LinearProgressIndicator(progress = { (state.loadedBytes.toFloat() / total).coerceIn(0f, 1f) }, modifier = top)
+                } else {
+                    LinearProgressIndicator(modifier = top)
+                }
+            }
+            is PdfPreviewState.Failed -> FullscreenPdfMessage(state.message)
+            is PdfPreviewState.Ready -> when (val opened = rememberPdf(state.file)) {
+                OpenedPdf.Opening -> LinearProgressIndicator(modifier = top)
+                // Its copy left the cache: loaded again, once
+                OpenedPdf.Gone -> if (reload.used) {
+                    FullscreenPdfMessage(PDF_GONE)
+                } else {
+                    LinearProgressIndicator(modifier = top)
+                    LaunchedEffect(Unit) { reload.use(onLoad) }
+                }
+                OpenedPdf.Unreadable -> FullscreenPdfMessage(UNREADABLE_PDF)
                 is OpenedPdf.Open -> ZoomablePages(opened.document)
             }
-            MediaIconButton(
-                icon = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                onClick = onDismissRequest,
-                modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(PdfBarInset),
-                size = PdfBarHeight,
-                container = MediaScrim.Button
+        }
+        MediaIconButton(
+            icon = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = "Back",
+            onClick = onBack,
+            modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(PdfBarInset),
+            size = PdfBarHeight,
+            container = MediaScrim.Button
+        )
+        // Clear of the back button on one side and the page number on the other, centred between them
+        PdfBarSlot(Modifier.align(Alignment.TopCenter).padding(horizontal = 112.dp)) {
+            Text(
+                title,
+                color = Color.White,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.labelOverPage()
             )
-            // Clear of the back button on one side and the page number on the other, centred between them
-            PdfBarSlot(Modifier.align(Alignment.TopCenter).padding(horizontal = 112.dp)) {
-                Text(
-                    title,
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.labelOverPage()
-                )
-            }
+        }
+    }
+}
+
+/** A line about the PDF in the middle of the fullscreen view, white on its dark background. */
+@Composable
+private fun FullscreenPdfMessage(text: String, modifier: Modifier = Modifier) {
+    Box(contentAlignment = Alignment.Center, modifier = modifier) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+            Icon(Icons.Filled.PictureAsPdf, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(32.dp))
+            Text(text, color = Color.White, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
         }
     }
 }
@@ -498,8 +552,17 @@ private fun InlinePdfPreviewPreview() {
 /** Full screen, with the made-up pages: the back button, the title and the page number in one line at the top. */
 @ScreenPreviews
 @Composable
-private fun FullScreenPdfDialogPreview() {
+private fun PdfFullscreenContentPreview() {
     PreviewTheme {
-        FullScreenPdfDialog(File("sample.pdf"), title = PreviewSamples.pdf.name, onDismissRequest = {})
+        PdfFullscreenContent(PdfPreviewState.Ready(File("sample.pdf")), title = PreviewSamples.pdf.name, onBack = {}, onLoad = {})
+    }
+}
+
+/** Full screen while it loads into the app. */
+@ScreenPreviews
+@Composable
+private fun PdfFullscreenLoadingPreview() {
+    PreviewTheme {
+        PdfFullscreenContent(PdfPreviewState.Loading(6_291_456, 24_117_248), title = PreviewSamples.pdf.name, onBack = {}, onLoad = {})
     }
 }

@@ -74,6 +74,8 @@ import tools.senko.materialdrain.ui.LocalBottomInset
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.components.CodePreview
 import tools.senko.materialdrain.ui.components.CodePreviewLoading
+import tools.senko.materialdrain.ui.components.MarkdownPreview
+import tools.senko.materialdrain.ui.components.isMarkdown
 import tools.senko.materialdrain.ui.components.DotScrollbar
 import tools.senko.materialdrain.ui.components.ExpandableText
 import tools.senko.materialdrain.ui.components.FileIcon
@@ -82,8 +84,9 @@ import tools.senko.materialdrain.ui.components.OdometerText
 import tools.senko.materialdrain.ui.components.fileKindLabel
 import tools.senko.materialdrain.ui.media.AudioPlayerPreview
 import tools.senko.materialdrain.ui.media.BlurredBackdrop
-import tools.senko.materialdrain.ui.media.FullScreenMediaPreviewDialog
-import tools.senko.materialdrain.ui.media.FullScreenPdfDialog
+import tools.senko.materialdrain.ui.media.FullScreenContent
+import tools.senko.materialdrain.ui.media.FullScreenFile
+import tools.senko.materialdrain.ui.media.FullScreenFileDialog
 import tools.senko.materialdrain.ui.media.InlineImagePreview
 import tools.senko.materialdrain.ui.media.InlinePdfPreview
 import tools.senko.materialdrain.ui.media.InlineVideoPreview
@@ -112,12 +115,19 @@ private val DetailCardShape = AppShapes.Card
 class FileDetailsActions(
     val loadPreview: () -> Unit = {},
     val loadPdfPreview: () -> Unit = {},
+    /** Loads a text that's too big for the preview anyway (see FileInfoViewModel.loadWholeText) */
+    val loadWholeText: () -> Unit = {},
     val openArchiveFolder: (inside: String) -> Unit = {},
     val downloadArchiveEntry: (StorageNode) -> Unit = {},
     val download: () -> Unit = {},
     val cancelDownload: () -> Unit = {},
     val delete: () -> Unit = {},
-    /** Goes to the file beside this one from the fullscreen preview (false when there's none); null for no swiping there */
+    /** Shares the file itself with another app, for a host whose files have no link (see DownloadManager.shareFile) */
+    val shareFile: (() -> Unit)? = null,
+    /**
+     * Goes to the file beside this one of the same kind (see FileGroup) from the fullscreen view, false when there's
+     * none; null for no swiping there
+     */
     val openNeighbour: ((toNext: Boolean) -> Boolean)? = null
 )
 
@@ -148,12 +158,14 @@ fun FileInfoDetailsCard(
             FileDetailsActions(
                 loadPreview = fileInfoViewModel::loadPreview,
                 loadPdfPreview = fileInfoViewModel::loadPdfPreview,
+                loadWholeText = fileInfoViewModel::loadWholeText,
                 openArchiveFolder = fileInfoViewModel::openArchiveFolder,
                 downloadArchiveEntry = fileInfoViewModel::downloadArchiveEntry,
                 download = { fileInfoViewModel.initiateDownloadFile(fileInfo) },
                 cancelDownload = { fileInfoViewModel.cancelDownload(fileInfo) },
                 delete = { fileInfoViewModel.initiateDeleteFile(fileInfo) },
-                openNeighbour = if (swipeBetweenFiles) fileInfoViewModel::openNeighbour else null
+                shareFile = { fileInfoViewModel.shareFile(fileInfo) },
+                openNeighbour = if (swipeBetweenFiles) { toNext -> fileInfoViewModel.openNeighbour(toNext, withinGroup = true) } else null
             )
         },
         context = context,
@@ -188,7 +200,8 @@ fun FileInfoDetailsCard(
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager = localContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
-    // Whether the picture or video is open fullscreen. It shows the file the page shows, which a swipe there changes
+    // Whether the file is open fullscreen (a picture, a video, a text or a PDF). It shows the file the page shows, which a
+    // swipe there changes
     var fullScreenOpen by remember { mutableStateOf(false) }
     // From the frame after the page opens; a preview (in Android Studio) shows one frame, so at once there
     var showPreviews by remember { mutableStateOf(inPreview) }
@@ -211,20 +224,37 @@ fun FileInfoDetailsCard(
         coroutineScope.launch { snackbarHostState.showSnackbar("$what copied") }
     }
 
-    // A PDF open full screen: its file in the app's cache (see FileInfoViewModel.fetchPdfPreview)
-    var fullScreenPdf by remember { mutableStateOf<java.io.File?>(null) }
-    fullScreenPdf?.let { file -> FullScreenPdfDialog(file, title = fileInfo.name, onDismissRequest = { fullScreenPdf = null }) }
-
     if (fullScreenOpen) {
-        FullScreenMediaPreviewDialog(
-            previewUri = rawFileApiUrl.toUri(),
-            previewMimeType = previewType,
-            thumbnailUrl = actualThumbnailUrl,
+        // Only the private filesystem needs the login for previews
+        val songApiKey = uiState.apiKey.takeIf { isFilesystemFile && it.isNotBlank() }
+        val textFile = isTextFile(fileInfo.name, previewType)
+        val wholeText = uiState.textPreviewFullContent ?: uiState.textPreviewContent
+        val textLanguage = remember(fileInfo.name, wholeText != null) {
+            languageFor(fileInfo.name, wholeText?.lineSequence()?.firstOrNull())
+        }
+        val content = when {
+            previewType?.startsWith("image/") == true || previewType?.startsWith("video/") == true -> FullScreenContent.Media
+            previewType?.startsWith("audio/") == true -> FullScreenContent.Song(songQueue, songApiKey)
+            uiState.previewHeld && (textFile || isPdf(fileInfo.name, previewType)) ->
+                FullScreenContent.Held(if (textFile) "the text" else "the PDF")
+            isPdf(fileInfo.name, previewType) -> FullScreenContent.Pdf(uiState.pdfPreview)
+            textFile -> FullScreenContent.Text(
+                text = wholeText.takeIf { !uiState.isLoadingTextPreview },
+                language = textLanguage,
+                error = uiState.textPreviewErrorMessage,
+                canLoadAnyway = uiState.textPreviewCanLoadAnyway
+            )
+            else -> FullScreenContent.None
+        }
+        FullScreenFileDialog(
+            file = FullScreenFile(fileInfo.key, rawFileApiUrl.toUri(), previewType, actualThumbnailUrl, fileInfo.name, content),
             apiKey = uiState.apiKey,
             onDismissRequest = { fullScreenOpen = false },
-            title = fileInfo.name,
-            fileKey = fileInfo.key,
-            onSwipe = actions.openNeighbour
+            onSwipe = actions.openNeighbour,
+            onLoad = {
+                if (uiState.previewHeld) actions.loadPreview() else actions.loadPdfPreview()
+            },
+            onLoadAnyway = actions.loadWholeText
         )
     }
 
@@ -320,7 +350,7 @@ fun FileInfoDetailsCard(
                         pdfPreview,
                         outerPadding = mediaPadding,
                         onLoad = actions.loadPdfPreview,
-                        onFullScreen = { fullScreenPdf = it }
+                        onFullScreen = { fullScreenOpen = true }
                     )
                 } else if (uiState.isLoadingTextPreview) {
                     // The text's own card, so nothing below it moves once the text is in
@@ -328,14 +358,39 @@ fun FileInfoDetailsCard(
                 } else if (uiState.textPreviewContent != null) {
                     val content = uiState.textPreviewContent ?: ""
                     val language = remember(fileInfo.name, content) { languageFor(fileInfo.name, content.lineSequence().firstOrNull()) }
-                    CodePreview(content = content, language = language, fullContent = uiState.textPreviewFullContent, title = fileInfo.name, outerPadding = mediaPadding)
+                    // Markdown as it's meant to look, any other text as its source
+                    if (isMarkdown(language)) {
+                        MarkdownPreview(
+                            content = content,
+                            language = language,
+                            fullContent = uiState.textPreviewFullContent,
+                            title = fileInfo.name,
+                            outerPadding = mediaPadding,
+                            onFullScreen = { fullScreenOpen = true }
+                        )
+                    } else {
+                        CodePreview(
+                            content = content,
+                            language = language,
+                            fullContent = uiState.textPreviewFullContent,
+                            title = fileInfo.name,
+                            outerPadding = mediaPadding,
+                            onFullScreen = { fullScreenOpen = true }
+                        )
+                    }
                 } else if (uiState.textPreviewErrorMessage != null) {
-                    Text(
-                        uiState.textPreviewErrorMessage ?: "Error loading text preview.",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text(
+                            uiState.textPreviewErrorMessage ?: "Error loading text preview.",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f)
+                        )
+                        // Too big for the preview, but not for the fullscreen view
+                        if (uiState.textPreviewCanLoadAnyway) {
+                            TextButton(onClick = actions.loadWholeText) { Text("Load anyway") }
+                        }
+                    }
                 } else if (actualThumbnailUrl != null) {
                     val request = imageRequest(localContext, actualThumbnailUrl) { crossfade(true) }
 
@@ -386,13 +441,17 @@ fun FileInfoDetailsCard(
                     }
                     context.startActivity(Intent.createChooser(send, null))
                 },
-                onDelete = actions.delete
+                onDelete = actions.delete,
+                onShareFile = actions.shareFile
             )
             }
 
             if (rich != null && (rich.views != null || rich.downloads != null || rich.bandwidthUsed != null)) {
                 Spacer(Modifier.height(16.dp))
-                StatsRow(rich)
+                // Its own for each file, and again once the host's own counts replace the list's after a swipe (see
+                // fileInfoCompleting): the numbers only roll when this file's change while it's shown, not from the last
+                // file's to this one's, nor from the list's older ones
+                key(fileInfo.key, uiState.fileInfoCompleting) { StatsRow(rich) }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -635,7 +694,8 @@ private fun ActionRow(
     onCancel: () -> Unit,
     onOpen: (Uri) -> Unit,
     onShare: (String) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onShareFile: (() -> Unit)? = null
 ) {
     var armed by remember { mutableStateOf(false) }
     LaunchedEffect(armed) {
@@ -665,6 +725,9 @@ private fun ActionRow(
         )
         if (shareUrl != null) {
             IconAction(Icons.Filled.Share, "Share the link", onClick = { onShare(shareUrl) })
+        } else if (onShareFile != null) {
+            // No link to share: the file itself
+            IconAction(Icons.Filled.Share, "Share the file", onClick = onShareFile)
         }
         if (canDelete) IconAction(Icons.Filled.Delete, "Delete", onClick = onDelete, destructive = true)
     }

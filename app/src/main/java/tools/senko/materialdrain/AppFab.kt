@@ -37,7 +37,7 @@ import tools.senko.materialdrain.ui.icons.symbols.Upload
 private const val SETTINGS_SAVE_TEXT = "Save Settings"
 private const val SETTINGS_SAVED_TEXT = "Settings saved"
 
-/** How far below its corner the button starts, enough to be off the screen; it slides up from there (as NavFabMenu's). */
+/** How far below its corner the button starts, enough to be off the screen; it slides up from there. */
 private val FabEntryOffset = 160.dp
 
 data class FabDetails(

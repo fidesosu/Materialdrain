@@ -25,7 +25,6 @@ import tools.senko.materialdrain.ui.icons.filled.Palette
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
-import tools.senko.materialdrain.navmenu.NavMenuPreview
 import tools.senko.materialdrain.ui.theme.ThemeMode
 import tools.senko.materialdrain.ui.theme.WallpaperColorsAvailable
 import tools.senko.materialdrain.settings.SEARCH_INDEX_FILE_NAME
@@ -180,13 +179,13 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
             SettingsItem.Header("Navigation"),
             SettingsItem.Choice(
                 title = "Navigation",
-                info = "The bottom bar has a tab for each screen. The floating button opens a small window of them when it's " +
-                    "tapped or swiped up, goes back to the tab before when it's held, and can be swiped to the left, the " +
-                    "middle or the right; it's still being tried out. Where the screen is wide " +
-                    "(a tablet, a phone on its side) the bar's tabs go along the side.",
-                options = listOf("Bottom bar" to false, "Floating button" to true),
-                selected = { appSettings.navPrototype.collectAsState().value },
-                onSelect = { appSettings.setNavPrototype(it) }
+                info = "The bottom bar has a tab for each screen; where the screen is wide (a tablet, a phone on its side) " +
+                    "its tabs go along the side. With swipes, a swipe sideways across the page goes to the tab beside it, " +
+                    "and only a thin strip at the bottom shows the tabs' icons, the one you're on lit: a swipe along it " +
+                    "goes through them, and a tap on one goes to it.",
+                options = listOf("Bottom bar" to false, "Swipes" to true),
+                selected = { appSettings.gestureNavigation.collectAsState().value },
+                onSelect = { appSettings.setGestureNavigation(it) }
             ),
             SettingsItem.Toggle(
                 title = "Every tab's name",
@@ -222,7 +221,8 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                 summary = "Swipe sideways to go to the next tab",
                 info = "A swipe to the left goes to the tab to the right, as the tabs lie in the bottom bar, and a swipe " +
                     "to the right to the one to the left. A swipe that starts at the very edge of the screen is the " +
-                    "system's back gesture, and what scrolls sideways (the folder path, a wide text) scrolls first.",
+                    "system's back gesture, and what scrolls sideways (the folder path, a wide text) scrolls first. " +
+                    "With swipe navigation (above) it's always on.",
                 isChecked = { appSettings.swipeBetweenTabs.collectAsState().value },
                 onCheckedChange = { appSettings.setSwipeBetweenTabs(it) }
             ),
@@ -230,12 +230,15 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
             SettingsItem.Toggle(
                 title = "Grid",
                 summary = "Big pictures instead of rows",
+                info = "What every folder and screen looks like by default. One of them can have its own look, from View " +
+                    "in the ⋮ menu at the top, which this then doesn't change.",
                 isChecked = { appSettings.gridView.collectAsState().value },
                 onCheckedChange = { appSettings.setGridView(it) }
             ),
             SettingsItem.Toggle(
                 title = "Compact rows",
                 summary = "Lower rows, so more of them fit",
+                info = "By default, as Grid above: View in the ⋮ menu at the top sets it for one folder or screen.",
                 isChecked = { appSettings.compactRows.collectAsState().value },
                 onCheckedChange = { appSettings.setCompactRows(it) }
             ),
@@ -395,10 +398,12 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                         onCheckedChange = { appSettings.setVibratePlayer(it) }
                     ),
                     SettingsItem.Toggle(
-                        title = "Navigation button",
-                        summary = "A long press going back a tab",
-                        isChecked = { appSettings.vibrateNavButton.collectAsState().value },
-                        onCheckedChange = { appSettings.setVibrateNavButton(it) }
+                        title = "Navigation swipes",
+                        summary = "A swipe going to another tab",
+                        info = "With swipe navigation (Look and feel, Navigation), a light vibration for each tab a swipe " +
+                            "goes to, across the page or along the strip at the bottom.",
+                        isChecked = { appSettings.vibrateNavSwipe.collectAsState().value },
+                        onCheckedChange = { appSettings.setVibrateNavSwipe(it) }
                     )
                 )
             )
@@ -564,25 +569,6 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                     "show it blank.",
                 isChecked = { appSettings.blockScreenshots.collectAsState().value },
                 onCheckedChange = { appSettings.setBlockScreenshots(it) }
-            )
-        )
-    ),
-
-    SettingsCategory(
-        id = "developer",
-        title = "Developer",
-        summary = "Prototypes and previews",
-        icon = Icons.Filled.Code,
-        tone = CategoryTone.NEUTRAL,
-        items = listOf(
-            SettingsItem.Choice(
-                title = "Navigation button's menu",
-                summary = "When the floating button is on",
-                info = "The floating button (Look and feel, Navigation) shows this host's tabs, or the menu of a made-up " +
-                    "host with dozens of screens, to see how a big one looks. The made-up items don't open anything.",
-                options = NavMenuPreview.entries.map { it.label to it },
-                selected = { appSettings.navMenuPreview.collectAsState().value },
-                onSelect = { appSettings.setNavMenuPreview(it) }
             )
         )
     ),

@@ -8,7 +8,7 @@ import tools.senko.materialdrain.provider.api.ProviderConfig
 import tools.senko.materialdrain.provider.api.resolveScreens
 
 /**
- * The tabs of the active host, in the order the bottom bar and the navigation button show them. [config] is the host's
+ * The tabs of the active host, in the order the bottom bar and the tab strip show them. [config] is the host's
  * config, null for the built-in Pixeldrain.
  */
 internal class HostTabs(val tabs: List<Tab>, val config: ProviderConfig?) {
@@ -50,11 +50,13 @@ internal fun rememberHostTabs(appContainer: AppContainer, activeHostId: String, 
     // config-driven (the built-in Pixeldrain) means one tab of each kind the host can back, with nothing taken away
     return remember(activeCapabilities, configScreens, activeConfig) {
         val tabs = configScreens?.map { Tab(it.screen.toScreen(), it) } ?: buildList {
-            add(Tab(Screen.Upload))
             if (ProviderCapability.ENUMERATE in activeCapabilities) add(Tab(Screen.Files))
             if (ProviderCapability.LISTS in activeCapabilities) add(Tab(Screen.Lists))
             if (ProviderCapability.BROWSE in activeCapabilities) add(Tab(Screen.Filesystem))
         }
-        HostTabs(tabs, activeConfig)
+        // The Upload tab only on a host with nowhere else to upload to: the Files and Filesystem screens upload from their
+        // ⋮ menu, and take shared files (see SharedUploadBar)
+        val uploadsElsewhere = tabs.any { it.screen == Screen.Files || it.screen == Screen.Filesystem }
+        HostTabs(tabs.filter { it.screen != Screen.Upload || !uploadsElsewhere }, activeConfig)
     }
 }

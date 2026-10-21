@@ -53,6 +53,9 @@ import tools.senko.materialdrain.util.formatSize
 
 internal const val MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES = 1 * 1024 * 1024 // 1MB
 private const val MAX_TEXT_PREVIEW_DISPLAY_LENGTH = 8 * 1024 // 8KB
+
+/** The most of a text that's loaded when it's asked for anyway, past [MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES] (see loadWholeText). */
+internal const val MAX_TEXT_LOAD_ANYWAY_BYTES = 16 * 1024 * 1024
 private const val API_KEY_MISSING = "API Key is missing. Please set it in Settings."
 
 
@@ -117,6 +120,20 @@ fun isArchiveName(name: String): Boolean = name.substringAfterLast('.', "").lowe
 fun isPdf(name: String, mimeType: String?): Boolean =
     mimeType == "application/pdf" || name.substringAfterLast('.', "").equals("pdf", ignoreCase = true)
 
+/**
+ * The kinds of file the fullscreen view has, which a swipe there stays within (see FileInfoViewModel.openNeighbour), so
+ * it goes from one to the next of what's viewed alike: pictures, videos and songs; texts and PDFs. Anything else has no
+ * fullscreen view.
+ */
+enum class FileGroup { MEDIA, DOCUMENT, OTHER }
+
+/** The [FileGroup] of a file, by its name and type (see previewMimeType). */
+fun fileGroup(name: String, mimeType: String?): FileGroup = when {
+    mimeType != null && listOf("image/", "video/", "audio/").any { mimeType.startsWith(it) } -> FileGroup.MEDIA
+    isPdf(name, mimeType) || isTextFile(name, mimeType) -> FileGroup.DOCUMENT
+    else -> FileGroup.OTHER
+}
+
 /** The most of a PDF that's loaded for its preview: Android draws the pages from a whole file on the device. */
 internal const val MAX_PDF_PREVIEW_BYTES = 64L * 1024 * 1024
 
@@ -137,6 +154,9 @@ sealed interface PdfPreviewState {
 data class FileInfoUiState(
     // For single file info
     val isLoadingFileInfo: Boolean = false,
+    // Shown from a list's entry after a swipe, while the host's full details of it are on their way (see completeFileInfo):
+    // its counts (views, downloads) are the list's until then, which may be older
+    val fileInfoCompleting: Boolean = false,
     val fileInfo: StorageNode? = null,
     val fileInfoErrorMessage: String? = null,
 
@@ -146,6 +166,8 @@ data class FileInfoUiState(
     // The whole text the preview was made from (up to the fetch limit), for the fullscreen view
     val textPreviewFullContent: String? = null,
     val textPreviewErrorMessage: String? = null,
+    // The text is too big for the preview but can be loaded anyway, up to a bigger limit (see loadWholeText)
+    val textPreviewCanLoadAnyway: Boolean = false,
 
     // For user's list of files
     val userFilesList: List<StorageNode> = emptyList(),
@@ -328,7 +350,7 @@ class FileInfoViewModel(
             it.copy(
                 isLoadingTextPreview = false,
                 textPreviewContent = null, textPreviewFullContent = null,
-                textPreviewErrorMessage = null,
+                textPreviewErrorMessage = null, textPreviewCanLoadAnyway = false,
                 pdfPreview = null
             )
         }
@@ -434,27 +456,38 @@ class FileInfoViewModel(
         onProgress: (Long, Long?) -> Unit
     ): ApiResponse<Long> = downloadNode(provider(), node, outputStream, onProgress)
 
-    private fun fetchTextFilePreviewContent(fileInfo: StorageNode) {
+    /**
+     * Loads the text of [fileInfo] for its preview, up to [limit] bytes: a bigger one says so, and (under the limit of
+     * [loadWholeText]) that it can be loaded anyway.
+     */
+    private fun fetchTextFilePreviewContent(fileInfo: StorageNode, limit: Int = MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES) {
         previewJob?.cancel()
         // Not text: nothing to say about it (the details show the file's kind already), but the text of the previous file
         // mustn't stay on screen
         if (!isTextFile(fileInfo.name, fileInfo.previewMimeType())) {
-            _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = null) }
+            _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = null, textPreviewCanLoadAnyway = false) }
             return
         }
 
-        val maxSize = formatSize(MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES.toLong())
+        val maxSize = formatSize(limit.toLong())
         val size = fileInfo.size ?: 0L
-        if (size > MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES) {
-            _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = "File is too large (${formatSize(size)}) for text preview. Max $maxSize.") }
+        val canLoadAnyway = limit < MAX_TEXT_LOAD_ANYWAY_BYTES && size <= MAX_TEXT_LOAD_ANYWAY_BYTES
+        if (size > limit) {
+            _uiState.update {
+                it.copy(
+                    isLoadingTextPreview = false, textPreviewContent = null, textPreviewFullContent = null,
+                    textPreviewErrorMessage = "File is too large (${formatSize(size)}) for text preview. Max $maxSize.",
+                    textPreviewCanLoadAnyway = canLoadAnyway
+                )
+            }
             return
         }
 
-        _uiState.update { it.copy(isLoadingTextPreview = true, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = null) }
+        _uiState.update { it.copy(isLoadingTextPreview = true, textPreviewContent = null, textPreviewFullContent = null, textPreviewErrorMessage = null, textPreviewCanLoadAnyway = false) }
         previewJob = viewModelScope.launch {
             // Capped as well: a host which doesn't tell the size (or tells it wrong) mustn't fill the memory with a huge file
             val bytes = ByteArrayOutputStream()
-            val buffer = LimitedOutputStream(bytes, MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES.toLong())
+            val buffer = LimitedOutputStream(bytes, limit.toLong())
             val response = try {
                 downloadNodeTo(fileInfo, buffer) { _, _ -> }
             } catch (e: CancellationException) {
@@ -464,7 +497,13 @@ class FileInfoViewModel(
                 ApiResponse.Error(ProviderError("preview_failed", e.message.orEmpty()))
             }
             if (buffer.overflowed) {
-                _uiState.update { it.copy(isLoadingTextPreview = false, textPreviewErrorMessage = "File is too large for text preview. Max $maxSize.") }
+                _uiState.update {
+                    it.copy(
+                        isLoadingTextPreview = false,
+                        textPreviewErrorMessage = "File is too large for text preview. Max $maxSize.",
+                        textPreviewCanLoadAnyway = limit < MAX_TEXT_LOAD_ANYWAY_BYTES
+                    )
+                }
                 return@launch
             }
             when (response) {
@@ -503,13 +542,26 @@ class FileInfoViewModel(
         neighboursByNode = byNode
     }
 
-    /** The file after (or, not [next], before) the one shown, in the list it was opened from; null when there's none. */
-    private fun neighbour(next: Boolean): StorageNode? {
+    /**
+     * The file after (or, not [next], before) the one shown, in the list it was opened from; [withinGroup], the nearest
+     * one that's of the shown one's [FileGroup] (no folder), the others passed over. Null when there's none.
+     */
+    private fun neighbour(next: Boolean, withinGroup: Boolean = false): StorageNode? {
         val shown = _uiState.value.fileInfo ?: return null
         val index = neighbours.indexOfFirst { it.key == shown.key }
         if (index == -1) return null
-        return neighbours.getOrNull(if (next) index + 1 else index - 1)
+        val group = if (withinGroup) shown.group() else null
+        val step = if (next) 1 else -1
+        var at = index + step
+        while (at in neighbours.indices) {
+            val candidate = neighbours[at]
+            if (group == null || (!candidate.isDirectory && candidate.group() == group)) return candidate
+            at += step
+        }
+        return null
     }
+
+    private fun StorageNode.group(): FileGroup = fileGroup(name, previewMimeType())
 
     /** [node] as a song of the background player's queue, or null when it isn't a song (or has no address). */
     fun queueSongOf(node: StorageNode): QueueSong? {
@@ -534,9 +586,12 @@ class FileInfoViewModel(
     /** Whether there's a file to swipe to, see [openNeighbour]. */
     fun hasNeighbour(next: Boolean): Boolean = neighbour(next) != null
 
-    /** Opens the file after (or, not [next], before) the one shown, in the list it was opened from. False when there's none. */
-    fun openNeighbour(next: Boolean): Boolean {
-        val target = neighbour(next) ?: return false
+    /**
+     * Opens the file after (or, not [next], before) the one shown, in the list it was opened from; [withinGroup] (the
+     * fullscreen view), the nearest one of its kind (see [FileGroup]). False when there's none.
+     */
+    fun openNeighbour(next: Boolean, withinGroup: Boolean = false): Boolean {
+        val target = neighbour(next, withinGroup) ?: return false
         // At once from the list's own entry, so the page comes in without waiting for the host; a host's file has its
         // full details (Pixeldrain's views and downloads) filled in once they come
         setFileInfoFromNode(target)
@@ -551,10 +606,15 @@ class FileInfoViewModel(
     private fun completeFileInfo(node: StorageNode) {
         val id = node.ref.id ?: return
         val store = provider().fileStore ?: return
+        _uiState.update { it.copy(fileInfoCompleting = true) }
         fileInfoJob = viewModelScope.launch {
-            val full = (store.fileInfo(StorageRef(id = id)) as? ApiResponse.Success)?.data ?: return@launch
+            val full = (store.fileInfo(StorageRef(id = id)) as? ApiResponse.Success)?.data
             if (_uiState.value.fileInfo?.key != node.key) return@launch
-            _uiState.update { it.copy(fileInfo = full) }
+            if (full == null) {
+                _uiState.update { it.copy(fileInfoCompleting = false) }
+                return@launch
+            }
+            _uiState.update { it.copy(fileInfo = full, fileInfoCompleting = false) }
             if (full.previewMimeType() != node.previewMimeType()) showPreview(full, withArchive = showsArchive(full))
         }
     }
@@ -619,14 +679,15 @@ class FileInfoViewModel(
 
     /**
      * Whether the details show what's inside [node]: an archive the host can reach to look inside (Pixeldrain only can for
-     * the filesystem's, not the files of the account), unless the tab it's opened from leaves that out.
+     * the filesystem's, not the files of the account), or a zip the app can read in parts itself (see archivesOf), unless
+     * the tab it's opened from leaves that out.
      */
     fun showsArchive(node: StorageNode): Boolean =
-        isArchiveName(node.name) && ProviderCapability.ARCHIVE_BROWSE !in tabLimits && provider().archives?.canOpen(node.ref) == true
+        isArchiveName(node.name) && ProviderCapability.ARCHIVE_BROWSE !in tabLimits && archivesOf(provider())?.canOpen(node.ref) == true
 
     /** Lists the folder [inside] of the [archive] for the details, see FileDetailsScreen. */
     private fun loadArchive(archive: StorageRef, inside: String) {
-        val archives = provider().archives ?: return
+        val archives = archivesOf(provider()) ?: return
         archiveJob?.cancel()
         _uiState.update { it.copy(archive = ArchiveView(archive, inside, entries = null, error = null)) }
         archiveJob = viewModelScope.launch {
@@ -675,7 +736,8 @@ class FileInfoViewModel(
             it.copy(
                 isLoadingFileInfo = false,
                 fileInfo = node,
-                fileInfoErrorMessage = null
+                fileInfoErrorMessage = null,
+                fileInfoCompleting = false
             )
         }
         node.ref.id?.let { appSettings.openedFile = SavedOpenedFile(configStore.activeProviderId.value, it, node.ref.path) }
@@ -702,6 +764,11 @@ class FileInfoViewModel(
         fetchTextFilePreviewContent(node)
         fetchPdfPreview(node)
         if (withArchive) loadArchive(node.ref, "")
+    }
+
+    /** Loads a text that's too big for the preview anyway, up to [MAX_TEXT_LOAD_ANYWAY_BYTES]: asked for in its details. */
+    fun loadWholeText() {
+        uiState.value.fileInfo?.let { fetchTextFilePreviewContent(it, limit = MAX_TEXT_LOAD_ANYWAY_BYTES) }
     }
 
     /** Loads the preview the data saver held back, see [showPreview]. */
@@ -864,10 +931,42 @@ class FileInfoViewModel(
     // --- Actions on several files at once ---
 
     /** Downloads the files one after another, several simultaneous downloads can run into the download limits. */
-    fun downloadFilesSequentially(files: List<StorageNode>) = downloadManager.downloadSequentially(files)
+    fun downloadFilesSequentially(files: List<StorageNode>, title: String? = null) = downloadManager.downloadSequentially(files, title = title)
 
-    /** Downloads the files as zip archive(s) where the host can, see DownloadManager.downloadAsZip. */
+    /** Downloads the files as zip archive(s), made by the host where it can, see DownloadManager.downloadAsZip. */
     fun downloadFilesAsZip(files: List<StorageNode>, archiveName: String) = downloadManager.downloadAsZip(files, archiveName)
+
+    /** Downloads files and folders of a folder browser, each file on its own or all in one zip, see DownloadManager.downloadItems. */
+    fun downloadItems(items: List<StorageNode>, style: DownloadStyle, archiveName: String) =
+        downloadManager.downloadItems(items, style, archiveName)
+
+    /** A download of folders waiting to be confirmed for being big, see DownloadManager.confirmation. */
+    val downloadConfirmation: StateFlow<DownloadConfirmation?> get() = downloadManager.confirmation
+
+    fun confirmDownload() = downloadManager.confirmDownload()
+
+    fun dismissDownloadConfirmation() = downloadManager.dismissConfirmation()
+
+    /** Shares the file itself with another app, for a host whose files have no link, see DownloadManager.shareFile. */
+    fun shareFile(node: StorageNode) = downloadManager.shareFile(node)
+
+    /** Downloads the files of [list] (from the lists overview, where it isn't open), each on its own or all in one zip. */
+    fun downloadList(list: FileList, style: DownloadStyle) {
+        val lists = provider().lists ?: return
+        viewModelScope.launch {
+            when (val response = lists.listContents(list.id)) {
+                is ApiResponse.Success -> {
+                    val files = response.data.files
+                    when {
+                        files.isEmpty() -> messages.show("\"${list.title}\" has no files.")
+                        style == DownloadStyle.ZIP -> downloadManager.downloadAsZip(files, list.title)
+                        else -> downloadManager.downloadSequentially(files, title = list.title)
+                    }
+                }
+                is ApiResponse.Error -> messages.show("Couldn't open \"${list.title}\": ${response.error.message}", long = true)
+            }
+        }
+    }
 
 
     /** Checks the preconditions of an action on several files and marks it as running. */

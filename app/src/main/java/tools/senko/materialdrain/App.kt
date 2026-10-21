@@ -58,13 +58,13 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.util.UnstableApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import kotlin.time.Duration.Companion.milliseconds
 import tools.senko.materialdrain.files.DownloadStatus
-import tools.senko.materialdrain.navmenu.NavFabPosition
 import tools.senko.materialdrain.files.SelectionBarHeight
 import tools.senko.materialdrain.files.openDownloadedFile
 import tools.senko.materialdrain.hosts.HostSwitcher
@@ -73,19 +73,19 @@ import tools.senko.materialdrain.files.FileInfoDetailsCard
 import tools.senko.materialdrain.files.FileInfoViewModel
 import tools.senko.materialdrain.browser.BrowserMode
 import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
+import tools.senko.materialdrain.provider.api.ProviderCapability
 import tools.senko.materialdrain.browser.BrowserScreen
 import tools.senko.materialdrain.browser.SharedUpload
 import tools.senko.materialdrain.ui.media.AudioPlayerView
 import tools.senko.materialdrain.ui.media.BackgroundMiniPlayer
 import tools.senko.materialdrain.ui.media.LocalOpenAudioPlayer
+import tools.senko.materialdrain.ui.media.LocalSongCardShown
 import tools.senko.materialdrain.ui.media.rememberAudioPlayerSheetState
 import tools.senko.materialdrain.ui.media.rememberBackgroundSong
 import tools.senko.materialdrain.ui.media.rememberPlaybackController
 import tools.senko.materialdrain.filesystem.FilesystemViewModel
 import tools.senko.materialdrain.lists.ListViewModel
-import tools.senko.materialdrain.navmenu.NavFabMenu
 import tools.senko.materialdrain.ui.components.sidewaysSwipe
-import tools.senko.materialdrain.navmenu.menu
 import tools.senko.materialdrain.settings.ui.ACCOUNT_CATEGORY_ID
 import tools.senko.materialdrain.settings.ui.AccountViewModel
 import tools.senko.materialdrain.settings.ui.HOSTS_CATEGORY_ID
@@ -99,6 +99,7 @@ import tools.senko.materialdrain.files.key
 import tools.senko.materialdrain.ui.LocalBlurredBackdrop
 import tools.senko.materialdrain.ui.LocalBottomInset
 import tools.senko.materialdrain.browser.ScreenAction
+import tools.senko.materialdrain.browser.ViewChoice
 import tools.senko.materialdrain.browser.ScreenMenuEntries
 import tools.senko.materialdrain.browser.SortChoice
 import tools.senko.materialdrain.ui.components.OverflowMenuButton
@@ -112,6 +113,8 @@ import tools.senko.materialdrain.ui.LocalVideoLoop
 import tools.senko.materialdrain.ui.VideoLoopSetting
 import tools.senko.materialdrain.ui.LocalPlayerSettings
 import tools.senko.materialdrain.ui.LocalAppHaptics
+import tools.senko.materialdrain.ui.HapticKind
+import tools.senko.materialdrain.ui.HapticPlace
 import tools.senko.materialdrain.ui.rememberAppHaptics
 import tools.senko.materialdrain.ui.PlayerSettings
 import tools.senko.materialdrain.ui.LocalListLook
@@ -200,9 +203,8 @@ fun MaterialdrainScreen() {
     val blurredBackdrop by appContainer.appSettings.blurredBackdrop.collectAsState()
     val textWrap by appContainer.appSettings.textWrap.collectAsState()
     val loopVideos by appContainer.appSettings.loopVideos.collectAsState()
-    val navPrototype by appContainer.appSettings.navPrototype.collectAsState()
-    val navMenuPreview by appContainer.appSettings.navMenuPreview.collectAsState()
-    val navFabPosition by appContainer.appSettings.navFabPosition.collectAsState()
+    // Swipes between the tabs with only the tab strip at the bottom, instead of the bottom bar (see TabStrip)
+    val gestureNav by appContainer.appSettings.gestureNavigation.collectAsState()
     val swipeTabs by appContainer.appSettings.swipeBetweenTabs.collectAsState()
     // How the players behave and how the lists look, for the screens deep down (see LocalPlayerSettings, LocalListLook)
     val playerSettings = rememberPlayerSettings(appContainer.appSettings)
@@ -283,13 +285,20 @@ fun MaterialdrainScreen() {
     val filesystemListStates = rememberSaveable(saver = TabScrollStates.Saver) { TabScrollStates() }
     // The page the main content shows now (see Shown)
     val shownNow = Shown(currentScreen, currentTab, activeHostId)
-    // The New actions of each page shown (see BrowserScreen), by Shown.key, for the ⋮ menu in the top bar
+    // The actions of each page shown (see BrowserScreen), by Shown.key, for the ⋮ menu in the top bar; and the look of
+    // its list, for the menu's View page
     val screenActions = remember { mutableStateMapOf<String, List<ScreenAction>>() }
+    val screenViews = remember { mutableStateMapOf<String, ViewChoice>() }
+    // Whether each page shown has a bar at its bottom (see BrowserScreen's onBottomBarChange)
+    val pageBottomBars = remember { mutableStateMapOf<String, Boolean>() }
     // While items are selected the bar is at the bottom, so the FAB and the snackbars move up over it
     var selectingItems by remember { mutableStateOf(false) }
     // The song player over the whole app (see AudioPlayerView), and the height of the miniplayer which opens it too
     val audioPlayerSheet = rememberAudioPlayerSheetState()
     val openAudioPlayer = remember(audioPlayerSheet) { { audioPlayerSheet.open() } }
+    // Whether the song card of a file's details is on the screen, which the miniplayer of the same song stays away for
+    var songCardShown by remember { mutableStateOf(false) }
+    val onSongCardShown = remember { { shown: Boolean -> songCardShown = shown } }
     // The background player and its song, for the miniplayer and the player over the app; only with background songs
     val playbackController = if (playerSettings.backgroundAudio) rememberPlaybackController() else null
     val backgroundSong = rememberBackgroundSong(playbackController)
@@ -335,45 +344,51 @@ fun MaterialdrainScreen() {
     val searchAvailable = currentScreen == Screen.Files || currentScreen == Screen.Filesystem ||
         (currentScreen == Screen.Lists && listOpened)
     LaunchedEffect(searchAvailable) { if (!searchAvailable) showSearchModal = false }
-    // Whether the navigation prototype's window is open (see NavFabMenu)
-    var navMenuOpen by remember { mutableStateOf(false) }
     // The screen behind the search modal is blurred (Android 12 and up, see SearchModal), easing in and out
     val searchBlur by animateDpAsState(
         targetValue = if (showSearchModal && Build.VERSION.SDK_INT >= 31) SEARCH_BLUR_RADIUS else 0.dp,
         animationSpec = tween(if (reduceMotion) 100 else 250),
         label = "searchBlur"
     )
-    // And behind the navigation window: only the screen under it, as the window is drawn in the same window as the screen
-    val navMenuBlur by animateDpAsState(
-        targetValue = if (navMenuOpen && navPrototype && Build.VERSION.SDK_INT >= 31) SEARCH_BLUR_RADIUS else 0.dp,
-        animationSpec = tween(if (reduceMotion) 100 else 250),
-        label = "navMenuBlur"
-    )
     // The details page reopens the file it showed; when that file can't be found, the Files screen is shown instead
     LaunchedEffect(Unit) {
         if (currentScreen == Screen.FileDetail && !fileInfoViewModel.restoreOpenedFile()) navigateTo(Screen.Files)
     }
 
-    // Files shared from another app go to the upload screen, which queues them like picked files, or into a folder of a
-    // Filesystem tab. Where the host has more than one of those places, the user picks one (see ShareTargetDialog)
+    // Files shared from another app (or picked with the Upload shortcut, see uploadPicker) wait for the screen they go
+    // into, whichever the user goes to: a bar at the bottom of the browse screens uploads them there, into the folder
+    // that's open or as new files of the host (see SharedUploadBar). A host with only an Upload tab, which has no other
+    // place for them, takes them there as picked files. Nothing uploads before the button is pressed, nor while the app
+    // is locked, which covers the screens
     val pendingShares by appContainer.pendingShares.collectAsState()
-    val filesystemShare by appContainer.filesystemShare.collectAsState()
     val appLocked by appContainer.appLock.locked.collectAsState()
-    val shareTargets = remember(navBarOrder) { shareTargetsOf(navBarOrder) }
-    val sendShares = { uris: List<android.net.Uri>, target: Tab? ->
-        appContainer.pendingShares.value = emptyList()
-        if (target?.screen == Screen.Filesystem) {
-            // The tab shows a bar to upload them into the folder that's open (see SharedUploadBar)
-            appContainer.filesystemShare.value = FilesystemShare(uris, activeHostId, target.id)
-            selectTab(target)
-        } else {
-            target?.let(selectTab) ?: navigateTo(Screen.Upload)
+    val uploadOnlyHost = navBarOrder.isNotEmpty() && navBarOrder.none { it.screen == Screen.Files || it.screen == Screen.Filesystem }
+    LaunchedEffect(pendingShares, appLocked, uploadOnlyHost) {
+        if (pendingShares.isEmpty() || appLocked) return@LaunchedEffect
+        if (uploadOnlyHost) {
+            val uris = pendingShares
+            appContainer.pendingShares.value = emptyList()
+            tabOf(Screen.Upload)?.let(selectTab)
             uploadViewModel.onFilesSelected(uris, context)
+        } else if (currentScreen !in setOf(Screen.Files, Screen.Filesystem, Screen.Lists)) {
+            // Opened on a page without the bar (the settings, a file's details): to the first place that takes them
+            navBarOrder.firstOrNull { it.screen == Screen.Files || it.screen == Screen.Filesystem }?.let(selectTab)
         }
     }
-    // A share waits for the unlock: nothing uploads while the app is locked
-    LaunchedEffect(pendingShares, appLocked, shareTargets) {
-        if (pendingShares.isNotEmpty() && !appLocked && shareTargets.size <= 1) sendShares(pendingShares, shareTargets.firstOrNull())
+    val sharedUpload = pendingShares.takeIf { it.isNotEmpty() && !uploadOnlyHost }?.let { uris ->
+        SharedUpload(
+            uris,
+            onSent = { appContainer.pendingShares.value = emptyList() },
+            onCancel = { appContainer.pendingShares.value = emptyList() }
+        )
+    }
+    // The Upload shortcut and tile, on a host without an Upload tab: the files picked wait as shared ones do
+    val uploadPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isNotEmpty()) appContainer.pendingShares.value = uris
+    }
+    // Whether the Files screen can upload into the active host (see UploadViewModel.uploadNow): its own files to put them in
+    val filesCanUpload = remember(activeHostId, configChanges) {
+        appContainer.providerRegistry.resolve(activeHostId).let { it.fileStore != null && ProviderCapability.UPLOAD in it.capabilities }
     }
     // A link, a shortcut or shared text (see PendingOpen), also once the app is unlocked. A Pixeldrain link opens on the
     // built-in Pixeldrain, whichever host is active
@@ -383,7 +398,12 @@ fun MaterialdrainScreen() {
         if (appLocked) return@LaunchedEffect
         appContainer.pendingOpen.value = null
         when (open) {
-            is PendingOpen.ToScreen -> tabOf(open.screen)?.let(selectTab) ?: navigateTo(open.screen)
+            // Upload where the host has no Upload tab: the files are picked, then wait for their place as shared ones do
+            is PendingOpen.ToScreen -> if (open.screen == Screen.Upload && tabOf(Screen.Upload) == null) {
+                uploadPicker.launch("*/*")
+            } else {
+                tabOf(open.screen)?.let(selectTab) ?: navigateTo(open.screen)
+            }
             is PendingOpen.PixeldrainFile -> {
                 appContainer.providerConfigStore.setActive(PIXELDRAIN_PROVIDER_ID)
                 fileInfoViewModel.setNeighbours(emptyList(), byNode = false)
@@ -396,9 +416,13 @@ fun MaterialdrainScreen() {
                 listViewModel.openList(FileList(id = open.id, title = "", fileCount = 0, canEdit = false))
                 navigateTo(Screen.Lists)
             }
-            is PendingOpen.Text -> {
+            // Shared text: on an upload-only host, into its Upload tab's text; elsewhere a text file, which waits for its
+            // place as shared files do
+            is PendingOpen.Text -> if (tabOf(Screen.Upload) != null && uploadOnlyHost) {
                 uploadViewModel.onTextToUploadChanged(open.text)
-                navigateTo(Screen.Upload)
+                tabOf(Screen.Upload)?.let(selectTab)
+            } else {
+                appContainer.pendingShares.value = listOf(sharedTextFile(context, open.text))
             }
         }
     }
@@ -467,7 +491,16 @@ fun MaterialdrainScreen() {
     }
 
     LaunchedEffect(uploadApiKeyMissing, currentScreen) {
-        if (uploadApiKeyMissing && currentScreen == Screen.Upload) dialog = AppDialog.UploadApiKeyRequired
+        if (uploadApiKeyMissing && (currentScreen == Screen.Upload || currentScreen == Screen.Files)) dialog = AppDialog.UploadApiKeyRequired
+    }
+    // An upload which put new files on the host (the Files screen's, see UploadViewModel.uploadNow): its list shows them
+    LaunchedEffect(uploadViewModel) {
+        uploadViewModel.uiState.map { it.isLoading }.distinctUntilChanged().drop(1).collect { loading ->
+            val state = uploadViewModel.uiState.value
+            if (!loading && (state.queuedItems.any { it.status == UploadItemStatus.DONE } || state.uploadResult?.success == true)) {
+                fileInfoViewModel.fetchUserFiles()
+            }
+        }
     }
 
     // The ViewModels' messages for the snackbar, one after another (see UiMessages)
@@ -519,11 +552,10 @@ fun MaterialdrainScreen() {
         }
     }
 
-    // The navigation prototype has its own button in the corner, which takes the place of the screens' buttons; the
-    // upload screen keeps its upload button
+    // The screen's own button in the corner: Upload, or Save in the settings
     val fabState by remember {
         derivedStateOf {
-            if (navPrototype) null else screenFab(
+            screenFab(
                 screen = currentScreen,
                 canUpload = uploadUiState.hasUploadable && !uploadUiState.isLoading,
                 onUpload = { if (uploadUiState.hasUploadable && !uploadUiState.isLoading) uploadViewModel.upload() },
@@ -538,29 +570,19 @@ fun MaterialdrainScreen() {
             )
         }
     }
-    // Like the old bottom bar, the navigation FAB stays out of the way on detail screens
-    // With one screen (or none) turned on there's nothing to navigate between, so the bar/FAB would only take up space
-    // A wide screen has the tabs at its side instead of the bottom bar, unless the navigation button is chosen
-    val useRail = isWideScreen() && !navPrototype && navBarOrder.size > 1
+    // With one screen (or none) turned on there's nothing to navigate between, so the bar or strip would only take up space
+    // A wide screen has the tabs at its side instead of the bottom bar, unless swipe navigation is chosen
+    val useRail = isWideScreen() && !gestureNav && navBarOrder.size > 1
     val barLabels by appContainer.appSettings.barLabels.collectAsState()
     val swipeFiles by appContainer.appSettings.swipeBetweenFiles.collectAsState()
-    val showNavFab = navPrototype && currentScreen != Screen.FileDetail && navBarOrder.size > 1
-    // The snackbar shares the row of the navigation button at an edge, so the button doesn't rise over it. Where no button
-    // sits beside it (hidden on detail screens, or in the middle) it takes the full width, and in the middle the button rises over it
-    val snackbarBesideFab = navPrototype && fabState == null && showNavFab && navFabPosition != NavFabPosition.CENTER
-    // The bar of shared files waiting for a folder (see SharedUploadBar) is in the selection bar's place
-    val sharingHere = filesystemShare?.let { it.hostId == activeHostId && it.tabId == currentTab?.id && currentScreen == Screen.Filesystem } == true
-    val bottomBarRaised = selectingItems || sharingHere
+    // A bar at the bottom of the page shown (the selection's, or one of what waits for its place, see BrowserScreen),
+    // which the FAB and the snackbars go up over
+    val bottomBarRaised = pageBottomBars[shownNow.key] == true
     val fabLiftTarget = (if (bottomBarRaised) SelectionBarHeight else 0.dp) +
-        (if (!snackbarBesideFab && snackbarHeightDp > 0.dp) snackbarHeightDp + 8.dp else 0.dp)
-    // The buttons lift with the snackbar, on the same motion as its size and the gap beside the button
+        (if (snackbarHeightDp > 0.dp) snackbarHeightDp + 8.dp else 0.dp)
+    // The button lifts with the snackbar, on the same motion as its size
     val fabLift by animateDpAsState(targetValue = fabLiftTarget, animationSpec = snackbarMotion(reduceMotion), label = "fabLift")
-    // The navigation button sits in the same corner: it rises over the upload button when both are shown
-    val navLiftTarget = fabLiftTarget + (if (navPrototype && fabState != null) fabHeightDp + 16.dp else 0.dp) +
-        // And over the miniplayer, which the Scaffold below doesn't lift it over, as it sits outside it
-        (if (navPrototype) miniPlayerHeightDp else 0.dp)
-    val navLift by animateDpAsState(targetValue = navLiftTarget, animationSpec = snackbarMotion(reduceMotion), label = "navLift")
-    val isFabVisible = showNavFab || fabState != null
+    val isFabVisible = fabState != null
 
     // The thumbnails the data saver holds back, for every picture of a file in the app (see FileIcon)
     val dataSaver = appContainer.dataSaver
@@ -584,15 +606,16 @@ fun MaterialdrainScreen() {
         LocalPlayerSettings provides playerSettings,
         LocalListLook provides listLook,
         LocalDataSaver provides dataSaverState,
-        // Menus open above the bottom bar or the navigation button (see MenuFloor)
+        // Menus open above the bottom bar or the tab strip (see MenuFloor)
         LocalMenuFloor provides remember { MenuFloor() },
-        // The song card's cover and title open the song player (see AudioPlayerView)
+        // The song card's badge opens the song player (see AudioPlayerView)
         LocalOpenAudioPlayer provides openAudioPlayer.takeIf { playerSettings.backgroundAudio },
+        LocalSongCardShown provides onSongCardShown.takeIf { playerSettings.backgroundAudio },
         LocalAppHaptics provides appHaptics
     ) {
     SharedTransitionLayout {
-        // The Box lets the FAB navigation prototype (Developer settings) sit on top of the Scaffold. Blurred as a
-        // whole while the search modal is open, which is its own window and so stays sharp
+        // The Box lets the song player sit on top of the Scaffold. Blurred as a whole while the search modal is open,
+        // which is its own window and so stays sharp
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -603,8 +626,7 @@ fun MaterialdrainScreen() {
             AppNavigationRail(currentTab, navBarOrder, onTabSelected = selectTab, alwaysShowLabels = barLabels)
         }
         Scaffold(
-            // Blurred behind the navigation window, which sits on top of it in this Box and so stays sharp
-            modifier = Modifier.weight(1f).then(if (navMenuBlur > 0.dp) Modifier.blur(navMenuBlur) else Modifier),
+            modifier = Modifier.weight(1f),
             topBar = {
                 Column {
                     AppTopBar(
@@ -642,7 +664,8 @@ fun MaterialdrainScreen() {
                                     close = close,
                                     sort = if (sortable) SortChoice(sortField, sortAscending, appContainer.appSettings::changeSortOrder) else null,
                                     actions = screenActions[shownNow.key].orEmpty(),
-                                    onOpenSettings = { navigateTo(Screen.Settings) }
+                                    onOpenSettings = { navigateTo(Screen.Settings) },
+                                    view = screenViews[shownNow.key]
                                 )
                             }
                         } },
@@ -666,32 +689,38 @@ fun MaterialdrainScreen() {
             bottomBar = {
                 // Above the upload button, so the button slides down behind the bar
                 Column(modifier = Modifier.zIndex(2f)) {
-                // The navigation bar's own visibility, which the miniplayer above it needs too
-                val navigationBarShown = !navPrototype && !useRail && currentScreen != Screen.FileDetail && navBarOrder.size > 1
+                // The bottom bar's own visibility (or the tab strip's), which the miniplayer above it needs too
+                val navigationBarShown = !useRail && currentScreen != Screen.FileDetail && navBarOrder.size > 1
                 // The song playing in the background, above the bar. Not while items are selected, whose bar has the
-                // bottom then, nor on the details of the song itself, which show its own card
+                // bottom then, nor on the details of the song itself while they show its own card: once that's
+                // scrolled away, it comes in
                 if (playerSettings.backgroundAudio) {
                     BackgroundMiniPlayer(
                         song = backgroundSong,
                         visible = !selectingItems,
-                        hiddenSongId = if (currentScreen == Screen.FileDetail) fileInfoUiState.fileInfo?.let { fileInfoViewModel.rawUrlFor(it) } else null,
+                        hiddenSongId = if (currentScreen == Screen.FileDetail && songCardShown) {
+                            fileInfoUiState.fileInfo?.let { fileInfoViewModel.rawUrlFor(it) }
+                        } else null,
                         aboveSystemBar = !navigationBarShown,
                         sheet = audioPlayerSheet,
                         modifier = Modifier.onSizeChanged { miniPlayerHeightDp = with(localDensity) { it.height.toDp() } }
                     )
                 }
                 AnimatedVisibility(
-                    // The FAB navigation prototype (Developer settings) replaces the bar while it's on; with no
-                    // screens to show there is nothing for the bar to hold either
+                    // With no screens to show there is nothing for the bar to hold
                     visible = navigationBarShown,
                     // The bar rises out of the bottom edge and sinks back into it, its icons with it: its top stays on the
                     // growing or shrinking space, which the page above follows
                     enter = if (reduceMotion) fadeIn(tween(100)) else fadeIn() + expandVertically(expandFrom = Alignment.Top),
                     exit = if (reduceMotion) fadeOut(tween(100)) else fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
                 ) {
-                    BottomNavigationBar(
-                        currentTab, navBarOrder, onTabSelected = selectTab, modifier = Modifier.keepsMenusAbove(), alwaysShowLabels = barLabels
-                    )
+                    if (gestureNav) {
+                        TabStrip(currentTab, navBarOrder, onTabSelected = selectTab, modifier = Modifier.keepsMenusAbove())
+                    } else {
+                        BottomNavigationBar(
+                            currentTab, navBarOrder, onTabSelected = selectTab, modifier = Modifier.keepsMenusAbove(), alwaysShowLabels = barLabels
+                        )
+                    }
                 }
                 }
             },
@@ -702,7 +731,6 @@ fun MaterialdrainScreen() {
                 // The snackbar stays at the bottom; while selecting it sits above the selection bar
                 AppSnackbarHost(
                     hostState = snackbarHostState,
-                    edgeFab = if (snackbarBesideFab) navFabPosition else null,
                     fabSize = fabHeightDp,
                     reduceMotion = reduceMotion,
                     modifier = Modifier
@@ -712,15 +740,19 @@ fun MaterialdrainScreen() {
                 )
             }
         ) { paddingValues ->
-            // A swipe sideways goes to the tab beside this one (Look and feel), while nothing else is open over the tab
-            val swipeEnabled = swipeTabs && currentTab != null && navBarOrder.size > 1 && !noScreensConfigured &&
-                !selectingItems && !showSearchModal && !navMenuOpen
+            // A swipe sideways goes to the tab beside this one (Look and feel; always with swipe navigation), while
+            // nothing else is open over the tab
+            val swipeEnabled = (swipeTabs || gestureNav) && currentTab != null && navBarOrder.size > 1 && !noScreensConfigured &&
+                !selectingItems && !showSearchModal
             AnimatedContent(
                 targetState = shownNow,
                 modifier = Modifier.sidewaysSwipe(swipeEnabled) { toNext ->
                     val index = navBarOrder.indexOf(currentTab)
                     val next = if (index == -1) null else navBarOrder.getOrNull(if (toNext) index + 1 else index - 1)
-                    next?.let(selectTab)
+                    next?.let {
+                        if (gestureNav) appHaptics.perform(HapticKind.THRESHOLD, HapticPlace.NAV_SWIPE)
+                        selectTab(it)
+                    }
                 },
                 // The tab too: two tabs of one kind (two Filesystem tabs) are two pages, moved between like any tabs. Not
                 // the host: switching hosts on the same tab changes the page in place instead of sliding
@@ -746,7 +778,7 @@ fun MaterialdrainScreen() {
                 // Without the app's bottom bar, the file screens and the details go on under the system's navigation bar
                 // (the lists add room for it after their last item, see LocalBottomInset) instead of being cut off above it.
                 // The upload and settings screens keep their buttons clear of it.
-                val bottomBarShown = !navPrototype && !useRail && targetScreen != Screen.FileDetail && navBarOrder.size > 1
+                val bottomBarShown = !useRail && targetScreen != Screen.FileDetail && navBarOrder.size > 1
                 val goesUnderBars = targetScreen in setOf(Screen.FileDetail, Screen.Files, Screen.Lists, Screen.Filesystem)
                 val underNavigationBar = !bottomBarShown && goesUnderBars
                 // The miniplayer floats over those screens, so what's behind it shows while it's swiped away; they still
@@ -775,8 +807,7 @@ fun MaterialdrainScreen() {
                         Screen.Upload -> UploadScreenContent(
                             uploadViewModel = uploadViewModel,
                             fabHeight = fabHeightDp,
-                            isFabVisible = isFabVisible,
-                            inlineUploadButton = navPrototype
+                            isFabVisible = isFabVisible
                         )
                         Screen.Files, Screen.Lists, Screen.Filesystem -> {
                             // A Filesystem tab has its own browser, loading only while it's on screen; the other tabs use
@@ -815,20 +846,21 @@ fun MaterialdrainScreen() {
                                 fabHeight = fabHeightDp,
                                 isFabVisible = isFabVisible,
                                 onActionsChange = { screenActions[shown.key] = it },
-                                sharedUpload = filesystemShare
-                                    ?.takeIf { targetScreen == Screen.Filesystem && it.hostId == shown.hostId && it.tabId == targetTab?.id }
-                                    ?.let { share ->
-                                        SharedUpload(
-                                            count = share.uris.size,
-                                            onUpload = {
-                                                tabFilesystem.onFilesPickedForUpload(share.uris, context)
-                                                appContainer.filesystemShare.value = null
-                                            },
-                                            onCancel = { appContainer.filesystemShare.value = null }
-                                        )
-                                    }
+                                viewKey = shown.key,
+                                onViewChange = { screenViews[shown.key] = it },
+                                sharedUpload = sharedUpload,
+                                onUploadFiles = if (targetScreen == Screen.Files && filesCanUpload &&
+                                    ProviderCapability.UPLOAD !in targetTab?.config?.disabledCapabilities.orEmpty()
+                                ) { uris -> uploadViewModel.uploadNow(uris, context) } else null,
+                                onBottomBarChange = { pageBottomBars[shown.key] = it }
                             )
-                            DisposableEffect(shown.key) { onDispose { screenActions.remove(shown.key) } }
+                            DisposableEffect(shown.key) {
+                                onDispose {
+                                    screenActions.remove(shown.key)
+                                    screenViews.remove(shown.key)
+                                    pageBottomBars.remove(shown.key)
+                                }
+                            }
                         }
                         Screen.FileDetail -> Box(
                             modifier = Modifier
@@ -900,31 +932,8 @@ fun MaterialdrainScreen() {
             }
         }
         }
-        // Kept while the navigation prototype is on: it slides out of the screen when hidden (see NavFabMenu)
-        if (navPrototype) {
-            NavFabMenu(
-                menu = navMenuPreview.menu(navBarOrder),
-                currentScreen = currentScreen,
-                currentTab = currentTab,
-                position = navFabPosition,
-                onPositionChange = appContainer.appSettings::setNavFabPosition,
-                onNavigate = selectTab,
-                onFabHeightChanged = { fabHeightDp = it },
-                lift = navLift,
-                visible = showNavFab,
-                onOpenChange = { navMenuOpen = it }
-            )
-        }
-        // Over everything of the app, the navigation button too
+        // Over everything of the app
         AudioPlayerView(audioPlayerSheet, backgroundSong, compact = playerSettings.compactPlayer)
-        }
-
-        if (pendingShares.isNotEmpty() && !appLocked && shareTargets.size > 1) {
-            ShareTargetDialog(
-                targets = shareTargets,
-                onChoose = { target -> sendShares(pendingShares, target) },
-                onCancel = { appContainer.pendingShares.value = emptyList() }
-            )
         }
 
         AppDialogs(
@@ -1121,8 +1130,9 @@ private fun ColumnScope.TransferBarSlot(
     val filesystemUpload by filesystemViewModel.uploadProgress.collectAsState()
     val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
     val downloads by fileInfoViewModel.downloads.collectAsState()
-    val activeTransfer: TransferProgress? = when (currentScreen) {
-        Screen.Upload if uploadUiState.isLoading -> TransferProgress(
+    // The upload screen's upload, or the Files screen's (see UploadViewModel.uploadNow), on either
+    val upload = if (uploadUiState.isLoading && (currentScreen == Screen.Upload || currentScreen == Screen.Files)) {
+        TransferProgress(
             transferredBytes = uploadUiState.uploadedBytes,
             totalBytes = uploadUiState.uploadTotalSizeBytes,
             bytesPerSecond = uploadUiState.uploadSpeedBytesPerSec,
@@ -1131,6 +1141,8 @@ private fun ColumnScope.TransferBarSlot(
                 "${items.count { it.status == UploadItemStatus.DONE }} / ${items.size} files"
             }
         )
+    } else null
+    val activeTransfer: TransferProgress? = upload ?: when (currentScreen) {
         Screen.Filesystem if filesystemUpload != null -> filesystemUpload!!.let {
             TransferProgress(
                 transferredBytes = it.uploadedBytes,
@@ -1201,7 +1213,7 @@ private fun <T> derivedFrom(calc: () -> T): State<T> = remember { derivedStateOf
 // ---- Previews ----
 
 /** The tabs of the built-in Pixeldrain, as the bottom bar has them. */
-private val PreviewTabs = listOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem).map { Tab(it) }
+private val PreviewTabs = listOf(Screen.Files, Screen.Lists, Screen.Filesystem).map { Tab(it) }
 
 /**
  * The app as a whole on [screen]: its top bar, [content] (one of the screens' own previews' content), and the bottom bar
@@ -1264,14 +1276,12 @@ private fun AppUploadPreview() = AppFramePreview(Screen.Upload) {
         uiState = UploadUiState(),
         fabHeight = 0.dp,
         isFabVisible = false,
-        inlineUploadButton = false,
         onFilesPicked = {},
         onClearPickedFile = {},
         onTextChange = {},
         onRemoveQueued = {},
         onClearQueued = {},
-        onCancel = {},
-        onUpload = {}
+        onCancel = {}
     )
 }
 

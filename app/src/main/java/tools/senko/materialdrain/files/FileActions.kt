@@ -18,6 +18,7 @@ import tools.senko.materialdrain.ui.icons.filled.Remove
 import tools.senko.materialdrain.ui.icons.filled.Delete
 import tools.senko.materialdrain.ui.icons.filled.Download
 import tools.senko.materialdrain.ui.icons.filled.FolderCopy
+import tools.senko.materialdrain.ui.icons.filled.FolderZip
 import tools.senko.materialdrain.ui.icons.filled.Share
 import tools.senko.materialdrain.ui.icons.filled.QueueMusic
 import androidx.compose.material3.AlertDialog
@@ -65,6 +66,30 @@ fun shareLink(context: Context, url: String) {
     context.startActivity(Intent.createChooser(sendIntent, null))
 }
 
+/** "Download" in a ⋮ menu where it can be either (a folder, a list): opens the page of [DownloadChoiceEntries]. */
+@Composable
+fun DownloadMenuItem(onClick: () -> Unit) {
+    AppMenuItem("Download", leadingIcon = Icons.Filled.Download, trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight, onClick = onClick)
+}
+
+/**
+ * The page of a ⋮ menu behind its "Download" ([DownloadMenuItem]), for several files or a folder: each file on its own
+ * ([onSeparately]; a folder's files in its folders, made again in Download), or all in one zip ([onZip]). It starts with
+ * "Download", going back ([onBack]).
+ */
+@Composable
+fun DownloadChoiceEntries(onBack: () -> Unit, onSeparately: () -> Unit, onZip: () -> Unit, folders: Boolean) {
+    AppMenuItem("Download", leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft, onClick = onBack)
+    AppMenuDivider()
+    AppMenuItem(
+        "Separately",
+        leadingIcon = Icons.Filled.Download,
+        supportingText = if (folders) "Each file, in its folders" else "Each file on its own",
+        onClick = onSeparately
+    )
+    AppMenuItem("As one ZIP", leadingIcon = Icons.Filled.FolderZip, onClick = onZip)
+}
+
 /** The 3 dot menu of a file of the Files page or of a list. */
 @Composable
 fun FileItemMenu(
@@ -78,10 +103,12 @@ fun FileItemMenu(
     /** Only for the files of a list which can be changed. */
     onRemoveFromList: (() -> Unit)? = null,
     /** Only for a song, while songs play in the background (see SongQueue). */
-    onAddToQueue: (() -> Unit)? = null
+    onAddToQueue: (() -> Unit)? = null,
+    /** Shares the file itself, for a host whose files have no link ([shareUrl] null). */
+    onShareFile: (() -> Unit)? = null
 ) {
     OverflowMenuButton(contentDescription = "More options for ${file.name}") { close ->
-        FileItemMenuEntries(close, shareUrl, canDelete, onDownload, onAddToFilesystem, onAddToList, onDelete, onRemoveFromList, onAddToQueue)
+        FileItemMenuEntries(close, shareUrl, canDelete, onDownload, onAddToFilesystem, onAddToList, onDelete, onRemoveFromList, onAddToQueue, onShareFile)
     }
 }
 
@@ -100,6 +127,7 @@ private fun FileItemMenuEntries(
     onDelete: () -> Unit,
     onRemoveFromList: (() -> Unit)?,
     onAddToQueue: (() -> Unit)? = null,
+    onShareFile: (() -> Unit)? = null,
     addToOpen: Boolean = false
 ) {
     val context = LocalContext.current
@@ -112,6 +140,8 @@ private fun FileItemMenuEntries(
             AppMenuItem("Download", leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload() })
             if (url != null) {
                 AppMenuItem("Share link", leadingIcon = Icons.Filled.Share, onClick = { close(); shareLink(context, url) })
+            } else if (onShareFile != null) {
+                AppMenuItem("Share file", leadingIcon = Icons.Filled.Share, onClick = { close(); onShareFile() })
             }
             if (onAddToQueue != null) {
                 AppMenuItem("Add to queue", leadingIcon = Icons.Filled.QueueMusic, onClick = { close(); onAddToQueue() })

@@ -209,6 +209,7 @@ val KnownEndpoints: List<EndpointInfo> = listOf(
     EndpointInfo("upload", "Upload tab", "Uploading a file, with no folder of its own.", "{filename}"),
     EndpointInfo("browse_list", "Filesystem tab", "Listing one folder.", "{path}"),
     EndpointInfo("browse_download", "Filesystem tab", "Downloading a file by its path.", "{path}"),
+    EndpointInfo("browse_download_archive", "Filesystem tab", "A folder and everything in it as one zip.", "{path}"),
     EndpointInfo("browse_upload", "Filesystem tab", "Uploading into a folder.", "{path} and {make_parents}"),
     EndpointInfo("browse_thumbnail", "Filesystem tab", "The thumbnail of a file by its path.", "{path}"),
     EndpointInfo("browse_mkdir", "Filesystem tab", "Making a folder ({action} is mkdir or mkdirall).", "{path} and {action}"),

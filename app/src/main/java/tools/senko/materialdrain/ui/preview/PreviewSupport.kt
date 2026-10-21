@@ -126,4 +126,28 @@ fun greet(name: String) = println("Hello, ${'$'}name!")
 - one
 - two
 """
+
+    /** A Markdown file with each kind of block, for the Markdown previews (see MarkdownPreview). */
+    const val MARKDOWN = """# Release notes
+
+Version **1.5** brings *swiping* between files, `code` in notes and [a link](https://pixeldrain.com).
+
+## Done
+- [x] Fullscreen texts
+- [ ] Markdown tables
+  - nested, with ~~struck~~ text
+
+> A quote, with **its own** marks.
+
+```kotlin
+val greeting = "Hello"
+```
+
+| Kind | Count |
+|------|------:|
+| Pictures | 12 |
+| Songs | 3 |
+
+---
+"""
 }

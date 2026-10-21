@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -37,13 +36,10 @@ import tools.senko.materialdrain.ui.icons.filled.Share
 import tools.senko.materialdrain.ui.icons.filled.Upload
 import tools.senko.materialdrain.ui.icons.automirrored.filled.ArrowBack
 import tools.senko.materialdrain.ui.icons.automirrored.filled.OpenInNew
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +48,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -86,8 +83,13 @@ import tools.senko.materialdrain.files.FileActionRequest
 import tools.senko.materialdrain.files.FileInfoViewModel
 import tools.senko.materialdrain.files.listDate
 import tools.senko.materialdrain.files.FileItemMenu
+import tools.senko.materialdrain.files.DownloadChoiceEntries
+import tools.senko.materialdrain.files.DownloadMenuItem
+import tools.senko.materialdrain.files.DownloadStyle
+import tools.senko.materialdrain.ui.components.AppMenuPages
 import tools.senko.materialdrain.files.SelectionAction
 import tools.senko.materialdrain.files.SelectionActionBar
+import tools.senko.materialdrain.files.SelectionBarHeight
 import tools.senko.materialdrain.files.key
 import tools.senko.materialdrain.files.fileComparator
 import tools.senko.materialdrain.files.shareLink
@@ -99,6 +101,9 @@ import tools.senko.materialdrain.provider.api.ProviderCapability
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.provider.api.StorageRef
 import tools.senko.materialdrain.settings.AppSettings
+import tools.senko.materialdrain.settings.ListLayout
+import tools.senko.materialdrain.settings.ViewLook
+import tools.senko.materialdrain.ui.icons.filled.CheckBox
 import tools.senko.materialdrain.settings.SEARCH_INDEX_DELETE_WARNING
 import tools.senko.materialdrain.settings.isSearchIndex
 import tools.senko.materialdrain.ui.LocalBottomInset
@@ -109,7 +114,7 @@ import tools.senko.materialdrain.ui.components.CenteredTextMessage
 import tools.senko.materialdrain.ui.components.ConfirmDialog
 import tools.senko.materialdrain.ui.components.ErrorMessage
 import tools.senko.materialdrain.ui.components.FileListItem
-import tools.senko.materialdrain.ui.components.FolderPickerDialog
+import tools.senko.materialdrain.filesystem.FilesystemUiState
 import tools.senko.materialdrain.ui.components.OverflowMenuButton
 import tools.senko.materialdrain.ui.components.TextInputDialog
 import tools.senko.materialdrain.util.formatRelativeDateTime
@@ -153,10 +158,24 @@ fun BrowserScreen(
     fabHeight: Dp,
     isFabVisible: Boolean,
     onSelectingChange: (Boolean) -> Unit,
-    /** Told the screen's actions for New in the ⋮ menu at the top (see App.kt), e.g. the filesystem's upload. */
+    /** Told the screen's actions for the ⋮ menu at the top (see App.kt), e.g. the filesystem's upload. */
     onActionsChange: (List<ScreenAction>) -> Unit = {},
-    /** Files shared from another app, waiting for a folder of this Filesystem tab (see App.kt) */
-    sharedUpload: SharedUpload? = null
+    /**
+     * What the folders' own looks are kept by (see AppSettings.viewLooks): the host and the tab; the folder or the list
+     * shown is added to it here
+     */
+    viewKey: String = "",
+    /** Told how the list looks, for the View page of the ⋮ menu at the top (see App.kt) */
+    onViewChange: (ViewChoice) -> Unit = {},
+    /** Files shared from another app, waiting for the screen they go into (see App.kt): this one, where it takes them */
+    sharedUpload: SharedUpload? = null,
+    /**
+     * Uploads files as new files of the host, for the Files screen's Upload (in the ⋮ menu) and shared files sent to it
+     * (see UploadViewModel.uploadNow); null where the host can't take them there
+     */
+    onUploadFiles: ((List<Uri>) -> Unit)? = null,
+    /** Told whether a bar is at the bottom of the screen (the selection's, or one waiting for a place), see App.kt */
+    onBottomBarChange: (Boolean) -> Unit = {}
 ) {
     val fsState by filesystemViewModel.uiState.collectAsState()
     val fsDisplayedChildren by filesystemViewModel.displayedChildren.collectAsState()
@@ -284,9 +303,7 @@ fun BrowserScreen(
     var showNewFolderDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
     var entryToRename by remember { mutableStateOf<StorageNode?>(null) }
-    var entryToMove by remember { mutableStateOf<StorageNode?>(null) }
     var entryToDelete by remember { mutableStateOf<StorageNode?>(null) }
-    var showBulkMove by remember { mutableStateOf(false) }
     var showBulkDelete by remember { mutableStateOf(false) }
     // Files and list actions (delete, add to filesystem or to a list, remove from a list)
     var actionRequest by remember { mutableStateOf<FileActionRequest?>(null) }
@@ -297,14 +314,27 @@ fun BrowserScreen(
     val messages = remember { AppContainer.get(context.applicationContext as Application).uiMessages }
 
     // The Filesystem screen's own upload button, scoped here (not a FAB) so it works the same whichever navigation
-    // style is on — the classic bottom bar and the FAB navigation prototype don't always have a FAB of their own
+    // style is on
     val filesystemUploadLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents(),
         onResult = { uris: List<Uri> -> filesystemViewModel.onFilesPickedForUpload(uris, context) }
     )
 
-    // Back: leaves the selection first, then the open list, then goes up a folder (filesystem). At the top, the
-    // activity takes the press (see MainActivity).
+    // The Files screen's Upload: picked files go up right away as new files of the host (see onUploadFiles)
+    val filesUploadLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents(),
+        onResult = { uris: List<Uri> -> if (uris.isNotEmpty()) onUploadFiles?.invoke(uris) }
+    )
+
+    // Entries of this tab being moved (see FilesystemViewModel.pendingMove): the user browses to the folder they go into,
+    // where the bar at the bottom moves them. The folders among them can't be opened meanwhile, nor moved into themselves
+    val pendingMove by filesystemViewModel.pendingMove.collectAsState()
+    val moving = mode == BrowserMode.FILESYSTEM && pendingMove.isNotEmpty()
+    val movedFolders = remember(pendingMove) { pendingMove.filter { it.isDirectory }.map { it.ref.path.trim('/') } }
+
+    // Back: leaves the selection first, then the open list, then goes up a folder (filesystem); at the top, it leaves
+    // the entries being moved where they are. At the top, the activity takes the press (see MainActivity).
+    BackHandler(enabled = moving && !filesystemViewModel.canNavigateToParent()) { filesystemViewModel.cancelMove() }
     BackHandler(enabled = mode == BrowserMode.FILESYSTEM && filesystemViewModel.canNavigateToParent()) {
         filesystemViewModel.navigateToParentPath()
     }
@@ -314,6 +344,8 @@ fun BrowserScreen(
     // What happens on tapping an entry
     val onOpen: (StorageNode) -> Unit = { node ->
         when {
+            mode == BrowserMode.FILESYSTEM && node.isDirectory && moving && node.ref.path.trim('/') in movedFolders ->
+                messages.show("\"${node.name}\" is being moved, so it can't be opened")
             mode == BrowserMode.FILESYSTEM && node.isDirectory -> filesystemViewModel.navigateToChild(node)
             mode == BrowserMode.LISTS && openedList == null ->
                 listState.lists.firstOrNull { it.id == node.ref.id }?.let { listViewModel.openList(it) }
@@ -365,40 +397,6 @@ fun BrowserScreen(
                 entryToRename = null
             },
             onDismiss = { entryToRename = null }
-        )
-    }
-    entryToMove?.let { entry ->
-        FolderPickerDialog(
-            title = "Move \"${entry.name}\"",
-            confirmLabel = "Move here",
-            initialPath = fsState.currentPath,
-            rootPath = filesystemViewModel.browseRootPath,
-            rootName = filesystemViewModel.browseRootName,
-            excludedPaths = if (entry.isDirectory) setOf(entry.ref.path.trim('/')) else emptySet(),
-            loadFolders = { filesystemViewModel.listSubdirectories(it) },
-            onConfirm = {
-                filesystemViewModel.moveEntry(entry, it)
-                entryToMove = null
-            },
-            onDismiss = { entryToMove = null }
-        )
-    }
-    if (showBulkMove) {
-        FolderPickerDialog(
-            title = "Move ${selectedEntries.size} items",
-            confirmLabel = "Move here",
-            initialPath = fsState.currentPath,
-            rootPath = filesystemViewModel.browseRootPath,
-            rootName = filesystemViewModel.browseRootName,
-            // A folder can't be moved into itself
-            excludedPaths = selectedEntries.filter { it.isDirectory }.mapTo(HashSet()) { it.ref.path.trim('/') },
-            loadFolders = { filesystemViewModel.listSubdirectories(it) },
-            onConfirm = {
-                filesystemViewModel.moveEntries(selectedEntries, it)
-                exitSelection()
-                showBulkMove = false
-            },
-            onDismiss = { showBulkMove = false }
         )
     }
     if (showBulkDelete) {
@@ -532,17 +530,55 @@ fun BrowserScreen(
         icon = Icons.Filled.SelectAll,
         onClick = toggleAll
     )
+    // The selected songs at the end of the background player's queue, in the order they're shown; the rest are left out
+    val songs = remember(selectedEntries, playback) {
+        if (playback == null) emptyList() else selectedEntries.mapNotNull { fileInfoViewModel.queueSongOf(it) }
+    }
+    val addSongsToQueue = playback?.let { player ->
+        SelectionAction("Add to queue", Icons.Filled.QueueMusic, {
+            val wasEmpty = player.mediaItemCount == 0
+            songs.forEach { player.addToQueue(it, placeholderArt) }
+            messages.show(
+                when {
+                    wasEmpty -> "Playing ${songs.first().title}" + if (songs.size > 1) " and ${songs.size - 1} more" else ""
+                    songs.size == 1 -> "Added to the queue"
+                    else -> "Added ${songs.size} songs to the queue"
+                }
+            )
+            exitSelection()
+        }, enabled = songs.isNotEmpty())
+    }
+    // The open folder's name, for a zip of what's selected in it
+    val folderName = fsState.pathSegments.lastOrNull()?.name ?: fsState.hostName
     val selectionActions: List<SelectionAction> = when (mode) {
         BrowserMode.FILESYSTEM -> buildList {
-            add(SelectionAction("Download", Icons.Filled.Download, { fileInfoViewModel.downloadFilesSequentially(files); exitSelection() }, enabled = files.isNotEmpty()))
-            if (fsState.canWrite) add(SelectionAction("Move", Icons.AutoMirrored.Filled.DriveFileMove, { showBulkMove = true }, enabled = selectedEntries.isNotEmpty() && !fsState.isModifying))
+            // One file is only downloaded; a folder, or several things, each file on its own or all in one zip
+            val single = selectedEntries.singleOrNull()
+            if (single != null && !single.isDirectory) {
+                add(SelectionAction("Download", Icons.Filled.Download, { fileInfoViewModel.initiateDownloadFile(single); exitSelection() }))
+            } else {
+                add(downloadChoices(enabled = selectedEntries.isNotEmpty()) { style ->
+                    fileInfoViewModel.downloadItems(selectedEntries, style, single?.name ?: folderName)
+                    exitSelection()
+                })
+            }
+            // Then browsed to the folder they go into, in this tab itself (see the move bar below)
+            if (fsState.canWrite) add(SelectionAction("Move", Icons.AutoMirrored.Filled.DriveFileMove, { filesystemViewModel.startMove(selectedEntries); exitSelection() }, enabled = selectedEntries.isNotEmpty() && !fsState.isModifying))
             if (fsState.canDelete && canDelete) add(SelectionAction("Delete", Icons.Filled.Delete, { showBulkDelete = true }, enabled = selectedEntries.isNotEmpty() && !fsState.isModifying, destructive = true))
+            addSongsToQueue?.let { add(it) }
             add(selectAll)
         }
         BrowserMode.FILES, BrowserMode.LISTS -> buildList {
-            // Each file on its own, or all of them in one archive
-            add(SelectionAction("Download", Icons.Filled.Download, { fileInfoViewModel.downloadFilesSequentially(files); exitSelection() }, enabled = files.isNotEmpty()))
-            add(SelectionAction("Download as ZIP", Icons.Filled.FolderZip, { fileInfoViewModel.downloadFilesAsZip(files, openedList?.title ?: "Pixeldrain files"); exitSelection() }, enabled = files.isNotEmpty()))
+            // Each file on its own, or all of them in one archive; one file is only downloaded
+            if (files.size <= 1) {
+                add(SelectionAction("Download", Icons.Filled.Download, { fileInfoViewModel.downloadFilesSequentially(files); exitSelection() }, enabled = files.isNotEmpty()))
+            } else {
+                add(downloadChoices(enabled = true) { style ->
+                    if (style == DownloadStyle.ZIP) fileInfoViewModel.downloadFilesAsZip(files, openedList?.title ?: "Pixeldrain files")
+                    else fileInfoViewModel.downloadFilesSequentially(files)
+                    exitSelection()
+                })
+            }
             if (canDelete) add(SelectionAction("Delete", Icons.Filled.Delete, { actionRequest = FileActionRequest.Delete(files) }, enabled = files.isNotEmpty(), destructive = true))
             add(SelectionAction("Add to list", Icons.AutoMirrored.Filled.PlaylistAdd, { actionRequest = FileActionRequest.AddToList(files) }, enabled = files.isNotEmpty()))
             add(SelectionAction("Add to filesystem", Icons.Filled.FolderCopy, { actionRequest = FileActionRequest.AddToFilesystem(files) }, enabled = files.isNotEmpty()))
@@ -550,18 +586,130 @@ fun BrowserScreen(
                 // The list's own file count, not the filtered entries (see the single-item action below)
                 add(SelectionAction("Remove from this list", Icons.Filled.Remove, { actionRequest = FileActionRequest.RemoveFromList(files, list, listState.listFiles.size) }, enabled = files.isNotEmpty()))
             }
+            addSongsToQueue?.let { add(it) }
             add(selectAll)
         }
     }
 
-    // The Filesystem's actions behind New in the ⋮ menu at the top: upload, new folder and import, while it can be written to
-    val screenActions = if (mode != BrowserMode.FILESYSTEM) emptyList() else if (fsState.canWrite && !selectionMode) buildList {
+    // The screen's actions in the ⋮ menu at the top (see ScreenMenuEntries for their order): an open list's downloads and
+    // Select, for this page; behind New, the Filesystem's upload, new folder and import, while it can be written to
+    val listFiles = listState.listFiles
+    val screenActions = if (selectionMode) emptyList() else buildList {
+        // Always the whole list, even while a filter narrows what's shown: each file on its own, or all in one archive
+        if (openedList != null) {
+            add(
+                ScreenAction(
+                    Icons.Filled.Download,
+                    if (listFiles.size > 1) "Download all" else "Download",
+                    enabled = listFiles.isNotEmpty(),
+                    group = ScreenActionGroup.PAGE,
+                    choices = if (listFiles.size > 1) {
+                        downloadScreenChoices { style ->
+                            if (style == DownloadStyle.ZIP) fileInfoViewModel.downloadFilesAsZip(listFiles, openedList.title)
+                            else fileInfoViewModel.downloadFilesSequentially(listFiles, title = openedList.title)
+                        }
+                    } else emptyList()
+                ) { fileInfoViewModel.downloadFilesSequentially(listFiles) }
+            )
+        }
+        // The open folder itself, with everything in it
+        if (mode == BrowserMode.FILESYSTEM && entries.isNotEmpty()) {
+            val folder = StorageNode(ref = StorageRef(path = fsState.currentPath.trim('/')), name = folderName, isDirectory = true)
+            add(
+                ScreenAction(
+                    Icons.Filled.Download,
+                    "Download this folder",
+                    group = ScreenActionGroup.PAGE,
+                    choices = downloadScreenChoices { style -> fileInfoViewModel.downloadItems(listOf(folder), style, folderName) }
+                ) {}
+            )
+        }
+        // What a long press on an entry starts, for those who don't know it (not the lists overview, which only opens)
+        if (entries.isNotEmpty() && !(mode == BrowserMode.LISTS && openedList == null)) {
+            add(ScreenAction(Icons.Filled.CheckBox, "Select", group = ScreenActionGroup.PAGE) { selecting = true })
+        }
+        // The Files screen's upload, as the Filesystem's: new files of the host
+        if (mode == BrowserMode.FILES && onUploadFiles != null) {
+            add(ScreenAction(Icons.Filled.Upload, "Upload") { filesUploadLauncher.launch("*/*") })
+        }
+        if (mode == BrowserMode.FILESYSTEM && fsState.canWrite) {
             if (canUploadFs) add(ScreenAction(Icons.Filled.Upload, "Upload", enabled = !fsState.isModifying && fsUploadStatus == null) { filesystemUploadLauncher.launch("*/*") })
             if (canMkdirFs) add(ScreenAction(Icons.Filled.CreateNewFolder, "New folder", enabled = !fsState.isModifying) { showNewFolderDialog = true })
             if (fsState.canImport) add(ScreenAction(Icons.Filled.Link, "Import files by ID", enabled = !fsState.isModifying) { showImportDialog = true })
-        } else emptyList()
+        }
+    }
     val currentOnActionsChange by rememberUpdatedState(onActionsChange)
     SideEffect { currentOnActionsChange(screenActions) }
+
+    // The look of what's shown: its own (View in the ⋮ menu at the top), else the Look and feel's (LocalListLook)
+    val shownViewKey = when (mode) {
+        BrowserMode.FILESYSTEM -> "$viewKey:path:${fsState.currentPath.trim('/')}"
+        BrowserMode.LISTS -> openedList?.let { "$viewKey:list:${it.id}" } ?: "$viewKey:lists"
+        BrowserMode.FILES -> viewKey
+    }
+    val viewLooks by appSettings.viewLooks.collectAsState()
+    val ownLook = viewLooks[shownViewKey]
+    // The nearest folder above this one whose look is for its subfolders too (see ViewLook.subfolders): this one has that
+    // look where it has none of its own, over the Look and feel's
+    val inheritedPath = if (mode != BrowserMode.FILESYSTEM) null else {
+        generateSequence(fsState.currentPath.trim('/')) { path -> if (path.isEmpty()) null else path.substringBeforeLast('/', "") }
+            .drop(1)
+            .firstOrNull { viewLooks["$viewKey:path:$it"]?.subfolders == true }
+    }
+    val inheritedLook = inheritedPath?.let { viewLooks["$viewKey:path:$it"] }
+    val defaultLook = LocalListLook.current
+    val defaultLayout = if (defaultLook.grid) ListLayout.GRID else ListLayout.LIST
+    val fallbackLayout = inheritedLook?.layout ?: defaultLayout
+    val fallbackCompact = inheritedLook?.compact ?: defaultLook.compact
+    val listLayout = ownLook?.layout ?: fallbackLayout
+    // Smart: a grid for what's mostly pictures and videos, rows for the rest
+    val smartGrid = remember(entries) { smartLayoutIsGrid(entries) }
+    val look = defaultLook.copy(
+        grid = when (listLayout) {
+            ListLayout.GRID -> true
+            ListLayout.LIST -> false
+            ListLayout.SMART -> smartGrid
+        },
+        compact = ownLook?.compact ?: fallbackCompact
+    )
+    val viewChoice = ViewChoice(
+        grid = look.grid,
+        compact = look.compact,
+        custom = ownLook != null,
+        defaultLabel = when {
+            fallbackLayout == ListLayout.SMART -> "Smart"
+            fallbackLayout == ListLayout.GRID -> "Grid"
+            fallbackCompact -> "Compact rows"
+            else -> "List"
+        },
+        onLayout = { layout -> appSettings.setViewLook(shownViewKey, (ownLook ?: ViewLook()).copy(layout = layout)) },
+        onCompact = { compact -> appSettings.setViewLook(shownViewKey, (ownLook ?: ViewLook()).copy(compact = compact)) },
+        onReset = { appSettings.setViewLook(shownViewKey, null) },
+        subfolders = if (mode == BrowserMode.FILESYSTEM) ownLook?.subfolders == true else null,
+        // Turned on, the look shown becomes this folder's own, for its subfolders too, whichever it had it from
+        onSubfolders = { on ->
+            appSettings.setViewLook(
+                shownViewKey,
+                if (on) ViewLook(listLayout, look.compact, subfolders = true)
+                else ownLook?.copy(subfolders = false)
+            )
+        },
+        inheritedFrom = inheritedPath?.let { path -> if (path.isEmpty()) "the top folder" else path.substringAfterLast('/') },
+        smart = listLayout == ListLayout.SMART
+    )
+    val currentOnViewChange by rememberUpdatedState(onViewChange)
+    SideEffect { currentOnViewChange(viewChoice) }
+
+    // The bar of what waits for its place here (entries being moved, shared files), see rememberDestinationBar; with the
+    // selection's, what App.kt lifts the button and the snackbars over
+    val destinationBar = rememberDestinationBar(
+        mode, selectionMode, pendingMove, movedFolders, sharedUpload, fsState, canUploadFs,
+        fsUploadBusy = fsUploadStatus != null, filesystemViewModel = filesystemViewModel, onUploadFiles = onUploadFiles
+    )
+    val bottomBarShown = selectionMode || destinationBar != null
+    LaunchedEffect(bottomBarShown) { onBottomBarChange(bottomBarShown) }
+    DisposableEffect(Unit) { onDispose { onBottomBarChange(false) } }
+    CompositionLocalProvider(LocalListLook provides look) {
     BrowserContent(
         mode = mode,
         entries = entries,
@@ -588,10 +736,7 @@ fun BrowserScreen(
         isModifying = fsState.isModifying,
         uploadStatus = fsUploadStatus,
         openedList = openedList,
-        listHasFiles = listState.listFiles.isNotEmpty(),
         onCloseList = { listViewModel.closeList() },
-        onDownloadList = { openedList?.let { fileInfoViewModel.downloadFilesAsZip(listState.listFiles, it.title) } },
-        onDownloadListFiles = { fileInfoViewModel.downloadFilesSequentially(listState.listFiles) },
         selectionMode = selectionMode,
         selectedKeys = selectedKeys,
         selectedCount = selectedEntries.size,
@@ -613,9 +758,22 @@ fun BrowserScreen(
         rowActions = BrowserRowActions(
             toggleSelection = { node -> selectedKeys = if (node.key in selectedKeys) selectedKeys - node.key else selectedKeys + node.key },
             startSelecting = { node -> startSelecting(node.key) },
-            download = { node -> fileInfoViewModel.initiateDownloadFile(node) },
+            download = { node, style ->
+                when {
+                    // A list of the overview, as its files
+                    mode == BrowserMode.LISTS && openedList == null ->
+                        listState.lists.firstOrNull { it.id == node.ref.id }?.let { fileInfoViewModel.downloadList(it, style) }
+                    node.isDirectory -> fileInfoViewModel.downloadItems(listOf(node), style, node.name)
+                    else -> fileInfoViewModel.initiateDownloadFile(node)
+                }
+            },
+            downloadHasChoices = { node ->
+                if (mode == BrowserMode.LISTS && openedList == null) (listState.lists.firstOrNull { it.id == node.ref.id }?.fileCount ?: 0) > 1
+                else node.isDirectory
+            },
+            shareFile = { node -> fileInfoViewModel.shareFile(node) },
             rename = { node -> entryToRename = node },
-            move = { node -> entryToMove = node },
+            move = { node -> filesystemViewModel.startMove(listOf(node)) },
             delete = { node -> if (mode == BrowserMode.FILESYSTEM) entryToDelete = node else actionRequest = FileActionRequest.Delete(listOf(node)) },
             addToFilesystem = { node -> actionRequest = FileActionRequest.AddToFilesystem(listOf(node)) },
             addToList = { node -> actionRequest = FileActionRequest.AddToList(listOf(node)) },
@@ -635,10 +793,78 @@ fun BrowserScreen(
         scrollState = scrollState,
         fabHeight = fabHeight,
         isFabVisible = isFabVisible,
-        // The selection's bar takes its place while items are selected
-        sharedUpload = sharedUpload?.takeIf { mode == BrowserMode.FILESYSTEM && !selectionMode },
-        sharedUploadFolder = fsState.pathSegments.lastOrNull()?.name ?: fsState.hostName,
-        canUploadShared = fsState.canWrite && canUploadFs && !fsState.isModifying && fsUploadStatus == null
+        destinationBar = destinationBar
+    )
+    }
+}
+
+/**
+ * The bar of what waits at the bottom of a browser for its place (see DestinationBar), as [BrowserScreen] works it out:
+ * the entries being moved ([pendingMove], into the folder that's open), else the files shared to the app
+ * ([sharedUpload]), into this screen where it takes them; nothing while items are selected, whose bar has the place.
+ */
+@Composable
+private fun rememberDestinationBar(
+    mode: BrowserMode,
+    selectionMode: Boolean,
+    pendingMove: List<StorageNode>,
+    movedFolders: List<String>,
+    sharedUpload: SharedUpload?,
+    fsState: FilesystemUiState,
+    canUploadFs: Boolean,
+    fsUploadBusy: Boolean,
+    filesystemViewModel: FilesystemViewModel,
+    onUploadFiles: ((List<Uri>) -> Unit)?
+): DestinationRequest? {
+    if (selectionMode) return null
+    val context = LocalContext.current
+    val folderName = fsState.pathSegments.lastOrNull()?.name ?: fsState.hostName
+    if (mode == BrowserMode.FILESYSTEM && pendingMove.isNotEmpty()) {
+        val here = fsState.currentPath.trim('/')
+        val insideMoved = movedFolders.any { here == it || here.startsWith("$it/") }
+        val alreadyHere = pendingMove.all { it.ref.path.trim('/').substringBeforeLast('/', "") == here }
+        val canMoveHere = fsState.canWrite && !fsState.isModifying && !insideMoved && !alreadyHere
+        return DestinationRequest(
+            title = if (pendingMove.size == 1) "Moving \"${pendingMove.first().name}\"" else "Moving ${pendingMove.size} items",
+            destination = folderName.takeIf { canMoveHere },
+            unavailable = when {
+                insideMoved -> "Not into a folder that's being moved"
+                alreadyHere -> "Already in this folder: open another"
+                else -> "Open a folder that can be written to"
+            },
+            confirmLabel = "Move here",
+            cancelDescription = "Leave them where they are",
+            onConfirm = { filesystemViewModel.moveHere() },
+            onCancel = { filesystemViewModel.cancelMove() }
+        )
+    }
+    val shared = sharedUpload ?: return null
+    // Where this screen puts them: the folder that's open, the host's own files; a list takes no files of its own
+    val destination = when (mode) {
+        BrowserMode.FILESYSTEM -> folderName.takeIf { fsState.canWrite && canUploadFs && !fsState.isModifying && !fsUploadBusy }
+        BrowserMode.FILES -> "your files".takeIf { onUploadFiles != null }
+        BrowserMode.LISTS -> null
+    }
+    return DestinationRequest(
+        title = if (shared.count == 1) "1 shared file" else "${shared.count} shared files",
+        destination = destination,
+        unavailable = when (mode) {
+            BrowserMode.FILESYSTEM -> "Open a folder that can be written to"
+            BrowserMode.FILES -> "This host takes no uploads here"
+            BrowserMode.LISTS -> "Go to Files or a folder to upload them"
+        },
+        confirmLabel = "Upload here",
+        cancelDescription = "Don't upload the shared files",
+        // Only where there's a destination: the button is off elsewhere
+        onConfirm = {
+            when (mode) {
+                BrowserMode.FILESYSTEM -> filesystemViewModel.onFilesPickedForUpload(shared.uris, context)
+                BrowserMode.FILES -> onUploadFiles?.invoke(shared.uris)
+                BrowserMode.LISTS -> Unit
+            }
+            if (destination != null) shared.onSent()
+        },
+        onCancel = shared.onCancel
     )
 }
 
@@ -646,7 +872,12 @@ fun BrowserScreen(
 class BrowserRowActions(
     val toggleSelection: (StorageNode) -> Unit = {},
     val startSelecting: (StorageNode) -> Unit = {},
-    val download: (StorageNode) -> Unit = {},
+    /** Downloads a file, or a folder or a list as [DownloadStyle] says. */
+    val download: (StorageNode, DownloadStyle) -> Unit = { _, _ -> },
+    /** Whether an entry's Download offers both styles (a folder, a list of several files), in a page of its menu. */
+    val downloadHasChoices: (StorageNode) -> Boolean = { it.isDirectory },
+    /** Shares a file itself, for a host whose files have no link. */
+    val shareFile: (StorageNode) -> Unit = {},
     val rename: (StorageNode) -> Unit = {},
     val move: (StorageNode) -> Unit = {},
     val delete: (StorageNode) -> Unit = {},
@@ -681,10 +912,7 @@ fun BrowserContent(
     isModifying: Boolean,
     uploadStatus: String?,
     openedList: FileList?,
-    listHasFiles: Boolean,
     onCloseList: () -> Unit,
-    onDownloadList: () -> Unit,
-    onDownloadListFiles: () -> Unit,
     selectionMode: Boolean,
     selectedKeys: Set<String>,
     selectedCount: Int,
@@ -701,9 +929,8 @@ fun BrowserContent(
     scrollState: LazyListState,
     fabHeight: Dp,
     isFabVisible: Boolean,
-    sharedUpload: SharedUpload? = null,
-    sharedUploadFolder: String = "",
-    canUploadShared: Boolean = false
+    /** What waits at the bottom for its place, in the selection bar's place (see DestinationBar) */
+    destinationBar: DestinationRequest? = null
 ) {
     val context = LocalContext.current
     val pullRefreshState = rememberPullToRefreshState()
@@ -728,11 +955,13 @@ fun BrowserContent(
                 }
                 BrowserMode.LISTS -> if (openedList != null) {
                     StatusCards(onCancelTransfer = onCancelTransfer, onLoadThumbnails = loadThumbnails)
+                    // Its title and back to the lists; what's done with the whole list (its downloads) is in the ⋮ menu at
+                    // the top, so the title has the row
                     if (!selectionMode) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             IconButton(onClick = onCloseList) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to the lists")
@@ -740,25 +969,10 @@ fun BrowserContent(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(openedList.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 Text(
-                                    "Files: ${openedList.fileCount}",
+                                    if (openedList.fileCount == 1) "1 file" else "${openedList.fileCount} files",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                            }
-                            // Always the whole list, even while a filter narrows what's shown below: each file on its own,
-                            // or all of them in one archive
-                            if (listHasFiles) {
-                                FilledTonalIconButton(onClick = onDownloadListFiles) {
-                                    Icon(Icons.Filled.Download, contentDescription = "Download all, each file on its own")
-                                }
-                                Button(
-                                    onClick = onDownloadList,
-                                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding
-                                ) {
-                                    Icon(Icons.Filled.FolderZip, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
-                                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                                    Text("All (ZIP)")
-                                }
                             }
                         }
                     }
@@ -825,7 +1039,9 @@ fun BrowserContent(
                                 onOpen = { onOpen(node) },
                                 onToggleSelection = { rowActions.toggleSelection(node) },
                                 onLongClick = { rowActions.startSelecting(node) },
-                                onDownload = { rowActions.download(node) },
+                                onDownload = { style -> rowActions.download(node, style) },
+                                downloadHasChoices = rowActions.downloadHasChoices(node),
+                                onShareFile = if (node.isDirectory) null else { { rowActions.shareFile(node) } },
                                 onRename = { rowActions.rename(node) },
                                 onMove = { rowActions.move(node) },
                                 onDelete = { rowActions.delete(node) },
@@ -845,13 +1061,20 @@ fun BrowserContent(
                     LazyColumn(
                         state = scrollState,
                         modifier = Modifier.fillMaxSize(),
-                        // Past the last file: room for the upload button, or the system's navigation bar (LocalBottomInset)
-                        contentPadding = PaddingValues(bottom = (if (isFabVisible) fabHeight + 16.dp else 16.dp) + LocalBottomInset.current)
+                        // Past the last file, only the room for what covers the end of the list: the system's navigation
+                        // bar or the miniplayer (LocalBottomInset), the upload button, and the bar floating over the list
+                        // (the selection's, or one waiting for a place). Nothing more, so a list which fits doesn't scroll
+                        contentPadding = PaddingValues(
+                            bottom = LocalBottomInset.current +
+                                (if (isFabVisible) fabHeight + 16.dp else 0.dp) +
+                                (if (selectionMode || destinationBar != null) SelectionBarHeight else 0.dp)
+                        )
                     ) {
                         if (grid) {
                             // The grid is rows of tiles, so it scrolls (and keeps its place) with the same state as the list
                             items(entries.chunked(columns), key = { row -> "row:" + row.first().key }) { row ->
-                                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp)) {
+                                // Clear of the scrollbar's dot at the end (see DotScrollbar), which sat over the tiles there
+                                Row(modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = GRID_SCROLLBAR_ROOM)) {
                                     row.forEach { node -> entry(node, true, Modifier.weight(1f)) }
                                     repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
                                 }
@@ -869,14 +1092,18 @@ fun BrowserContent(
                     DotScrollbar(state = scrollState)
                 }
             }
+            // Floating over the end of the list, which shows around them as it does around the miniplayer (the list
+            // leaves room for them after its last entry, above)
+            Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+                SelectionActionBar(
+                    visible = selectionMode,
+                    selectedCount = selectedCount,
+                    onClose = onExitSelection,
+                    actions = selectionActions
+                )
+                DestinationBar(destinationBar)
             }
-            SelectionActionBar(
-                visible = selectionMode,
-                selectedCount = selectedCount,
-                onClose = onExitSelection,
-                actions = selectionActions
-            )
-            SharedUploadBar(sharedUpload, folder = sharedUploadFolder, canUpload = canUploadShared)
+            }
         }
     }
 }
@@ -902,8 +1129,23 @@ private fun emptyText(mode: BrowserMode, inList: Boolean, filter: String): Strin
     else -> "This folder is empty."
 }
 
+/**
+ * What the Smart layout picks for [entries] (see ListLayout.SMART): the grid where more than half of the files are
+ * pictures or videos, which are seen by their pictures; rows for the rest (songs, documents, archives), which are told
+ * apart by their names, and for a folder of only folders.
+ */
+private fun smartLayoutIsGrid(entries: List<StorageNode>): Boolean {
+    val files = entries.filter { !it.isDirectory }
+    if (files.isEmpty()) return false
+    val visual = files.count { node -> node.previewMimeType()?.let { it.startsWith("image/") || it.startsWith("video/") } == true }
+    return visual * 2 > files.size
+}
+
 /** How wide a tile of the grid is about to be; the row gets as many as fit. */
 private val GRID_TILE_WIDTH = 120.dp
+
+/** The room the grid leaves at its end for the scrollbar's dot (see DotScrollbar), which is drawn this far in at most. */
+private val GRID_SCROLLBAR_ROOM = 14.dp
 
 /** One row (or, [asTile], one tile of the grid) of the browser, with the menu and the actions its mode offers. */
 @Composable
@@ -924,7 +1166,7 @@ private fun BrowserEntry(
     onOpen: () -> Unit,
     onToggleSelection: () -> Unit,
     onLongClick: () -> Unit,
-    onDownload: () -> Unit,
+    onDownload: (DownloadStyle) -> Unit,
     onRename: () -> Unit,
     onMove: () -> Unit,
     onDelete: () -> Unit,
@@ -932,7 +1174,9 @@ private fun BrowserEntry(
     onAddToList: () -> Unit,
     onRemoveFromList: () -> Unit,
     onShareLink: (String) -> Unit,
-    onAddToQueue: (() -> Unit)? = null
+    onAddToQueue: (() -> Unit)? = null,
+    downloadHasChoices: Boolean = node.isDirectory,
+    onShareFile: (() -> Unit)? = null
 ) {
     // A list in the lists overview: its own page, when the host has one
     val folderLink = if (node.isDirectory && mode == BrowserMode.LISTS) shareUrl else null
@@ -944,7 +1188,7 @@ private fun BrowserEntry(
     val trailingContent: @Composable () -> Unit = {
             when {
                 // The lists overview: a folder per list, opened or linked
-                node.isDirectory && mode == BrowserMode.LISTS -> ListFolderMenu(node.name, folderLink, onOpen, onShareLink)
+                node.isDirectory && mode == BrowserMode.LISTS -> ListFolderMenu(node.name, folderLink, onOpen, onShareLink, onDownload, downloadHasChoices)
                 // The filesystem: folders and files with their own actions
                 mode == BrowserMode.FILESYSTEM -> FilesystemMenu(
                     node = node,
@@ -955,19 +1199,21 @@ private fun BrowserEntry(
                     onRename = onRename,
                     onMove = onMove,
                     onDelete = onDelete,
-                    onAddToQueue = onAddToQueue
+                    onAddToQueue = onAddToQueue,
+                    onShareFile = onShareFile
                 )
                 // Files and the files of a list: the shared file menu
                 else -> FileItemMenu(
                     file = node,
                     shareUrl = shareUrl,
                     canDelete = canDelete && (if (mode == BrowserMode.LISTS) listCanEdit else true),
-                    onDownload = onDownload,
+                    onDownload = { onDownload(DownloadStyle.SEPARATELY) },
                     onAddToFilesystem = onAddToFilesystem,
                     onAddToList = onAddToList,
                     onDelete = onDelete,
                     onRemoveFromList = if (mode == BrowserMode.LISTS && listCanEdit && openedList != null) onRemoveFromList else null,
-                    onAddToQueue = onAddToQueue
+                    onAddToQueue = onAddToQueue,
+                    onShareFile = onShareFile
                 )
             }
     }
@@ -1002,18 +1248,38 @@ private fun BrowserEntry(
     }
 }
 
+/** The ⋮ menu of a list in the lists overview: open it, download its files ([downloadHasChoices]: in a page of two ways), share its link. */
 @Composable
 private fun ListFolderMenu(
     title: String,
     link: String?,
     onOpen: () -> Unit,
-    onShareLink: (String) -> Unit
+    onShareLink: (String) -> Unit,
+    onDownload: (DownloadStyle) -> Unit,
+    downloadHasChoices: Boolean
 ) {
     OverflowMenuButton(contentDescription = "More options for $title") { close ->
-        AppMenuItem("Open", leadingIcon = Icons.AutoMirrored.Filled.OpenInNew, onClick = { close(); onOpen() })
-        if (link != null) {
-            AppMenuItem("Share link", leadingIcon = Icons.Filled.Share, onClick = { close(); onShareLink(link) })
-        }
+        // Remembered in the menu's popup, so each opening starts on the first page
+        var downloadPage by remember { mutableStateOf(false) }
+        AppMenuPages(
+            showSecondary = downloadPage,
+            primary = {
+                AppMenuItem("Open", leadingIcon = Icons.AutoMirrored.Filled.OpenInNew, onClick = { close(); onOpen() })
+                if (downloadHasChoices) DownloadMenuItem { downloadPage = true }
+                else AppMenuItem("Download", leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload(DownloadStyle.SEPARATELY) })
+                if (link != null) {
+                    AppMenuItem("Share link", leadingIcon = Icons.Filled.Share, onClick = { close(); onShareLink(link) })
+                }
+            },
+            secondary = {
+                DownloadChoiceEntries(
+                    onBack = { downloadPage = false },
+                    onSeparately = { close(); onDownload(DownloadStyle.SEPARATELY) },
+                    onZip = { close(); onDownload(DownloadStyle.ZIP) },
+                    folders = false
+                )
+            }
+        )
     }
 }
 
@@ -1023,29 +1289,70 @@ private fun FilesystemMenu(
     shareUrl: String?,
     canWrite: Boolean,
     canDelete: Boolean,
-    onDownload: () -> Unit,
+    onDownload: (DownloadStyle) -> Unit,
     onRename: () -> Unit,
     onMove: () -> Unit,
     onDelete: () -> Unit,
-    onAddToQueue: (() -> Unit)? = null
+    onAddToQueue: (() -> Unit)? = null,
+    /** Shares the file itself, where it has no link ([shareUrl] null). */
+    onShareFile: (() -> Unit)? = null
 ) {
     OverflowMenuButton(contentDescription = "More options for ${node.name}") { close ->
-        if (!node.isDirectory) {
-            AppMenuItem("Download", leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload() })
-        }
-        if (onAddToQueue != null) {
-            AppMenuItem("Add to queue", leadingIcon = Icons.Filled.QueueMusic, onClick = { close(); onAddToQueue() })
-        }
-        if (canWrite) {
-            AppMenuItem("Rename", leadingIcon = Icons.Filled.Edit, onClick = { close(); onRename() })
-            AppMenuItem("Move", leadingIcon = Icons.AutoMirrored.Filled.DriveFileMove, supportingText = "To another folder", onClick = { close(); onMove() })
-        }
-        if (canDelete) {
-            AppMenuDivider()
-            AppMenuItem("Delete", leadingIcon = Icons.Filled.Delete, destructive = true, onClick = { close(); onDelete() })
-        }
+        // A folder's Download is a page of its own: each file on its own, or all in one zip. Remembered in the menu's
+        // popup, so each opening starts on the first page
+        var downloadPage by remember { mutableStateOf(false) }
+        AppMenuPages(
+            showSecondary = downloadPage,
+            primary = {
+                if (node.isDirectory) {
+                    DownloadMenuItem { downloadPage = true }
+                } else {
+                    AppMenuItem("Download", leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload(DownloadStyle.SEPARATELY) })
+                    if (shareUrl == null && onShareFile != null) {
+                        AppMenuItem("Share file", leadingIcon = Icons.Filled.Share, onClick = { close(); onShareFile() })
+                    }
+                }
+                if (onAddToQueue != null) {
+                    AppMenuItem("Add to queue", leadingIcon = Icons.Filled.QueueMusic, onClick = { close(); onAddToQueue() })
+                }
+                if (canWrite) {
+                    AppMenuItem("Rename", leadingIcon = Icons.Filled.Edit, onClick = { close(); onRename() })
+                    AppMenuItem("Move", leadingIcon = Icons.AutoMirrored.Filled.DriveFileMove, supportingText = "To another folder", onClick = { close(); onMove() })
+                }
+                if (canDelete) {
+                    AppMenuDivider()
+                    AppMenuItem("Delete", leadingIcon = Icons.Filled.Delete, destructive = true, onClick = { close(); onDelete() })
+                }
+            },
+            secondary = {
+                DownloadChoiceEntries(
+                    onBack = { downloadPage = false },
+                    onSeparately = { close(); onDownload(DownloadStyle.SEPARATELY) },
+                    onZip = { close(); onDownload(DownloadStyle.ZIP) },
+                    folders = true
+                )
+            }
+        )
     }
 }
+
+/** "Download" for the selection bar, as each file on its own or all in one zip, chosen in a menu of the two. */
+private fun downloadChoices(enabled: Boolean, onDownload: (DownloadStyle) -> Unit) = SelectionAction(
+    "Download",
+    Icons.Filled.Download,
+    {},
+    enabled = enabled,
+    choices = listOf(
+        SelectionAction("Separately", Icons.Filled.Download, { onDownload(DownloadStyle.SEPARATELY) }),
+        SelectionAction("As one ZIP", Icons.Filled.FolderZip, { onDownload(DownloadStyle.ZIP) })
+    )
+)
+
+/** The same two ways, for a Download of the ⋮ menu at the top of the screen (see ScreenAction.choices). */
+private fun downloadScreenChoices(onDownload: (DownloadStyle) -> Unit) = listOf(
+    ScreenAction(Icons.Filled.Download, "Separately") { onDownload(DownloadStyle.SEPARATELY) },
+    ScreenAction(Icons.Filled.FolderZip, "As one ZIP") { onDownload(DownloadStyle.ZIP) }
+)
 
 /** The line under the sort row while the filesystem uploads: which file it's on, of how many. */
 private fun FilesystemUploadProgress.statusLine(): String = "Uploading $currentFileName ($currentIndex/$totalFiles)"
@@ -1100,10 +1407,7 @@ internal fun SampleBrowserContent(
         isModifying = false,
         uploadStatus = uploadStatus,
         openedList = openedList,
-        listHasFiles = entries.isNotEmpty(),
         onCloseList = {},
-        onDownloadList = {},
-        onDownloadListFiles = {},
         selectionMode = selecting,
         selectedKeys = selectedKeys.orEmpty(),
         selectedCount = selectedKeys?.size ?: 0,
@@ -1146,7 +1450,7 @@ private fun BrowserListsPreview() = BrowserPreview(
     listOf("Holiday 2026", "Shared with Sam", "Wallpapers").map { StorageNode(StorageRef(id = it), it, isDirectory = true) }
 )
 
-/** A list opened: its title, Back, and its downloads (each file, and All (ZIP)). */
+/** A list opened: its title and Back (its downloads are in the ⋮ menu at the top). */
 @ScreenPreviews
 @Composable
 private fun BrowserOpenedListPreview() = BrowserPreview(

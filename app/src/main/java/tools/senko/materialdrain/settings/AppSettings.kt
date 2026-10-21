@@ -13,8 +13,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import androidx.core.content.edit
 import tools.senko.materialdrain.Screen
 import tools.senko.materialdrain.files.SortableField
-import tools.senko.materialdrain.navmenu.NavFabPosition
-import tools.senko.materialdrain.navmenu.NavMenuPreview
 import tools.senko.materialdrain.provider.api.FileList
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.ui.theme.DEFAULT_THEME_COLOR
@@ -31,9 +29,7 @@ private const val WALLPAPER_COLORS_PREF = "theme_wallpaper_colors"
 private const val THEME_COLOR_PREF = "theme_color"
 private const val BLACK_BACKGROUND_PREF = "theme_black_background"
 private const val SWIPE_TABS_PREF = "swipe_between_tabs"
-private const val NAV_PROTOTYPE_PREF = "dev_nav_prototype"
-private const val NAV_MENU_PREVIEW_PREF = "dev_nav_menu_preview"
-private const val NAV_FAB_POSITION_PREF = "nav_fab_position"
+private const val GESTURE_NAVIGATION_PREF = "gesture_navigation"
 private const val SORT_FIELD_PREF = "files_sort_field"
 private const val SORT_ASCENDING_PREF = "files_sort_ascending"
 private const val TEXT_WRAP_PREF = "text_wrap"
@@ -46,6 +42,7 @@ private const val HOLD_HOST_CHECKS_PREF = "data_saver_hold_host_checks"
 private const val LAST_SCREEN_PREF = "last_screen"
 private const val LAST_TAB_PREF = "last_tab"
 private const val FILESYSTEM_PATH_PREFIX = "filesystem_path_"
+private const val VIEW_LOOK_PREFIX = "view_look_"
 private const val OPENED_LIST_ID_PREF = "opened_list_id"
 private const val OPENED_LIST_TITLE_PREF = "opened_list_title"
 private const val OPENED_LIST_COUNT_PREF = "opened_list_count"
@@ -79,7 +76,7 @@ private const val UNDO_CLOSE_SONG_PREF = "undo_close_song"
 private const val VIBRATION_PREF = "vibration"
 private const val VIBRATION_STRENGTH_PREF = "vibration_strength"
 private const val VIBRATE_PLAYER_PREF = "vibrate_player"
-private const val VIBRATE_NAV_BUTTON_PREF = "vibrate_nav_button"
+private const val VIBRATE_NAV_SWIPE_PREF = "vibrate_nav_swipe"
 private const val COPY_LINK_PREF = "copy_link_after_upload"
 private const val OPEN_AFTER_DOWNLOAD_PREF = "open_after_download"
 private const val DOWNLOAD_SUBFOLDER_PREF = "download_subfolder"
@@ -90,8 +87,11 @@ private const val LOCK_TIMEOUT_PREF = "lock_timeout_seconds"
 /** The choices for [AppSettings.searchResultLimit]; 0 is no limit. */
 val SEARCH_RESULT_LIMITS = listOf(0, 200, 50, 20)
 
-/** The screens the app can open on (see [AppSettings.startScreen]), besides the one it was last on. */
-val START_SCREENS = listOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem)
+/**
+ * The screens the app can open on (see [AppSettings.startScreen]), besides the one it was last on: Upload last, as only
+ * a host with nothing else to upload to has it (see rememberHostTabs).
+ */
+val START_SCREENS = listOf(Screen.Files, Screen.Lists, Screen.Filesystem, Screen.Upload)
 
 /** The choices for [AppSettings.seekStepSeconds]. */
 val SEEK_STEPS = listOf(5, 10, 15, 30)
@@ -107,6 +107,36 @@ const val SEARCH_INDEX_DELETE_WARNING =
         "Almost nobody has a reason to delete it, and Pixeldrain will re-create it after a while anyway."
 
 fun StorageNode.isSearchIndex(): Boolean = !isDirectory && name == SEARCH_INDEX_FILE_NAME
+
+/**
+ * How a file list is laid out: rows, a grid of big pictures, or Smart, either one picked by what's in it (the grid for
+ * pictures and videos, see BrowserScreen's smartLayoutIsGrid). Whether rows are compact is chosen apart, whichever.
+ */
+enum class ListLayout { LIST, GRID, SMART }
+
+/**
+ * A folder's (or a screen's, or an open list's) own look, chosen in the View page of the ⋮ menu at the top: what it sets
+ * is used there over the Look and feel's defaults ([AppSettings.gridView], [AppSettings.compactRows]); null keeps the
+ * default. A Filesystem folder's look can be for its [subfolders] too, all the way down: the ones without a look of their
+ * own have the nearest such folder's above them (see BrowserScreen's inheritedPath).
+ */
+data class ViewLook(val layout: ListLayout? = null, val compact: Boolean? = null, val subfolders: Boolean = false) {
+    val isEmpty: Boolean get() = layout == null && compact == null
+
+    /** As it's kept in the preferences: the layout's name (or -), then 1, 0 or - for compact, then r if for [subfolders]. */
+    fun encode(): String = "${layout?.name ?: "-"};${compact?.let { if (it) "1" else "0" } ?: "-"}" + if (subfolders) ";r" else ""
+
+    companion object {
+        fun decode(text: String): ViewLook {
+            val (layout, compact, subfolders) = (text.split(';') + listOf("-", "-", "-")).take(3)
+            return ViewLook(
+                layout = ListLayout.entries.firstOrNull { it.name == layout },
+                compact = when (compact) { "1" -> true; "0" -> false; else -> null },
+                subfolders = subfolders == "r"
+            )
+        }
+    }
+}
 
 /** The list open on the Lists screen when the app was closed, with the host it belongs to. */
 data class SavedOpenedList(val hostId: String, val list: FileList)
@@ -196,23 +226,14 @@ class AppSettings(context: Context) {
 
     fun setLoopVideos(loop: Boolean) = loopVideosPref.set(loop)
 
-    private val navPrototypePref = booleanSetting(NAV_PROTOTYPE_PREF, false)
-    /** The navigation button replaces the bottom bar (Look and feel, Navigation style). Off by default. */
-    val navPrototype: StateFlow<Boolean> = navPrototypePref.flow
+    private val gestureNavigationPref = booleanSetting(GESTURE_NAVIGATION_PREF, false)
+    /**
+     * Swipes between the tabs, with only the thin tab strip at the bottom (see TabStrip), instead of the bottom bar (Look
+     * and feel, Navigation). Off by default.
+     */
+    val gestureNavigation: StateFlow<Boolean> = gestureNavigationPref.flow
 
-    fun setNavPrototype(enabled: Boolean) = navPrototypePref.set(enabled)
-
-    private val navMenuPreviewPref = enumSetting(NAV_MENU_PREVIEW_PREF, NavMenuPreview.PIXELDRAIN)
-    /** Developer setting: which provider's menu the FAB navigation prototype shows. */
-    val navMenuPreview: StateFlow<NavMenuPreview> = navMenuPreviewPref.flow
-
-    fun setNavMenuPreview(preview: NavMenuPreview) = navMenuPreviewPref.set(preview)
-
-    private val navFabPositionPref = enumSetting(NAV_FAB_POSITION_PREF, NavFabPosition.END)
-    /** Where the navigation FAB sits, changed by swiping the FAB sideways. */
-    val navFabPosition: StateFlow<NavFabPosition> = navFabPositionPref.flow
-
-    fun setNavFabPosition(position: NavFabPosition) = navFabPositionPref.set(position)
+    fun setGestureNavigation(enabled: Boolean) = gestureNavigationPref.set(enabled)
 
     private val sortFieldPref = enumSetting(SORT_FIELD_PREF, SortableField.NAME)
     /** The field every sortable file list in the app is sorted by (Files, Filesystem, and an opened list's files share
@@ -249,16 +270,37 @@ class AppSettings(context: Context) {
     fun setBarLabels(always: Boolean) = barLabelsPref.set(always)
 
     private val compactRowsPref = booleanSetting(COMPACT_ROWS_PREF, false)
-    /** The rows of the file lists are lower, with smaller pictures, so more of them fit. Off by default. */
+    /**
+     * The rows of the file lists are lower, with smaller pictures, so more of them fit. Off by default. Only the default:
+     * a folder with its own look (see [viewLooks]) keeps that.
+     */
     val compactRows: StateFlow<Boolean> = compactRowsPref.flow
 
     fun setCompactRows(enabled: Boolean) = compactRowsPref.set(enabled)
 
     private val gridViewPref = booleanSetting(GRID_VIEW_PREF, false)
-    /** The file lists are a grid of big pictures instead of rows. Off by default. */
+    /** The file lists are a grid of big pictures instead of rows. Off by default. Only the default, as [compactRows]. */
     val gridView: StateFlow<Boolean> = gridViewPref.flow
 
     fun setGridView(enabled: Boolean) = gridViewPref.set(enabled)
+
+    private val viewLooksState = MutableStateFlow(
+        prefs.all.mapNotNull { (key, value) ->
+            if (key.startsWith(VIEW_LOOK_PREFIX) && value is String) key.removePrefix(VIEW_LOOK_PREFIX) to ViewLook.decode(value) else null
+        }.toMap()
+    )
+    /**
+     * The folders' and screens' own looks (see [ViewLook]), by the key of what they're the look of: the host, the tab and
+     * the folder or list (see BrowserScreen's viewKey).
+     */
+    val viewLooks: StateFlow<Map<String, ViewLook>> = viewLooksState.asStateFlow()
+
+    /** Gives what [key] stands for its own [look]; null (or one that sets nothing) goes back to the defaults. */
+    fun setViewLook(key: String, look: ViewLook?) {
+        val kept = look?.takeUnless { it.isEmpty }
+        prefs.edit { if (kept == null) remove(VIEW_LOOK_PREFIX + key) else putString(VIEW_LOOK_PREFIX + key, kept.encode()) }
+        viewLooksState.value = if (kept == null) viewLooksState.value - key else viewLooksState.value + (key to kept)
+    }
 
     private val relativeDatesPref = booleanSetting(RELATIVE_DATES_PREF, true)
     /** The file lists say how long ago a file changed ("3 days ago"); off, the date and time itself. */
@@ -370,11 +412,11 @@ class AppSettings(context: Context) {
 
     fun setVibratePlayer(enabled: Boolean) = vibratePlayerPref.set(enabled)
 
-    private val vibrateNavButtonPref = booleanSetting(VIBRATE_NAV_BUTTON_PREF, true)
-    /** The navigation button vibrates when a long press goes back a tab. */
-    val vibrateNavButton: StateFlow<Boolean> = vibrateNavButtonPref.flow
+    private val vibrateNavSwipePref = booleanSetting(VIBRATE_NAV_SWIPE_PREF, true)
+    /** With swipe navigation, a swipe going to another tab vibrates lightly (see TabStrip). */
+    val vibrateNavSwipe: StateFlow<Boolean> = vibrateNavSwipePref.flow
 
-    fun setVibrateNavButton(enabled: Boolean) = vibrateNavButtonPref.set(enabled)
+    fun setVibrateNavSwipe(enabled: Boolean) = vibrateNavSwipePref.set(enabled)
 
     // ---- Files and transfers ----
 
@@ -547,7 +589,7 @@ class AppSettings(context: Context) {
 
     /** The screen the app was last on, so it opens there again. Kept across restarts. */
     var lastScreen: Screen
-        get() = enumPref(LAST_SCREEN_PREF, Screen.Upload)
+        get() = enumPref(LAST_SCREEN_PREF, Screen.Files)
         set(value) = prefs.edit { putString(LAST_SCREEN_PREF, value.name) }
 
     /** The tab the app was last on (see ScreenConfig.tabId), for a host with several tabs of one kind; null for none yet. */

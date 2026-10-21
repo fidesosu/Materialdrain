@@ -231,8 +231,12 @@ class PlayerUiState(val player: Player) {
     }
 }
 
+/**
+ * [player]'s state as the controls show it. Where the song is isn't announced by the player, so it's asked for five
+ * times a second while [polling]: not while what shows it is hidden (the compact player kept ready, see AudioPlayerView).
+ */
 @Composable
-fun rememberPlayerUiState(player: Player): PlayerUiState {
+fun rememberPlayerUiState(player: Player, polling: Boolean = true): PlayerUiState {
     val state = remember(player) { PlayerUiState(player) }
 
     DisposableEffect(player) {
@@ -251,9 +255,9 @@ fun rememberPlayerUiState(player: Player): PlayerUiState {
         onDispose { player.removeListener(listener) }
     }
 
-    // The position is not announced by the player, it has to be asked for
-    LaunchedEffect(player) {
-        while (isActive) {
+    // The position is not announced by the player, it has to be asked for; at once when it's shown again
+    LaunchedEffect(player, polling) {
+        while (polling && isActive) {
             state.refresh()
             delay(200)
         }

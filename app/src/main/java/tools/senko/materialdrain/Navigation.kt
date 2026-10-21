@@ -40,6 +40,28 @@ import tools.senko.materialdrain.ui.icons.filled.Movie
 import tools.senko.materialdrain.ui.icons.filled.MusicNote
 import tools.senko.materialdrain.ui.icons.filled.PhotoCamera
 import tools.senko.materialdrain.ui.icons.filled.Storage
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.LayoutDirection
+import tools.senko.materialdrain.ui.HapticKind
+import tools.senko.materialdrain.ui.HapticPlace
+import tools.senko.materialdrain.ui.LocalAppHaptics
+import tools.senko.materialdrain.ui.LocalReduceMotion
 
 /** The screens of the app. [icon] is null for the one that isn't reached from the navigation, a file's details. */
 enum class Screen(val title: String, private val iconOf: (() -> ImageVector)?) {
@@ -76,9 +98,6 @@ data class Tab(val screen: Screen, val config: ScreenConfig? = null) {
 
     /** Its own icon from the config (see [TabIcons]), or the screen's. */
     val icon: ImageVector get() = config?.icon?.let { TabIcons[it.trim().lowercase()] } ?: requireNotNull(screen.icon)
-
-    /** The group the config puts it in, in the navigation button's menu; null for the row of the tabs without one. */
-    val section: String? get() = config?.section?.trim()?.takeIf { it.isNotEmpty() }
 }
 
 /** The icons a config can give a tab (ScreenConfig.icon), by name. */
@@ -195,6 +214,120 @@ fun AppNavigationRail(
     }
 }
 
+/** How tall the [TabStrip] is, over the system's navigation bar: its dots, and room to touch them. */
+private val StripHeight = 18.dp
+
+/** A dot of the [TabStrip], and the one of the tab shown, as wide as [ShownDotWidth]. */
+private val DotSize = 6.dp
+private val ShownDotWidth = 20.dp
+
+/**
+ * How far apart the dots' middles are, the same for all of them, and so the room each has to be tapped in: the shown
+ * one's wider dot fits in it, so it grows and shrinks from its middle without moving the others.
+ */
+private val DotPitch = 20.dp
+
+/** How long a dot takes to fade to or from the accent colour. */
+private const val DOT_FADE_MILLIS = 150
+
+/** How far a drag along the [TabStrip] goes for each tab it moves by. */
+private val StripStep = 32.dp
+
+/**
+ * The tabs with swipe navigation (Look and feel, Navigation), at the bottom of the screen: no bar, only a thin row with a
+ * dot for each tab, the one shown wider and in the accent colour, which says where this tab is among them and how many
+ * are on either side of it; the screen's title says which it is. The tabs are changed with a swipe sideways across the
+ * page (see sidewaysSwipe), or along this row, a tab for every [StripStep] the finger goes, with a light vibration each;
+ * a tapped dot goes to its tab too. It keeps clear of the system's navigation bar.
+ */
+@Composable
+fun TabStrip(currentTab: Tab?, tabs: List<Tab>, onTabSelected: (Tab) -> Unit, modifier: Modifier = Modifier) {
+    val currentIndex = tabs.indexOfFirst { it.isCurrent(currentTab) }
+    val haptics = LocalAppHaptics.current
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val latestTabs by rememberUpdatedState(tabs)
+    val latestIndex by rememberUpdatedState(currentIndex)
+    val select by rememberUpdatedState(onTabSelected)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .height(StripHeight)
+            .pointerInput(rtl) {
+                val step = StripStep.toPx()
+                var pulled = 0f
+                var from = 0
+                var at = 0
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        pulled = 0f
+                        from = latestIndex.coerceAtLeast(0)
+                        at = from
+                    },
+                    onHorizontalDrag = { change, amount ->
+                        change.consume()
+                        // Along the row: to the right is to the tabs after this one (to the left, right to left)
+                        pulled += if (rtl) -amount else amount
+                        val target = (from + (pulled / step).toInt()).coerceIn(0, latestTabs.lastIndex)
+                        if (target != at) {
+                            at = target
+                            haptics.perform(HapticKind.THRESHOLD, HapticPlace.NAV_SWIPE)
+                            select(latestTabs[target])
+                        }
+                    }
+                )
+            }
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            tabs.forEachIndexed { index, tab ->
+                StripDot(tab, selected = index == currentIndex, onClick = { select(tab) })
+            }
+        }
+    }
+}
+
+/**
+ * One tab of the [TabStrip]: a dot, wider and in the accent colour when it's the one shown ([selected]). Its place is as
+ * wide whichever it is ([DotPitch]), so the dot widens and narrows from its middle, whichever way the tabs went, and
+ * fades between the colours.
+ */
+@Composable
+private fun StripDot(tab: Tab, selected: Boolean, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val reduceMotion = LocalReduceMotion.current
+    val width by animateDpAsState(
+        if (selected) ShownDotWidth else DotSize,
+        if (reduceMotion) snap() else spring(),
+        label = "stripDotWidth"
+    )
+    val color by animateColorAsState(
+        if (selected) colors.primary else colors.onSurfaceVariant.copy(alpha = 0.35f),
+        if (reduceMotion) snap() else tween(DOT_FADE_MILLIS),
+        label = "stripDotColor"
+    )
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(width = DotPitch, height = StripHeight)
+            .clickable(
+                interactionSource = null,
+                indication = null,
+                role = Role.Tab,
+                onClickLabel = tab.title,
+                onClick = onClick
+            )
+            .semantics { this.selected = selected; contentDescription = tab.title }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = width, height = DotSize)
+                .clip(CircleShape)
+                .background(color)
+        )
+    }
+}
+
 /** Whether the screen is wide enough for the tabs to go at its side (see [AppNavigationRail]). */
 @Composable
 fun isWideScreen(): Boolean = LocalConfiguration.current.screenWidthDp >= 600
@@ -206,10 +339,10 @@ fun isWideScreen(): Boolean = LocalConfiguration.current.screenWidthDp >= 600
 @Composable
 private fun BottomNavigationBarPreview() {
     PreviewTheme {
-        val tabs = listOf(Screen.Upload, Screen.Files, Screen.Lists, Screen.Filesystem).map { Tab(it) }
+        val tabs = listOf(Screen.Files, Screen.Lists, Screen.Filesystem).map { Tab(it) }
         Column {
-            BottomNavigationBar(currentTab = tabs[1], tabs = tabs, onTabSelected = {})
-            BottomNavigationBar(currentTab = tabs[1], tabs = tabs, onTabSelected = {}, alwaysShowLabels = false)
+            BottomNavigationBar(currentTab = tabs[0], tabs = tabs, onTabSelected = {})
+            BottomNavigationBar(currentTab = tabs[0], tabs = tabs, onTabSelected = {}, alwaysShowLabels = false)
         }
     }
 }
@@ -232,13 +365,26 @@ private fun AppNavigationRailPreview() {
     }
 }
 
-/** Made-up tabs of a big host: Filesystem tabs with their own names, icons and sections. */
+/** The swipe navigation's strip with the tabs of the built-in Pixeldrain, Files shown; and with a big host's seven. */
+@ThemePreviews
+@Composable
+private fun TabStripPreview() {
+    PreviewTheme {
+        val tabs = listOf(Screen.Files, Screen.Lists, Screen.Filesystem).map { Tab(it) }
+        Column {
+            TabStrip(currentTab = tabs[0], tabs = tabs, onTabSelected = {})
+            TabStrip(currentTab = ManyTabs[2], tabs = ManyTabs, onTabSelected = {})
+        }
+    }
+}
+
+/** Made-up tabs of a big host: Filesystem tabs with their own names and icons. */
 private val ManyTabs = listOf(
     Tab(Screen.Upload),
     Tab(Screen.Filesystem, ScreenConfig(HostScreen.FILESYSTEM, id = "photos", name = "Photos", icon = "photo")),
-    Tab(Screen.Filesystem, ScreenConfig(HostScreen.FILESYSTEM, id = "music", name = "Music", icon = "music", section = "Media")),
-    Tab(Screen.Filesystem, ScreenConfig(HostScreen.FILESYSTEM, id = "videos", name = "Videos", icon = "video", section = "Media")),
-    Tab(Screen.Filesystem, ScreenConfig(HostScreen.FILESYSTEM, id = "backups", name = "Backups", icon = "backup", section = "Admin")),
+    Tab(Screen.Filesystem, ScreenConfig(HostScreen.FILESYSTEM, id = "music", name = "Music", icon = "music")),
+    Tab(Screen.Filesystem, ScreenConfig(HostScreen.FILESYSTEM, id = "videos", name = "Videos", icon = "video")),
+    Tab(Screen.Filesystem, ScreenConfig(HostScreen.FILESYSTEM, id = "backups", name = "Backups", icon = "backup")),
     Tab(Screen.Filesystem, ScreenConfig(HostScreen.FILESYSTEM, id = "docs", name = "Documents", icon = "document")),
-    Tab(Screen.Filesystem, ScreenConfig(HostScreen.FILESYSTEM, id = "shared", name = "Shared", icon = "shared", section = "Admin"))
+    Tab(Screen.Filesystem, ScreenConfig(HostScreen.FILESYSTEM, id = "shared", name = "Shared", icon = "shared"))
 )

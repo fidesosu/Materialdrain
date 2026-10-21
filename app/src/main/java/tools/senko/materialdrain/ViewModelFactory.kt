@@ -19,7 +19,7 @@ class ViewModelFactory(
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(UploadViewModel::class.java)) {
-            return UploadViewModel(application, container.providerRegistry, container.providerConfigStore, container.sessionManager, container.transferRegistry, container.appSettings) as T
+            return UploadViewModel(application, container.providerRegistry, container.providerConfigStore, container.sessionManager, container.transferRegistry, container.appSettings, container.uiMessages) as T
         }
         if (modelClass.isAssignableFrom(FileInfoViewModel::class.java)) {
             return FileInfoViewModel(application, container.providerRegistry, container.providerConfigStore, container.sessionManager, container.downloadManager, container.appSettings, container.uiMessages, container.contentChanges, container.dataSaver) as T

@@ -328,7 +328,7 @@ private fun visibleArea(hostView: View, anchor: LayoutCoordinates?, anchorBounds
 
 /**
  * The top of the app's navigation at the bottom of the screen, which menus open above rather than over: the bottom bar,
- * or the button of the navigation prototype. Each tells it with [keepsMenusAbove]; the highest one counts.
+ * or the tab strip of swipe navigation. Each tells it with [keepsMenusAbove]; the highest one counts.
  */
 class MenuFloor {
     private val tops = mutableMapOf<Any, Float>()

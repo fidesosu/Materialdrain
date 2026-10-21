@@ -54,6 +54,7 @@ import tools.senko.materialdrain.transfer.TransferSpeedTracker
 import tools.senko.materialdrain.transfer.estimateEtaSeconds
 import tools.senko.materialdrain.util.readContentUriInfo
 import tools.senko.materialdrain.settings.AppSettings
+import tools.senko.materialdrain.UiMessages
 
 // SharedPreferences constants
 private const val TAG = "PIXEL_VM_DEBUG" // Tag for Logcat
@@ -150,7 +151,8 @@ class UploadViewModel(
     private val configStore: ProviderConfigStore,
     private val sessionManager: SessionManager,
     private val transfers: TransferRegistry,
-    private val appSettings: AppSettings
+    private val appSettings: AppSettings,
+    private val messages: UiMessages
 ) : ViewModel() {
 
     private fun provider() = registry.resolve(configStore.activeProviderId.value)
@@ -500,6 +502,31 @@ class UploadViewModel(
         )
     }
 
+    /**
+     * Uploads [uris] right away as new files of the host: the Files screen's Upload (in its ⋮ menu), and files shared to
+     * the app sent there (see SharedUploadBar). Read and queued as picked files are, then sent as [upload] sends them;
+     * how it went is told on the snackbar rather than on the Upload screen, which isn't there. Not while an upload runs.
+     */
+    fun uploadNow(uris: List<Uri>, context: Context) {
+        if (uris.isEmpty() || _uiState.value.isLoading) return
+        pickJob?.cancel()
+        pickJob = viewModelScope.launch {
+            val items = withContext(Dispatchers.IO) { uris.map { uri -> readUploadItem(uri, context) } }
+            _uiState.update {
+                it.copy(
+                    queuedItems = items,
+                    pickedFile = null,
+                    uploadTotalSizeBytes = null,
+                    textToUpload = "",
+                    errorMessage = null,
+                    uploadResult = null,
+                    uploadedBytes = 0L
+                )
+            }
+            uploadQueuedItems(fromScreen = false)
+        }
+    }
+
     fun removeQueuedItem(itemId: Int) {
         if (_uiState.value.isLoading) return
         _uiState.update { it.copy(queuedItems = it.queuedItems.filterNot { item -> item.id == itemId }) }
@@ -550,7 +577,11 @@ class UploadViewModel(
         _uiState.update { it.copy(uploadResult = null, errorMessage = null, isLoading = false, uploadedBytes = 0L) }
     }
 
-    private fun uploadQueuedItems() {
+    /**
+     * Sends the queued files. [fromScreen] false (see [uploadNow]): there's no Upload screen to show how it went, and so
+     * to retry from, so the snackbar says it instead.
+     */
+    private fun uploadQueuedItems(fromScreen: Boolean = true) {
         // In the order the files were last changed, oldest first (files whose date Android doesn't know go last, as
         // they were picked), and one after another, so they reach the host in that order; otherwise several at once
         val ordered = appSettings.uploadInModifiedOrder.value
@@ -658,8 +689,12 @@ class UploadViewModel(
                         isLoading = false,
                         uploadSpeedBytesPerSec = 0L,
                         uploadEtaSeconds = null,
-                        errorMessage = if (failed > 0) "$failed of ${batch.size} uploads failed. Press Upload to retry the failed files." else null
+                        errorMessage = if (failed > 0 && fromScreen) "$failed of ${batch.size} uploads failed. Press Upload to retry the failed files." else null
                     )
+                }
+                if (!fromScreen) {
+                    val firstError = _uiState.value.queuedItems.firstOrNull { it.id in batchIds && it.status == UploadItemStatus.FAILED }?.errorMessage
+                    messages.show(if (failed > 0) "$outcomeMessage ${firstError.orEmpty()}".trim() else outcomeMessage.orEmpty(), long = failed > 0)
                 }
             } catch (e: CancellationException) {
                 outcome = TransferOutcome.CANCELLED

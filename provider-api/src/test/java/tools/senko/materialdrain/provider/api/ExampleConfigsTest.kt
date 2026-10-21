@@ -27,7 +27,7 @@ class ExampleConfigsTest {
         assertEquals(
             setOf(
                 "upload", "download", "download_archive", "archive_info", "archive_file", "delete", "file_info", "user_info", "list",
-                "browse_list", "browse_upload", "browse_download", "browse_thumbnail",
+                "browse_list", "browse_upload", "browse_download", "browse_download_archive", "browse_thumbnail",
                 "browse_mkdir", "browse_rename", "browse_delete", "browse_import",
                 "user_lists", "list_info", "list_create", "list_update", "list_delete", "share_id", "share_path",
                 "share_list", "thumbnail_id", "raw_id"

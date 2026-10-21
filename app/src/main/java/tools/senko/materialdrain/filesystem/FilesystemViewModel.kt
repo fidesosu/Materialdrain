@@ -524,6 +524,32 @@ class FilesystemViewModel(
         runBulkModification(entries, "deleted") { browse, entry -> browse.delete(entry.ref.path, recursive = entry.isDirectory) }
     }
 
+    private val _pendingMove = MutableStateFlow<List<StorageNode>>(emptyList())
+
+    /**
+     * Entries of this tab on their way to another of its folders, which the user browses to in the tab itself (see
+     * BrowserScreen's move bar), until they're moved there ([moveHere]) or left where they are ([cancelMove]); empty for
+     * none. Kept while other tabs are visited, as the tab's folder is.
+     */
+    val pendingMove: StateFlow<List<StorageNode>> = _pendingMove.asStateFlow()
+
+    fun startMove(entries: List<StorageNode>) {
+        _pendingMove.value = entries
+    }
+
+    fun cancelMove() {
+        _pendingMove.value = emptyList()
+    }
+
+    /** Moves the [pendingMove] entries into the folder that's open. */
+    fun moveHere() {
+        val entries = _pendingMove.value
+        if (entries.isEmpty() || _uiState.value.isModifying) return
+        _pendingMove.value = emptyList()
+        val here = _uiState.value.currentPath
+        if (entries.size == 1) moveEntry(entries.first(), here) else moveEntries(entries, here)
+    }
+
     fun moveEntries(entries: List<StorageNode>, destinationDirectory: String) {
         val destination = normalizePath(destinationDirectory, rootPath(provider()))
         runBulkModification(entries, "moved") { browse, entry ->

@@ -8,7 +8,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import tools.senko.materialdrain.files.DownloadStyle
 import tools.senko.materialdrain.files.FileInfoViewModel
+import tools.senko.materialdrain.ui.components.ConfirmDialog
+import tools.senko.materialdrain.util.formatSize
 import tools.senko.materialdrain.settings.SEARCH_INDEX_DELETE_WARNING
 import tools.senko.materialdrain.settings.isSearchIndex
 import tools.senko.materialdrain.upload.UploadViewModel
@@ -34,8 +37,8 @@ internal sealed class AppDialog(val title: String, val text: String, val opensAc
 }
 
 /**
- * The main screen's dialogs: the problem in [dialog], and the confirmation of a file's deletion while one is asked for
- * ([confirmDelete]). Closing [dialog] clears what it reported ([onClosed] then lets it go); OK on a missing API key goes to
+ * The main screen's dialogs: the problem in [dialog], the confirmation of a file's deletion while one is asked for
+ * ([confirmDelete]), and that of a big download of folders (see DownloadManager.downloadItems). Closing [dialog] clears what it reported ([onClosed] then lets it go); OK on a missing API key goes to
  * where it's set ([onOpenAccountSettings]).
  */
 @Composable
@@ -65,6 +68,22 @@ internal fun AppDialogs(
             title = { Text(shown.title) },
             text = { Text(shown.text) },
             confirmButton = { Button(onClick = { close(confirmed = true) }) { Text("OK") } }
+        )
+    }
+
+    // Read here, so its changes don't redraw the screen behind
+    val downloadConfirmation by fileInfoViewModel.downloadConfirmation.collectAsState()
+    downloadConfirmation?.let { download ->
+        val size = download.totalBytes?.let { ", ${formatSize(it)} in all" }.orEmpty()
+        ConfirmDialog(
+            title = "Download ${download.fileCount} files?",
+            text = "\"${download.title}\" holds ${download.fileCount} files$size. " + when (download.style) {
+                DownloadStyle.SEPARATELY -> "Each one is saved on its own, in its folders in Download."
+                DownloadStyle.ZIP -> "They're saved in one ZIP, made on this device as they download."
+            },
+            confirmLabel = "Download",
+            onConfirm = { fileInfoViewModel.confirmDownload() },
+            onDismiss = { fileInfoViewModel.dismissDownloadConfirmation() }
         )
     }
 

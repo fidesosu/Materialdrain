@@ -36,7 +36,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -63,6 +62,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -70,6 +70,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import coil.imageLoader
+import coil.memory.MemoryCache
 import coil.request.SuccessResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -91,6 +92,7 @@ import tools.senko.materialdrain.ui.icons.filled.MusicNote
 import tools.senko.materialdrain.ui.icons.filled.Pause
 import tools.senko.materialdrain.ui.icons.filled.PlayArrow
 import tools.senko.materialdrain.ui.icons.filled.Refresh
+import tools.senko.materialdrain.ui.icons.outlined.Image
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.ui.theme.AppShapes
@@ -121,13 +123,16 @@ private fun stretched(pulled: Float, limit: Float): Float =
     if (limit <= 0f) 0f else sign(pulled) * limit * (1f - exp(-abs(pulled) / limit))
 
 /**
- * How far the compact player has to have grown out of the miniplayer before it hides it: by then it has faded in over
- * it (see AudioPlayerView), so the miniplayer shows through it until its own cover and colour are there.
+ * With reduced animations, how far the compact player has to have grown out of the miniplayer before it hides it: by
+ * then it has faded in over it (see AudioPlayerView). Otherwise the miniplayer turns into it, hidden from the start.
  */
 internal const val COMPACT_OPAQUE_AT = 0.3f
 
 /** The height of the miniplayer's row, under which its progress line runs. */
 private val MiniPlayerHeight = 64.dp
+
+/** The shadow of the miniplayer's card, which the compact player's starts out as. */
+internal val MiniShadow = 4.dp
 
 /** The size of the cover a tint's colour is read from: plenty for its colour, and quick. */
 private const val ACCENT_SAMPLE_PX = 128
@@ -197,16 +202,19 @@ fun BackgroundMiniPlayer(
             },
             onDismiss = { closeSong(player, current, messages.takeIf { settings.undoCloseSong }) },
             modifier = (if (aboveSystemBar) Modifier.navigationBarsPadding() else Modifier)
-                // Under the compact player once that has faded in over it (see COMPACT_OPAQUE_AT), read as it's drawn
-                .graphicsLayer { alpha = if (compactPlayer && sheet.progress.value > COMPACT_OPAQUE_AT) 0f else 1f }
-        ) {
-            IconButton(onClick = { if (failed) state.retry() else state.togglePlayPause() }) {
-                when {
-                    failed -> Icon(Icons.Filled.Refresh, contentDescription = "Try again", tint = MaterialTheme.colorScheme.error)
-                    state.isBuffering -> CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                    else -> Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (playing) "Pause" else "Play")
+                // Hidden as soon as the compact player it turns into is there in its place; with reduced animations, once
+                // that has faded in over it (see COMPACT_OPAQUE_AT). Read as it's drawn
+                .graphicsLayer {
+                    val shown = sheet.progress.value
+                    alpha = if (compactPlayer && (if (reduceMotion) shown > COMPACT_OPAQUE_AT else shown > 0f)) 0f else 1f
                 }
-            }
+        ) {
+            MiniPlayButton(
+                playing = playing,
+                buffering = state.isBuffering,
+                failed = failed,
+                onClick = { if (failed) state.retry() else state.togglePlayPause() }
+            )
         }
     }
 }
@@ -291,7 +299,12 @@ fun MiniPlayer(
         targetValue = accent?.let { accentContainer(it, colors.primaryContainer, colors.primary) } ?: cardColor,
         label = "miniPlayerTint"
     )
-    DisposableEffect(sheet) { onDispose { sheet.miniBounds = null } }
+    DisposableEffect(sheet) {
+        onDispose {
+            sheet.miniBounds = null
+            sheet.miniParts.clear()
+        }
+    }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -304,8 +317,7 @@ fun MiniPlayer(
         Surface(
             color = cardColor,
             shape = AppShapes.Medium,
-            tonalElevation = 3.dp,
-            shadowElevation = 4.dp,
+            shadowElevation = MiniShadow,
             modifier = Modifier
                 .matchParentSize()
                 .graphicsLayer {
@@ -320,8 +332,7 @@ fun MiniPlayer(
     Surface(
         color = cardColor,
         shape = AppShapes.Medium,
-        tonalElevation = 3.dp,
-        shadowElevation = 4.dp,
+        shadowElevation = MiniShadow,
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
@@ -441,29 +452,38 @@ fun MiniPlayer(
                 .background(Brush.horizontalGradient(listOf(tint, cardColor)))
                 .clickable(onClickLabel = "Open the player", onClick = sheet::open)
         ) {
-            MiniPlayerRow(art, title, artist, controls)
-            val lineModifier = Modifier.fillMaxWidth().height(2.dp)
-            val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
-            when {
-                failed -> LinearProgressIndicator(
-                    progress = { 1f },
-                    drawStopIndicator = {},
-                    gapSize = 0.dp,
-                    color = MaterialTheme.colorScheme.error,
-                    trackColor = trackColor,
-                    modifier = lineModifier
-                )
-                buffering -> LinearProgressIndicator(gapSize = 0.dp, trackColor = trackColor, modifier = lineModifier)
-                else -> LinearProgressIndicator(
-                    progress = progress,
-                    drawStopIndicator = {},
-                    gapSize = 0.dp,
-                    trackColor = trackColor,
-                    modifier = lineModifier
-                )
-            }
+            MiniPlayerRow(art, title, artist, controls, sheet = sheet)
+            MiniProgressLine(progress, buffering, failed)
         }
     }
+    }
+}
+
+/**
+ * How far the song is ([progress], 0 to 1), as the line along the bottom of the miniplayer: running on its own while it's
+ * [buffering], red when it [failed].
+ */
+@Composable
+internal fun MiniProgressLine(progress: () -> Float, buffering: Boolean, failed: Boolean, modifier: Modifier = Modifier) {
+    val lineModifier = modifier.fillMaxWidth().height(2.dp)
+    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+    when {
+        failed -> LinearProgressIndicator(
+            progress = { 1f },
+            drawStopIndicator = {},
+            gapSize = 0.dp,
+            color = MaterialTheme.colorScheme.error,
+            trackColor = trackColor,
+            modifier = lineModifier
+        )
+        buffering -> LinearProgressIndicator(gapSize = 0.dp, trackColor = trackColor, modifier = lineModifier)
+        else -> LinearProgressIndicator(
+            progress = progress,
+            drawStopIndicator = {},
+            gapSize = 0.dp,
+            trackColor = trackColor,
+            modifier = lineModifier
+        )
     }
 }
 
@@ -478,23 +498,58 @@ private suspend fun awaitSongChange(before: Any?, current: () -> Any?) {
 /** A song as the miniplayer shows it, e.g. the one that peeks in beside it: its title, artist and cover (see MiniPlayer). */
 data class MiniSong(val title: String?, val artist: String?, val art: Any?)
 
-/** The cover, the title and the artist of the miniplayer, then [controls] at the end. */
+/**
+ * The cover, the title and the artist of the miniplayer, then [controls] at the end. With [sheet] (the miniplayer's own
+ * row, not the song peeking in beside it), where the cover, the text and the controls are goes to it, for the compact
+ * player to grow its own out of them (see AudioPlayerSheetState.miniParts).
+ */
 @Composable
-internal fun MiniPlayerRow(art: Any?, title: String?, artist: String?, controls: @Composable RowScope.() -> Unit = {}) {
+internal fun MiniPlayerRow(
+    art: Any?,
+    title: String?,
+    artist: String?,
+    controls: @Composable RowScope.() -> Unit = {},
+    sheet: AudioPlayerSheetState? = null
+) {
+    fun Modifier.part(part: MorphPart) = if (sheet == null) this else onGloballyPositioned { sheet.miniParts[part] = it }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.height(MiniPlayerHeight).padding(start = 8.dp, end = 4.dp)
     ) {
-        MiniCover(art)
+        MiniCover(art, modifier = Modifier.part(MorphPart.Cover))
         Spacer(Modifier.width(12.dp))
-        // One line each, scrolling when it doesn't fit (see ScrollingText)
-        Column(modifier = Modifier.weight(1f)) {
-            ScrollingText(title ?: "Audio", style = MaterialTheme.typography.titleSmall)
-            artist?.let {
-                ScrollingText(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+        MiniPlayerText(title, artist, modifier = Modifier.weight(1f).part(MorphPart.Text))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.part(MorphPart.Play), content = controls)
+    }
+}
+
+/**
+ * The miniplayer's play button: only its sign, with no container, the loading circle while it's [buffering], try again
+ * (in the error colour) when it [failed].
+ */
+@Composable
+internal fun MiniPlayButton(playing: Boolean, buffering: Boolean, failed: Boolean, onClick: () -> Unit) {
+    IconButton(onClick = onClick) { MiniPlayGlyph(playing, buffering, failed) }
+}
+
+/** What [MiniPlayButton] shows; the compact player growing out of the miniplayer draws it too, fading out (see AudioPlayerView). */
+@Composable
+internal fun MiniPlayGlyph(playing: Boolean, buffering: Boolean, failed: Boolean) {
+    when {
+        failed -> Icon(Icons.Filled.Refresh, contentDescription = "Try again", tint = MaterialTheme.colorScheme.error)
+        buffering -> CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+        else -> Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (playing) "Pause" else "Play")
+    }
+}
+
+/** The title and the artist as the miniplayer shows them: one line each, scrolling when it doesn't fit (see ScrollingText). */
+@Composable
+internal fun MiniPlayerText(title: String?, artist: String?, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        ScrollingText(title ?: "Audio", style = MaterialTheme.typography.titleSmall)
+        artist?.let {
+            ScrollingText(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Row(verticalAlignment = Alignment.CenterVertically, content = controls)
     }
 }
 
@@ -544,26 +599,76 @@ private object AccentCache {
     @Synchronized fun put(key: String, color: Color?) { colors[key] = color }
 }
 
-/** The song's cover in the miniplayer, or a note where it has none. */
+/**
+ * Up to how big a cover is loaded at this one size, whatever size it's shown at: the miniplayer's, the queue's and the
+ * song card's then share one copy in the memory cache.
+ */
+private val SharedCoverSize = 96.dp
+
+/**
+ * From how big a cover is shown as big as it is in its file (see MediaCovers.large) rather than as its thumbnail: the
+ * players' (the compact one's and up). The thumbnail stands in until it's there, so the compact player growing out of
+ * the miniplayer has its cover at once.
+ */
+private val LargeCoverSize = 96.dp
+
+/**
+ * The song's cover in the miniplayer (and the players, the song card and the queue), or a note where it has none. With
+ * [onLoad], the cover is held back (the data saver, see DataSaver): a picture's sign, which loads it when tapped. A cover
+ * inside the song's file is decoded away from the main thread, only as big as it's shown (see rememberDecoded).
+ */
 @Composable
-internal fun MiniCover(art: Any?, size: androidx.compose.ui.unit.Dp = 48.dp, shape: androidx.compose.ui.graphics.Shape = MediaControlShape) {
+internal fun MiniCover(
+    art: Any?,
+    size: androidx.compose.ui.unit.Dp = 48.dp,
+    shape: androidx.compose.ui.graphics.Shape = MediaControlShape,
+    modifier: Modifier = Modifier,
+    onLoad: (() -> Unit)? = null,
+    contentDescription: String? = null
+) {
     val context = LocalContext.current
+    val density = LocalDensity.current
+    val sharedPx = with(density) { SharedCoverSize.roundToPx() }
+    val large = size >= LargeCoverSize
+    val shared = !large && size <= SharedCoverSize
+    // The note's size: bigger on the bigger covers (the song card's and up)
+    val glyph = Modifier.size(if (size >= 64.dp) 32.dp else 24.dp)
     Box(
-        modifier = Modifier.size(size).clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
+        modifier = modifier
+            .size(size)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .then(if (onLoad != null) Modifier.clickable(onClickLabel = "Load the cover", onClick = onLoad) else Modifier),
         contentAlignment = Alignment.Center
     ) {
-        when (art) {
-            is ByteArray -> rememberDecodedBitmap(art)?.let { bitmap ->
-                Image(bitmap, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            } ?: Icon(Icons.Filled.MusicNote, contentDescription = null)
-            is Uri, is String -> AsyncImage(
-                model = remember(art) { imageRequest(context, art) { crossfade(true) } },
-                contentDescription = null,
+        when {
+            onLoad != null -> Icon(Icons.Outlined.Image, contentDescription = "Load the cover", modifier = glyph)
+            art is ByteArray -> when (val decoded = rememberDecoded(art, maxSizePx = with(density) { size.roundToPx() })) {
+                is Decoded.Done -> Image(
+                    decoded.bitmap,
+                    contentDescription = contentDescription,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                // Only the square while it decodes, rather than the note for a moment
+                Decoded.Decoding -> Unit
+                Decoded.Failed -> Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = glyph)
+            }
+            art is Uri || art is String -> AsyncImage(
+                model = remember(art, shared, large) {
+                    imageRequest(context, if (large) MediaCovers.large(art) ?: art else art) {
+                        crossfade(true)
+                        if (shared) size(sharedPx)
+                        // The thumbnail (already in the memory cache, see SharedCoverSize) until the big one is there
+                        if (large) placeholderMemoryCacheKey(MemoryCache.Key(art.toString()))
+                    }
+                },
+                contentDescription = contentDescription,
                 contentScale = ContentScale.Crop,
                 error = rememberVectorPainter(Icons.Filled.MusicNote),
                 modifier = Modifier.fillMaxSize()
             )
-            else -> Icon(Icons.Filled.MusicNote, contentDescription = null)
+            else -> Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = glyph)
         }
     }
 }
@@ -578,19 +683,19 @@ private fun MiniPlayerPreview() {
         val sheet = rememberAudioPlayerSheetState()
         Column {
             MiniPlayer(title = "A Song", artist = "Some Artist", art = null, progress = { 0.35f }, sheet = sheet) {
-                IconButton(onClick = {}) { Icon(Icons.Filled.PlayArrow, contentDescription = "Play") }
+                MiniPlayButton(playing = false, buffering = false, failed = false, onClick = {})
             }
             MiniPlayer(
                 title = "A rather long file name of a song - Remastered (2026).flac", artist = null, art = null,
                 progress = { 0.8f }, sheet = sheet, accent = Color(0xFFD0583A)
             ) {
-                IconButton(onClick = {}) { Icon(Icons.Filled.Pause, contentDescription = "Pause") }
+                MiniPlayButton(playing = true, buffering = false, failed = false, onClick = {})
             }
             MiniPlayer(title = "Loading", artist = "Some Artist", art = null, progress = { 0f }, sheet = sheet, buffering = true) {
-                IconButton(onClick = {}) { CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp) }
+                MiniPlayButton(playing = true, buffering = true, failed = false, onClick = {})
             }
             MiniPlayer(title = "Can't be played", artist = null, art = null, progress = { 0f }, sheet = sheet, failed = true) {
-                IconButton(onClick = {}) { Icon(Icons.Filled.Refresh, contentDescription = "Try again", tint = MaterialTheme.colorScheme.error) }
+                MiniPlayButton(playing = false, buffering = false, failed = true, onClick = {})
             }
         }
     }

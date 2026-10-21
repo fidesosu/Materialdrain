@@ -113,6 +113,14 @@ import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import tools.senko.materialdrain.ui.preview.PreviewSamples
 import tools.senko.materialdrain.files.fileComparator
 import tools.senko.materialdrain.ui.icons.filled.Upload
+import tools.senko.materialdrain.ui.icons.filled.Check
+import tools.senko.materialdrain.ui.icons.filled.Download
+import tools.senko.materialdrain.ui.icons.filled.FolderZip
+import tools.senko.materialdrain.ui.icons.filled.GridView
+import tools.senko.materialdrain.ui.icons.filled.AutoAwesome
+import tools.senko.materialdrain.ui.icons.filled.Refresh
+import tools.senko.materialdrain.ui.icons.filled.ViewList
+import tools.senko.materialdrain.settings.ListLayout
 
 /** The path at the top of the filesystem: each folder is tappable, and the row scrolls to the end of it. */
 @Composable
@@ -136,7 +144,7 @@ fun PathBreadcrumb(
             fontWeight = FontWeight.Bold,
             modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp)
         )
         return
     }
@@ -145,7 +153,8 @@ fun PathBreadcrumb(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(scrollState)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            // A little closer to the bar above than to the list below
+            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         pathSegments.forEachIndexed { index, segment ->
@@ -259,22 +268,64 @@ fun StatusCards(
 /** The sort order of a sortable list, for the ⋮ menu at the top of its screen (see [ScreenMenuEntries]). */
 class SortChoice(val field: SortableField, val ascending: Boolean, val onSelect: (SortableField) -> Unit)
 
-/** An action of a screen behind New in the ⋮ menu at its top (see [ScreenMenuEntries]), e.g. the filesystem's upload. */
+/** Where a [ScreenAction] goes in the ⋮ menu at the top of its screen (see [ScreenMenuEntries]). */
+enum class ScreenActionGroup {
+    /** At the top, as it is: what's done with the page shown (download an open list, select) */
+    PAGE,
+
+    /** Behind New: what makes something new on it (upload, a new folder) */
+    NEW
+}
+
+/**
+ * An action of a screen in the ⋮ menu at its top (see [ScreenMenuEntries]), in its [group]: e.g. the filesystem's upload.
+ * With [choices] (Download: each file on its own, or all in one zip), it opens a page of those instead.
+ */
 data class ScreenAction(
     val icon: ImageVector,
     val description: String,
     val enabled: Boolean = true,
+    val group: ScreenActionGroup = ScreenActionGroup.NEW,
+    val choices: List<ScreenAction> = emptyList(),
     val onClick: () -> Unit
 )
 
-/** A page of the ⋮ menu at the top of a screen (see [ScreenMenuEntries]). */
-enum class ScreenMenuPage { Sort, New }
+/**
+ * How the list a screen shows looks, for the View page of its ⋮ menu (see [ScreenMenuEntries]): as a [grid] or rows,
+ * [compact] rows, and whether that's this folder's own look ([custom]) or the Look and feel's defaults, which
+ * [defaultLabel] says. [onLayout] and [onCompact] give the folder its own look, [onReset] takes it back to the defaults.
+ *
+ * A Filesystem folder's look can be for its subfolders too ([subfolders], null where there are none to have it, set with
+ * [onSubfolders]); one that has the look of such a folder above it says which ([inheritedFrom]), and that look is then
+ * what [defaultLabel] says and [onReset] goes back to. With the Smart layout chosen ([smart]), [grid] is what it picked.
+ */
+class ViewChoice(
+    val grid: Boolean,
+    val compact: Boolean,
+    val custom: Boolean,
+    val defaultLabel: String,
+    val onLayout: (ListLayout) -> Unit,
+    val onCompact: (Boolean) -> Unit,
+    val onReset: () -> Unit,
+    val subfolders: Boolean? = null,
+    val onSubfolders: (Boolean) -> Unit = {},
+    val inheritedFrom: String? = null,
+    val smart: Boolean = false
+)
+
+/** A page of the ⋮ menu at the top of a screen (see [ScreenMenuEntries]); [Choices], those of a [ScreenAction]. */
+enum class ScreenMenuPage { Sort, View, New, Choices }
 
 /**
- * The entries of the ⋮ menu at the top of a screen: Sort by for a sortable list ([sort]), with the field it's sorted on,
- * and New for the screen's own [actions], each opening a page of its own; then Settings, at the bottom. [close] closes
- * the menu, which choosing a field doesn't (see [SortMenuEntries]). [startPage] is the page it opens on, for the
- * previews.
+ * The entries of the ⋮ menu at the top of a screen, in the order they're reached for:
+ * - first what's done with the page shown (the [actions] of [ScreenActionGroup.PAGE]: an open list's downloads, Select),
+ *   then New, a page of the screen's actions which make something ([ScreenActionGroup.NEW]): what the menu is opened for;
+ * - then how the list is shown: Sort by for a sortable list ([sort]), with the field it's sorted on, and View ([view]),
+ *   its look, each a page of its own; set less often, they come after;
+ * - last Settings, which leaves the screen.
+ *
+ * [close] closes the menu, which choosing on the Sort by and View pages doesn't, so the change can be seen (see
+ * [SortMenuEntries]). [startPage] is the page it opens on, for the previews.
  */
 @Composable
 fun ScreenMenuEntries(
@@ -282,8 +333,11 @@ fun ScreenMenuEntries(
     sort: SortChoice?,
     actions: List<ScreenAction>,
     onOpenSettings: () -> Unit,
+    view: ViewChoice? = null,
     startPage: ScreenMenuPage? = null
 ) {
+    val pageActions = actions.filter { it.group == ScreenActionGroup.PAGE }
+    val newActions = actions.filter { it.group == ScreenActionGroup.NEW }
     // Remembered in the menu's popup, so each opening starts on the first page
     var page by remember { mutableStateOf(startPage) }
     // The page shown on the second level, kept while going back so it slides out as it was
@@ -292,15 +346,20 @@ fun ScreenMenuEntries(
         secondPage = to
         page = to
     }
-    // The pages behind Sort by and New. Each one is measured even while another is shown, so the menu keeps one width
+    // The action whose choices are on the Choices page
+    var choicesOf by remember { mutableStateOf(pageActions.firstOrNull { it.choices.isNotEmpty() }) }
+    // The pages behind Sort by, View and New. Each one is measured even while another is shown, so the menu keeps one width
     val sortPage: @Composable ColumnScope.() -> Unit = {
         if (sort != null) SortMenuEntries(sort.field, sort.ascending, sort.onSelect, onBack = { page = null })
     }
+    val viewPage: @Composable ColumnScope.() -> Unit = {
+        if (view != null) ViewMenuEntries(view, onBack = { page = null })
+    }
     val newPage: @Composable ColumnScope.() -> Unit = {
-        if (actions.isNotEmpty()) {
+        if (newActions.isNotEmpty()) {
             AppMenuItem("New", onClick = { page = null }, leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
             AppMenuDivider()
-            actions.forEach { action ->
+            newActions.forEach { action ->
                 AppMenuItem(
                     text = action.description,
                     leadingIcon = action.icon,
@@ -313,9 +372,61 @@ fun ScreenMenuEntries(
             }
         }
     }
+    val choicesPage: @Composable ColumnScope.() -> Unit = {
+        choicesOf?.let { action ->
+            AppMenuItem(action.description, onClick = { page = null }, leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
+            AppMenuDivider()
+            action.choices.forEach { choice ->
+                AppMenuItem(
+                    text = choice.description,
+                    leadingIcon = choice.icon,
+                    enabled = choice.enabled,
+                    onClick = {
+                        close()
+                        choice.onClick()
+                    }
+                )
+            }
+        }
+    }
+    val pages = mapOf(
+        ScreenMenuPage.Sort to sortPage,
+        ScreenMenuPage.View to viewPage,
+        ScreenMenuPage.New to newPage,
+        ScreenMenuPage.Choices to choicesPage
+    )
     AppMenuPages(
         showSecondary = page != null,
         primary = {
+            // What's done with this page
+            pageActions.forEach { action ->
+                AppMenuItem(
+                    text = action.description,
+                    leadingIcon = action.icon,
+                    trailingIcon = if (action.choices.isEmpty()) null else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    enabled = action.enabled,
+                    onClick = {
+                        if (action.choices.isEmpty()) {
+                            close()
+                            action.onClick()
+                        } else {
+                            choicesOf = action
+                            open(ScreenMenuPage.Choices)
+                        }
+                    }
+                )
+            }
+            if (newActions.isNotEmpty()) {
+                AppMenuItem(
+                    "New",
+                    leadingIcon = Icons.Filled.Add,
+                    trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    enabled = newActions.any { it.enabled },
+                    onClick = { open(ScreenMenuPage.New) }
+                )
+            }
+            // How it's shown
+            if ((pageActions.isNotEmpty() || newActions.isNotEmpty()) && (sort != null || view != null)) AppMenuDivider()
             if (sort != null) {
                 AppMenuItem(
                     "Sort by",
@@ -325,30 +436,89 @@ fun ScreenMenuEntries(
                     onClick = { open(ScreenMenuPage.Sort) }
                 )
             }
-            if (actions.isNotEmpty()) {
+            if (view != null) {
                 AppMenuItem(
-                    "New",
-                    leadingIcon = Icons.Filled.Add,
+                    "View",
+                    leadingIcon = if (view.grid) Icons.Filled.GridView else Icons.Filled.ViewList,
+                    trailingText = if (view.smart) "Smart" else if (view.grid) "Grid" else if (view.compact) "Compact" else "List",
                     trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    enabled = actions.any { it.enabled },
-                    onClick = { open(ScreenMenuPage.New) }
+                    onClick = { open(ScreenMenuPage.View) }
                 )
             }
-            if (sort != null || actions.isNotEmpty()) AppMenuDivider()
+            if (pageActions.isNotEmpty() || newActions.isNotEmpty() || sort != null || view != null) AppMenuDivider()
             AppMenuItem("Settings", leadingIcon = Icons.Filled.Settings, onClick = { close(); onOpenSettings() })
         },
-        secondary = {
-            when (secondPage) {
-                ScreenMenuPage.Sort -> sortPage()
-                ScreenMenuPage.New -> newPage()
-            }
+        secondary = { pages.getValue(secondPage)() },
+        otherPages = { pages.filterKeys { it != secondPage }.values.forEach { it() } }
+    )
+}
+
+/**
+ * The entries of the View page: "View" going back ([onBack]), the layouts (rows, a grid, and Smart, either by what's shown),
+ * Compact rows, whether a Filesystem folder's look is for its subfolders too, and going back to the Look and feel's
+ * defaults (or the look of the folder above it has). What's chosen is this folder's own look (see ViewLook), and the menu
+ * stays open, so it can be seen.
+ */
+@Composable
+private fun ViewMenuEntries(view: ViewChoice, onBack: () -> Unit) {
+    AppMenuItem("View", onClick = onBack, leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
+    AppMenuDivider()
+    val list = !view.smart && !view.grid
+    val grid = !view.smart && view.grid
+    AppMenuItem(
+        "List",
+        leadingIcon = Icons.Filled.ViewList,
+        active = list,
+        trailingIcon = if (list) Icons.Filled.Check else null,
+        onClick = { view.onLayout(ListLayout.LIST) }
+    )
+    AppMenuItem(
+        "Grid",
+        leadingIcon = Icons.Filled.GridView,
+        active = grid,
+        trailingIcon = if (grid) Icons.Filled.Check else null,
+        onClick = { view.onLayout(ListLayout.GRID) }
+    )
+    // Which of the two it picked, while it's chosen
+    AppMenuItem(
+        "Smart",
+        leadingIcon = Icons.Filled.AutoAwesome,
+        supportingText = if (view.smart) "Here: ${if (view.grid) "Grid" else "List"}" else "A grid for pictures and videos",
+        active = view.smart,
+        trailingIcon = if (view.smart) Icons.Filled.Check else null,
+        onClick = { view.onLayout(ListLayout.SMART) }
+    )
+    AppMenuDivider()
+    // Only rows have a height to lower; Smart may pick them, so it's chosen for them there too, whichever it picked
+    val compactShown = view.compact && (!view.grid || view.smart)
+    AppMenuItem(
+        "Compact rows",
+        active = compactShown,
+        trailingIcon = if (compactShown) Icons.Filled.Check else null,
+        enabled = !view.grid || view.smart,
+        onClick = { view.onCompact(!view.compact) }
+    )
+    AppMenuDivider()
+    // What this look is set for: a folder's can be for the ones inside it too, except those with a look of their own
+    if (view.subfolders != null) {
+        AppMenuItem(
+            "Subfolders too",
+            supportingText = "Unless one has a look of its own",
+            active = view.subfolders,
+            trailingIcon = if (view.subfolders) Icons.Filled.Check else null,
+            onClick = { view.onSubfolders(!view.subfolders) }
+        )
+    }
+    AppMenuItem(
+        "Use the default",
+        leadingIcon = Icons.Filled.Refresh,
+        supportingText = when {
+            view.custom -> "${view.inheritedFrom?.let { "From $it" } ?: "Look and feel's"}: ${view.defaultLabel}"
+            view.inheritedFrom != null -> "Has the look of ${view.inheritedFrom}"
+            else -> "This one has no look of its own"
         },
-        otherPages = {
-            when (secondPage) {
-                ScreenMenuPage.Sort -> newPage()
-                ScreenMenuPage.New -> sortPage()
-            }
-        }
+        enabled = view.custom,
+        onClick = view.onReset
     )
 }
 
@@ -622,34 +792,53 @@ private fun StatusCardsPreview() {
     }
 }
 
-/** The filesystem's ⋮ menu, open: Sort by (sorted on name), New, and Settings. */
+/** The filesystem's ⋮ menu, open: New, Sort by (sorted on name), View, and Settings; and an open list's, its downloads first. */
 @ThemePreviews
 @Composable
 private fun ScreenMenuPreview() {
     PreviewTheme(padding = 8.dp) {
-        AppMenuPreview { ScreenMenuEntries({}, PreviewSort, PreviewActions, onOpenSettings = {}) }
+        Row {
+            AppMenuPreview { ScreenMenuEntries({}, PreviewSort, PreviewActions, onOpenSettings = {}, view = PreviewView) }
+            AppMenuPreview { ScreenMenuEntries({}, PreviewSort, PreviewListActions, onOpenSettings = {}, view = PreviewView) }
+        }
     }
 }
 
-/** Its pages: the sorting (on size, largest first) and New. */
+/** Its pages: the sorting (on size, largest first), View (this folder's own grid, for its subfolders too) and New. */
 @ThemePreviews
 @Composable
 private fun ScreenMenuPagesPreview() {
     PreviewTheme(padding = 8.dp) {
         Row {
             AppMenuPreview {
-                ScreenMenuEntries({}, SortChoice(SortableField.SIZE, ascending = false) {}, PreviewActions, onOpenSettings = {}, startPage = ScreenMenuPage.Sort)
+                ScreenMenuEntries({}, SortChoice(SortableField.SIZE, ascending = false) {}, PreviewActions, onOpenSettings = {}, view = PreviewView, startPage = ScreenMenuPage.Sort)
             }
-            AppMenuPreview { ScreenMenuEntries({}, PreviewSort, PreviewActions, onOpenSettings = {}, startPage = ScreenMenuPage.New) }
+            AppMenuPreview {
+                ScreenMenuEntries(
+                    {}, PreviewSort, PreviewActions, onOpenSettings = {},
+                    view = ViewChoice(grid = true, compact = false, custom = true, defaultLabel = "List", {}, {}, {}, subfolders = true),
+                    startPage = ScreenMenuPage.View
+                )
+            }
+            AppMenuPreview { ScreenMenuEntries({}, PreviewSort, PreviewActions, onOpenSettings = {}, view = PreviewView, startPage = ScreenMenuPage.New) }
         }
     }
 }
 
 private val PreviewSort = SortChoice(SortableField.NAME, ascending = true) {}
+private val PreviewView = ViewChoice(grid = false, compact = false, custom = false, defaultLabel = "List", {}, {}, {})
 private val PreviewActions = listOf(
     ScreenAction(Icons.Filled.Upload, "Upload") {},
     ScreenAction(Icons.Filled.CreateNewFolder, "New folder") {},
     ScreenAction(Icons.Filled.Link, "Import files by ID") {}
+)
+private val PreviewListActions = listOf(
+    ScreenAction(
+        Icons.Filled.Download,
+        "Download all",
+        group = ScreenActionGroup.PAGE,
+        choices = listOf(ScreenAction(Icons.Filled.Download, "Separately") {}, ScreenAction(Icons.Filled.FolderZip, "As one ZIP") {})
+    ) {}
 )
 
 @ThemePreviews

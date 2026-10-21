@@ -6,6 +6,10 @@ import android.net.Uri
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /** Opens one of the app's screens: the launcher's shortcuts and the Quick Settings tile start the app with it. */
 const val ACTION_OPEN_SCREEN = "tools.senko.materialdrain.action.OPEN_SCREEN"
@@ -29,10 +33,16 @@ sealed interface PendingOpen {
 }
 
 /**
- * Files shared from another app on their way into a folder of the Filesystem tab [tabId] of the host [hostId], see
- * AppContainer.filesystemShare: the tab shows a bar to upload them into the folder it's in (see SharedUploadBar).
+ * [text] shared from another app (see PendingOpen.Text), as a text file to upload: written to the cache, to wait for its
+ * place as shared files do (see SharedUploadBar). The ones of shares over a day old go then, long uploaded or dropped.
  */
-data class FilesystemShare(val uris: List<Uri>, val hostId: String, val tabId: String)
+fun sharedTextFile(context: Context, text: String): Uri {
+    val dir = File(context.cacheDir, "shared_text").apply { mkdirs() }
+    val dayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+    dir.listFiles()?.filter { it.lastModified() < dayAgo }?.forEach { it.delete() }
+    val stamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
+    return Uri.fromFile(File(dir, "text_$stamp.txt").apply { writeText(text) })
+}
 
 private val PIXELDRAIN_HOSTS = setOf("pixeldrain.com", "www.pixeldrain.com", "pixeldrain.net", "www.pixeldrain.net")
 

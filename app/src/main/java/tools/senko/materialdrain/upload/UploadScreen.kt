@@ -14,9 +14,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.layout.PaddingValues
-import tools.senko.materialdrain.ui.icons.symbols.Symbols
-import tools.senko.materialdrain.ui.icons.symbols.Upload
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.filled.*
@@ -51,9 +48,7 @@ import tools.senko.materialdrain.ui.preview.PreviewSamples
 fun UploadScreenContent(
     uploadViewModel: UploadViewModel,
     fabHeight: Dp,
-    isFabVisible: Boolean,
-    /** The experimental navigation has no upload button of its own, so the upload action is a button under the content */
-    inlineUploadButton: Boolean = false
+    isFabVisible: Boolean
 ) {
     val uiState by uploadViewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -61,14 +56,12 @@ fun UploadScreenContent(
         uiState = uiState,
         fabHeight = fabHeight,
         isFabVisible = isFabVisible,
-        inlineUploadButton = inlineUploadButton,
         onFilesPicked = { uris -> uploadViewModel.onFilesSelected(uris, context) },
         onClearPickedFile = { uploadViewModel.onFileSelected(null, context) },
         onTextChange = uploadViewModel::onTextToUploadChanged,
         onRemoveQueued = uploadViewModel::removeQueuedItem,
         onClearQueued = uploadViewModel::clearQueuedItems,
         onCancel = uploadViewModel::cancelUpload,
-        onUpload = uploadViewModel::upload,
         // Text shared from another app (see PendingOpen.Text) is on the text tab
         initialTab = if (uiState.textToUpload.isNotBlank() && uiState.pickedFile == null && uiState.queuedItems.isEmpty()) 1 else 0
     )
@@ -80,14 +73,12 @@ fun UploadScreenContent(
     uiState: UploadUiState,
     fabHeight: Dp,
     isFabVisible: Boolean,
-    inlineUploadButton: Boolean,
     onFilesPicked: (List<Uri>) -> Unit,
     onClearPickedFile: () -> Unit,
     onTextChange: (String) -> Unit,
     onRemoveQueued: (Int) -> Unit,
     onClearQueued: () -> Unit,
     onCancel: () -> Unit,
-    onUpload: () -> Unit,
     /** The tab it opens on: 0 for a file, 1 for text */
     initialTab: Int = 0
 ) {
@@ -327,21 +318,6 @@ fun UploadScreenContent(
                         Text("Ready to upload. Size: ${formatSize(effectiveSize)}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom=8.dp), textAlign = TextAlign.Center)
                     }
                 }
-                if (inlineUploadButton && uiState.hasUploadable && !uiState.isLoading) {
-                    Button(
-                        onClick = onUpload,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                            .height(44.dp),
-                        shape = AppShapes.Medium,
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
-                    ) {
-                        Icon(Symbols.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Upload", style = MaterialTheme.typography.labelLarge)
-                    }
-                }
                 // Add Spacer at the end of the scrollable content if FAB is visible
                 if (isFabVisible) {
                     Spacer(Modifier.height(fabHeight + 16.dp)) // 16.dp for extra margin
@@ -563,14 +539,12 @@ private fun UploadPreview(uiState: UploadUiState, tab: Int = 0) {
             uiState = uiState,
             fabHeight = 56.dp,
             isFabVisible = uiState.hasUploadable,
-            inlineUploadButton = false,
             onFilesPicked = {},
             onClearPickedFile = {},
             onTextChange = {},
             onRemoveQueued = {},
             onClearQueued = {},
             onCancel = {},
-            onUpload = {},
             initialTab = tab
         )
     }

@@ -153,6 +153,10 @@
       "method": "GET",
       "path": "/filesystem/{path}"
     },
+    "browse_download_archive": {
+      "method": "GET",
+      "path": "/filesystem/{path}?bulk_download"
+    },
     "browse_thumbnail": {
       "method": "GET",
       "path": "/filesystem/{path}?thumbnail"
