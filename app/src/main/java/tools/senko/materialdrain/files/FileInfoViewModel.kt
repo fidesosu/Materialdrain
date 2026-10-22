@@ -56,7 +56,7 @@ private const val MAX_TEXT_PREVIEW_DISPLAY_LENGTH = 8 * 1024 // 8KB
 
 /** The most of a text that's loaded when it's asked for anyway, past [MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES] (see loadWholeText). */
 internal const val MAX_TEXT_LOAD_ANYWAY_BYTES = 16 * 1024 * 1024
-private const val API_KEY_MISSING = "API Key is missing. Please set it in Settings."
+private const val API_KEY_MISSING = "Log in or add an API key in Settings."
 
 
 /** Identifies a node in the app: its file id, or its path when it has no id (the filesystem). */
@@ -371,7 +371,7 @@ class FileInfoViewModel(
         }
         val size = node.size
         val tooBig = PdfPreviewState.Failed(
-            "Too big to preview (${size?.let { "${formatSize(it)}, " }.orEmpty()}at most ${formatSize(MAX_PDF_PREVIEW_BYTES)}). Download it to read it."
+            "Too big to preview (max ${formatSize(MAX_PDF_PREVIEW_BYTES)})."
         )
         if (size != null && size > MAX_PDF_PREVIEW_BYTES) {
             _uiState.update { it.copy(pdfPreview = tooBig) }
@@ -422,11 +422,11 @@ class FileInfoViewModel(
                             trimPdfCache(folder, keep = file)
                             PdfPreviewState.Ready(file)
                         }
-                        else -> PdfPreviewState.Failed("The PDF couldn't be kept for its preview.")
+                        else -> PdfPreviewState.Failed("The PDF couldn't be saved for preview.")
                     }
                 } catch (e: IOException) {
                     // The cache can't be written to, e.g. the device is full
-                    PdfPreviewState.Failed("The PDF couldn't be kept for its preview.")
+                    PdfPreviewState.Failed("The PDF couldn't be saved for preview.")
                 } finally {
                     // Gone already once it's renamed; otherwise what was loaded is of no use, cancelled or not
                     partial.delete()
@@ -476,7 +476,7 @@ class FileInfoViewModel(
             _uiState.update {
                 it.copy(
                     isLoadingTextPreview = false, textPreviewContent = null, textPreviewFullContent = null,
-                    textPreviewErrorMessage = "File is too large (${formatSize(size)}) for text preview. Max $maxSize.",
+                    textPreviewErrorMessage = "Too big to preview (max $maxSize).",
                     textPreviewCanLoadAnyway = canLoadAnyway
                 )
             }
@@ -500,7 +500,7 @@ class FileInfoViewModel(
                 _uiState.update {
                     it.copy(
                         isLoadingTextPreview = false,
-                        textPreviewErrorMessage = "File is too large for text preview. Max $maxSize.",
+                        textPreviewErrorMessage = "Too big to preview (max $maxSize).",
                         textPreviewCanLoadAnyway = limit < MAX_TEXT_LOAD_ANYWAY_BYTES
                     )
                 }
@@ -629,7 +629,7 @@ class FileInfoViewModel(
 
     fun fetchFileInfo(fileId: String) {
         if (fileId.isBlank()) {
-            _uiState.update { it.copy(fileInfoErrorMessage = "Please enter or select a File ID.", isLoadingFileInfo = false) }
+            _uiState.update { it.copy(fileInfoErrorMessage = "Enter a file ID.", isLoadingFileInfo = false) }
             return
         }
         fileInfoJob?.cancel()
@@ -839,7 +839,7 @@ class FileInfoViewModel(
         val node = _uiState.value.nodeToDelete ?: return
         if (needsKeyButMissing()) {
             _uiState.update { it.copy(initiateDeleteFile = false, apiKeyMissingError = true) }
-            messages.show("Delete failed: API Key is missing. Cannot delete file.", long = true)
+            messages.show("Log in to delete files.", long = true)
             return
         }
         _uiState.update { it.copy(isLoadingDeleteFile = true) }
@@ -1161,7 +1161,7 @@ class FileInfoViewModel(
         return when (val deleted = lists.delete(list.id)) {
             is ApiResponse.Success -> ListRewrite.Replaced(newId)
             is ApiResponse.Error -> ListRewrite.Failed(
-                "The list was rebuilt as a new list, but the old one could not be deleted: ${deleted.error.message}"
+                "Saved as a new list. The old one couldn't be deleted: ${deleted.error.message}"
             )
         }
     }

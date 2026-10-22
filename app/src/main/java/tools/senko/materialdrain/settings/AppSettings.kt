@@ -103,8 +103,7 @@ val LOCK_TIMEOUTS = listOf(0, 30, 60, 300)
 const val SEARCH_INDEX_FILE_NAME = ".search_index.gz"
 
 const val SEARCH_INDEX_DELETE_WARNING =
-    "$SEARCH_INDEX_FILE_NAME is used by Pixeldrain itself to store the paths of your files. " +
-        "Almost nobody has a reason to delete it, and Pixeldrain will re-create it after a while anyway."
+    "Pixeldrain uses this file for your file paths and recreates it anyway."
 
 fun StorageNode.isSearchIndex(): Boolean = !isDirectory && name == SEARCH_INDEX_FILE_NAME
 

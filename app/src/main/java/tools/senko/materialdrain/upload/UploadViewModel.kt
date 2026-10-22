@@ -689,7 +689,7 @@ class UploadViewModel(
                         isLoading = false,
                         uploadSpeedBytesPerSec = 0L,
                         uploadEtaSeconds = null,
-                        errorMessage = if (failed > 0 && fromScreen) "$failed of ${batch.size} uploads failed. Press Upload to retry the failed files." else null
+                        errorMessage = if (failed > 0 && fromScreen) "$failed of ${batch.size} failed. Tap Upload to retry." else null
                     )
                 }
                 if (!fromScreen) {
@@ -736,7 +736,7 @@ class UploadViewModel(
             _uiState.update {
                 it.copy(
                     isLoading = false,
-                    errorMessage = "No file selected or text provided.",
+                    errorMessage = "Pick a file or enter text.",
                     pickedFile = null,
                     uploadTotalSizeBytes = null,
                     textToUpload = ""
@@ -842,14 +842,14 @@ class UploadViewModel(
                         it.copy(
                             isLoading = false,
                             uploadResult = response,
-                            errorMessage = response.message ?: "Upload failed with no specific message."
+                            errorMessage = response.message ?: "Upload failed."
                         )
                     }
                 }
             } else { 
                 if (_uiState.value.isLoading) {
                      _uiState.update {
-                        it.copy(isLoading = false, errorMessage = it.errorMessage ?: "Upload did not return a response.")
+                        it.copy(isLoading = false, errorMessage = it.errorMessage ?: "No answer from the host.")
                     }
                 }
             }

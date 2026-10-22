@@ -575,7 +575,7 @@ class GenericRestStorageProvider(
             val userInfo = config.endpoints[ENDPOINT_USER_INFO]
                 ?: return FieldValidation(
                     "credentials", label, ok = true, inconclusive = true,
-                    message = "Not checked: this config has no user_info endpoint to test them against"
+                    message = "Not checked: no user_info endpoint"
                 )
             val result = client.executeBuffered(userInfo, emptyMap(), auth.header)
                 ?: return FieldValidation("credentials", label, ok = false, message = "The user_info endpoint couldn't be resolved")

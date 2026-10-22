@@ -92,8 +92,7 @@ fun SettingsEnvironment.ProviderHostsSection() {
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            "Pixeldrain is always available. Custom hosts below are used by the Files, Lists, Filesystem and Upload " +
-                "screens once they're the active host (the switcher at the top of those screens).",
+            "Pixeldrain is always there. Switch hosts at the top of the Files screens.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -113,8 +112,7 @@ fun SettingsEnvironment.ProviderHostsSection() {
         Text("Add a custom host", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            "Pick the kind of host to fill in its details in a form, or paste a config someone shared. Configs never " +
-                "contain passwords or tokens, so they're safe to share; sign-in details are entered here in the app, per host.",
+            "Pick a kind of host, or paste a shared config. Configs never contain passwords.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -226,7 +224,7 @@ private fun OtpDialog(prompt: OtpPrompt, busy: Boolean, viewModel: ProviderSetti
         title = { Text("Two-factor authentication") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Enter the ${prompt.digits}-digit code from your authenticator app to sign in to ${prompt.hostName}.")
+                Text("Enter the ${prompt.digits}-digit code from your authenticator app.")
                 OutlinedTextField(
                     value = code,
                     onValueChange = { code = it.filter(Char::isDigit).take(prompt.digits) },
@@ -359,7 +357,7 @@ private fun HostCard(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Auto-update from ${ConfigUpdates.hostOf(url) ?: url}", style = MaterialTheme.typography.bodyMedium)
                                 Text(
-                                    "Checked when the app starts, at most once a day. Updates that change where your sign-in is sent always wait for you.",
+                                    "Checked daily. Updates that change where your sign-in goes wait for you.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = colors.onSurfaceVariant
                                 )
@@ -424,7 +422,7 @@ private fun HostCard(
                             Text(
                                 when (passwordMode) {
                                     PasswordAuthMode.LOGIN -> "Used while you're not signed in."
-                                    PasswordAuthMode.BASIC -> "Used when the username and password aren't both filled in."
+                                    PasswordAuthMode.BASIC -> "Used without a username and password."
                                     null -> "This host only takes an API key."
                                 },
                                 style = MaterialTheme.typography.bodySmall,
@@ -550,23 +548,23 @@ private fun UpdateApprovalDialog(approval: UpdateApproval, viewModel: ProviderSe
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("${approval.hostName}: version ${approval.fromVersion} → ${approval.toVersion}")
                 if (approval.sensitiveChanges.isNotEmpty()) {
-                    Text("This update changes where or how your sign-in details are sent:")
+                    Text("This update changes how your sign-in is sent:")
                     approval.sensitiveChanges.forEach { change ->
                         Text("• ${change.description}", style = MaterialTheme.typography.bodyMedium)
                     }
                     Text(
-                        "Only update if you trust where this config comes from.",
+                        "Only update if you trust its source.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 if (approval.clearsToken) {
                     Text(
-                        "Your saved API key, username and password will be removed. Enter them again once you've checked the new address.",
+                        "Your saved sign-in will be removed.",
                         color = MaterialTheme.colorScheme.error
                     )
                 }
-                if (approval.discardsEdits) Text("Updating replaces the edits you made to this config.")
+                if (approval.discardsEdits) Text("Updating replaces your edits.")
             }
         },
         confirmButton = { TextButton(onClick = { viewModel.confirmApproval() }) { Text("Update") } },
@@ -581,9 +579,9 @@ private fun EditNoticeDialog(notice: EditNotice, viewModel: ProviderSettingsView
         title = { Text("This config is edited") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("${notice.hostName} still updates from ${notice.updateHost ?: "its update URL"}, so an update would overwrite your changes.")
+                Text("Updates from ${notice.updateHost ?: "its update URL"} would replace your edits.")
                 if (notice.autoUpdateTurnedOff) {
-                    Text("Auto-update has been turned off for it. You can turn it back on if you want updates to replace your edits.")
+                    Text("Auto-update is now off.")
                 }
             }
         },

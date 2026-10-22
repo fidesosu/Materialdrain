@@ -250,7 +250,7 @@ fun ConfigEditor(
                                 when {
                                     parsed == null -> jsonError = "The JSON can't be read. Fix it here to use the form."
                                     sectionsFor(parsed.textOf("kind")) == null ->
-                                        jsonError = "The form knows the kinds generic_rest, webdav, s3 and smb. Set \"kind\" to one of them to use it."
+                                        jsonError = "Set \"kind\" to generic_rest, webdav, s3 or smb to use the form."
                                     else -> {
                                         root = parsed
                                         jsonError = null
@@ -501,7 +501,7 @@ private fun EndpointPage(page: Page.OfEndpoint, form: FormState) {
     val info = KnownEndpoints.firstOrNull { it.name == page.name }
     var confirmRemove by remember { mutableStateOf(false) }
     PageColumn {
-        Intro(info?.let { "${it.area}. ${it.help}" } ?: "Not a name this app uses: it's kept, but nothing calls it.")
+        Intro(info?.let { "${it.area}. ${it.help}" } ?: "Unknown name: kept, but unused.")
         FieldsEditor(info?.fields ?: endpointFields(), page.path, form)
         OutlinedButton(
             onClick = { confirmRemove = true },
@@ -535,7 +535,7 @@ private fun EndpointPage(page: Page.OfEndpoint, form: FormState) {
 private fun OtherFieldsPage(sections: List<Section>, form: FormState) {
     val keys = form.root.keys - describedKeys(sections)
     PageColumn {
-        Intro("Fields this version of the app doesn't read, e.g. notes or fields for a newer version. They're kept as they are.")
+        Intro("Fields this version doesn't use. They're kept.")
         keys.forEach { key ->
             RawJsonField(key, form.root.getValue(key), onValue = { form.setObject(emptyList(), form.root.with(key, it)) })
         }
@@ -552,11 +552,6 @@ private fun JsonPage(text: String, onChange: (String) -> Unit, modifier: Modifie
                 textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 visualTransformation = rememberCodeHighlighting(remember { languageFor("config.json") }),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 320.dp)
-            )
-            Text(
-                "The config as JSON, as it's exported.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -794,7 +789,7 @@ private fun RawJsonField(key: String, value: JsonElement, onValue: (JsonElement?
         label = { Text(key) },
         textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
         isError = invalid,
-        supportingText = if (invalid) ({ Text("Not valid JSON yet: the last valid value is kept") }) else null,
+        supportingText = if (invalid) ({ Text("Invalid JSON: the last valid value is kept") }) else null,
         trailingIcon = { IconButton(onClick = { onValue(null) }) { Icon(Icons.Filled.Delete, contentDescription = "Remove $key") } },
         modifier = Modifier.fillMaxWidth()
     )

@@ -54,7 +54,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     SettingsCategory(
         id = ACCOUNT_CATEGORY_ID,
         title = "Account",
-        summary = "Your pixeldrain account, usage and billing",
+        summary = "Pixeldrain account and billing",
         icon = Icons.Filled.AccountCircle,
         tone = CategoryTone.PRIMARY,
         // The account itself at the top of the settings, see AccountTile
@@ -66,7 +66,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     SettingsCategory(
         id = HOSTS_CATEGORY_ID,
         title = "Hosts",
-        summary = "Custom hosts and their configs",
+        summary = "Custom hosts",
         icon = Icons.Filled.Dns,
         tone = CategoryTone.TERTIARY,
         status = {
@@ -79,7 +79,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     SettingsCategory(
         id = "data_saver",
         title = "Data saver",
-        summary = "Load things only when you ask",
+        summary = "Load only on request",
         icon = Icons.Filled.DataSaverOn,
         tone = CategoryTone.PRIMARY,
         status = {
@@ -92,49 +92,41 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         items = listOf(
             SettingsItem.Toggle(
                 title = "Data saver",
-                summary = "What loads by itself waits to be asked for",
-                info = "Nothing is turned off, it only waits until you ask for it: a thumbnail loads when its tile is " +
-                    "tapped (or all of them with Thumbnails above the list), a preview with its Load preview button, the " +
-                    "configs with Check all for updates on the Hosts page, and the hosts with the refresh in the host " +
-                    "switcher. Choose below what waits.",
+                summary = "Load things only when tapped",
+                info = "Thumbnails, previews, config updates and host checks wait until you tap them. Choose which below.",
                 isChecked = { appSettings.dataSaver.collectAsState().value },
                 onCheckedChange = { appSettings.setDataSaver(it) },
                 children = listOf(
                     SettingsItem.Choice(
                         title = "Applies",
-                        info = "On mobile data, the data saver only applies while the network is metered: mobile data, " +
-                            "and Wi-Fi which Android was told is metered (such as a phone's hotspot). On other Wi-Fi " +
-                            "everything loads as usual.",
+                        info = "Only on metered networks: mobile data and hotspots.",
                         options = listOf("Always" to false, "On mobile data" to true),
                         selected = { appSettings.dataSaverMobileOnly.collectAsState().value },
                         onSelect = { appSettings.setDataSaverMobileOnly(it) }
                     ),
                     SettingsItem.Toggle(
                         title = "Thumbnails",
-                        summary = "Tap a tile, or Thumbnails above the list",
+                        summary = "Tap a tile to load it",
                         isChecked = { appSettings.holdThumbnails.collectAsState().value },
                         onCheckedChange = { appSettings.setHoldThumbnails(it) }
                     ),
                     SettingsItem.Toggle(
                         title = "Previews",
-                        summary = "Load preview in a file's details",
-                        info = "Pictures, videos, songs, text, PDFs and the contents of archives. A video or song still only " +
-                            "streams once it's played.",
+                        summary = "Tap Load preview to see one",
                         isChecked = { appSettings.holdPreviews.collectAsState().value },
                         onCheckedChange = { appSettings.setHoldPreviews(it) }
                     ),
                     SettingsItem.Toggle(
                         title = "Config updates",
-                        summary = "Check all for updates, on the Hosts page",
-                        info = "Configs with automatic updates are otherwise checked once a day, when the app starts.",
+                        summary = "Only with Check all for updates",
+                        info = "Otherwise checked once a day.",
                         isChecked = { appSettings.holdConfigUpdates.collectAsState().value },
                         onCheckedChange = { appSettings.setHoldConfigUpdates(it) }
                     ),
                     SettingsItem.Toggle(
                         title = "Host checks",
-                        summary = "The refresh in the host switcher",
-                        info = "The host switcher otherwise checks every few minutes whether each host answers, with one " +
-                            "small request per host.",
+                        summary = "Only with refresh in the host switcher",
+                        info = "Otherwise checked every few minutes.",
                         isChecked = { appSettings.holdHostChecks.collectAsState().value },
                         onCheckedChange = { appSettings.setHoldHostChecks(it) }
                     )
@@ -146,7 +138,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     SettingsCategory(
         id = "look",
         title = "Look and feel",
-        summary = "Theme, navigation, previews and animations",
+        summary = "Theme, navigation, lists",
         icon = Icons.Filled.Palette,
         tone = CategoryTone.SECONDARY,
         items = listOfNotNull(
@@ -160,15 +152,14 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
             SettingsItem.Toggle(
                 title = "Black background",
                 summary = "In the dark theme",
-                info = "The dark theme's background is black, and its cards darker, which saves power on an OLED screen.",
+                info = "Saves power on OLED screens.",
                 isChecked = { appSettings.theme.collectAsState().value.blackBackground },
                 onCheckedChange = { appSettings.setBlackBackground(it) }
             ),
             // Only where the system has the wallpaper's colours to give (Android 12 and up)
             if (WallpaperColorsAvailable) SettingsItem.Toggle(
                 title = "Wallpaper colours",
-                summary = "The app's colours come from your wallpaper",
-                info = "Off, they are made from the colour chosen below instead.",
+                summary = "Colours from your wallpaper",
                 isChecked = { appSettings.theme.collectAsState().value.wallpaperColors },
                 onCheckedChange = { appSettings.setWallpaperColors(it) }
             ) else null,
@@ -179,98 +170,79 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
             SettingsItem.Header("Navigation"),
             SettingsItem.Choice(
                 title = "Navigation",
-                info = "The bottom bar has a tab for each screen; where the screen is wide (a tablet, a phone on its side) " +
-                    "its tabs go along the side. With swipes, a swipe sideways across the page goes to the tab beside it, " +
-                    "and only a thin strip at the bottom shows the tabs' icons, the one you're on lit: a swipe along it " +
-                    "goes through them, and a tap on one goes to it.",
+                info = "Swipes: swipe sideways to change tabs. A thin strip at the bottom shows where you are.",
                 options = listOf("Bottom bar" to false, "Swipes" to true),
                 selected = { appSettings.gestureNavigation.collectAsState().value },
                 onSelect = { appSettings.setGestureNavigation(it) }
             ),
             SettingsItem.Toggle(
-                title = "Every tab's name",
-                summary = "Under its icon in the bar",
-                info = "Off, only the chosen tab has its name under its icon, the others only their icons.",
+                title = "Tab labels",
+                summary = "On every tab, not only the open one",
                 isChecked = { appSettings.barLabels.collectAsState().value },
                 onCheckedChange = { appSettings.setBarLabels(it) }
             ),
             SettingsItem.Choice(
                 title = "Open on",
-                summary = "The screen the app starts on",
                 options = listOf<Pair<String, Screen?>>("Last" to null) + START_SCREENS.map { it.title to it },
                 selected = { appSettings.startScreen.collectAsState().value },
                 onSelect = { appSettings.setStartScreen(it) }
             ),
             SettingsItem.Toggle(
                 title = "Press back twice to close",
-                summary = "So one press doesn't close the app",
                 isChecked = { appSettings.confirmExit.collectAsState().value },
                 onCheckedChange = { appSettings.setConfirmExit(it) }
             ),
             SettingsItem.Toggle(
                 title = "Swipe between files",
-                summary = "In a file's details and its fullscreen preview",
-                info = "A swipe to the left in a file's details, or in a picture or video open fullscreen, opens the next " +
-                    "file of the list it was opened from, a swipe to the right the one before. What scrolls sideways (a " +
-                    "wide text, a zoomed picture, the video's seek bar) scrolls first.",
+                summary = "In file details and fullscreen",
                 isChecked = { appSettings.swipeBetweenFiles.collectAsState().value },
                 onCheckedChange = { appSettings.setSwipeBetweenFiles(it) }
             ),
             SettingsItem.Toggle(
                 title = "Swipe between tabs",
-                summary = "Swipe sideways to go to the next tab",
-                info = "A swipe to the left goes to the tab to the right, as the tabs lie in the bottom bar, and a swipe " +
-                    "to the right to the one to the left. A swipe that starts at the very edge of the screen is the " +
-                    "system's back gesture, and what scrolls sideways (the folder path, a wide text) scrolls first. " +
-                    "With swipe navigation (above) it's always on.",
+                info = "Always on with swipe navigation.",
                 isChecked = { appSettings.swipeBetweenTabs.collectAsState().value },
                 onCheckedChange = { appSettings.setSwipeBetweenTabs(it) }
             ),
             SettingsItem.Header("File lists"),
             SettingsItem.Toggle(
                 title = "Grid",
-                summary = "Big pictures instead of rows",
-                info = "What every folder and screen looks like by default. One of them can have its own look, from View " +
-                    "in the ⋮ menu at the top, which this then doesn't change.",
+                summary = "Tiles instead of rows",
+                info = "The default. Change one folder with View in the ⋮ menu.",
                 isChecked = { appSettings.gridView.collectAsState().value },
                 onCheckedChange = { appSettings.setGridView(it) }
             ),
             SettingsItem.Toggle(
                 title = "Compact rows",
-                summary = "Lower rows, so more of them fit",
-                info = "By default, as Grid above: View in the ⋮ menu at the top sets it for one folder or screen.",
+                summary = "Smaller rows",
+                info = "The default. Change one folder with View in the ⋮ menu.",
                 isChecked = { appSettings.compactRows.collectAsState().value },
                 onCheckedChange = { appSettings.setCompactRows(it) }
             ),
             SettingsItem.Toggle(
                 title = "Dates as time ago",
                 summary = "\"3 days ago\" instead of the date",
-                info = "Off, the lists show the date and time a file was changed (or uploaded) instead.",
                 isChecked = { appSettings.relativeDates.collectAsState().value },
                 onCheckedChange = { appSettings.setRelativeDates(it) }
             ),
             SettingsItem.Header("Previews and animations"),
             SettingsItem.Toggle(
                 title = "Blurred backdrop",
-                summary = "The thumbnail, blurred, behind previews",
-                info = "The file's thumbnail, blurred, fills the space around a fullscreen image or video, and is there " +
-                    "while a preview is loading. Off, the background is black.",
+                summary = "Blurred thumbnail behind previews",
+                info = "Off: black background.",
                 isChecked = { appSettings.blurredBackdrop.collectAsState().value },
                 onCheckedChange = { appSettings.setBlurredBackdrop(it) }
             ),
             SettingsItem.Toggle(
                 title = "Wrap long lines",
                 summary = "In text previews",
-                info = "Text previews (code, logs, configs) break long lines onto the next line. Off, the lines stay as " +
-                    "they are and can be scrolled sideways.",
                 isChecked = { appSettings.textWrap.collectAsState().value },
                 onCheckedChange = { appSettings.setTextWrap(it) }
             ),
             SettingsItem.Toggle(
                 title = "Reduce animations",
                 summary = "Screens only fade",
-                info = "Leaves out sliding, scaling, spinning and rolling text, and scrolls without animation. Animations " +
-                    "are also reduced when they are turned off in the Android settings.",
+                info = "Also follows Android's animation setting.",
                 isChecked = { appSettings.reduceAnimations.collectAsState().value },
                 onCheckedChange = { appSettings.setReduceAnimations(it) }
             )
@@ -285,16 +257,13 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         tone = CategoryTone.TERTIARY,
         items = listOf(
             SettingsItem.Toggle(
-                title = "Play videos at once",
-                summary = "When the player opens",
+                title = "Autoplay videos",
                 isChecked = { appSettings.autoplay.collectAsState().value },
                 onCheckedChange = { appSettings.setAutoplay(it) }
             ),
             SettingsItem.Toggle(
                 title = "Resume videos",
-                summary = "From where they were left",
-                info = "A video opened again goes on from where it was stopped. Kept for the last 200 videos, on this " +
-                    "device only. One watched to its end starts from the beginning again.",
+                info = "Remembers the last 200 videos on this device.",
                 isChecked = { appSettings.resumeVideos.collectAsState().value },
                 onCheckedChange = { appSettings.setResumeVideos(it) }
             ),
@@ -306,49 +275,40 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                 onSelect = { appSettings.setSeekStepSeconds(it) }
             ),
             SettingsItem.Choice(
-                title = "Start at speed",
-                summary = "Videos and songs",
+                title = "Default speed",
                 options = START_SPEEDS.map { speed -> (speed.toString().removeSuffix(".0") + "×") to speed },
                 selected = { appSettings.defaultSpeed.collectAsState().value },
                 onSelect = { appSettings.setDefaultSpeed(it) }
             ),
             SettingsItem.Toggle(
                 title = "Brightness and volume swipes",
-                summary = "Up and down in the video player",
-                info = "In the video player, a swipe up or down on the left half changes the brightness of the screen (for " +
-                    "the video only), on the right half the volume.",
+                summary = "In the video player",
+                info = "Left side: brightness. Right side: volume.",
                 isChecked = { appSettings.playerGestures.collectAsState().value },
                 onCheckedChange = { appSettings.setPlayerGestures(it) }
             ),
             SettingsItem.Toggle(
                 title = "Play songs in the background",
                 summary = "With controls in the notification",
-                info = "A song goes on playing after you leave its details or the app, with its controls in the " +
-                    "notification and on the lock screen. Off, it stops with its details.",
+                info = "Off: songs stop when you leave them.",
                 isChecked = { appSettings.backgroundAudio.collectAsState().value },
                 onCheckedChange = { appSettings.setBackgroundAudio(it) }
             ),
             SettingsItem.Toggle(
                 title = "Tint the player",
-                summary = "With the colour of the song's cover",
-                info = "The miniplayer of a song playing in the background takes the colour of the song's cover, fading " +
-                    "into its own. A cover without much colour leaves it as it is.",
+                summary = "Use the cover's colour",
                 isChecked = { appSettings.tintPlayer.collectAsState().value },
                 onCheckedChange = { appSettings.setTintPlayer(it) }
             ),
             SettingsItem.Toggle(
                 title = "Compact player",
-                summary = "A third of the screen instead of all of it",
-                info = "The song player opened from the miniplayer is a card about a third of the screen high, which the " +
-                    "miniplayer grows into, with the page still showing above it. Off, the player covers the whole screen.",
+                summary = "Opens as a card, not fullscreen",
                 isChecked = { appSettings.compactPlayer.collectAsState().value },
                 onCheckedChange = { appSettings.setCompactPlayer(it) }
             ),
             SettingsItem.Toggle(
                 title = "Undo closing a song",
-                summary = "An Undo after swiping the miniplayer down",
-                info = "Swiping the miniplayer down stops the song and empties the queue. With this on, the snackbar " +
-                    "offers an Undo for a few seconds, which puts the songs back where they were.",
+                summary = "After swiping the miniplayer away",
                 isChecked = { appSettings.undoCloseSong.collectAsState().value },
                 onCheckedChange = { appSettings.setUndoCloseSong(it) }
             )
@@ -358,7 +318,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     SettingsCategory(
         id = "feedback",
         title = "Feedback",
-        summary = "Vibrations, and how strong they are",
+        summary = "Vibration",
         icon = Icons.Filled.Vibration,
         tone = CategoryTone.SECONDARY,
         status = {
@@ -368,23 +328,20 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         items = listOf(
             SettingsItem.Toggle(
                 title = "Vibration",
-                summary = "Short taps when a gesture would do something",
-                info = "The app's own vibrations, played as touch feedback: the system's touch feedback setting turns them " +
-                    "down or off too. Choose below how strong they are and where they're used.",
+                summary = "When a swipe would do something",
+                info = "Also follows Android's touch feedback setting.",
                 isChecked = { appSettings.vibration.collectAsState().value },
                 onCheckedChange = { appSettings.setVibration(it) },
                 children = listOf(
                     SettingsItem.Choice(
                         title = "Strength",
-                        info = "On phones which can't play vibrations of different strengths, Light is the system's softest " +
-                            "tick and the others its click.",
+                        info = "Some phones only tell Light apart from the rest.",
                         options = VibrationStrength.entries.map { it.label to it },
                         selected = { appSettings.vibrationStrength.collectAsState().value },
                         onSelect = { appSettings.setVibrationStrength(it) }
                     ),
                     SettingsItem.Action(
                         title = "Try it",
-                        summary = "One vibration at this strength",
                         onClick = { context ->
                             AppHaptics.vibratorOf(context)?.let { AppHaptics.vibrate(it, HapticKind.THRESHOLD, appSettings.vibrationStrength.value) }
                         }
@@ -392,16 +349,12 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                     SettingsItem.Toggle(
                         title = "Song player swipes",
                         summary = "When letting go would open, skip or close",
-                        info = "The miniplayer vibrates once a swipe has gone far enough that letting go would open the " +
-                            "player, go to another song or close the song, and lighter when the finger goes back from there.",
                         isChecked = { appSettings.vibratePlayer.collectAsState().value },
                         onCheckedChange = { appSettings.setVibratePlayer(it) }
                     ),
                     SettingsItem.Toggle(
                         title = "Navigation swipes",
-                        summary = "A swipe going to another tab",
-                        info = "With swipe navigation (Look and feel, Navigation), a light vibration for each tab a swipe " +
-                            "goes to, across the page or along the strip at the bottom.",
+                        summary = "With swipe navigation",
                         isChecked = { appSettings.vibrateNavSwipe.collectAsState().value },
                         onCheckedChange = { appSettings.setVibrateNavSwipe(it) }
                     )
@@ -413,37 +366,31 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     SettingsCategory(
         id = "files",
         title = "Files",
-        summary = "Your filesystem, uploads, downloads and search",
+        summary = "Uploads, downloads, search",
         icon = Icons.Filled.Folder,
         tone = CategoryTone.PRIMARY,
         items = listOf(
             SettingsItem.Toggle(
                 title = "Hide $SEARCH_INDEX_FILE_NAME",
                 summary = "Pixeldrain's own index of your files",
-                info = "Pixeldrain uses this file itself to store the paths of your files and re-creates it when it is " +
-                    "removed. Hiding it keeps you from deleting it by accident.",
+                info = "Pixeldrain needs it and recreates it if deleted.",
                 isChecked = { appSettings.hideSearchIndex.collectAsState().value },
                 onCheckedChange = { appSettings.setHideSearchIndex(it) }
             ),
             SettingsItem.Toggle(
                 title = "Folders first",
-                summary = "In the filesystem, however it's sorted",
                 isChecked = { appSettings.foldersFirst.collectAsState().value },
                 onCheckedChange = { appSettings.setFoldersFirst(it) }
             ),
             SettingsItem.Toggle(
                 title = "Copy the link after uploading",
-                summary = "Of each file uploaded",
-                info = "When an upload is done, the links of the uploaded files are copied, one per line, ready to paste. " +
-                    "Only for hosts whose files have links, such as Pixeldrain.",
+                info = "One link per line. Only for hosts with links.",
                 isChecked = { appSettings.copyLinkAfterUpload.collectAsState().value },
                 onCheckedChange = { appSettings.setCopyLinkAfterUpload(it) }
             ),
             SettingsItem.Toggle(
                 title = "Open downloads when done",
-                summary = "A file downloaded on its own",
-                info = "A file is opened with the app for its kind as soon as it's downloaded. Not the files of a download " +
-                    "of several.",
+                summary = "Single files only",
                 isChecked = { appSettings.openAfterDownload.collectAsState().value },
                 onCheckedChange = { appSettings.setOpenAfterDownload(it) }
             ),
@@ -455,36 +402,27 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
             ),
             SettingsItem.Toggle(
                 title = "Show hosts in the file picker",
-                summary = "So other apps can open their files",
-                info = "The hosts with folders show in Android's file picker and Files app, where other apps can open (not " +
-                    "change) their files. A file is fetched whole when it's opened. Not while the app is locked with " +
-                    "your fingerprint, which the picker doesn't ask for.",
+                summary = "Let other apps open your hosts' files",
+                info = "Read-only. Hidden while the app lock is on.",
                 isChecked = { appSettings.documentsProvider.collectAsState().value },
                 onCheckedChange = { appSettings.setDocumentsProvider(it) }
             ),
             SettingsItem.Toggle(
                 title = "Upload by last change",
                 summary = "Oldest first, one file at a time",
-                info = "Several files are uploaded oldest first, by when they were last changed on this device, and one " +
-                    "after another, so they arrive at the host (and get their upload dates) in that order. Slower for " +
-                    "many small files, which otherwise go a few at once.",
+                info = "Keeps upload dates in order. Slower for many small files.",
                 isChecked = { appSettings.uploadInModifiedOrder.collectAsState().value },
                 onCheckedChange = { appSettings.setUploadInModifiedOrder(it) }
             ),
             SettingsItem.Toggle(
                 title = "Tap twice to download",
                 summary = "In a file's details",
-                info = "The Download button in a file's details asks to be tapped again before it starts, so a slip of " +
-                    "the finger doesn't start a download of what may be gigabytes. Off, one tap starts it.",
                 isChecked = { appSettings.confirmDownloadTap.collectAsState().value },
                 onCheckedChange = { appSettings.setConfirmDownloadTap(it) }
             ),
             SettingsItem.Choice(
-                title = "Most search results",
-                summary = "When searching the filesystem",
-                info = "Searching the filesystem looks through the open folder and every folder inside it, so a big tree " +
-                    "can match thousands of files. All of them are shown unless you set a limit, which can help on " +
-                    "slower devices.",
+                title = "Search result limit",
+                info = "Lower it if search is slow.",
                 options = SEARCH_RESULT_LIMITS.map { (if (it == 0) "No limit" else "$it") to it },
                 selected = { appSettings.searchResultLimit.collectAsState().value },
                 onSelect = { appSettings.setSearchResultLimit(it) }
@@ -495,34 +433,29 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     SettingsCategory(
         id = "notifications",
         title = "Notifications",
-        summary = "Progress of uploads and downloads",
+        summary = "Transfer progress",
         icon = Icons.Filled.Notifications,
         tone = CategoryTone.TERTIARY,
         items = listOf(
             SettingsItem.Action(
                 title = "Notification settings",
-                summary = "All notifications of this app",
-                info = "Uploads and downloads keep running while the app is in the background and show their progress in " +
-                    "a notification. Each kind of notification has its own settings in Android, where you can change " +
-                    "its importance, sound, vibration and lock screen visibility.",
                 external = true,
                 onClick = { context -> openNotificationSettings(context, null) },
                 children = listOf(
                     SettingsItem.Action(
                         title = "Transfer progress",
-                        summary = "While uploading or downloading",
                         external = true,
                         onClick = { context -> openNotificationSettings(context, CHANNEL_TRANSFER_PROGRESS) }
                     ),
                     SettingsItem.Action(
                         title = "Completed transfers",
-                        summary = "When one finished in the background",
+                        summary = "Finished in the background",
                         external = true,
                         onClick = { context -> openNotificationSettings(context, CHANNEL_TRANSFER_COMPLETE) }
                     ),
                     SettingsItem.Action(
                         title = "Failed transfers",
-                        summary = "When one failed in the background",
+                        summary = "Failed in the background",
                         external = true,
                         onClick = { context -> openNotificationSettings(context, CHANNEL_TRANSFER_FAILED) }
                     )
@@ -534,21 +467,18 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
     SettingsCategory(
         id = "security",
         title = "Privacy and security",
-        summary = "Locking the app, screenshots",
+        summary = "App lock, screenshots",
         icon = Icons.Filled.Lock,
         tone = CategoryTone.SECONDARY,
         items = listOf(
             SettingsItem.Toggle(
                 title = "Lock with fingerprint or face",
-                summary = "When the app is opened again",
-                info = "Asks for your fingerprint, face or screen lock each time the app is opened again, after it was in " +
-                    "the background for a while. Needs a fingerprint, face or screen lock set up on this device.",
+                info = "Needs a screen lock on this device.",
                 isChecked = { appSettings.biometricLock.collectAsState().value },
                 onCheckedChange = { if (appSettings.biometricLockAvailable()) appSettings.setBiometricLock(it) },
                 children = listOf(
                     SettingsItem.Choice(
-                        title = "Ask again after",
-                        summary = "Away from the app",
+                        title = "Lock after",
                         options = LOCK_TIMEOUTS.map { seconds ->
                             val label = when {
                                 seconds == 0 -> "Always"
@@ -565,8 +495,6 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
             SettingsItem.Toggle(
                 title = "Block screenshots",
                 summary = "And hide the app in recent apps",
-                info = "Screenshots and screen recordings of the app come out black, adb's included, and the recent apps " +
-                    "show it blank.",
                 isChecked = { appSettings.blockScreenshots.collectAsState().value },
                 onCheckedChange = { appSettings.setBlockScreenshots(it) }
             )
@@ -588,21 +516,21 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
             SettingsItem.Header("Links"),
             SettingsItem.Action(
                 title = "Website",
-                summary = "Downloads of every version",
+                summary = "All versions",
                 icon = Icons.Filled.Language,
                 external = true,
                 onClick = { context -> openLink(context, "https://materialdrain.senko.tools") }
             ),
             SettingsItem.Action(
                 title = "Documentation",
-                summary = "How the app works, and adding hosts",
+                summary = "Guides and adding hosts",
                 icon = Icons.AutoMirrored.Filled.MenuBook,
                 external = true,
                 onClick = { context -> openLink(context, "https://materialdrain.senko.tools/docs/") }
             ),
             SettingsItem.Action(
                 title = "Changes",
-                summary = "What each release changed",
+                summary = "Release notes",
                 icon = Icons.Filled.NewReleases,
                 external = true,
                 onClick = { context -> openLink(context, "https://github.com/fidesosu/Materialdrain/releases") }
@@ -616,7 +544,7 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
             ),
             SettingsItem.Action(
                 title = "Report a problem",
-                summary = "Opens a new issue on GitHub",
+                summary = "On GitHub",
                 icon = Icons.Filled.BugReport,
                 external = true,
                 onClick = { context -> openLink(context, "https://github.com/fidesosu/Materialdrain/issues/new") }

@@ -21,7 +21,7 @@ fun InlineTextPreview(
     textContent: String?
 ) {
     textContent?.takeIf { it.isNotBlank() }?.let {
-        Text("Content Preview (4KB Max):", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top=8.dp, bottom=4.dp))
+        Text("Preview", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top=8.dp, bottom=4.dp))
         OutlinedTextField(
             value = it,
             onValueChange = { /* Read-only */ },

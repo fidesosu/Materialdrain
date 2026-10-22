@@ -32,10 +32,61 @@ val SortOptions: List<Pair<String, SortableField>> = listOf(
 )
 
 private fun StorageNode.sortKey(field: SortableField): Comparable<*> = when (field) {
-    SortableField.NAME -> name.lowercase()
+    SortableField.NAME -> NaturalName(name)
     SortableField.SIZE -> size ?: 0L
     // By the moment itself, not the text: hosts write dates differently, and RFC 1123 doesn't sort as text
     SortableField.UPLOAD_DATE -> parseDateTime(listDate)?.toEpochMilli() ?: Long.MIN_VALUE
+}
+
+/**
+ * A name as it's sorted: without regard to case, and with the numbers in it by their value rather than digit by digit,
+ * so "Episode 2" comes before "Episode 11" (and "1x9" before "1x10"), as a person would put them.
+ */
+internal class NaturalName(name: String) : Comparable<NaturalName> {
+    private val text = name.lowercase()
+    override fun compareTo(other: NaturalName): Int = compareNatural(text, other.text)
+}
+
+private fun Char.isAsciiDigit() = this in '0'..'9'
+
+/**
+ * Compares [a] and [b] character by character, but each run of digits as the number it is. The same number written with
+ * more leading zeros ("01" against "1") only decides when nothing else does, the one with fewer first.
+ */
+internal fun compareNatural(a: String, b: String): Int {
+    var i = 0
+    var j = 0
+    var zeros = 0
+    while (i < a.length && j < b.length) {
+        if (a[i].isAsciiDigit() && b[j].isAsciiDigit()) {
+            // The numbers without their leading zeros: the longer one is the bigger, else the first digit that differs
+            var startA = i
+            while (startA < a.length - 1 && a[startA] == '0' && a[startA + 1].isAsciiDigit()) startA++
+            var startB = j
+            while (startB < b.length - 1 && b[startB] == '0' && b[startB + 1].isAsciiDigit()) startB++
+            var endA = startA
+            while (endA < a.length && a[endA].isAsciiDigit()) endA++
+            var endB = startB
+            while (endB < b.length && b[endB].isAsciiDigit()) endB++
+            val lengthA = endA - startA
+            val lengthB = endB - startB
+            if (lengthA != lengthB) return lengthA - lengthB
+            for (k in 0 until lengthA) {
+                val difference = a[startA + k] - b[startB + k]
+                if (difference != 0) return difference
+            }
+            if (zeros == 0) zeros = (startA - i) - (startB - j)
+            i = endA
+            j = endB
+        } else {
+            val difference = a[i] - b[j]
+            if (difference != 0) return difference
+            i++
+            j++
+        }
+    }
+    val rest = (a.length - i) - (b.length - j)
+    return if (rest != 0) rest else zeros
 }
 
 /**

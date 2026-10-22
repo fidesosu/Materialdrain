@@ -72,7 +72,7 @@ internal fun ProfileCard(user: UserInfo, state: AccountUiState, viewModel: Accou
         }
         if (user.emailAddressPending.isNotBlank()) {
             CardDivider()
-            AccountRow(Icons.Filled.MarkEmailUnread, "Waiting for verification", user.emailAddressPending, supporting = "Open the link in the e-mail to add it")
+            AccountRow(Icons.Filled.MarkEmailUnread, "Waiting for verification", user.emailAddressPending, supporting = "Open the link in the e-mail")
         }
         CardDivider()
         AccountRow(Icons.Filled.AlternateEmail, "E-mail addresses", "Add or remove them", supporting = "On pixeldrain.com") {
@@ -86,7 +86,7 @@ internal fun ProfileCard(user: UserInfo, state: AccountUiState, viewModel: Accou
             label = "Username",
             confirmLabel = "Change",
             initialValue = user.username,
-            supportingText = "Log in with the new username from now on. Links to your files stay the same.",
+            supportingText = "Links to your files stay the same.",
             onConfirm = { viewModel.changeUsername(it); renaming = false },
             onDismiss = { renaming = false }
         )
@@ -103,7 +103,7 @@ internal fun SecurityCard(user: UserInfo) {
             Icons.Filled.Security,
             "Two-factor authentication",
             if (user.otpEnabled) "On" else "Off",
-            supporting = "Turned on or off on pixeldrain.com"
+            supporting = "On pixeldrain.com"
         ) {
             WebsiteLink(WEBSITE_SETTINGS_URL, "Turning two-factor authentication on or off")
         }
@@ -133,7 +133,7 @@ internal fun SharingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
         AccountSwitchRow(
             Icons.Filled.Speed,
             "Hotlinking",
-            "Downloads of your files use your premium transfer, so they're fast and work outside the file viewer",
+            "Fast downloads of your files, paid by you",
             checked = user.hotlinkingEnabled,
             enabled = !busy,
             onChange = viewModel::setHotlinking
@@ -142,7 +142,7 @@ internal fun SharingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
         AccountSwitchRow(
             Icons.Filled.Visibility,
             "Skip the file viewer",
-            "Links to your files open the file itself instead of pixeldrain's page",
+            "Links open the file, not pixeldrain's page",
             checked = user.skipFileViewer,
             enabled = !busy,
             onChange = viewModel::setSkipFileViewer
@@ -169,7 +169,7 @@ internal fun SharingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
             Icons.Filled.Handshake,
             "Affiliate",
             user.affiliateUserName.ifBlank { "None" },
-            supporting = "The account which gets a reward for what you buy"
+            supporting = "Gets a reward for your purchases"
         ) {
             TextButton(onClick = { dialog = SharingDialog.AFFILIATE }, enabled = !busy) { Text("Edit") }
         }
@@ -180,7 +180,7 @@ internal fun SharingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
             title = "Sites which can embed your files",
             label = "Domains",
             initialValue = user.fileEmbedDomains.split(' ').filter { it.isNotBlank() }.joinToString("\n"),
-            supportingText = "One per line, like example.com. Leave it empty so no site can.",
+            supportingText = "One per line, like example.com.",
             singleLine = false,
             onConfirm = { viewModel.setEmbedDomains(it); dialog = null },
             onDismiss = { dialog = null }
@@ -195,7 +195,6 @@ internal fun SharingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
             title = "Affiliate",
             label = "Username",
             initialValue = user.affiliateUserName,
-            supportingText = "Leave it empty to have none.",
             onConfirm = { viewModel.setAffiliate(it); dialog = null },
             onDismiss = { dialog = null }
         )
@@ -232,7 +231,7 @@ internal fun BillingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
             Icons.Filled.Straighten,
             "Upload size limit",
             if (plan.fileSizeLimit > 0) formatSize(plan.fileSizeLimit) else "No limit",
-            supporting = "The biggest a single file you upload can be".takeIf { plan.fileSizeLimit > 0 }
+            supporting = "Largest upload".takeIf { plan.fileSizeLimit > 0 }
         )
         CardDivider()
         AccountRow(Icons.Filled.Timer, "Files are removed", if (plan.fileExpiryDays > 0) "${plan.fileExpiryDays} days after they were last viewed" else "Never")
@@ -298,7 +297,7 @@ internal fun BillingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
     switchingTo?.let { (id, label) ->
         ConfirmDialog(
             title = "Switch to $label?",
-            text = "Your plan's costs are then paid from your credit, which needs to be at least ${formatEuro(1_000_000)}. You have ${formatEuro(user.balanceMicroEur)}.",
+            text = "Paid from your credit (at least ${formatEuro(1_000_000)}). You have ${formatEuro(user.balanceMicroEur)}.",
             confirmLabel = "Switch",
             onConfirm = { viewModel.activatePlan(id, label); switchingTo = null },
             onDismiss = { switchingTo = null }
@@ -338,7 +337,7 @@ internal fun BrandingCard(user: UserInfo, state: AccountUiState, viewModel: Acco
     val set = BrandingFields.filter { current[it.key].orEmpty().let { value -> value.isNotBlank() && value != "false" } }
 
     AccountCard(title = "File viewer") {
-        if (set.isEmpty()) CardNote("Your files are shown on pixeldrain's own file viewer. Your plan lets you give it your own theme, images and links.")
+        if (set.isEmpty()) CardNote("Your own theme, images and links on pixeldrain's file viewer.")
         set.forEachIndexed { index, field ->
             if (index > 0) CardDivider()
             AccountRow(
@@ -410,7 +409,7 @@ internal fun DangerCard() {
             Icons.Filled.DeleteForever,
             "Delete my account",
             "On pixeldrain.com",
-            supporting = "Every session is logged out, and the account and its files are deleted 7 days later. Logging in again before then cancels it."
+            supporting = "You're logged out everywhere and the account is deleted in 7 days. Logging in again cancels it."
         ) {
             WebsiteLink(WEBSITE_SETTINGS_URL, "Deleting your account")
         }

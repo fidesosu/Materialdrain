@@ -315,7 +315,7 @@ fun UploadScreenContent(
                 if (!uiState.isLoading && uploadResult == null) {
                     val effectiveSize = if (selectedTabIndex == 0) uiState.uploadTotalSizeBytes else uiState.textToUpload.toByteArray().size.toLong().takeIf { it > 0 }
                     if (effectiveSize != null && (uiState.pickedFile != null ||uiState.textToUpload.isNotBlank())) {
-                        Text("Ready to upload. Size: ${formatSize(effectiveSize)}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom=8.dp), textAlign = TextAlign.Center)
+                        Text("${formatSize(effectiveSize)}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom=8.dp), textAlign = TextAlign.Center)
                     }
                 }
                 // Add Spacer at the end of the scrollable content if FAB is visible
@@ -364,13 +364,6 @@ private fun UploadDropZone(enabled: Boolean, onClick: () -> Unit) {
                 "Tap to choose files",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = contentAlpha),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                "Anywhere in this area. You can pick more than one file.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
                 textAlign = TextAlign.Center
             )
         }

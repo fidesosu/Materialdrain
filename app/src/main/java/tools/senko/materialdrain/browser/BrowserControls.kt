@@ -503,7 +503,6 @@ private fun ViewMenuEntries(view: ViewChoice, onBack: () -> Unit) {
     if (view.subfolders != null) {
         AppMenuItem(
             "Subfolders too",
-            supportingText = "Unless one has a look of its own",
             active = view.subfolders,
             trailingIcon = if (view.subfolders) Icons.Filled.Check else null,
             onClick = { view.onSubfolders(!view.subfolders) }
@@ -514,8 +513,8 @@ private fun ViewMenuEntries(view: ViewChoice, onBack: () -> Unit) {
         leadingIcon = Icons.Filled.Refresh,
         supportingText = when {
             view.custom -> "${view.inheritedFrom?.let { "From $it" } ?: "Look and feel's"}: ${view.defaultLabel}"
-            view.inheritedFrom != null -> "Has the look of ${view.inheritedFrom}"
-            else -> "This one has no look of its own"
+            view.inheritedFrom != null -> "Same as ${view.inheritedFrom}"
+            else -> "Already the default"
         },
         enabled = view.custom,
         onClick = view.onReset

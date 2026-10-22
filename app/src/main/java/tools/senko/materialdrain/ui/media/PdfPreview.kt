@@ -295,7 +295,7 @@ fun InlinePdfPreview(state: PdfPreviewState, outerPadding: PaddingValues, onLoad
 }
 
 /** Said of a PDF whose copy left the cache again right after it was loaded again (see [ReloadOnce]). */
-private const val PDF_GONE = "The PDF couldn't be kept on the device. Go back and open it again."
+private const val PDF_GONE = "The PDF couldn't be saved. Open it again."
 
 /**
  * Loads a PDF again whose copy left the cache, but only once: if the copy is gone again at once (the cache full, the

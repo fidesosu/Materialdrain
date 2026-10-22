@@ -142,7 +142,7 @@ fun SettingsEnvironment.AccountPage() {
             is Loadable.Loaded -> {
                 AccountHero(user.data, onRefresh = { accountViewModel.refresh() })
                 if (!user.data.canUpload) {
-                    WarningBanner("Verify an e-mail address to upload. New accounts need one before they can upload files.")
+                    WarningBanner("Verify an e-mail address to upload.")
                 }
                 UsageCard(user.data)
                 StatisticsCard(state, accountViewModel)
@@ -170,7 +170,7 @@ private fun SignedOutHero() {
         Text("Your pixeldrain account", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
         Spacer(Modifier.height(4.dp))
         Text(
-            "Log in to see your storage, statistics and billing here, and to change your account's settings.",
+            "Log in to see storage, statistics and billing.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
         )
@@ -651,9 +651,9 @@ fun SettingsEnvironment.ApiKeySection(showMessages: Boolean = false) {
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = when (authState.activeSource) {
-                ApiKeySource.LOGIN -> "Your login is used for requests. This API key is used again after you log out."
-                ApiKeySource.MANUAL -> "This API key is used for requests. Logging in replaces it while you are logged in."
-                ApiKeySource.NONE -> "Make one on pixeldrain.com under API keys, paste it here and press Save."
+                ApiKeySource.LOGIN -> "Used after you log out."
+                ApiKeySource.MANUAL -> "Logging in overrides it."
+                ApiKeySource.NONE -> "Make one on pixeldrain.com under API keys."
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -839,14 +839,13 @@ internal fun WebsiteLink(url: String, what: String) {
             title = { Text("Open pixeldrain.com?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("$what is only possible on the pixeldrain website, pixeldrain doesn't let apps do it. This opens")
+                    Text("$what can only be done on the website. Opens")
                     Text(
                         url.removePrefix("https://"),
                         style = MaterialTheme.typography.bodyLarge,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    Text("in your browser. Log in there if it asks you to.")
                 }
             },
             confirmButton = { Button(onClick = { asking = false; openLink(context, url) }) { Text("Open") } },

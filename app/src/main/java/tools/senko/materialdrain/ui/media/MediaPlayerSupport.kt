@@ -268,8 +268,8 @@ fun rememberPlayerUiState(player: Player, polling: Boolean = true): PlayerUiStat
 /** "the media can't be played" in words which mean something to the user. */
 fun PlaybackException.userMessage(): String = when (errorCode) {
     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "Couldn't reach Pixeldrain. Check your connection."
-    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "Pixeldrain refused to send this file (it may be rate limited)."
+    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "Couldn't reach the host. Check your connection."
+    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "The host refused the file (maybe rate limited)."
     PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "The file was not found."
     PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
     PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,

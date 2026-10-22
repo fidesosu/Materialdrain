@@ -301,7 +301,7 @@ private fun NoFullScreenView(page: FullScreenFile) {
             Text(name, color = Color.White, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         }
         Text(
-            "This file has no fullscreen view. Go back to see it.",
+            "No fullscreen view for this file.",
             color = Color.White.copy(alpha = 0.7f),
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center

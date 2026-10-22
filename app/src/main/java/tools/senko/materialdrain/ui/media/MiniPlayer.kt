@@ -193,13 +193,7 @@ fun BackgroundMiniPlayer(
                 }
             },
             canSkip = { toNext -> if (toNext) player.hasNextMediaItem() else player.hasPreviousMediaItem() },
-            onSkip = { toNext ->
-                when {
-                    toNext && player.hasNextMediaItem() -> { player.seekToNextMediaItem(); true }
-                    !toNext && player.hasPreviousMediaItem() -> { player.seekToPreviousMediaItem(); true }
-                    else -> false
-                }
-            },
+            onSkip = { toNext -> current.skip(toNext) },
             onDismiss = { closeSong(player, current, messages.takeIf { settings.undoCloseSong }) },
             modifier = (if (aboveSystemBar) Modifier.navigationBarsPadding() else Modifier)
                 // Hidden as soon as the compact player it turns into is there in its place; with reduced animations, once

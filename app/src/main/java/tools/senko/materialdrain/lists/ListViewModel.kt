@@ -116,7 +116,7 @@ class ListViewModel(
 
     private fun loadApiKey() {
         if (needsKeyButMissing()) {
-            _uiState.update { it.copy(apiKeyMissingError = true, errorMessage = "API Key is missing. Please set it in Settings.", lists = emptyList()) }
+            _uiState.update { it.copy(apiKeyMissingError = true, errorMessage = "Log in or add an API key in Settings.", lists = emptyList()) }
         } else {
             _uiState.update { it.copy(apiKeyMissingError = false, errorMessage = null) }
             fetchUserLists()
@@ -129,7 +129,7 @@ class ListViewModel(
             return
         }
         if (needsKeyButMissing()) {
-            _uiState.update { it.copy(errorMessage = "API Key is required to fetch lists.", isLoading = false) }
+            _uiState.update { it.copy(errorMessage = "Log in or add an API key in Settings.", isLoading = false) }
             return
         }
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }

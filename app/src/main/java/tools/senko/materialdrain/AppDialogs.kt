@@ -22,15 +22,15 @@ import tools.senko.materialdrain.upload.UploadViewModel
  * where a missing API key is set.
  */
 internal sealed class AppDialog(val title: String, val text: String, val opensAccountSettings: Boolean = false) {
-    data class UploadFailed(val message: String) : AppDialog("Upload Failed", "Error: $message")
-    data class UploadError(val message: String) : AppDialog("Upload Error", message)
+    data class UploadFailed(val message: String) : AppDialog("Upload failed", "Error: $message")
+    data class UploadError(val message: String) : AppDialog("Upload error", message)
     data object UploadApiKeyRequired : AppDialog(
-        "API Key Required for Upload",
-        "Please set your API Key in the Settings screen to upload files.",
+        "Not signed in",
+        "Log in or add an API key in Settings to upload.",
         opensAccountSettings = true
     )
     data class FilesApiKeyRequired(val onDetails: Boolean, val message: String) : AppDialog(
-        if (onDetails) "API Key Required" else "API Key Required for Files",
+        "Not signed in",
         message,
         opensAccountSettings = true
     )
@@ -74,12 +74,12 @@ internal fun AppDialogs(
     // Read here, so its changes don't redraw the screen behind
     val downloadConfirmation by fileInfoViewModel.downloadConfirmation.collectAsState()
     downloadConfirmation?.let { download ->
-        val size = download.totalBytes?.let { ", ${formatSize(it)} in all" }.orEmpty()
+        val size = download.totalBytes?.let { ", ${formatSize(it)}" }.orEmpty()
         ConfirmDialog(
             title = "Download ${download.fileCount} files?",
-            text = "\"${download.title}\" holds ${download.fileCount} files$size. " + when (download.style) {
-                DownloadStyle.SEPARATELY -> "Each one is saved on its own, in its folders in Download."
-                DownloadStyle.ZIP -> "They're saved in one ZIP, made on this device as they download."
+            text = "${download.fileCount} files$size. " + when (download.style) {
+                DownloadStyle.SEPARATELY -> "Saved to Download in their folders."
+                DownloadStyle.ZIP -> "Saved as one ZIP."
             },
             confirmLabel = "Download",
             onConfirm = { fileInfoViewModel.confirmDownload() },

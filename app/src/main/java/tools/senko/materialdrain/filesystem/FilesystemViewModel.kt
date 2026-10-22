@@ -681,7 +681,7 @@ class FilesystemViewModel(
             "path_not_found" -> "The path does not exist (anymore)."
             "cannot_modify_root_dir" -> "The root folder can't be modified."
             "circular_dependency" -> "A folder can't be moved into itself."
-            ErrorCodes.AUTHENTICATION_REQUIRED -> "Authentication is required. Check your login or API key in Settings."
+            ErrorCodes.AUTHENTICATION_REQUIRED -> "Log in or check your API key in Settings."
             "user_out_of_space" -> "Your account has run out of storage space."
             "list_file_not_found" -> "One of the file IDs does not exist."
             else -> null
@@ -791,7 +791,7 @@ class FilesystemViewModel(
             } catch (e: CancellationException) {
                 outcome = TransferOutcome.CANCELLED
                 _uploadProgress.value = null
-                messages.show(if (uploaded > 0) "Upload cancelled, $uploaded file(s) were uploaded." else "Upload cancelled.")
+                messages.show(if (uploaded > 0) "Cancelled after $uploaded uploads." else "Upload cancelled.")
                 throw e
             } finally {
                 transfers.finish(transferId, outcome, outcomeMessage)
@@ -817,7 +817,7 @@ class FilesystemViewModel(
         }
 
     companion object {
-        private const val API_KEY_MISSING = "API Key is missing. Please set it in Settings to browse the filesystem."
+        private const val API_KEY_MISSING = "Log in or add an API key in Settings."
         /** The id of a host's Filesystem tab when its config gives it none (see ScreenConfig.tabId). */
         const val DEFAULT_TAB_ID = "filesystem"
     }

@@ -62,7 +62,7 @@ class AuthViewModel(
         val userId = uri?.getQueryParameter("link_login_user_id")
         val loginId = uri?.getQueryParameter("link_login_id")
         if (userId.isNullOrBlank() || loginId.isNullOrBlank()) {
-            _uiState.update { it.copy(errorMessage = "Paste the complete link from the e-mail, it contains link_login_user_id and link_login_id.", infoMessage = null) }
+            _uiState.update { it.copy(errorMessage = "Paste the whole link from the e-mail.", infoMessage = null) }
             return
         }
         submitLogin(username, password, totp, userId, loginId)
@@ -84,7 +84,7 @@ class AuthViewModel(
                         }
                     }
                     LoginResult.LoginLinkSent -> _uiState.update {
-                        it.copy(isBusy = false, loginLinkSent = true, infoMessage = "A login link was sent to your e-mail address. Paste it below to finish logging in.")
+                        it.copy(isBusy = false, loginLinkSent = true, infoMessage = "Login link sent. Paste it below.")
                     }
                 }
                 is ApiResponse.Error -> _uiState.update {
@@ -109,7 +109,7 @@ class AuthViewModel(
             _uiState.update {
                 AuthUiState(
                     activeSource = sessionManager.activeSource(),
-                    infoMessage = if (serverResult is ApiResponse.Error) "Logged out on this device, the server could not end the session." else "Logged out."
+                    infoMessage = if (serverResult is ApiResponse.Error) "Logged out here. The server couldn't end the session." else "Logged out."
                 )
             }
         }
@@ -139,10 +139,10 @@ class AuthViewModel(
     private fun describeLoginError(error: FileUploadResponse): String = when (error.value) {
         "user_not_found" -> "No account exists with this username or e-mail address."
         "password_incorrect" -> "The password is not correct."
-        "no_login_method_available" -> "Enter a password: this account has no e-mail address to send a login link to."
-        "otp_required" -> "This account uses two-factor authentication. Enter the one-time password from your authenticator app."
+        "no_login_method_available" -> "Enter a password: this account has no e-mail."
+        "otp_required" -> "Enter the code from your authenticator app."
         "otp_incorrect" -> "The one-time password is not correct."
-        "login_link_already_sent" -> "A login link was already sent, wait for it to expire before requesting another."
+        "login_link_already_sent" -> "A link was already sent. Wait for it to expire."
         "invalid_login_link" -> "This login link is not valid, it may have expired."
         "invalid_email_address" -> "The e-mail address is not valid."
         "ip_rate_limit_reached" -> "Too many login attempts, try again later."

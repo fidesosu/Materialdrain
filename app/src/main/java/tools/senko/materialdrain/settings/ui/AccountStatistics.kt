@@ -88,7 +88,7 @@ internal fun StatisticsCard(state: AccountUiState, viewModel: AccountViewModel) 
             }
         }
         if (state.statistic == UsageStatistic.TRANSFER_PAID) {
-            CardNote("Premium transfer is what was downloaded from your files at full speed, paid by you or by the people downloading.")
+            CardNote("Full-speed downloads of your files.")
         }
     }
 }

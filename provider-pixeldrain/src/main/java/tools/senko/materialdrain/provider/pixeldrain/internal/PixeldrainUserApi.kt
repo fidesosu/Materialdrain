@@ -161,7 +161,7 @@ class PixeldrainUserApiImpl(private val http: PixeldrainHttpClient) : Pixeldrain
 
     override suspend fun getUserFiles(apiKey: String): ApiResponse<UserFilesListResponse> {
         if (apiKey.isBlank()) {
-            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "API Key is required to fetch user files."))
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "Log in first."))
         }
         return try {
             http.ktor.prepareGet {
@@ -182,14 +182,14 @@ class PixeldrainUserApiImpl(private val http: PixeldrainHttpClient) : Pixeldrain
             }
         } catch (e: Exception) {
             Log.e(TAG_USER_API, "Exception for GET user files: ${e.message}", e)
-            val errorMsg = e.message ?: "Network request failed or failed to parse error response"
+            val errorMsg = e.message ?: "Couldn't reach Pixeldrain."
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_user_files", message = errorMsg))
         }
     }
 
     override suspend fun getUserLists(apiKey: String): ApiResponse<UserListsResponse> {
         if (apiKey.isBlank()) {
-            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "API Key is required to fetch user lists."))
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "Log in first."))
         }
         return try {
             http.ktor.prepareGet {
@@ -210,7 +210,7 @@ class PixeldrainUserApiImpl(private val http: PixeldrainHttpClient) : Pixeldrain
             }
         } catch (e: Exception) {
             Log.e(TAG_USER_API, "Exception for GET user lists: ${e.message}", e)
-            val errorMsg = e.message ?: "Network request failed or failed to parse error response"
+            val errorMsg = e.message ?: "Couldn't reach Pixeldrain."
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_user_lists", message = errorMsg))
         }
     }

@@ -799,9 +799,7 @@ fun MaterialdrainScreen() {
                             bottom = if (underNavigationBar) 0.dp else bottomPadding - behindMiniPlayer
                         )
                 ) {
-                    val noScreensMessage = "${activeConfig?.name ?: "This host"} has no screens to show: its config's " +
-                        "\"screens\" list is empty, or only names screens this host can't offer. Edit the config in " +
-                        "Settings → Hosts, or remove \"screens\" to show everything the host can do."
+                    val noScreensMessage = "${activeConfig?.name ?: "This host"} has no tabs to show. Check \"screens\" in its config under Settings → Hosts."
                     when (targetScreen) {
                         in BROWSE_SCREENS if noScreensConfigured -> CenteredTextMessage(noScreensMessage)
                         Screen.Upload -> UploadScreenContent(
@@ -904,7 +902,7 @@ fun MaterialdrainScreen() {
                                         } else {
                                             val errorMessage = fileInfoUiState.fileInfoErrorMessage ?: "File details not available."
                                             Text(
-                                                text = "$errorMessage Please go back and select a different file.",
+                                                text = errorMessage,
                                                 modifier = Modifier.padding(16.dp),
                                                 textAlign = TextAlign.Center
                                             )

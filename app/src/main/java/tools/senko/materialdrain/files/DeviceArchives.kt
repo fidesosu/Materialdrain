@@ -276,9 +276,9 @@ class DeviceZipArchives(private val provider: StorageProvider) : ArchiveOps {
 
     private class ArchiveFailure(val error: ProviderError) : Exception(error.message)
 
-    private fun noRanges() = ArchiveFailure(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't send parts of a file, so the archive can't be looked inside."))
+    private fun noRanges() = ArchiveFailure(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't open archives without downloading them."))
 
-    private fun noAddress() = ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This archive can't be reached to look inside it."))
+    private fun noAddress() = ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "Couldn't reach this archive."))
 
     private fun broken() = ApiResponse.Error(ProviderError("invalid_zip_file", "This archive is either not valid or damaged."))
 

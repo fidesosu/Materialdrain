@@ -4,6 +4,12 @@ import android.net.Uri
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
+import androidx.media3.session.MediaController
+import androidx.core.os.bundleOf
+import kotlin.random.Random
 
 /**
  * A song for the background player's queue (see [PlaybackService]): its address, which is its id there too, its name
@@ -53,4 +59,23 @@ internal fun Player.addToQueue(song: QueueSong, placeholderArt: ByteArray) {
 internal fun Player.neighbourSong(next: Boolean): MediaItem? {
     val index = if (next) nextMediaItemIndex else previousMediaItemIndex
     return if (index == C.INDEX_UNSET) null else getMediaItemAt(index)
+}
+
+/**
+ * Moves the song at [from] in the order the queue plays in to [to], which [order] is (the queue's indexes, see
+ * BackgroundSong.playOrder): in the queue itself, or, while it's shuffled, in the shuffled order, which the background
+ * player is told of (see PlaybackService).
+ */
+@androidx.annotation.OptIn(UnstableApi::class)
+internal fun Player.moveInPlayOrder(order: List<Int>, from: Int, to: Int) {
+    if (from == to || from !in order.indices || to !in order.indices) return
+    if (!shuffleModeEnabled) {
+        moveMediaItem(order[from], order[to])
+        return
+    }
+    val moved = order.toMutableList().apply { add(to, removeAt(from)) }.toIntArray()
+    when (this) {
+        is MediaController -> sendCustomCommand(SetShuffleOrderCommand, bundleOf(EXTRA_SHUFFLE_ORDER to moved))
+        is ExoPlayer -> setShuffleOrder(DefaultShuffleOrder(moved, Random.nextLong()))
+    }
 }

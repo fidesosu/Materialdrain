@@ -39,7 +39,7 @@ internal fun EditableTextDialog(
     title: String,
     label: String,
     initialValue: String,
-    supportingText: String,
+    supportingText: String? = null,
     singleLine: Boolean = true,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit
@@ -58,7 +58,7 @@ internal fun EditableTextDialog(
                     minLines = if (singleLine) 1 else 3,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Text(supportingText, style = MaterialTheme.typography.bodySmall)
+                supportingText?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             }
         },
         confirmButton = { Button(onClick = { onConfirm(value) }, enabled = value != initialValue) { Text("Save") } },
@@ -91,7 +91,7 @@ internal fun TransferCapDialog(currentBytes: Long, planCapBytes: Long, onConfirm
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
-                    "Stops your premium transfer from being used past this, so it doesn't cost more than you want. Leave it empty for your plan's cap.",
+                    "Caps premium transfer spending. Empty: your plan's cap.",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -141,7 +141,7 @@ internal fun AddCreditDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
                 if (hasOpenInvoice) {
                     Text(
-                        "You still have an unpaid invoice. Pay that one first: invoices can't be cancelled, they expire by themselves.",
+                        "Pay your open invoice first. It expires by itself.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -164,7 +164,7 @@ internal fun AddCreditDialog(
                     }
                 }
                 Text(
-                    "Pixeldrain only takes cryptocurrency for now. The payment page opens in your browser, with the address and amount to send.",
+                    "Paid in cryptocurrency, on a page in your browser.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -175,7 +175,7 @@ internal fun AddCreditDialog(
                     placeholder = { Text("NLD") },
                     singleLine = true,
                     isError = country.isNotEmpty() && country.length != 3,
-                    supportingText = { Text("Three letters, like NLD, DEU or USA, for the VAT") },
+                    supportingText = { Text("For VAT, like NLD or USA") },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -211,7 +211,7 @@ internal fun BrandingDialog(current: Map<String, String>, onConfirm: (Map<String
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
                 Text(
-                    "How the download page of your files looks. Images are files on your account (JPEG, PNG, GIF or WebP, at most 10 MB): copy their ID from their details.",
+                    "Images are files on your account (JPEG, PNG, GIF, WebP, max 10 MB). Copy the ID from their details.",
                     style = MaterialTheme.typography.bodySmall
                 )
                 BrandingFields.forEach { field ->

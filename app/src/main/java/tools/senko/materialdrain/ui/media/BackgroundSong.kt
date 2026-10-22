@@ -49,6 +49,28 @@ class BackgroundSong(val player: Player) {
         return player.hasNextMediaItem()
     }
 
+    /**
+     * Whether the last move to another song went on through the queue (true) or back: for the way the new song comes in
+     * (see SwipeableCover). Told by what moved it ([skip]), else by where the two songs are in [playOrder].
+     */
+    var forward by mutableStateOf(true)
+        private set
+
+    /** The way [skip] went, until the song it skipped to comes. */
+    private var skipping: Boolean? = null
+
+    /**
+     * Goes to the song after (or, not [toNext], before) the one playing, in the order the queue plays in, round to the
+     * other end while it repeats; false when there's none.
+     */
+    fun skip(toNext: Boolean): Boolean {
+        val can = if (toNext) player.hasNextMediaItem() else player.hasPreviousMediaItem()
+        if (!can) return false
+        skipping = toNext
+        if (toNext) player.seekToNextMediaItem() else player.seekToPreviousMediaItem()
+        return true
+    }
+
     /** Off, then the whole queue, then the one song, then off again. */
     fun cycleRepeat() {
         player.repeatMode = when (player.repeatMode) {
@@ -69,6 +91,9 @@ class BackgroundSong(val player: Player) {
     val artist: String? get() = songId?.let { SongTags.of(it)?.artist } ?: metadata.artist?.toString()
     val album: String? get() = songId?.let { SongTags.of(it)?.album } ?: metadata.albumTitle?.toString()
 
+    /** What the players show of the song playing, all of it at once (see [ShownSong]). */
+    val shown: ShownSong get() = ShownSong(songId, art, title, artist, album)
+
     /** The picture to show: the cover, or the audio tile of a song without one (see songItem). */
     val art: Any? get() = metadata.artworkData ?: metadata.artworkUri ?: metadata.extras?.getByteArray(EXTRA_FALLBACK_ART)
 
@@ -81,10 +106,13 @@ class BackgroundSong(val player: Player) {
     internal val listener = object : Player.Listener {
         override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) { metadata = mediaMetadata }
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            val from = index
             // The new song's picture with it, rather than the last one's until its own metadata comes
             metadata = player.mediaMetadata
             songId = mediaItem?.mediaId
             index = player.currentMediaItemIndex
+            forward = skipping ?: (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || wentOn(playOrder, from, index))
+            skipping = null
         }
         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
             songId = player.currentMediaItem?.mediaId
@@ -100,6 +128,25 @@ class BackgroundSong(val player: Player) {
     }
 
     private companion object {
+        /**
+         * Whether going from the song at [from] to the one at [to] (indexes of the queue) went on through [order]: to
+         * the one just after it, or round from the last one to the first; back to the one just before it, or round from
+         * the first to the last, went back; any other, on when it's further on.
+         */
+        fun wentOn(order: List<Int>, from: Int, to: Int): Boolean {
+            val a = order.indexOf(from)
+            val b = order.indexOf(to)
+            if (a == -1 || b == -1) return to >= from
+            val last = order.lastIndex
+            return when {
+                b == a + 1 -> true
+                b == a - 1 -> false
+                a == last && b == 0 -> true
+                a == 0 && b == last -> false
+                else -> b >= a
+            }
+        }
+
         fun itemsOf(player: Player): List<MediaItem> = List(player.mediaItemCount) { player.getMediaItemAt(it) }
 
         /** The order the player goes through its queue in, shuffled or not, from the first song to the last. */
@@ -116,6 +163,12 @@ class BackgroundSong(val player: Player) {
         }
     }
 }
+
+/**
+ * A song as the players show it: its id, picture, title, artist and album, kept together so one leaving the screen as
+ * the next comes in (see CompactPlayer) keeps its own rather than showing the next one's.
+ */
+data class ShownSong(val id: String?, val art: Any?, val title: String?, val artist: String?, val album: String?)
 
 /** How many songs on each side of the one playing have their tags read ahead, for the peek and a skip (see SongTags). */
 private const val TAGS_AHEAD = 2

@@ -43,6 +43,23 @@ class FileSortTest {
     }
 
     @Test
+    fun `numbers in names sort by their value`() {
+        val files = listOf("Chainsaw Man 1x11.mkv", "Chainsaw Man 1x2.mkv", "chainsaw man 1x1.mkv", "Chainsaw Man 1x12.mkv", "Chainsaw Man 1x10.mkv")
+            .map { node(it) }
+        assertEquals(
+            listOf("chainsaw man 1x1.mkv", "Chainsaw Man 1x2.mkv", "Chainsaw Man 1x10.mkv", "Chainsaw Man 1x11.mkv", "Chainsaw Man 1x12.mkv"),
+            files.sortedWith(fileComparator(SortableField.NAME, ascending = true)).map { it.name }
+        )
+    }
+
+    @Test
+    fun `leading zeros only decide between the same numbers`() {
+        assertEquals(listOf("a1", "a01", "a2", "a010"), listOf("a010", "a2", "a01", "a1").sortedWith { x, y -> compareNatural(x, y) })
+        assertEquals(listOf("a01b", "a1c"), listOf("a1c", "a01b").sortedWith { x, y -> compareNatural(x, y) })
+        assertEquals(listOf("track", "track 0", "track 9", "track 10"), listOf("track 10", "track", "track 9", "track 0").sortedWith { x, y -> compareNatural(x, y) })
+    }
+
+    @Test
     fun `a comparator used again sorts the same way`() {
         val comparator = fileComparator(SortableField.NAME, ascending = true)
         val files = listOf(node("c"), node("a"), node("b"))

@@ -237,9 +237,7 @@ fun FileActionDialogs(
             val count = request.files.size
             ConfirmDialog(
                 title = if (count == 1) "Delete file?" else "Delete $count files?",
-                text = (if (count == 1) "\"${request.files.first().name}\"" else "The selected files") +
-                    " will be deleted from your Pixeldrain account, this also removes " +
-                    (if (count == 1) "it" else "them") + " from every list. This cannot be undone.",
+                text = "Also removes " + (if (count == 1) "it" else "them") + " from every list. This can't be undone.",
                 confirmLabel = "Delete",
                 isDestructive = true,
                 onConfirm = {
@@ -275,7 +273,6 @@ fun FileActionDialogs(
                     label = "List title",
                     confirmLabel = "Create",
                     initialValue = "Pixeldrain List",
-                    supportingText = "Creates a new list with " + (if (count == 1) "this file" else "these $count files") + ".",
                     onConfirm = { title ->
                         handlers.createList(request.files.mapNotNull { it.ref.id }, title)
                         onStarted()
@@ -302,10 +299,9 @@ fun FileActionDialogs(
             ConfirmDialog(
                 title = if (count == 1) "Remove file from list?" else "Remove $count files from list?",
                 text = if (deletesList) {
-                    "A list can't be empty: with all of its files removed, the list \"${request.list.title}\" is deleted. " +
-                        "The files themselves stay on your account."
+                    "This deletes the list \"${request.list.title}\". The files stay on your account."
                 } else {
-                    "The files are only taken out of \"${request.list.title}\", they stay on your account and in your other lists."
+                    "The files stay on your account and other lists."
                 },
                 confirmLabel = if (deletesList) "Delete list" else "Remove",
                 isDestructive = deletesList,

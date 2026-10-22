@@ -530,7 +530,7 @@ private fun ScreensField(spec: FieldSpec, value: JsonElement?, onValue: (JsonEle
             Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                 Text("Choose the tabs myself", style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    if (chosen) "Ticked tabs show in this order. A tab the host can't back is left out." else spec.help,
+                    if (chosen) "Ticked tabs show in this order." else spec.help,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -611,7 +611,7 @@ private fun ScreenRow(
             // What's wrong with the tab, on the tab itself (see screenProblems)
             val problem = when {
                 repeatedId -> "Another tab has the id \"$tabId\": only the first one shows."
-                screen != HostScreen.FILESYSTEM && !entry.root.isNullOrBlank() -> "A root folder does nothing here, only on a Filesystem tab."
+                screen != HostScreen.FILESYSTEM && !entry.root.isNullOrBlank() -> "Root folders only work on Filesystem tabs."
                 else -> null
             }
             problem?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
@@ -638,7 +638,7 @@ private fun ScreenRow(
                         onValueChange = { onChange(entry.copy(name = it)) },
                         label = { Text("Tab name") },
                         placeholder = { Text(screen?.label() ?: entry.screen) },
-                        supportingText = { Text("Replaces the tab's label and title, e.g. Media for a share of films.") },
+                        supportingText = { Text("Replaces the tab's name.") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -651,8 +651,8 @@ private fun ScreenRow(
                         isError = repeatedId,
                         supportingText = {
                             Text(
-                                if (repeatedId) "Another tab has this id: give each its own, or only the first one shows."
-                                else "Tells this tab apart from others of its kind. Needed for a second one; left empty, it's ${entry.screen.lowercase()}."
+                                if (repeatedId) "Another tab has this id. Only the first shows."
+                                else "Needed for a second tab of this kind. Default: ${entry.screen.lowercase()}."
                             )
                         },
                         singleLine = true,
@@ -664,7 +664,7 @@ private fun ScreenRow(
                             onValueChange = { onChange(entry.copy(root = it.ifEmpty { null })) },
                             label = { Text("Root folder") },
                             placeholder = { Text("The whole host") },
-                            supportingText = { Text("The folder this tab opens at, under the host's own top, e.g. Media/Films. It can't go above it.") },
+                            supportingText = { Text("The folder this tab opens at, e.g. Media/Films.") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -680,11 +680,6 @@ private fun ScreenRow(
                             )
                         }
                     }
-                    Text(
-                        "Only takes away: an action the host can't do isn't shown anyway.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             },
             confirmButton = { TextButton(onClick = { editing = false }) { Text("Done") } }
@@ -706,7 +701,7 @@ private fun EndpointsField(value: JsonElement?, form: FormState, onValue: (JsonE
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (endpoints.isEmpty()) {
             Text(
-                "None yet: a config needs at least one. Start with browse_list for a folder browser, or list for a flat file list.",
+                "None yet. Add browse_list for folders or list for a file list.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error
             )

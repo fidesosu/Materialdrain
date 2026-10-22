@@ -267,7 +267,7 @@ class AccountViewModel(
                         put("checkout_country", country.trim().uppercase())
                         put("checkout_provider", network)
                     })
-                    uiMessages.show("The payment opens in your browser. The credit is added once it's paid.", long = true)
+                    uiMessages.show("Credit is added once paid.", long = true)
                     loadInvoices()
                     loadUser(quietly = true)
                 }
@@ -343,15 +343,15 @@ const val WEBSITE_LOGIN_REQUIRED = "website_login_required"
 
 /** What an error of the user API means, in the words of the account page. */
 internal fun describe(error: FileUploadResponse): String = when (error.value) {
-    WEBSITE_LOGIN_REQUIRED -> "Pixeldrain only allows this from its website. Open your account on pixeldrain.com to do it there."
+    WEBSITE_LOGIN_REQUIRED -> "Only possible on pixeldrain.com."
     "api_key_missing" -> "Log in or enter an API key first."
     "authentication_failed", "unauthorized" -> "The API key isn't valid anymore. Log in again."
     "username_already_registered" -> "That username is already taken."
     "email_address_already_registered" -> "Another account already uses that e-mail address."
     "invalid_email_address" -> "That e-mail address isn't valid."
     "too_many_email_addresses" -> "An account can have at most 5 e-mail addresses. Remove one first."
-    "login_link_already_sent" -> "A verification link was already sent. Wait for it to expire before asking for another."
-    "last_email_address" -> "This is the last e-mail address of the account, it needs at least one."
+    "login_link_already_sent" -> "A link was already sent. Wait for it to expire."
+    "last_email_address" -> "An account needs at least one e-mail address."
     "not_enough_credit_for_prepaid" -> "A prepaid plan needs at least €1 of credit. Add credit first."
     "invalid_domain_name" -> "Each embed domain needs a period in it, like example.com."
     "user_not_found" -> "No account has that username."

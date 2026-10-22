@@ -515,7 +515,7 @@ class DownloadManager(
                     is ApiResponse.Success -> {
                         downloadSuccessful = true
                         val bytesCopied = response.data
-                        val message = "File '${node.name}' downloaded (${formatSize(bytesCopied)})."
+                        val message = "Downloaded ${node.name}"
                         outcome = TransferOutcome.COMPLETED
                         outcomeMessage = message
                         updateDownload(key) {
@@ -530,7 +530,7 @@ class DownloadManager(
                         }
                     }
                     is ApiResponse.Error -> {
-                        throw IOException(response.error.message.ifBlank { "Download failed due to API error." })
+                        throw IOException(response.error.message.ifBlank { "Download failed." })
                     }
                 }
             } catch (e: Exception) {

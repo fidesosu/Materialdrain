@@ -153,7 +153,7 @@ class PixeldrainCoreApiImpl(private val http: PixeldrainHttpClient) : Pixeldrain
             }
         } catch (e: Exception) {
             Log.e(TAG_CORE_API, "Exception for GET file info: ${e.message}", e)
-            val errorMsg = e.message ?: "Network request failed or failed to parse error response"
+            val errorMsg = e.message ?: "Couldn't reach Pixeldrain."
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_file_info", message = errorMsg))
         }
     }
@@ -197,14 +197,14 @@ class PixeldrainCoreApiImpl(private val http: PixeldrainHttpClient) : Pixeldrain
             }
         } catch (e: Exception) {
             Log.e(TAG_CORE_API, "Exception during GET file content as text: ${e.message}", e)
-            val errorMsg = e.message ?: "Network request failed or failed to parse response"
+            val errorMsg = e.message ?: "Couldn't reach Pixeldrain."
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_get_content", message = errorMsg))
         }
     }
 
     override suspend fun deleteFile(apiKey: String, fileId: String): ApiResponse<FileUploadResponse> {
         if (apiKey.isBlank()) {
-            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "API Key is required to delete files."))
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "Log in first."))
         }
         if (fileId.isBlank()) {
             return ApiResponse.Error(FileUploadResponse(success = false, value = "file_id_missing", message = "File ID is required to delete a file."))
@@ -229,14 +229,14 @@ class PixeldrainCoreApiImpl(private val http: PixeldrainHttpClient) : Pixeldrain
             }
         } catch (e: Exception) {
             Log.e(TAG_CORE_API, "Exception during DELETE file: ${e.message}", e)
-            val errorMsg = e.message ?: "Network request failed or failed to parse error/success response"
+            val errorMsg = e.message ?: "Couldn't reach Pixeldrain."
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_delete_file", message = errorMsg))
         }
     }
 
     override suspend fun createList(apiKey: String, title: String, fileIds: List<String>): ApiResponse<FileUploadResponse> {
         if (apiKey.isBlank()) {
-            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "API Key is required to create a list."))
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "Log in first."))
         }
         if (fileIds.isEmpty()) {
             return ApiResponse.Error(FileUploadResponse(success = false, value = "cannot_create_empty_list", message = "You cannot make a list with no files."))
@@ -269,7 +269,7 @@ class PixeldrainCoreApiImpl(private val http: PixeldrainHttpClient) : Pixeldrain
 
     override suspend fun updateList(apiKey: String, listId: String, title: String, fileIds: List<String>): ApiResponse<FileUploadResponse> {
         if (apiKey.isBlank()) {
-            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "API Key is required to change a list."))
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "Log in first."))
         }
         if (fileIds.isEmpty()) {
             return ApiResponse.Error(FileUploadResponse(success = false, value = "cannot_create_empty_list", message = "A list cannot have no files."))
@@ -284,7 +284,7 @@ class PixeldrainCoreApiImpl(private val http: PixeldrainHttpClient) : Pixeldrain
 
     override suspend fun deleteList(apiKey: String, listId: String): ApiResponse<FileUploadResponse> {
         if (apiKey.isBlank()) {
-            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "API Key is required to delete a list."))
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "Log in first."))
         }
         val request = Request.Builder()
             .url(http.apiUrl("list", listId).build())
@@ -329,7 +329,7 @@ class PixeldrainCoreApiImpl(private val http: PixeldrainHttpClient) : Pixeldrain
             }
         } catch (e: Exception) {
             Log.e(TAG_CORE_API, "Exception for GET list: ${e.message}", e)
-            ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_get_list", message = e.message ?: "Network request failed or failed to parse response"))
+            ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_get_list", message = e.message ?: "Couldn't reach Pixeldrain."))
         }
     }
 }

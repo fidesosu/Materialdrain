@@ -52,13 +52,13 @@ class TransferNotifier(private val context: Context) {
         )
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL_TRANSFER_COMPLETE, "Completed transfers", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "Shown when an upload or download finished while the app was in the background"
+                description = "When a transfer finishes in the background"
                 group = CHANNEL_GROUP_TRANSFERS
             }
         )
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL_TRANSFER_FAILED, "Failed transfers", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Shown when an upload or download failed while the app was in the background"
+                description = "When a transfer fails in the background"
                 group = CHANNEL_GROUP_TRANSFERS
             }
         )

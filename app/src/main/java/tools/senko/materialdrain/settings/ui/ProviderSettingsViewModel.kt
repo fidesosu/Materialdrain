@@ -103,7 +103,7 @@ class ProviderSettingsViewModel(
         val source = ConfigSource.of(text)
         if (source == null) {
             val reason = ProviderConfigCodec.explainFailure(text) ?: "it couldn't be read"
-            _uiState.update { it.copy(importError = "This isn't a usable provider config: $reason.") }
+            _uiState.update { it.copy(importError = "Not a valid config: $reason.") }
             return false
         }
         // The newly imported host is the one the Files, Lists and Filesystem screens use
@@ -327,8 +327,8 @@ class ProviderSettingsViewModel(
         CheckOutcome.UpToDate -> "Up to date"
         is CheckOutcome.UpdateAvailable ->
             if (outcome.sensitiveChanges.isEmpty()) "Version ${outcome.version} is available"
-            else "Version ${outcome.version} is available and needs your approval"
-        is CheckOutcome.NeedsNewerApp -> "A newer version needs a newer app (version ${outcome.minAppVersion})"
+            else "Version ${outcome.version} needs your approval"
+        is CheckOutcome.NeedsNewerApp -> "Update needs app version ${outcome.minAppVersion}"
         is CheckOutcome.Failed -> "Couldn't check: ${outcome.message}"
         CheckOutcome.NoUpdateUrl -> "This config has no update URL"
     }

@@ -31,6 +31,13 @@ import androidx.compose.material.icons.Icons
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import android.content.Intent
+import android.os.Bundle
+import androidx.media3.common.ForwardingPlayer
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
+import kotlin.random.Random
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -62,19 +69,41 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        val player = createPlayer(this, isVideo = false)
-        session = MediaSession.Builder(this, player)
+        val exoPlayer = createPlayer(this, isVideo = false)
+        session = MediaSession.Builder(this, ReshufflingPlayer(exoPlayer))
             .setBitmapLoader(CoverBitmapLoader(this, scope))
             .setCallback(object : MediaSession.Callback {
                 // The service is exported for the system's media controls, which only play, pause and seek: only the
-                // app itself can choose what plays, so another app can't have it load an address of its choosing
+                // app itself can choose what plays, so another app can't have it load an address of its choosing. The
+                // app can also set the order the queue is shuffled in (see moveInPlayOrder)
                 override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
-                    if (controller.packageName == packageName) return super.onConnect(session, controller)
+                    if (controller.packageName == packageName) {
+                        return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                            .setAvailableSessionCommands(
+                                MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().add(SetShuffleOrderCommand).build()
+                            )
+                            .build()
+                    }
                     val commands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon()
                         .remove(Player.COMMAND_SET_MEDIA_ITEM)
                         .remove(Player.COMMAND_CHANGE_MEDIA_ITEMS)
                         .build()
                     return MediaSession.ConnectionResult.AcceptedResultBuilder(session).setAvailablePlayerCommands(commands).build()
+                }
+
+                override fun onCustomCommand(
+                    session: MediaSession,
+                    controller: MediaSession.ControllerInfo,
+                    customCommand: SessionCommand,
+                    args: Bundle
+                ): ListenableFuture<SessionResult> {
+                    if (customCommand.customAction != SetShuffleOrderCommand.customAction) return super.onCustomCommand(session, controller, customCommand, args)
+                    val order = args.getIntArray(EXTRA_SHUFFLE_ORDER)
+                    // Only a whole order of the queue as it is now: one sent before a change to it no longer fits
+                    val fits = order != null && order.size == exoPlayer.mediaItemCount && order.sorted() == List(order.size) { it }
+                    if (!fits) return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
+                    exoPlayer.setShuffleOrder(DefaultShuffleOrder(order, Random.nextLong()))
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                 }
 
                 // An item sent by a controller may come without its address: it's its id
@@ -110,6 +139,37 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 }
+
+/**
+ * The background player, which shuffles the queue anew each time shuffle is turned on, with the song playing first: a
+ * player's own shuffled order is made once for the queue, so turning shuffle off and on again gave the same one, and the
+ * song playing could be anywhere in it (the songs before it counting as played).
+ */
+@UnstableApi
+private class ReshufflingPlayer(private val exoPlayer: ExoPlayer) : ForwardingPlayer(exoPlayer) {
+    override fun setShuffleModeEnabled(shuffleModeEnabled: Boolean) {
+        if (shuffleModeEnabled && !exoPlayer.shuffleModeEnabled) exoPlayer.reshuffle()
+        super.setShuffleModeEnabled(shuffleModeEnabled)
+    }
+}
+
+/** A new random order of the queue, starting with the song playing. */
+@UnstableApi
+private fun ExoPlayer.reshuffle() {
+    val count = mediaItemCount
+    if (count == 0) return
+    val current = currentMediaItemIndex.coerceIn(0, count - 1)
+    val order = intArrayOf(current) + (0 until count).filter { it != current }.shuffled().toIntArray()
+    setShuffleOrder(DefaultShuffleOrder(order, Random.nextLong()))
+}
+
+/**
+ * The app's command to [PlaybackService] for the order the queue plays in while it's shuffled, its indexes in
+ * [EXTRA_SHUFFLE_ORDER] (see moveInPlayOrder): the order of a queue rearranged while shuffled.
+ */
+internal val SetShuffleOrderCommand = SessionCommand("tools.senko.materialdrain.SET_SHUFFLE_ORDER", Bundle.EMPTY)
+
+internal const val EXTRA_SHUFFLE_ORDER = "tools.senko.materialdrain.SHUFFLE_ORDER"
 
 /**
  * A controller of [PlaybackService]'s player, null until it's connected (a moment). Letting it go (leaving the details)

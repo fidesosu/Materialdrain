@@ -77,33 +77,32 @@ private fun str(value: String) = JsonPrimitive(value)
 // ---- Shared parts ----
 
 private val nameField = FieldSpec(
-    "name", "Name", "The name the app shows for this host, in the switcher and the settings.",
+    "name", "Name", "Shown in the host switcher.",
     required = true, placeholder = "My NAS"
 )
 
 private val screensField = FieldSpec(
     "screens", "Screens",
-    "Which tabs this host shows, and in what order. Left to the app, every tab the host can back is shown. A kind can " +
-        "be shown more than once, each with its own id (and for the filesystem its own root folder).",
+    "Which tabs show, in order. Empty: all the host supports.",
     kind = FieldKind.Screens, common = true
 )
 
 private val metaSection = Section(
     "Sharing and updates",
-    "Who made the config and where newer versions come from. None of it is secret.",
+    "Author and update source.",
     listOf(
         FieldSpec(
             "meta", "Details", "", common = true,
             kind = FieldKind.Group(
                 listOf(
                     FieldSpec(
-                        "id", "Config id", "A stable name for the config. Importing one with the same id and update address replaces it.",
+                        "id", "Config id", "Same id and update URL replaces the existing config.",
                         common = true, placeholder = "com.example.my-host"
                     ),
-                    FieldSpec("version", "Version", "A whole number; raise it whenever you publish a change.", kind = FieldKind.Number, default = JsonPrimitive(0), common = true),
+                    FieldSpec("version", "Version", "Raise it with each change.", kind = FieldKind.Number, default = JsonPrimitive(0), common = true),
                     FieldSpec("author", "Author", "Shown in the app next to the version.", common = true),
                     FieldSpec(
-                        "update_url", "Update address", "An https address of the raw config file, checked at most once a day for a newer version.",
+                        "update_url", "Update address", "https URL of the raw config, checked daily.",
                         placeholder = "https://example.com/my-host.json"
                     ),
                     FieldSpec("min_app_version", "Lowest app version", "Older apps say so instead of breaking.", kind = FieldKind.Number)
@@ -152,7 +151,7 @@ private fun requestFields(placeholders: String?): List<FieldSpec> = listOf(
     ),
     FieldSpec("body", "Body", "What's sent with the request.", kind = bodyChoice, default = str("RAW")),
     FieldSpec(
-        "query", "Query parameters", "Added to the address. A value that's just one {placeholder} with nothing to fill in is left out.",
+        "query", "Query parameters", "Added to the URL. Empty placeholders are left out.",
         kind = FieldKind.KeyValues(valueHint = "{placeholder} or a fixed value")
     ),
     FieldSpec(
@@ -160,7 +159,7 @@ private fun requestFields(placeholders: String?): List<FieldSpec> = listOf(
         shownWhen = { it.textOf("body") == "FORM" || it.containsKey("form") }
     ),
     FieldSpec(
-        "json", "JSON body", "Sent as the body when it's JSON. {title_json} and {files_json} are filled in already encoded.",
+        "json", "JSON body", "JSON body. {title_json} and {files_json} come encoded.",
         kind = FieldKind.Text(multiline = true), shownWhen = { it.textOf("body") == "JSON" || it.containsKey("json") },
         common = true
     ),
@@ -169,14 +168,14 @@ private fun requestFields(placeholders: String?): List<FieldSpec> = listOf(
         default = JsonArray(listOf(JsonPrimitive(200), JsonPrimitive(201)))
     ),
     FieldSpec(
-        "list_path", "List of items", "For a listing: where the array of items is in the answer. Left out, the answer itself is the array.",
+        "list_path", "List of items", "Path to the items array. Empty: the whole answer.",
         placeholder = "$.files"
     ),
     FieldSpec(
-        "response_map", "Answer fields", "Where the app finds each value in the answer (for a listing, in each item), as a dot-path like $.file.name.",
+        "response_map", "Answer fields", "Dot-path to each value, like $.file.name.",
         kind = FieldKind.KeyValues(responseFieldSuggestions, valueHint = "$.field")
     ),
-    FieldSpec("breadcrumb_path", "Folder path", "For a folder listing: where the folders leading to it are in the answer.", placeholder = "$.path"),
+    FieldSpec("breadcrumb_path", "Folder path", "Path to the parent folders.", placeholder = "$.path"),
     FieldSpec(
         "listing_map", "Listing fields", "Values of the listing as a whole.",
         kind = FieldKind.KeyValues(
@@ -218,8 +217,7 @@ val KnownEndpoints: List<EndpointInfo> = listOf(
     EndpointInfo("browse_import", "Filesystem tab", "Copying files into a folder by their ids.", "{path} and {files_json}"),
     EndpointInfo(
         "archive_info", "Filesystem tab",
-        "What's inside an archive, without downloading it. With {path} for the archives in the folders, with {id} for the " +
-            "files of the account: an archive the endpoint can't reach shows no contents.",
+        "Archive contents without downloading. {path} for folders, {id} for account files.",
         "{path} or {id}"
     ),
     EndpointInfo("archive_file", "Filesystem tab", "One file out of an archive.", "{path} or {id}, and {entry}"),
@@ -243,7 +241,7 @@ private fun authField(webdav: Boolean) = FieldSpec(
         listOf(
             FieldSpec(
                 "type", "API key sent as",
-                "How a saved API key (or a session from signing in) goes with each request.",
+                "How the API key or session is sent.",
                 kind = choice(
                     ChoiceOption("NONE", "Nothing", "No API key"),
                     ChoiceOption("BASIC", "Basic", "HTTP Basic: the key is the password"),
@@ -257,17 +255,17 @@ private fun authField(webdav: Boolean) = FieldSpec(
                 shownWhen = { it.textOf("type") == "HEADER" }
             ),
             FieldSpec(
-                "key_username", "Username sent with the key", "With Basic, the username that goes with the key (often left empty).",
+                "key_username", "Username sent with the key", "For Basic. Often empty.",
                 default = str(""), shownWhen = { (it.textOf("type") ?: if (webdav) "BASIC" else "NONE") == "BASIC" }
             ),
             FieldSpec(
-                "password_auth", "Username and password", "For hosts that take a username and password, not only an API key.",
+                "password_auth", "Username and password", "For hosts with a username and password.",
                 common = true, canTurnOff = true,
                 kind = FieldKind.Group(
                     listOf(
                         FieldSpec(
                             "mode", "Used as",
-                            "Sent with every request, or exchanged once for a session (the password isn't kept then).",
+                            "",
                             kind = choice(
                                 ChoiceOption("BASIC", "Every request", "HTTP Basic, the password is kept on the device"),
                                 ChoiceOption("LOGIN", "Sign-in request", "Exchanged for a session, the password isn't kept")
@@ -287,7 +285,7 @@ private fun authField(webdav: Boolean) = FieldSpec(
                                     ),
                                     FieldSpec(
                                         "fields", "Fields",
-                                        "{username}, {password} and {otp} are filled in. A field that's just {otp} is only sent once a code is asked for.",
+                                        "{username}, {password} and {otp} are filled in. {otp} is only sent when a code is asked for.",
                                         kind = FieldKind.KeyValues(
                                             listOf(
                                                 Suggestion("username", "The username", "{username}"),
@@ -300,7 +298,7 @@ private fun authField(webdav: Boolean) = FieldSpec(
                                     ),
                                     FieldSpec("token", "Session in the answer", "Where the session token is in the answer.", required = true, placeholder = "$.auth_key"),
                                     FieldSpec(
-                                        "otp", "Two-factor codes", "When the host asks for a code, the same sign-in is sent again with it.",
+                                        "otp", "Two-factor codes", "If the host asks for a code, the sign-in is sent again with it.",
                                         common = true, canTurnOff = true,
                                         kind = FieldKind.Group(
                                             listOf(
@@ -314,7 +312,7 @@ private fun authField(webdav: Boolean) = FieldSpec(
                             )
                         ),
                         FieldSpec(
-                            "logout", "Sign-out request", "Ends the session on the host when signing out; without it, signing out is only on the device.",
+                            "logout", "Sign-out request", "Ends the session on the host when signing out.",
                             kind = FieldKind.Group(requestFields(null)), common = true, canTurnOff = true,
                             shownWhen = { it.textOf("mode") == "LOGIN" }
                         )
@@ -339,22 +337,22 @@ private val genericRestSections = listOf(
         "Basics", "The name, and where the API is.",
         listOf(
             nameField,
-            FieldSpec("base_url", "Base address", "The API's address; every endpoint's path is added to it.", required = true, placeholder = "https://files.example.com/api"),
+            FieldSpec("base_url", "Base address", "The API's base URL.", required = true, placeholder = "https://files.example.com/api"),
             FieldSpec("browse_root", "Start folder", "The folder the Filesystem tab starts at (Pixeldrain uses me).", default = str("")),
             FieldSpec(
                 "send_credentials", "Send the sign-in", "Off for a public host that must not see it.",
                 kind = FieldKind.Toggle, default = JsonPrimitive(true)
             ),
             FieldSpec(
-                "account_fallback", "Use the Pixeldrain account", "Without a sign-in of its own, use the one in Settings → Account. Only for pixeldrain.com.",
+                "account_fallback", "Use the Pixeldrain account", "Uses the Account sign-in. pixeldrain.com only.",
                 kind = FieldKind.Toggle, default = JsonPrimitive(false)
             )
         ),
         startOpen = true
     ),
-    Section("Sign-in", "How the sign-in goes with each request. The key or password itself is entered on the host's card, never here.", listOf(authField(webdav = false))),
+    Section("Sign-in", "How sign-in is sent. Keys and passwords go on the host's card.", listOf(authField(webdav = false))),
     Section(
-        "Endpoints", "The requests the app makes. Each one unlocks a part of the app; the ones left out are simply not offered.",
+        "Endpoints", "Each request unlocks a feature.",
         listOf(FieldSpec("endpoints", "Endpoints", "", kind = FieldKind.Endpoints, required = true))
     ),
     Section("Screens", "The tabs this host shows.", listOf(screensField)),
@@ -367,14 +365,14 @@ private val webDavSections = listOf(
         listOf(
             nameField,
             FieldSpec(
-                "base_url", "WebDAV address", "The share's address. {username} is filled in with the username you sign in with.",
+                "base_url", "WebDAV address", "{username} is replaced with your username.",
                 required = true, placeholder = "https://cloud.example.com/remote.php/dav/files/{username}"
             ),
             FieldSpec("root_path", "Start folder", "The folder the app starts in.", default = str("/"), common = true)
         ),
         startOpen = true
     ),
-    Section("Sign-in", "How the sign-in is sent. The username and password are entered on the host's card, never here.", listOf(authField(webdav = true))),
+    Section("Sign-in", "Username and password go on the host's card.", listOf(authField(webdav = true))),
     Section("Screens", "The tabs this host shows.", listOf(screensField)),
     metaSection
 )
@@ -386,16 +384,16 @@ private val s3Sections = listOf(
             nameField,
             FieldSpec("endpoint", "Server address", "The S3 server, with its port when it has one.", required = true, placeholder = "https://nas.example.com:9000"),
             FieldSpec("bucket", "Bucket", "The bucket to browse.", required = true, placeholder = "my-bucket"),
-            FieldSpec("region", "Region", "The region the requests are signed for; most self-hosted servers take any.", default = str("us-east-1"), common = true),
+            FieldSpec("region", "Region", "Most self-hosted servers accept any.", default = str("us-east-1"), common = true),
             FieldSpec(
-                "path_style", "Bucket in the path", "Addresses like server/bucket/file, which MinIO and most self-hosted servers need. Off, bucket.server/file.",
+                "path_style", "Bucket in the path", "server/bucket/file (MinIO, most self-hosted). Off: bucket.server/file.",
                 kind = FieldKind.Toggle, default = JsonPrimitive(true)
             ),
-            FieldSpec("prefix", "Only under", "Only show files under this prefix, as if it were the top.", default = str(""), placeholder = "photos/")
+            FieldSpec("prefix", "Only under", "Only show files under this prefix.", default = str(""), placeholder = "photos/")
         ),
         startOpen = true
     ),
-    Section("Screens", "The tabs this host shows. The access key is entered on the host's card.", listOf(screensField)),
+    Section("Screens", "The tabs this host shows.", listOf(screensField)),
     metaSection
 )
 
@@ -419,17 +417,17 @@ private val smbSections = listOf(
         startOpen = true
     ),
     Section(
-        "Connection", "The port, the account's domain, and how the connection is protected.",
+        "Connection", "Port, domain and encryption.",
         listOf(
             FieldSpec("root_path", "Start folder", "The folder inside the share the app starts in.", default = str(""), placeholder = "Photos/2024"),
             FieldSpec("port", "Port", "The SMB port.", kind = FieldKind.Number, default = JsonPrimitive(445)),
-            FieldSpec("domain", "Domain", "The Windows domain or workgroup of the account; empty for a local account.", default = str("")),
+            FieldSpec("domain", "Domain", "Empty for a local account.", default = str("")),
             FieldSpec(
-                "min_version", "Oldest version", "The oldest SMB version allowed. The newest the server offers is always used.",
+                "min_version", "Oldest version", "Oldest SMB version allowed.",
                 kind = choice(ChoiceOption("SMB2", "SMB 2"), ChoiceOption("SMB3", "SMB 3")), default = str("SMB2")
             ),
             FieldSpec(
-                "encrypt", "Encrypt", "Encrypts the traffic. Needs SMB 3; without it the connection fails rather than going unencrypted.",
+                "encrypt", "Encrypt", "Needs SMB 3. Fails instead of connecting unencrypted.",
                 kind = FieldKind.Toggle, default = JsonPrimitive(false)
             )
         )

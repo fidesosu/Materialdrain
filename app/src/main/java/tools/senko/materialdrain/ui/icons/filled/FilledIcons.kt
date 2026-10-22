@@ -44,6 +44,7 @@ val Icons.Filled.DeleteForever: ImageVector by lazy { icon("Filled.DeleteForever
 val Icons.Filled.Description: ImageVector by lazy { icon("Filled.Description", "M14,2L6,2c-1.1,0,-1.99,0.9,-1.99,2L4,20c0,1.1,0.89,2,1.99,2L18,22c1.1,0,2,-0.9,2,-2L20,8l-6,-6ZM16,18L8,18v-2h8v2ZM16,14L8,14v-2h8v2ZM13,9L13,3.5L18.5,9L13,9Z") }
 val Icons.Filled.Dns: ImageVector by lazy { icon("Filled.Dns", "M20,13H4c-0.55,0,-1,0.45,-1,1v6c0,0.55,0.45,1,1,1h16c0.55,0,1,-0.45,1,-1v-6c0,-0.55,-0.45,-1,-1,-1ZM7,19c-1.1,0,-2,-0.9,-2,-2s0.9,-2,2,-2s2,0.9,2,2s-0.9,2,-2,2ZM20,3H4c-0.55,0,-1,0.45,-1,1v6c0,0.55,0.45,1,1,1h16c0.55,0,1,-0.45,1,-1V4c0,-0.55,-0.45,-1,-1,-1ZM7,9c-1.1,0,-2,-0.9,-2,-2s0.9,-2,2,-2s2,0.9,2,2s-0.9,2,-2,2Z") }
 val Icons.Filled.Download: ImageVector by lazy { icon("Filled.Download", "M5,20h14v-2H5V20ZM19,9h-4V3H9v6H5l7,7L19,9Z") }
+val Icons.Filled.DragHandle: ImageVector by lazy { icon("Filled.DragHandle", "M20,9H4v2h16V9ZM4,15h16v-2H4V15Z") }
 val Icons.Filled.Edit: ImageVector by lazy { icon("Filled.Edit", "M3,17.25V21h3.75L17.81,9.94l-3.75,-3.75L3,17.25ZM20.71,7.04c0.39,-0.39,0.39,-1.02,0,-1.41l-2.34,-2.34c-0.39,-0.39,-1.02,-0.39,-1.41,0l-1.83,1.83l3.75,3.75l1.83,-1.83Z") }
 val Icons.Filled.Email: ImageVector by lazy { icon("Filled.Email", "M20,4L4,4c-1.1,0,-1.99,0.9,-1.99,2L2,18c0,1.1,0.9,2,2,2h16c1.1,0,2,-0.9,2,-2L22,6c0,-1.1,-0.9,-2,-2,-2ZM20,8l-8,5l-8,-5L4,6l8,5l8,-5v2Z") }
 val Icons.Filled.Error: ImageVector by lazy { icon("Filled.Error", "M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10,-4.48,10,-10S17.52,2,12,2ZM13,17h-2v-2h2v2ZM13,13h-2L11,7h2v6Z") }

@@ -287,7 +287,8 @@ fun BrowserScreen(
     LaunchedEffect(entries) {
         if (selectedKeys.isNotEmpty()) {
             val listed = entries.mapTo(HashSet()) { it.key }
-            val remaining = selectedKeys.filterTo(HashSet()) { it in listed }
+            // In the order they were selected, which the songs go to the queue in
+            val remaining = selectedKeys.filterTo(LinkedHashSet()) { it in listed }
             if (remaining.size != selectedKeys.size) selectedKeys = remaining
         }
     }
@@ -345,7 +346,7 @@ fun BrowserScreen(
     val onOpen: (StorageNode) -> Unit = { node ->
         when {
             mode == BrowserMode.FILESYSTEM && node.isDirectory && moving && node.ref.path.trim('/') in movedFolders ->
-                messages.show("\"${node.name}\" is being moved, so it can't be opened")
+                messages.show("\"${node.name}\" is being moved")
             mode == BrowserMode.FILESYSTEM && node.isDirectory -> filesystemViewModel.navigateToChild(node)
             mode == BrowserMode.LISTS && openedList == null ->
                 listState.lists.firstOrNull { it.id == node.ref.id }?.let { listViewModel.openList(it) }
@@ -378,7 +379,7 @@ fun BrowserScreen(
             label = "File IDs",
             confirmLabel = "Import",
             singleLine = false,
-            supportingText = "Separate several IDs with spaces or commas. The files are copied from your Pixeldrain files into this folder.",
+            supportingText = "Separate IDs with spaces or commas.",
             onConfirm = {
                 filesystemViewModel.importFilesById(it.split(',', ' ', '\n', '\t'))
                 showImportDialog = false
@@ -403,10 +404,9 @@ fun BrowserScreen(
         val folderCount = selectedEntries.count { it.isDirectory }
         ConfirmDialog(
             title = "Delete ${selectedEntries.size} items?",
-            text = "The selected items will be deleted." +
-                (if (folderCount > 0) " This includes everything inside the selected folder" + (if (folderCount > 1) "s" else "") + "." else "") +
-                (if (selectedEntries.any { it.isSearchIndex() }) "\n\n$SEARCH_INDEX_DELETE_WARNING" else "") +
-                "\n\nThis cannot be undone.",
+            text = (if (folderCount > 0) "Folders are deleted with everything inside. " else "") +
+                "This can't be undone." +
+                (if (selectedEntries.any { it.isSearchIndex() }) "\n\n$SEARCH_INDEX_DELETE_WARNING" else ""),
             confirmLabel = "Delete",
             isDestructive = true,
             onConfirm = {
@@ -440,7 +440,7 @@ fun BrowserScreen(
         val names = pending.conflictingNames
         ConfirmDialog(
             title = "Replace existing files?",
-            text = "${names.size} of the selected files already exist in this folder and will be overwritten: " +
+            text = "${names.size} files already exist here and will be replaced: " +
                 names.take(5).joinToString(", ") + if (names.size > 5) ", …" else "",
             confirmLabel = "Overwrite",
             isDestructive = true,
@@ -524,15 +524,22 @@ fun BrowserScreen(
     // What can be done with the selected entries, by mode. The first three are icons on the bar, the rest its menu.
     val files = selectedEntries.filter { !it.isDirectory }
     val allSelected = entries.isNotEmpty() && selectedEntries.size == entries.size
-    val toggleAll = { selectedKeys = if (allSelected) emptySet() else entries.mapTo(HashSet()) { it.key } }
+    // The ones already selected stay first, in their order, then the rest as they're shown
+    val toggleAll = { selectedKeys = if (allSelected) emptySet() else selectedKeys + entries.map { it.key } }
     val selectAll = SelectionAction(
         label = if (allSelected) "Deselect all" else "Select all",
         icon = Icons.Filled.SelectAll,
         onClick = toggleAll
     )
-    // The selected songs at the end of the background player's queue, in the order they're shown; the rest are left out
-    val songs = remember(selectedEntries, playback) {
-        if (playback == null) emptyList() else selectedEntries.mapNotNull { fileInfoViewModel.queueSongOf(it) }
+    // The selected songs at the end of the background player's queue, in the order they were selected (selectedKeys
+    // keeps it); the rest are left out
+    val songs = remember(selectedEntries, selectedKeys, playback) {
+        if (playback == null) {
+            emptyList()
+        } else {
+            val byKey = selectedEntries.associateBy { it.key }
+            selectedKeys.mapNotNull { byKey[it] }.mapNotNull { fileInfoViewModel.queueSongOf(it) }
+        }
     }
     val addSongsToQueue = playback?.let { player ->
         SelectionAction("Add to queue", Icons.Filled.QueueMusic, {
@@ -1004,7 +1011,7 @@ fun BrowserContent(
                     CircularProgressIndicator()
                 }
                 keyMissing -> PullableFill {
-                    ErrorMessage(errorMessage ?: "API Key is missing. Please set it in Settings to load your files.")
+                    ErrorMessage(errorMessage ?: "Log in or add an API key in Settings.")
                 }
                 errorMessage != null && entries.isEmpty() -> PullableFill {
                     Column(
@@ -1122,10 +1129,10 @@ private fun PullableFill(content: @Composable () -> Unit) {
 }
 
 private fun emptyText(mode: BrowserMode, inList: Boolean, filter: String): String = when {
-    filter.isNotBlank() -> "No files match your filter: '$filter'"
+    filter.isNotBlank() -> "No matches for '$filter'"
     mode == BrowserMode.LISTS && !inList -> "No lists found."
     mode == BrowserMode.LISTS -> "This list has no files."
-    mode == BrowserMode.FILES -> "No files found. Use the refresh button at the top to reload."
+    mode == BrowserMode.FILES -> "No files."
     else -> "This folder is empty."
 }
 
@@ -1186,36 +1193,36 @@ private fun BrowserEntry(
         if (relative) formatRelativeDateTime(node.listDate) else node.listDate?.let { formatApiDateTimeString(it) }
     }
     val trailingContent: @Composable () -> Unit = {
-            when {
-                // The lists overview: a folder per list, opened or linked
-                node.isDirectory && mode == BrowserMode.LISTS -> ListFolderMenu(node.name, folderLink, onOpen, onShareLink, onDownload, downloadHasChoices)
-                // The filesystem: folders and files with their own actions
-                mode == BrowserMode.FILESYSTEM -> FilesystemMenu(
-                    node = node,
-                    shareUrl = shareUrl,
-                    canWrite = canWriteFs,
-                    canDelete = canDeleteFs,
-                    onDownload = onDownload,
-                    onRename = onRename,
-                    onMove = onMove,
-                    onDelete = onDelete,
-                    onAddToQueue = onAddToQueue,
-                    onShareFile = onShareFile
-                )
-                // Files and the files of a list: the shared file menu
-                else -> FileItemMenu(
-                    file = node,
-                    shareUrl = shareUrl,
-                    canDelete = canDelete && (if (mode == BrowserMode.LISTS) listCanEdit else true),
-                    onDownload = { onDownload(DownloadStyle.SEPARATELY) },
-                    onAddToFilesystem = onAddToFilesystem,
-                    onAddToList = onAddToList,
-                    onDelete = onDelete,
-                    onRemoveFromList = if (mode == BrowserMode.LISTS && listCanEdit && openedList != null) onRemoveFromList else null,
-                    onAddToQueue = onAddToQueue,
-                    onShareFile = onShareFile
-                )
-            }
+        when {
+            // The lists overview: a folder per list, opened or linked
+            node.isDirectory && mode == BrowserMode.LISTS -> ListFolderMenu(node.name, folderLink, onOpen, onShareLink, onDownload, downloadHasChoices)
+            // The filesystem: folders and files with their own actions
+            mode == BrowserMode.FILESYSTEM -> FilesystemMenu(
+                node = node,
+                shareUrl = shareUrl,
+                canWrite = canWriteFs,
+                canDelete = canDeleteFs,
+                onDownload = onDownload,
+                onRename = onRename,
+                onMove = onMove,
+                onDelete = onDelete,
+                onAddToQueue = onAddToQueue,
+                onShareFile = onShareFile
+            )
+            // Files and the files of a list: the shared file menu
+            else -> FileItemMenu(
+                file = node,
+                shareUrl = shareUrl,
+                canDelete = canDelete && (if (mode == BrowserMode.LISTS) listCanEdit else true),
+                onDownload = { onDownload(DownloadStyle.SEPARATELY) },
+                onAddToFilesystem = onAddToFilesystem,
+                onAddToList = onAddToList,
+                onDelete = onDelete,
+                onRemoveFromList = if (mode == BrowserMode.LISTS && listCanEdit && openedList != null) onRemoveFromList else null,
+                onAddToQueue = onAddToQueue,
+                onShareFile = onShareFile
+            )
+        }
     }
     val onClick = { if (selectionMode) onToggleSelection() else onOpen() }
     if (asTile) {
