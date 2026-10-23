@@ -7,7 +7,7 @@ documentation** at `/docs/`. Both are made from the `website` branch, which shar
 
 | Path (on `website`) | What it is |
 | --- | --- |
-| `website/` | The home page: `index.html`, `style.css`, `releases.js` and `404.html`. Plain HTML, CSS and JavaScript, no build step |
+| `website/` | The home page: `index.html`, `style.css`, `releases.js` and `404.html`. Plain HTML, CSS and JavaScript, no build step. Also `robots.txt` and the icons (below) |
 | `docs/` | These pages, in Markdown, built with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/) |
 | `mkdocs.yml` | The documentation's settings: the theme, the Markdown extensions and the navigation |
 | `docs/requirements.txt` | The exact versions of MkDocs and Material the site is built with |
@@ -222,33 +222,58 @@ only lists them, and every download comes straight from GitHub.
    being in the background. The cards are only drawn again when the server has checked since. Where there's no
    `/releases.json` (a local preview, or a server not set up for it yet) the page asks GitHub once, itself.
 3. Drafts and releases without an `.apk` are left out.
-4. **Stable** is the newest release that isn't a pre-release and isn't tagged `dev-build`. **Development** is the
-   release tagged `dev-build`. Up to 8 older stable releases are listed under **Older versions** ("None yet." when
+4. **Stable** is the newest release that isn't a pre-release and isn't tagged `dev-build`. **Nightly** is the
+   release tagged `dev-build`, the development build (it's rebuilt with every push to `dev`, not once a night). Up to 8 older stable releases are listed under **Older versions** ("None yet." when
    there are none).
 5. Each card links straight to its APK, and shows the version, the date and the size. The version is read from the
    APK's name (`Materialdrain-1.4.20261009.1530.apk` gives `1.4.20261009.1530`); releases from before the build
    workflow named their APKs differently, so for those it's the tag without its `v`. The date is when the APK was
    uploaded, not when the release was published: the `dev-build` release is published once and then only edited, so
    its own date stays the first development build's, while each push to `dev` uploads a new APK.
-6. **Checked GitHub … ago** beside the Download heading counts up, every second, from when the server last read the
+6. **Under each card**: *What's new* (the release's page on GitHub, with its notes) and the APK's SHA-256, shortened,
+   with a button that copies all of it, to check a download against. GitHub records the checksum (`digest`) of
+   uploads since mid-2025; for older ones the line has only the notes. The older versions have *What's new* beside
+   their version, and their checksum in the version's tooltip.
+7. **Checked GitHub … ago** beside the Download heading counts up, every second, from when the server last read the
    list from GitHub (or the page did, when it had to ask itself). Its tooltip has the exact time. A time much older
    than 5 minutes means the server's checks are failing: `journalctl -u materialdrain-site-sync.service` says why.
-   When the list couldn't be loaded it stays empty.
+   From 20 minutes the page says so too, under the cards, since a newer build may be missing. When the list couldn't
+   be loaded it stays empty.
 
 If neither the server's list nor GitHub can be read, the page says so and the cards keep their plain links to the
 releases page, which are in the HTML from the start. So the page works, if more plainly, without the
 script.
+
+A card for a build that isn't published yet is dimmed and has no link, so it can't be clicked or reached with the
+keyboard.
+
+## The icons, link previews and security headers
+
+- **`website/icon.svg`** is the app's launcher icon, drawn from the app's own `pixeldrain_launcher.xml` on its
+  background colour (`#97B57C`), cut to the part a launcher shows. It's the favicon of both the home page and the
+  documentation (`theme.favicon: /icon.svg` in `mkdocs.yml`), and the logo before the title.
+- **`favicon.ico`** (16, 32 and 48 px), **`apple-touch-icon.png`** (180 px) and **`og-image.png`** (1200 × 630, the
+  picture a shared link shows in a chat) are made from it, with `rsvg-convert`. Change the icon, make them again.
+- **The `og:` and `twitter:` tags** in `index.html` are what Discord, Telegram and the like show for a link to the
+  site.
+- **A Content-Security-Policy**, as a `<meta>` tag in `index.html` and `404.html`, lets the pages load only their own
+  files, and `releases.js` talk only to the site and `api.github.com`. A new script, style or picture from elsewhere
+  has to be added to it, or the browser blocks it. The documentation has none: Material has inline scripts.
+- **`robots.txt`** points search engines at the documentation's `sitemap.xml`.
 
 ## The home page's layout
 
 On a computer the home page fits one screen, without a sidebar: `main` is up to 1200 px wide, at least as tall as the
 window, and centres its content top to bottom.
 
-- **The top**: the title and its line, with the Documentation and Source code links beside them (`.top`,
+- **The top**: the icon and title, its line, and a row of a few things the app does (`.features`, taken from
+  [What it can do](../index.md#what-it-can-do)), with the Documentation and Source code links beside them (`.top`,
   `.top-links`). The links go under the title only when there's no room for both.
-- **Download**: the Stable and Development cards side by side, as wide as the page.
+- **Download**: the Stable and Nightly cards side by side, as wide as the page, each with its notes and checksum under
+  it (`.build`), then a line on installing.
 - **Older versions**: a grid of tiles (`.versions`), four to a row from 960 px wide, so the 8 shown make two full rows;
   narrower, as many as fit. "All releases on GitHub" is at the end of the heading's line (`.section-head`).
 
-All of it fits 1280 × 720. Under 640 px wide (a phone) the page starts at the top, everything stacks, and it scrolls.
+All of it fits 1280 × 720, even with the warning about the server's checks; a fourth feature, or a second line of
+any kind, no longer does. Under 640 px wide (a phone) the page starts at the top, everything stacks, and it scrolls.
 Showing more than 8 older versions (`OLDER_SHOWN` in `releases.js`) adds rows, and may no longer fit a small screen.

@@ -64,8 +64,8 @@ Each update shows in `journalctl -u materialdrain-site-sync.service -n 5 --no-pa
 
 The script, the service and the nginx config changed. certbot has edited the server's copy of the config since, so
 rather than installing it again, add to its HTTPS `server` block (the one with `listen 443`) what's new in
-`materialdrain.senko.tools.conf`: the `gzip_types` line, the `location = /releases.json` block and the
-`Strict-Transport-Security` header. Then, from this folder:
+`materialdrain.senko.tools.conf`: the `gzip_types` line, the `location = /releases.json` block, the
+`location ~ ^/docs/assets/…` block and the `Strict-Transport-Security` header. Then, from this folder:
 
 ```bash
 sudo install -d /var/www/materialdrain-releases

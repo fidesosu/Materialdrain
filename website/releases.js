@@ -10,6 +10,8 @@
   const OLDER_SHOWN = 8;
   // How often an open page looks for a newer list: the server's own checks are 5 minutes apart
   const RECHECK_MILLIS = 60 * 1000;
+  // Several missed checks in a row: the page says the newest builds may be missing
+  const STALE_MILLIS = 20 * 60 * 1000;
 
   const apkOf = (release) => (release.assets || []).find((asset) => asset.name.toLowerCase().endsWith(".apk"));
 
@@ -31,19 +33,61 @@
 
   const sizeOf = (asset) => `${(asset.size / (1024 * 1024)).toFixed(1)} MB`;
 
+  // The hex digits of GitHub's "sha256:94437ae2…" for an asset; null for uploads from before GitHub recorded it
+  const sha256Of = (asset) => (asset.digest || "").match(/^sha256:([0-9a-f]{64})$/)?.[1] ?? null;
+
+  const notesLink = (release) => {
+    const link = document.createElement("a");
+    link.href = release.html_url;
+    link.textContent = "What's new";
+    return link;
+  };
+
+  // The release notes, and the APK's SHA-256 with a button to copy it, to check the download against
+  function fillExtra(extra, release, apk) {
+    extra.replaceChildren(notesLink(release));
+    const sha256 = sha256Of(apk);
+    if (!sha256) return;
+    const hash = document.createElement("code");
+    hash.textContent = `${sha256.slice(0, 8)}…${sha256.slice(-8)}`;
+    hash.title = sha256;
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "copy";
+    copy.textContent = "Copy";
+    copy.setAttribute("aria-label", "Copy the SHA-256 checksum");
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(sha256);
+        copy.textContent = "Copied";
+      } catch (_) {
+        copy.textContent = "Couldn't copy";
+      }
+      setTimeout(() => { copy.textContent = "Copy"; }, 2000);
+    });
+    extra.append(" · SHA-256 ", hash, " ", copy);
+  }
+
   function fillCard(id, release) {
-    const card = document.getElementById(id);
-    const field = (name) => card.querySelector(`[data-field="${name}"]`);
+    const build = document.getElementById(id);
+    const card = build.querySelector(".card");
+    const field = (name) => build.querySelector(`[data-field="${name}"]`);
     const apk = release && apkOf(release);
     card.classList.toggle("empty", !apk);
     if (!apk) {
+      // Without its link the card can't be reached with the keyboard either
+      card.removeAttribute("href");
+      card.setAttribute("aria-disabled", "true");
       field("version").textContent = "Not published yet";
+      field("meta").textContent = "";
+      field("extra").replaceChildren();
       return;
     }
     card.href = apk.browser_download_url;
-    card.setAttribute("download", "");
+    card.removeAttribute("aria-disabled");
     field("version").textContent = versionOf(release);
     field("meta").textContent = `${dateOf(release)} · ${sizeOf(apk)}`;
+    fillExtra(field("extra"), release, apk);
   }
 
   function fillOlder(releases) {
@@ -61,12 +105,19 @@
       const item = document.createElement("li");
       const link = document.createElement("a");
       link.href = apk.browser_download_url;
-      link.setAttribute("download", "");
       link.textContent = versionOf(release);
+      const sha256 = sha256Of(apk);
+      if (sha256) link.title = `SHA-256: ${sha256}`;
+      // The version and its notes on one line, when it was made and how big it is on the next
+      const head = document.createElement("span");
+      head.className = "version-head";
+      const notes = notesLink(release);
+      notes.className = "small";
+      head.append(link, notes);
       const meta = document.createElement("span");
       meta.className = "version-meta";
       meta.textContent = `${dateOf(release)} · ${sizeOf(apk)}`;
-      item.append(link, meta);
+      item.append(head, meta);
       list.append(item);
     }
   }
@@ -91,8 +142,14 @@
       : seconds < 60 ? `${s} s ago`
       : seconds < 3600 ? `${m} min ${s} s ago`
       : `${h} h ${m} min ago`;
+    const when = new Date(checkedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
     label.textContent = `Checked GitHub ${ago}`;
     label.title = new Date(checkedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
+    // The server checks every 5 minutes: this much older, its checks are failing (its journal says why). A list the
+    // page read from GitHub itself is only as old as the visit
+    document.getElementById("releases-status").textContent = !fromGitHub && Date.now() - checkedAt > STALE_MILLIS
+      ? `The server hasn't reached GitHub since ${when}, so a newer build may be missing here: all of them are on GitHub.`
+      : "";
   }
 
   // The releases and when they were read from GitHub. The server's copy is written on every check, so its
@@ -126,9 +183,8 @@
       if (at !== checkedAt) {
         show(releases);
         checkedAt = at;
-        tick();
       }
-      document.getElementById("releases-status").textContent = "";
+      tick();
     } catch (_) {
       // A list already shown stays; only the first load has nothing to fall back on but the plain links
       if (checkedAt === null) {

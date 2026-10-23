@@ -6,8 +6,8 @@ The app isn't on the Play Store. Download it from the [home page](https://materi
 [releases on GitHub](https://github.com/fidesosu/Materialdrain/releases):
 
 - **Stable** releases are the tested ones. Each has its own version.
-- The **development build** is the newest state of the app, rebuilt with every change. It has the newest features,
-  and may have bugs.
+- The **development build** (**Nightly** on the home page) is the newest state of the app, rebuilt with every
+  change. It has the newest features, and may have bugs.
 
 Open the downloaded `.apk` on your phone to install it. Android asks once whether your browser (or file manager) may
 install apps; allow it. A newer build installs over an older one, stable or development alike, and your settings and

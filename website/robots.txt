@@ -1,0 +1,5 @@
+# Everything may be indexed. The home page is the only page outside the documentation
+User-agent: *
+Allow: /
+
+Sitemap: https://materialdrain.senko.tools/docs/sitemap.xml

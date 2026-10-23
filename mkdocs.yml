@@ -23,6 +23,8 @@ validation:
 
 theme:
   name: material
+  # The app's icon, the home page's (website/icon.svg), which is served from the root of the same site
+  favicon: /icon.svg
   # Dark only, in the site's own palette (docs/stylesheets/extra.css, the same as website/style.css)
   palette:
     scheme: slate

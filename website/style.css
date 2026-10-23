@@ -54,11 +54,11 @@ main {
   min-height: 100vh;
   min-height: 100dvh;
   margin: 0 auto;
-  padding: 40px 32px;
+  padding: 28px 32px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 36px;
+  gap: 28px;
 }
 
 /* The title, with the links to the documentation and the source at its side */
@@ -99,7 +99,13 @@ h1 {
   margin: 0 0 12px;
   color: var(--accent-highlight);
   letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
+
+/* The app's icon before its name, as tall as the letters */
+.logo { width: 1em; height: 1em; flex: none; }
 
 h2 {
   font-size: 0.85rem;
@@ -111,12 +117,29 @@ h2 {
 }
 
 .lead { font-size: 1.15rem; color: var(--text-muted); margin: 0; }
+
+/* A few things the app does, as a row of small labels under the line about it */
+.features {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.features li {
+  font-size: 0.85rem;
+  padding: 3px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
 .small { font-size: 0.9rem; color: var(--text-muted); }
 
 a { color: var(--link-color); text-underline-offset: 3px; }
 a:hover { color: var(--link-hover); }
 
-a:focus-visible {
+a:focus-visible, button:focus-visible {
   outline: 2px solid var(--border-focus);
   outline-offset: 3px;
   border-radius: 6px;
@@ -132,7 +155,7 @@ a:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 26px 28px;
+  padding: 22px 28px;
   border-radius: 20px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -164,6 +187,29 @@ a:focus-visible {
 /* A build that isn't published yet: there's nothing to download */
 .card.empty { opacity: 0.6; pointer-events: none; }
 
+/* A card with its release notes and checksum under it; the card takes the height the line leaves */
+.build { display: flex; flex-direction: column; gap: 8px; }
+.build .card { flex: 1; }
+.build-extra { margin: 0 4px; }
+.build-extra:empty { display: none; }
+.build-extra code { font-size: 0.85rem; color: var(--text-main); }
+
+/* Copying a checksum: a small button, the size of the line's text */
+.copy {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 1px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--link-color);
+  cursor: pointer;
+}
+.copy:hover { background: var(--bg-soft); border-color: var(--border-focus); color: var(--link-hover); }
+
+/* How to install, under the cards */
+.install { margin: 12px 0 0; }
+
 .card-title { font-size: 1.3rem; font-weight: 650; }
 .card-version { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .card-text { font-size: 0.9rem; opacity: 0.8; }
@@ -181,12 +227,13 @@ a:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 12px 16px;
+  padding: 10px 16px;
   border-radius: 14px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
 }
-.versions a { font-weight: 600; font-variant-numeric: tabular-nums; }
+.version-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.versions .version-head > a:first-child { font-weight: 600; font-variant-numeric: tabular-nums; }
 .version-meta { color: var(--text-muted); font-size: 0.9rem; }
 .versions li.version-meta { background: none; border: none; padding: 0; }
 
@@ -208,6 +255,7 @@ a:focus-visible {
 
 /* Nothing to say about the builds: no empty line for it */
 #releases-status:empty { display: none; }
+#releases-status { margin: 12px 0 0; color: var(--yellow); }
 
 /* Counts up every second: the digits keep their width so the line doesn't shift */
 #releases-refreshed { font-variant-numeric: tabular-nums; }
