@@ -1,14 +1,15 @@
-// The download page's builds, read from the repository's GitHub releases when the page opens: the newest stable
-// release (from main), the development build (the dev-build pre-release, from dev), and the older stable releases.
-// The app's build workflow publishes them; this only lists them, and every download comes straight from GitHub.
-// When GitHub can't be reached (or its limit of requests is used up), the page keeps its links to the releases page.
+// The download page's builds, from the repository's GitHub releases: the newest stable release (from main), the
+// development build (the dev-build pre-release, from dev), and the older stable releases. The app's build workflow
+// publishes them; this only lists them, and every download comes straight from GitHub.
+// The server reads the list from GitHub every 5 minutes and serves it as /releases.json, so visitors don't use up
+// GitHub's 60 requests an hour, and the page can say when the server last checked. When that file isn't there (a
+// local preview) the page asks GitHub itself; when neither answers, it keeps its links to the releases page.
 (() => {
   const REPO = "fidesosu/Materialdrain";
   const DEV_TAG = "dev-build";
   const OLDER_SHOWN = 8;
-  // GitHub allows a visitor 60 requests an hour: the list is kept for a few minutes rather than asked for on every visit
-  const CACHE_KEY = "materialdrain-releases";
-  const CACHE_MILLIS = 5 * 60 * 1000;
+  // How often an open page looks for a newer list: the server's own checks are 5 minutes apart
+  const RECHECK_MILLIS = 60 * 1000;
 
   const apkOf = (release) => (release.assets || []).find((asset) => asset.name.toLowerCase().endsWith(".apk"));
 
@@ -34,8 +35,8 @@
     const card = document.getElementById(id);
     const field = (name) => card.querySelector(`[data-field="${name}"]`);
     const apk = release && apkOf(release);
+    card.classList.toggle("empty", !apk);
     if (!apk) {
-      card.classList.add("empty");
       field("version").textContent = "Not published yet";
       return;
     }
@@ -47,6 +48,7 @@
 
   function fillOlder(releases) {
     const list = document.getElementById("older-list");
+    list.replaceChildren();
     if (releases.length === 0) {
       const item = document.createElement("li");
       item.className = "version-meta";
@@ -77,45 +79,69 @@
     fillOlder(stable.slice(1));
   }
 
-  // "Last refresh: 2 min 5 s ago", counting up from when the list was read from GitHub (a kept list's, not the visit's)
-  function showRefreshed(at) {
+  // "Checked GitHub 2 min 5 s ago", counting up from when the list was read from GitHub: by the server, or by this page
+  // when it had to ask GitHub itself
+  let checkedAt = null;
+  function tick() {
+    if (checkedAt === null) return;
     const label = document.getElementById("releases-refreshed");
-    label.title = new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
-    const tick = () => {
-      const seconds = Math.max(0, Math.floor((Date.now() - at) / 1000));
-      const h = Math.floor(seconds / 3600), m = Math.floor(seconds / 60) % 60, s = seconds % 60;
-      const ago = seconds < 5 ? "just now"
-        : seconds < 60 ? `${s} s ago`
-        : seconds < 3600 ? `${m} min ${s} s ago`
-        : `${h} h ${m} min ago`;
-      label.textContent = `Last refresh: ${ago}`;
-    };
-    tick();
-    setInterval(tick, 1000);
+    const seconds = Math.max(0, Math.floor((Date.now() - checkedAt) / 1000));
+    const h = Math.floor(seconds / 3600), m = Math.floor(seconds / 60) % 60, s = seconds % 60;
+    const ago = seconds < 5 ? "just now"
+      : seconds < 60 ? `${s} s ago`
+      : seconds < 3600 ? `${m} min ${s} s ago`
+      : `${h} h ${m} min ago`;
+    label.textContent = `Checked GitHub ${ago}`;
+    label.title = new Date(checkedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
   }
 
-  // The releases and when they were read from GitHub
+  // The releases and when they were read from GitHub. The server's copy is written on every check, so its
+  // Last-Modified is when the server last asked; a failed check leaves the file, and its time, as they were
   async function load() {
     try {
-      const cached = JSON.parse(sessionStorage.getItem(CACHE_KEY) || "null");
-      if (cached && Date.now() - cached.at < CACHE_MILLIS) return cached;
-    } catch (_) { /* no cache to use */ }
+      const response = await fetch("/releases.json", { cache: "no-cache" });
+      const modified = Date.parse(response.headers.get("Last-Modified"));
+      if (response.ok && !Number.isNaN(modified)) {
+        return { at: modified, releases: await response.json(), fromServer: true };
+      }
+    } catch (_) { /* not served here: ask GitHub */ }
     const response = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=30`, {
       headers: { Accept: "application/vnd.github+json" },
     });
     if (!response.ok) throw new Error(`GitHub answered ${response.status}`);
-    const fetched = { at: Date.now(), releases: await response.json() };
-    try {
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify(fetched));
-    } catch (_) { /* storage full or off: fine */ }
-    return fetched;
+    return { at: Date.now(), releases: await response.json(), fromServer: false };
   }
 
-  load().then(({ at, releases }) => {
-    show(releases);
-    showRefreshed(at);
-  }).catch(() => {
-    document.getElementById("releases-status").textContent =
-      "Couldn't load the builds from GitHub just now: the buttons open the releases page instead.";
-  });
+  // Again every minute while the page is open, and when it's shown again after being in the background; the list is
+  // only drawn again when the server has checked since. A list this page read from GitHub itself isn't asked for again,
+  // which would only use up the visitor's requests
+  let loading = false;
+  let fromGitHub = false;
+  async function refresh() {
+    if (loading || fromGitHub || document.hidden) return;
+    loading = true;
+    try {
+      const { at, releases, fromServer } = await load();
+      fromGitHub = !fromServer;
+      if (at !== checkedAt) {
+        show(releases);
+        checkedAt = at;
+        tick();
+      }
+      document.getElementById("releases-status").textContent = "";
+    } catch (_) {
+      // A list already shown stays; only the first load has nothing to fall back on but the plain links
+      if (checkedAt === null) {
+        document.getElementById("releases-status").textContent =
+          "Couldn't load the builds from GitHub just now: the buttons open the releases page instead.";
+      }
+    } finally {
+      loading = false;
+    }
+  }
+
+  refresh();
+  setInterval(tick, 1000);
+  setInterval(refresh, RECHECK_MILLIS);
+  document.addEventListener("visibilitychange", refresh);
 })();

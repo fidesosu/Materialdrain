@@ -26,6 +26,7 @@ flowchart LR
     push[Push to website] --> build[site.yml builds it]
     build -->|force-push, one commit| site[site branch]
     server[The server, every 5 minutes] -->|git fetch| site
+    server -->|the releases| releases["/releases.json"]
     server --> nginx[nginx serves /var/www/materialdrain]
 ```
 
@@ -44,11 +45,12 @@ flowchart LR
 4. **The server pulls `site`.** A systemd timer (`materialdrain-site-sync.timer`) runs a small script every 5 minutes
    (and a minute after booting). It fetches the branch; when the commit is a new one, it resets
    `/var/www/materialdrain` to it and drops the old builds so the folder doesn't grow. nginx serves that folder.
+   The same script saves the app's releases for the download page (see [The downloads](#the-downloads)).
 
 So a change shows on the site within about 5 minutes of its build finishing.
 
 The server only ever reads from GitHub: nothing on GitHub can reach it, and the sync runs in a systemd sandbox that
-can only write the site's folder. Setting up a server is described in `docs/server-setup/README.md`.
+can only write the site's folder and the releases' one. Setting up a server is described in `docs/server-setup/README.md`.
 
 !!! warning "Never edit `site` by hand"
     `site` is output. The next build replaces it entirely, so a change made there is lost within minutes. Change
@@ -210,24 +212,31 @@ The home page's download cards are filled in by `website/releases.js`, in the vi
 GitHub releases. The app's build workflow publishes those (see [Development](index.md#the-build-workflow)); the website
 only lists them, and every download comes straight from GitHub.
 
-1. It asks `https://api.github.com/repos/fidesosu/Materialdrain/releases?per_page=30`. GitHub allows a visitor 60
-   such requests an hour, so the answer is kept in `sessionStorage` for 5 minutes rather than asked for on every
-   visit.
-2. Drafts and releases without an `.apk` are left out.
-3. **Stable** is the newest release that isn't a pre-release and isn't tagged `dev-build`. **Development** is the
+1. **The server reads the list.** Every 5 minutes the sync script asks
+   `https://api.github.com/repos/fidesosu/Materialdrain/releases?per_page=30` and saves the answer as
+   `/var/www/materialdrain-releases/releases.json`, which nginx serves as `/releases.json`. It's written on every
+   check, so its `Last-Modified` is when the server last asked GitHub; a failed check keeps the last good list and its
+   time. Visitors never ask GitHub themselves, so its limit of 60 requests an hour for each visitor doesn't matter.
+   The file is apart from the site's checkout, which git resets and cleans on every update.
+2. **The page reads `/releases.json`**, and again every minute while it's open and whenever it's shown again after
+   being in the background. The cards are only drawn again when the server has checked since. Where there's no
+   `/releases.json` (a local preview, or a server not set up for it yet) the page asks GitHub once, itself.
+3. Drafts and releases without an `.apk` are left out.
+4. **Stable** is the newest release that isn't a pre-release and isn't tagged `dev-build`. **Development** is the
    release tagged `dev-build`. Up to 8 older stable releases are listed under **Older versions** ("None yet." when
    there are none).
-4. Each card links straight to its APK, and shows the version, the date and the size. The version is read from the
+5. Each card links straight to its APK, and shows the version, the date and the size. The version is read from the
    APK's name (`Materialdrain-1.4.20261009.1530.apk` gives `1.4.20261009.1530`); releases from before the build
    workflow named their APKs differently, so for those it's the tag without its `v`. The date is when the APK was
    uploaded, not when the release was published: the `dev-build` release is published once and then only edited, so
    its own date stays the first development build's, while each push to `dev` uploads a new APK.
-5. **Last refresh** beside the Download heading counts up, every second, from when the list was read from GitHub: a
-   list kept from an earlier visit counts from that visit's request, not from this one. Its tooltip has the exact
-   time. When the list couldn't be loaded it stays empty.
+6. **Checked GitHub … ago** beside the Download heading counts up, every second, from when the server last read the
+   list from GitHub (or the page did, when it had to ask itself). Its tooltip has the exact time. A time much older
+   than 5 minutes means the server's checks are failing: `journalctl -u materialdrain-site-sync.service` says why.
+   When the list couldn't be loaded it stays empty.
 
-If GitHub can't be reached, or the visitor's requests are used up, the page says so and the cards keep their plain
-links to the releases page, which are in the HTML from the start. So the page works, if more plainly, without the
+If neither the server's list nor GitHub can be read, the page says so and the cards keep their plain links to the
+releases page, which are in the HTML from the start. So the page works, if more plainly, without the
 script.
 
 ## The home page's layout

@@ -7,10 +7,10 @@ After=network-online.target
 Type=oneshot
 ExecStart=/usr/local/bin/materialdrain-site-sync
 
-# Runs as root, so there's no extra user to look after, but in a sandbox: it can only write the site's folder, and it
-# has none of root's powers (no overriding file permissions, no changing owners, no mounting...). It only needs to fetch
-# from GitHub and write files it owns.
-ReadWritePaths=/var/www/materialdrain
+# Runs as root, so there's no extra user to look after, but in a sandbox: it can only write the site's folder and the
+# releases' one, and it has none of root's powers (no overriding file permissions, no changing owners, no mounting...).
+# It only needs to fetch from GitHub and write files it owns. Both folders have to exist, or the service won't start
+ReadWritePaths=/var/www/materialdrain /var/www/materialdrain-releases
 ProtectSystem=strict
 CapabilityBoundingSet=
 AmbientCapabilities=

@@ -8,9 +8,11 @@ How it works:
    `site` branch: the home page from `website/` at its root, the documentation built into `docs/`. The app's branches
    (`main`, `dev`) hold none of it.
 2. The server keeps a copy of that branch in `/var/www/materialdrain` and checks GitHub for a new build every
-   5 minutes (`materialdrain-site-sync.timer`). It runs as root, so there's no user to look after, but in a sandbox
-   which only lets it write that folder.
-3. nginx serves the folder.
+   5 minutes (`materialdrain-site-sync.timer`). Each time it also saves the app's releases, as GitHub lists them, to
+   `/var/www/materialdrain-releases/releases.json`, for the download page; the time of that file is when the server
+   last checked. It runs as root, so there's no user to look after, but in a sandbox which only lets it write those
+   two folders.
+3. nginx serves the folder, and the releases as `/releases.json`.
 
 The server only ever reads from GitHub. Nothing on GitHub can reach the server.
 
@@ -23,6 +25,8 @@ The server only ever reads from GitHub. Nothing on GitHub can reach the server.
 
 ## Setting it up
 
+0. **What it needs:** nginx, certbot (`python3-certbot-nginx`), git and curl: `sudo apt install nginx
+   python3-certbot-nginx git curl`.
 1. **DNS:** a record `materialdrain` pointing at the server. `dig +short materialdrain.senko.tools` prints its address.
 2. **Copy this folder to the server** (`scp -r docs/server-setup you@server:~/materialdrain-setup`) and `cd` into it.
 3. **nginx and HTTPS:**
@@ -41,6 +45,7 @@ The server only ever reads from GitHub. Nothing on GitHub can reach the server.
    ```
 5. **Keeping it up to date:**
    ```bash
+   sudo install -d /var/www/materialdrain-releases
    sudo install -m 755 materialdrain-site-sync.sh /usr/local/bin/materialdrain-site-sync
    sudo install -m 644 materialdrain-site-sync.service materialdrain-site-sync.timer /etc/systemd/system/
    sudo systemctl daemon-reload
@@ -48,16 +53,36 @@ The server only ever reads from GitHub. Nothing on GitHub can reach the server.
    sudo systemctl start materialdrain-site-sync.service
    systemctl status materialdrain-site-sync.service --no-pager
    ```
-   The service ends with `status=0/SUCCESS`.
+   The service ends with `status=0/SUCCESS`, and `curl -sI https://materialdrain.senko.tools/releases.json` answers
+   `200` with a `Last-Modified` of just now.
 6. **Clean up:** `rm -r ~/materialdrain-setup`.
 
 Each update shows in `journalctl -u materialdrain-site-sync.service -n 5 --no-pager` as
 `Updated the website: Site built from …`.
 
+## Updating a server set up before `/releases.json`
+
+The script, the service and the nginx config changed. certbot has edited the server's copy of the config since, so
+rather than installing it again, add to its HTTPS `server` block (the one with `listen 443`) what's new in
+`materialdrain.senko.tools.conf`: the `gzip_types` line, the `location = /releases.json` block and the
+`Strict-Transport-Security` header. Then, from this folder:
+
+```bash
+sudo install -d /var/www/materialdrain-releases
+sudo install -m 755 materialdrain-site-sync.sh /usr/local/bin/materialdrain-site-sync
+sudo install -m 644 materialdrain-site-sync.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo nginx -t && sudo systemctl reload nginx
+sudo systemctl start materialdrain-site-sync.service
+```
+
 ## If something goes wrong
 
 - **The service failed:** `journalctl -u materialdrain-site-sync.service -n 30 --no-pager` shows git's error.
-  `Read-only file system` means the site isn't at `/var/www/materialdrain`, the only folder the sandbox lets it write.
+  `Read-only file system` means the site isn't at `/var/www/materialdrain`, one of the two folders the sandbox lets
+  it write. `Failed to set up mount namespacing` means `/var/www/materialdrain-releases` doesn't exist.
+- **`Couldn't read the releases from GitHub`:** the site is still updated; curl's error is on the line above it. The
+  download page keeps the last good list, and its time keeps counting up.
 - **`sh\r` or `bad interpreter`:** the script got Windows line endings on the way:
   `sudo sed -i 's/\r$//' /usr/local/bin/materialdrain-site-sync`.
 - **certbot can't verify the domain:** the `dig` of step 1 must print this server's address, and
@@ -70,5 +95,5 @@ sudo systemctl disable --now materialdrain-site-sync.timer
 sudo rm /etc/systemd/system/materialdrain-site-sync.{service,timer} /usr/local/bin/materialdrain-site-sync
 sudo rm /etc/nginx/sites-enabled/materialdrain.senko.tools.conf /etc/nginx/sites-available/materialdrain.senko.tools.conf
 sudo systemctl reload nginx
-sudo rm -r /var/www/materialdrain
+sudo rm -r /var/www/materialdrain /var/www/materialdrain-releases
 ```
