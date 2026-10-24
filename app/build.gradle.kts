@@ -10,12 +10,12 @@ plugins {
 
 /*
  * The version, worked out from git, so it never has to be changed by hand for a release:
- * - versionName: the base in version.txt, then the release's number, e.g. "1.6.3". A build of a commit with a release
+ * - versionName: baseVersion below, then the release's number, e.g. "1.6.3". A build of a commit with a release
  *   tag (v1.6.3) is that release; any other build is the next one: one more than the newest v1.6.* tag behind it, or
- *   1.6.0 when there is none. Releases count up without gaps; change version.txt (to 1.7) only for a big step, which
+ *   1.6.0 when there is none. Releases count up without gaps; change baseVersion (to 1.7) only for a big step, which
  *   starts again at 1.7.0.
  *   Builds of the dev branch (VERSION_SUFFIX "-dev", set by the build workflow) add "-dev." and the number of commits
- *   since that newest tag, or since version.txt last changed, e.g. "1.6.4-dev.5", which sorts below 1.6.4.
+ *   since that newest tag, or since baseVersion became what it is, e.g. "1.6.4-dev.5", which sorts below 1.6.4.
  * - versionCode: the minutes since 2025 at the commit, so each newer commit's build installs over the one before,
  *   stable and dev alike, and it stays far below Android's limit for over 4000 years. A config's min_app_version is
  *   compared with it, so it must never go down.
@@ -24,7 +24,7 @@ plugins {
  * On CI anything git can't tell (a shallow checkout, no git) fails the build; elsewhere the version falls back to
  * "1.6.0-local" and the time to now.
  */
-val baseVersion = rootProject.file("version.txt").readText().trim()
+val baseVersion = "1.6"
 val isCi = System.getenv("CI") == "true"
 val isDevBuild = System.getenv("VERSION_SUFFIX") == "-dev"
 
@@ -48,7 +48,10 @@ val gitVersion: Pair<String, Long>? = runCatching {
         val next = "$baseVersion.${latest?.plus(1) ?: 0}"
         if (!isDevBuild) next else {
             val since = if (latest != null) "v$baseVersion.$latest" else {
-                git("log", "-1", "--format=%H", "--", "version.txt").ifEmpty { error("version.txt isn't committed yet") }
+                // The newest commit that changed how often this line appears: the one that set this base
+                val baseLine = "val baseVersion = \"$baseVersion\""
+                git("log", "-1", "--format=%H", "-S", baseLine, "--", buildFile.relativeTo(rootDir).invariantSeparatorsPath)
+                    .ifEmpty { error("the change to baseVersion $baseVersion isn't committed yet") }
             }
             "$next-dev.${git("rev-list", "--count", "$since..HEAD")}"
         }
