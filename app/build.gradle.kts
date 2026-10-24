@@ -1,7 +1,3 @@
-import java.time.Instant
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -13,20 +9,54 @@ plugins {
 // puts them in app/build/outputs/roborazzi (see PreviewImagesTest)
 
 /*
- * The version, made from the time of the commit being built, so it never has to be changed by hand for a release:
- * - versionName: BASE_VERSION, then the commit's date and time in UTC, e.g. "1.4.20261009.1530". The build workflow
- *   adds "-dev" for builds of the dev branch (VERSION_SUFFIX). Change BASE_VERSION only for a big step.
- * - versionCode: the minutes since 2025 at that commit, so each newer commit's build installs over the one before,
- *   stable and dev alike, and it stays far below Android's limit for over 4000 years.
- * The commit's time rather than the build's: building the same commit again gives the same version.
+ * The version, worked out from git, so it never has to be changed by hand for a release:
+ * - versionName: the base in version.txt, then the release's number, e.g. "1.6.3". A build of a commit with a release
+ *   tag (v1.6.3) is that release; any other build is the next one: one more than the newest v1.6.* tag behind it, or
+ *   1.6.0 when there is none. Releases count up without gaps; change version.txt (to 1.7) only for a big step, which
+ *   starts again at 1.7.0.
+ *   Builds of the dev branch (VERSION_SUFFIX "-dev", set by the build workflow) add "-dev." and the number of commits
+ *   since that newest tag, or since version.txt last changed, e.g. "1.6.4-dev.5", which sorts below 1.6.4.
+ * - versionCode: the minutes since 2025 at the commit, so each newer commit's build installs over the one before,
+ *   stable and dev alike, and it stays far below Android's limit for over 4000 years. A config's min_app_version is
+ *   compared with it, so it must never go down.
+ * - BuildConfig.COMMIT_TIME: the commit's time, in seconds since 1970, for the About page.
+ * The commit's time and tags rather than the build's: building the same commit again gives the same version.
+ * On CI anything git can't tell (a shallow checkout, no git) fails the build; elsewhere the version falls back to
+ * "1.6.0-local" and the time to now.
  */
-val baseVersion = "1.5"
-val commitEpochSeconds: Long = runCatching {
-    providers.exec { commandLine("git", "log", "-1", "--format=%ct") }.standardOutput.asText.get().trim().toLong()
-}.getOrElse { System.currentTimeMillis() / 1000 }
-val versionStamp: String = DateTimeFormatter.ofPattern("yyyyMMdd.HHmm").format(Instant.ofEpochSecond(commitEpochSeconds).atZone(ZoneOffset.UTC))
-val versionSuffix: String = System.getenv("VERSION_SUFFIX").orEmpty()
-val computedVersionName = "$baseVersion.$versionStamp$versionSuffix"
+val baseVersion = rootProject.file("version.txt").readText().trim()
+val isCi = System.getenv("CI") == "true"
+val isDevBuild = System.getenv("VERSION_SUFFIX") == "-dev"
+
+fun git(vararg args: String): String = providers.exec {
+    workingDir = rootDir
+    commandLine("git", *args)
+}.standardOutput.asText.get().trim()
+
+// Only "v1.6.<number>": never the older tags such as v1.5.20261014.1558, v1.4.0, release or dev-build
+val releaseTag = Regex("""^v${Regex.escape(baseVersion)}\.(\d+)$""")
+fun releaseNumbers(tags: String): List<Int> = tags.lines().mapNotNull { releaseTag.matchEntire(it.trim())?.groupValues?.get(1)?.toInt() }
+
+val gitVersion: Pair<String, Long>? = runCatching {
+    check(git("rev-parse", "--is-shallow-repository") != "true") {
+        "the checkout is shallow, so its commits and tags can't be counted (actions/checkout needs fetch-depth: 0)"
+    }
+    val commitTime = git("log", "-1", "--format=%ct").toLong()
+    val released = releaseNumbers(git("tag", "--points-at", "HEAD")).maxOrNull()
+    val name = if (released != null) "$baseVersion.$released" else {
+        val latest = releaseNumbers(git("tag", "--merged", "HEAD", "--list", "v$baseVersion.*")).maxOrNull()
+        val next = "$baseVersion.${latest?.plus(1) ?: 0}"
+        if (!isDevBuild) next else {
+            val since = if (latest != null) "v$baseVersion.$latest" else {
+                git("log", "-1", "--format=%H", "--", "version.txt").ifEmpty { error("version.txt isn't committed yet") }
+            }
+            "$next-dev.${git("rev-list", "--count", "$since..HEAD")}"
+        }
+    }
+    name to commitTime
+}.getOrElse { if (isCi) throw GradleException("Can't work out the version from git: ${it.message}", it) else null }
+val computedVersionName = gitVersion?.first ?: "$baseVersion.0-local"
+val commitEpochSeconds: Long = gitVersion?.second ?: (System.currentTimeMillis() / 1000)
 
 // Calculate Epoch second since: January 1, 2025 at 12:00:00 AM UTC
 val computedVersionCode: Int = ((commitEpochSeconds - 1_735_689_600L) / 60).toInt().coerceAtLeast(2)
@@ -42,6 +72,7 @@ android {
         targetSdk = 36
         versionCode = computedVersionCode
         versionName = computedVersionName
+        buildConfigField("long", "COMMIT_TIME", "${commitEpochSeconds}L")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -89,6 +120,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     testOptions {
         unitTests {

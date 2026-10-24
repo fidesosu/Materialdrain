@@ -4,7 +4,9 @@
 #   marked the latest. Older releases stay listed.
 # - a push to dev: the same, as the one "Development build" pre-release (tag dev-build), replaced by every push.
 # - a pull request: tests and a debug build only. It never sees the signing key.
-# The version comes from the commit's time (see app/build.gradle.kts); dev builds end in "-dev".
+# The version comes from version.txt and the release tags (see app/build.gradle.kts): main's builds are the next
+# release, e.g. 1.6.3, and dev's add "-dev." and the commits since the last release, e.g. 1.6.4-dev.5. So the
+# checkouts take the whole history and the tags (fetch-depth: 0).
 # The website's download page lists these releases (website branch).
 #
 # Only a change to what goes into the APK builds it: the app, the provider modules it's made of, the example configs
@@ -22,6 +24,7 @@ on:
       - "gradle/**"
       - "*.gradle.kts"
       - "gradle.properties"
+      - "version.txt"
       - "gradlew"
       - "gradlew.bat"
       - "!**/*.md"
@@ -35,6 +38,7 @@ on:
       - "gradle/**"
       - "*.gradle.kts"
       - "gradle.properties"
+      - "version.txt"
       - "gradlew"
       - "gradlew.bat"
       - "!**/*.md"
@@ -53,6 +57,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:
@@ -95,6 +101,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:
@@ -149,7 +157,13 @@ jobs:
         run: |
           tag="v${VERSION}"
           if gh release view "$tag" > /dev/null 2>&1; then
-            # The same commit built again: the same version, so its APK is replaced
+            # The same commit built again: the same version, so its APK is replaced. Never another commit's release,
+            # which would have its number only after history was rewritten
+            tagged=$(git rev-parse "refs/tags/$tag^{commit}" 2>/dev/null || true)
+            if [ "$tagged" != "$GITHUB_SHA" ]; then
+              echo "::error::Version ${VERSION} already belongs to another commit (${tagged:-unknown}); its release is left as it is."
+              exit 1
+            fi
             gh release upload "$tag" "$FILE" --clobber
           else
             # The notes list what changed since the release before, not since the development build

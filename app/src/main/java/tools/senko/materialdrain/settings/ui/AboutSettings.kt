@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.settings.ui
 
+import tools.senko.materialdrain.BuildConfig
 import tools.senko.materialdrain.ui.theme.AppShapes
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -36,9 +37,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
-import java.time.LocalDateTime
+import java.time.Instant
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
@@ -47,41 +47,33 @@ internal data class AppAbout(
     val versionName: String,
     val versionCode: Long,
     val kind: String,
-    /** When the commit this build was made from was made, from the version (see app/build.gradle.kts); null when it isn't one of those */
-    val committed: String?,
+    /** When the commit this build was made from was made (BuildConfig.COMMIT_TIME, see app/build.gradle.kts) */
+    val committed: String,
     val packageName: String
 ) {
     /** For copying into a bug report. */
     fun asText(): String = buildString {
         appendLine("Materialdrain $versionName ($kind)")
         appendLine("Version code $versionCode")
-        committed?.let { appendLine("Commit date $it") }
+        appendLine("Commit date $committed")
         append("Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}), ${Build.MANUFACTURER} ${Build.MODEL}")
     }
 }
-
-/** "1.4.20261009.1530" or "1.4.20261009.1530-dev": a base version, then the commit's date and time in UTC. */
-private val VERSION_PATTERN = Regex("""^\d+(?:\.\d+)*\.(\d{8})\.(\d{4})(-dev)?$""")
 
 internal fun readAbout(context: Context): AppAbout {
     // Not there in a preview (in Android Studio), which has no app installed: no version then
     val info = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
     val versionName = info?.versionName.orEmpty()
     val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-    val match = VERSION_PATTERN.find(versionName)
     val kind = when {
         debuggable -> "Debug build"
-        match?.groupValues?.get(3) == "-dev" -> "Development build"
+        // "1.6.4-dev.5": a build of the dev branch (see app/build.gradle.kts)
+        "-dev." in versionName -> "Development build"
         else -> "Stable release"
     }
-    val committed = match?.let {
-        runCatching {
-            LocalDateTime.parse(it.groupValues[1] + it.groupValues[2], DateTimeFormatter.ofPattern("yyyyMMddHHmm"))
-                .atOffset(ZoneOffset.UTC)
-                .atZoneSameInstant(ZoneId.systemDefault())
-                .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT))
-        }.getOrNull()
-    }
+    val committed = Instant.ofEpochSecond(BuildConfig.COMMIT_TIME)
+        .atZone(ZoneId.systemDefault())
+        .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT))
     return AppAbout(versionName, info?.longVersionCode ?: 0L, kind, committed, context.packageName)
 }
 
@@ -120,7 +112,7 @@ fun SettingsEnvironment.AboutSection() {
         SelectionContainer {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 AboutRow("Version code", about.versionCode.toString())
-                about.committed?.let { AboutRow("Commit date", it) }
+                AboutRow("Commit date", about.committed)
                 AboutRow("Android", "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
                 AboutRow("Package", about.packageName)
             }
