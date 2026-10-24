@@ -15,7 +15,8 @@ plugins {
  *   1.6.0 when there is none. Releases count up without gaps; change baseVersion (to 1.7) only for a big step, which
  *   starts again at 1.7.0.
  *   Builds of the dev branch (VERSION_SUFFIX "-dev", set by the build workflow) add "-dev." and the number of commits
- *   since that newest tag, or since baseVersion became what it is, e.g. "1.6.4-dev.5", which sorts below 1.6.4.
+ *   that change the app (appPaths) since that newest tag, or since baseVersion became what it is (that commit included, so they start at 1 too), e.g.
+ *   "1.6.4-dev.5", which sorts below 1.6.4.
  * - versionCode: the minutes since 2025 at the commit, so each newer commit's build installs over the one before,
  *   stable and dev alike, and it stays far below Android's limit for over 4000 years. A config's min_app_version is
  *   compared with it, so it must never go down.
@@ -33,6 +34,20 @@ fun git(vararg args: String): String = providers.exec {
     commandLine("git", *args)
 }.standardOutput.asText.get().trim()
 
+// What goes into the APK: only commits that change it count for a dev build's number. The same list as the build
+// workflow's paths (.github/workflows/build.yml), which decide whether a commit builds at all; keep the two in step
+val appPaths = arrayOf(
+    ":(glob)app/**",
+    ":(glob)provider-*/**",
+    ":(glob)docs/provider-configs/**",
+    ":(glob)gradle/**",
+    ":(glob)*.gradle.kts",
+    "gradle.properties",
+    "gradlew",
+    "gradlew.bat",
+    ":(exclude,glob)**/*.md"
+)
+
 // Only "v1.6.<number>": never the older tags such as v1.5.20261014.1558, v1.4.0, release or dev-build
 val releaseTag = Regex("""^v${Regex.escape(baseVersion)}\.(\d+)$""")
 fun releaseNumbers(tags: String): List<Int> = tags.lines().mapNotNull { releaseTag.matchEntire(it.trim())?.groupValues?.get(1)?.toInt() }
@@ -48,12 +63,15 @@ val gitVersion: Pair<String, Long>? = runCatching {
         val next = "$baseVersion.${latest?.plus(1) ?: 0}"
         if (!isDevBuild) next else {
             val since = if (latest != null) "v$baseVersion.$latest" else {
-                // The newest commit that changed how often this line appears: the one that set this base
-                val baseLine = "val baseVersion = \"$baseVersion\""
-                git("log", "-1", "--format=%H", "-S", baseLine, "--", buildFile.relativeTo(rootDir).invariantSeparatorsPath)
+                // The newest commit that changed how often the line above appears: the one that set this base. A regex with
+                // "." for the quotes, which Windows would strip from the argument
+                val baseLine = "val baseVersion = .${baseVersion.replace(".", "\\.")}."
+                git("log", "-1", "--format=%H", "--pickaxe-regex", "-S", baseLine, "--", buildFile.relativeTo(rootDir).invariantSeparatorsPath)
                     .ifEmpty { error("the change to baseVersion $baseVersion isn't committed yet") }
             }
-            "$next-dev.${git("rev-list", "--count", "$since..HEAD")}"
+            // The commits after the release, or the one that set the base and those after it: dev builds start at 1
+            val commits = git("rev-list", "--count", "$since..HEAD", "--", *appPaths).toInt() + (if (latest == null) 1 else 0)
+            "$next-dev.$commits"
         }
     }
     name to commitTime
