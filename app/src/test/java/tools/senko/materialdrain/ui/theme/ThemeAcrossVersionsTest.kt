@@ -1,6 +1,5 @@
 package tools.senko.materialdrain.ui.theme
 
-import android.os.Build
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import org.junit.Assert.assertEquals
@@ -11,15 +10,13 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The theme on each Android version the app runs on. Before Android 12 there are no wallpaper colours (Material You): the
- * app's colours always come from the colour chosen in Look and feel, whatever the wallpaper setting says, and every text
- * colour has to stay readable on what it's drawn on, for every colour offered, light, dark and on black.
+ * The theme on each Android version the app runs on. Before Android 12 the system doesn't colour apps from the wallpaper
+ * (Material You): the app makes its colours itself, from the wallpaper's main colour or the one chosen in Look and feel,
+ * and every text colour has to stay readable on what it's drawn on, for every colour offered, light, dark and on black.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29, 30, 31, 33, 35])
 class ThemeAcrossVersionsTest {
-
-    private val sdk get() = Build.VERSION.SDK_INT
 
     /** WCAG's contrast ratio of two colours, 1 to 21. */
     private fun contrast(a: Color, b: Color): Double {
@@ -28,9 +25,9 @@ class ThemeAcrossVersionsTest {
     }
 
     @Test
-    fun wallpaperColoursOnlyFromAndroid12() {
-        assertEquals(sdk >= 31, WallpaperColorsAvailable)
-        assertEquals("The chosen colour is used where there are no wallpaper colours", sdk < 31, ThemeSettings(wallpaperColors = true).usesColor)
+    fun wallpaperColoursOnEveryVersion() {
+        // Before Android 12 from the wallpaper's main colour (see appColorScheme), from 12 the system's own
+        assertEquals(false, ThemeSettings(wallpaperColors = true).usesColor)
         assertTrue(ThemeSettings(wallpaperColors = false).usesColor)
     }
 

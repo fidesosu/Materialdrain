@@ -27,7 +27,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import tools.senko.materialdrain.ui.theme.ThemeMode
-import tools.senko.materialdrain.ui.theme.WallpaperColorsAvailable
 import tools.senko.materialdrain.settings.SEARCH_INDEX_FILE_NAME
 import tools.senko.materialdrain.settings.SEARCH_RESULT_LIMITS
 import tools.senko.materialdrain.settings.START_SCREENS
@@ -157,13 +156,12 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                 isChecked = { appSettings.theme.collectAsState().value.blackBackground },
                 onCheckedChange = { appSettings.setBlackBackground(it) }
             ),
-            // Only where the system has the wallpaper's colours to give (Android 12 and up)
-            if (WallpaperColorsAvailable) SettingsItem.Toggle(
+            SettingsItem.Toggle(
                 title = "Wallpaper colours",
                 summary = "Colours from your wallpaper",
                 isChecked = { appSettings.theme.collectAsState().value.wallpaperColors },
                 onCheckedChange = { appSettings.setWallpaperColors(it) }
-            ) else null,
+            ),
             SettingsItem.Custom {
                 val theme = appSettings.theme.collectAsState().value
                 ThemeColorPicker(selected = theme.color, enabled = theme.usesColor, onSelect = { appSettings.setThemeColor(it) })
