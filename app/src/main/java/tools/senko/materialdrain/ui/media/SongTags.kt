@@ -115,7 +115,7 @@ object SongTags {
         return try {
             val uri = Uri.parse(id)
             if (uri.scheme == "content" || uri.scheme == "file") retriever.setDataSource(context, uri)
-            else retriever.setDataSource(id, HostRequestAuth.headersFor(id))
+            else retriever.setHostDataSource(id)
             fun tag(key: Int) = retriever.extractMetadata(key)?.trim()?.takeIf { it.isNotEmpty() }
             Tags(
                 title = tag(MediaMetadataRetriever.METADATA_KEY_TITLE),

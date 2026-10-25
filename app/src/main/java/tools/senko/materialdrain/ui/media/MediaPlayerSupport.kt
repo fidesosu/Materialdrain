@@ -50,6 +50,10 @@ import com.google.common.util.concurrent.ListenableFuture
 object HostRequestAuth {
     @Volatile
     var headersFor: (url: String) -> Map<String, String> = { emptyMap() }
+
+    /** The app's HTTP client, for what reads files outside the players (see HttpMediaDataSource). */
+    @Volatile
+    var client: okhttp3.OkHttpClient? = null
 }
 
 // Playback starts as soon as a second of media is buffered (the default waits for two and a half),

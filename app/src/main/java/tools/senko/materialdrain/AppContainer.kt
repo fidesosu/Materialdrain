@@ -85,6 +85,8 @@ class AppContainer private constructor(application: Application) {
         refreshBundledPixeldrainConfig(application, providerConfigStore)
         // The image loader of the whole app, with album covers and video frames read out of the files as their thumbnails
         // (see MediaCovers), and GIFs and animated WebP moving wherever they're shown (see AnimatedImages)
+        // A thumbnail's read timeout, which the API's client goes without for long downloads, so a stalled one gives up
+        val thumbnailClient = okHttpClient.newBuilder().readTimeout(30, java.util.concurrent.TimeUnit.SECONDS).build()
         coil.Coil.setImageLoader {
             coil.ImageLoader.Builder(application)
                 .components {
@@ -92,13 +94,14 @@ class AppContainer private constructor(application: Application) {
                     add(tools.senko.materialdrain.ui.media.AnimatedImages.Factory())
                 }
                 // The API's own client, sharing its connections and threads: thumbnails reuse the HTTP/2 connection the
-                // app already has open to the host instead of opening their own. With a read timeout of its own, which
-                // the API's client goes without for long downloads, so a stalled thumbnail gives up
-                .okHttpClient { okHttpClient.newBuilder().readTimeout(30, java.util.concurrent.TimeUnit.SECONDS).build() }
+                // app already has open to the host instead of opening their own
+                .okHttpClient { thumbnailClient }
                 .build()
         }
         // Thumbnails of files on SMB shares are made on this device, and kept here between runs
         tools.senko.materialdrain.provider.smb.SmbContentServer.cacheDir = java.io.File(application.cacheDir, "smb-thumbnails")
+        // Song covers and tags and video frames, read by the media framework, come through it too (see HttpMediaDataSource)
+        HostRequestAuth.client = thumbnailClient
         HostRequestAuth.headersFor = { url ->
             providerRegistry.resolve(providerConfigStore.activeProviderId.value).requestHeaders(url)
         }

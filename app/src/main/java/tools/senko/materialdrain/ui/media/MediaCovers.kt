@@ -179,7 +179,7 @@ object MediaCovers {
         private fun withRetriever(src: String, read: (MediaMetadataRetriever) -> ByteArray?): Read {
             val retriever = MediaMetadataRetriever()
             return try {
-                retriever.setDataSource(src, HostRequestAuth.headersFor(src))
+                retriever.setHostDataSource(src)
                 read(retriever)?.let { Read.Found(it) } ?: Read.Nothing
             } catch (e: Exception) {
                 Log.w(TAG, "nothing read from $src: ${e.message}")
