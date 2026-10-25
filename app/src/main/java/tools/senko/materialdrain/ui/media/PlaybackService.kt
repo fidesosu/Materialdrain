@@ -36,6 +36,7 @@ import androidx.media3.common.ForwardingPlayer
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionError
 import androidx.media3.session.SessionResult
 import kotlin.random.Random
 import androidx.compose.runtime.Composable
@@ -73,9 +74,10 @@ class PlaybackService : MediaSessionService() {
         session = MediaSession.Builder(this, ReshufflingPlayer(exoPlayer))
             .setBitmapLoader(CoverBitmapLoader(this, scope))
             .setCallback(object : MediaSession.Callback {
-                // The service is exported for the system's media controls, which only play, pause and seek: only the
-                // app itself can choose what plays, so another app can't have it load an address of its choosing. The
-                // app can also set the order the queue is shuffled in (see moveInPlayOrder)
+                // The service is exported for the system's media controls (the notification, the lock screen, headsets
+                // through the system), which only play, pause and seek. No other app connects: each song's id is its
+                // address, which is the file itself on some hosts, and none may choose what plays either. Only the app
+                // itself sets the queue and the order it's shuffled in (see moveInPlayOrder)
                 override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
                     if (controller.packageName == packageName) {
                         return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
@@ -83,6 +85,9 @@ class PlaybackService : MediaSessionService() {
                                 MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().add(SetShuffleOrderCommand).build()
                             )
                             .build()
+                    }
+                    if (!controller.isTrusted && !session.isMediaNotificationController(controller)) {
+                        return MediaSession.ConnectionResult.reject()
                     }
                     val commands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon()
                         .remove(Player.COMMAND_SET_MEDIA_ITEM)
@@ -101,7 +106,7 @@ class PlaybackService : MediaSessionService() {
                     val order = args.getIntArray(EXTRA_SHUFFLE_ORDER)
                     // Only a whole order of the queue as it is now: one sent before a change to it no longer fits
                     val fits = order != null && order.size == exoPlayer.mediaItemCount && order.sorted() == List(order.size) { it }
-                    if (!fits) return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
+                    if (!fits) return Futures.immediateFuture(SessionResult(SessionError.ERROR_BAD_VALUE))
                     exoPlayer.setShuffleOrder(DefaultShuffleOrder(order, Random.nextLong()))
                     return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                 }
