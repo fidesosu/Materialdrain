@@ -61,7 +61,7 @@ internal fun rememberPreviewSettings(signedIn: Boolean = true): SettingsEnvironm
 }
 
 /** The bundled examples (docs/provider-configs) the Hosts page shows in a preview; one that can't be read is left out. */
-private val ExampleHostFiles = listOf("nextcloud.json", "smb.json", "minio.json")
+private val ExampleHostFiles = listOf("webdav.json", "smb.json", "s3.json")
 
 private fun importExampleHosts(context: Context, store: ProviderConfigStore) {
     if (store.providers.value.isNotEmpty()) return

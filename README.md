@@ -21,8 +21,8 @@ delete files, on as many hosts as you like.
 
 ## Host configs
 
-Example configs for other hosts are in [`docs/provider-configs`](docs/provider-configs) (MinIO, Nextcloud, SMB, TrueNAS
-over S3 and WebDAV, and Pixeldrain as a REST host). Paste one into "Or paste a config" in Settings → Hosts, or start
-from one of the "New host" templates there.
+Example configs for other hosts are in [`docs/provider-configs`](docs/provider-configs): one for each kind of host
+(WebDAV, S3, SMB and a REST API), the same as the "New host" templates in Settings → Hosts, and Pixeldrain's own config
+as a full REST host. Paste one into "Or paste a config" there.
 
 I don't have a schedule for updates. I'll update the app when I feel like it.

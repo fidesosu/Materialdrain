@@ -1,0 +1,601 @@
+{
+    "kind": "generic_rest",
+    "name": "REST API",
+    "base_url": "https://files.example.com/api",
+    "auth": {
+        "type": "BEARER",
+        "header_name": "Authorization",
+        "key_username": "",
+        "password_auth": {
+            "mode": "LOGIN",
+            "login": {
+                "method": "POST",
+                "path": "/auth/login",
+                "body": "JSON",
+                "fields": {
+                    "username": "{username}",
+                    "password": "{password}"
+                },
+                "token": "$.token",
+                "otp": null
+            },
+            "logout": {
+                "method": "DELETE",
+                "path": "/auth/session",
+                "body": "RAW",
+                "success_status": [
+                    200,
+                    201
+                ],
+                "response_map": {},
+                "list_path": null,
+                "query": {},
+                "form": {},
+                "json": null,
+                "breadcrumb_path": null,
+                "listing_map": {}
+            }
+        }
+    },
+    "endpoints": {
+        "upload": {
+            "method": "PUT",
+            "path": "/files/{filename}",
+            "body": "RAW",
+            "success_status": [
+                201
+            ],
+            "response_map": {
+                "id": "$.id",
+                "name": "$.name",
+                "size": "$.size",
+                "mime_type": "$.mime_type"
+            },
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "download": {
+            "method": "GET",
+            "path": "/files/{id}/content",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "download_archive": {
+            "method": "GET",
+            "path": "/files/zip",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {
+                "ids": "{ids}"
+            },
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "archive_info": {
+            "method": "GET",
+            "path": "/zip/{path}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {
+                "entries": ""
+            },
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "archive_file": {
+            "method": "GET",
+            "path": "/zip/{path}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {
+                "entry": "{entry}"
+            },
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "delete": {
+            "method": "DELETE",
+            "path": "/files/{id}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                204
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "file_info": {
+            "method": "GET",
+            "path": "/files/{id}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {
+                "name": "$.name",
+                "size": "$.size",
+                "mime_type": "$.mime_type"
+            },
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "user_info": {
+            "method": "GET",
+            "path": "/me",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {
+                "username": "$.username",
+                "quota_used": "$.storage.used",
+                "quota_total": "$.storage.total"
+            },
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "list": {
+            "method": "GET",
+            "path": "/files",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {
+                "id": "$.id",
+                "name": "$.name",
+                "size": "$.size",
+                "mime_type": "$.mime_type",
+                "created": "$.created"
+            },
+            "list_path": "$.files",
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "browse_list": {
+            "method": "GET",
+            "path": "/tree/{path}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {
+                "name": "$.name",
+                "path": "$.path",
+                "size": "$.size",
+                "mime_type": "$.mime_type",
+                "id": "$.id",
+                "is_directory": "$.type",
+                "created": "$.created",
+                "modified": "$.modified"
+            },
+            "list_path": "$.children",
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": "$.path",
+            "listing_map": {
+                "can_write": "$.permissions.write",
+                "can_delete": "$.permissions.delete"
+            }
+        },
+        "browse_upload": {
+            "method": "PUT",
+            "path": "/content/{path}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {
+                "name": "$.name",
+                "path": "$.path",
+                "size": "$.size",
+                "mime_type": "$.mime_type",
+                "id": "$.id"
+            },
+            "list_path": null,
+            "query": {
+                "make_parents": "{make_parents}"
+            },
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "browse_download": {
+            "method": "GET",
+            "path": "/content/{path}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "browse_download_archive": {
+            "method": "GET",
+            "path": "/zip/{path}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "browse_thumbnail": {
+            "method": "GET",
+            "path": "/thumbnail/{path}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "browse_mkdir": {
+            "method": "POST",
+            "path": "/tree/{path}",
+            "body": "RAW",
+            "success_status": [
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {},
+            "form": {
+                "action": "{action}"
+            },
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "browse_rename": {
+            "method": "POST",
+            "path": "/tree/{path}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {
+                "name": "$.name",
+                "path": "$.path"
+            },
+            "list_path": null,
+            "query": {},
+            "form": {
+                "action": "rename",
+                "target": "{target}",
+                "make_parents": "{make_parents}"
+            },
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "browse_delete": {
+            "method": "DELETE",
+            "path": "/tree/{path}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {
+                "recursive": "{recursive}"
+            },
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "browse_import": {
+            "method": "POST",
+            "path": "/tree/{path}",
+            "body": "RAW",
+            "success_status": [
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {},
+            "form": {
+                "action": "import",
+                "files": "{files_json}"
+            },
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "user_lists": {
+            "method": "GET",
+            "path": "/lists",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {
+                "id": "$.id",
+                "title": "$.title",
+                "file_count": "$.file_count",
+                "can_edit": "$.can_edit"
+            },
+            "list_path": "$.lists",
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "list_info": {
+            "method": "GET",
+            "path": "/lists/{list_id}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {
+                "id": "$.id",
+                "name": "$.name",
+                "size": "$.size",
+                "mime_type": "$.mime_type",
+                "created": "$.created"
+            },
+            "list_path": "$.files",
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {
+                "title": "$.title",
+                "can_edit": "$.can_edit"
+            }
+        },
+        "list_create": {
+            "method": "POST",
+            "path": "/lists",
+            "body": "JSON",
+            "success_status": [
+                201
+            ],
+            "response_map": {
+                "id": "$.id"
+            },
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": "{\"title\": {title_json}, \"files\": {files_json}}",
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "list_update": {
+            "method": "PUT",
+            "path": "/lists/{list_id}",
+            "body": "JSON",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": "{\"title\": {title_json}, \"files\": {files_json}}",
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "list_delete": {
+            "method": "DELETE",
+            "path": "/lists/{list_id}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                204
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "thumbnail_id": {
+            "method": "GET",
+            "path": "/files/{id}/thumbnail",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "raw_id": {
+            "method": "GET",
+            "path": "/files/{id}/content",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "share_id": {
+            "method": "GET",
+            "path": "https://files.example.com/f/{id}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "share_path": {
+            "method": "GET",
+            "path": "https://files.example.com/d/{path}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        },
+        "share_list": {
+            "method": "GET",
+            "path": "https://files.example.com/l/{list_id}",
+            "body": "RAW",
+            "success_status": [
+                200,
+                201
+            ],
+            "response_map": {},
+            "list_path": null,
+            "query": {},
+            "form": {},
+            "json": null,
+            "breadcrumb_path": null,
+            "listing_map": {}
+        }
+    },
+    "browse_root": "",
+    "send_credentials": true,
+    "account_fallback": false,
+    "screens": [
+        {
+            "screen": "UPLOAD",
+            "id": "upload",
+            "name": null,
+            "root": null,
+            "disabled_capabilities": []
+        },
+        {
+            "screen": "FILES",
+            "id": "files",
+            "name": null,
+            "root": null,
+            "disabled_capabilities": []
+        },
+        {
+            "screen": "LISTS",
+            "id": "lists",
+            "name": null,
+            "root": null,
+            "disabled_capabilities": []
+        },
+        {
+            "screen": "FILESYSTEM",
+            "id": "filesystem",
+            "name": null,
+            "root": null,
+            "disabled_capabilities": []
+        }
+    ],
+    "meta": {
+        "id": "example.rest",
+        "version": 1,
+        "update_url": null,
+        "min_app_version": null,
+        "author": ""
+    }
+}

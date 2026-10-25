@@ -1,0 +1,32 @@
+{
+    "kind": "s3",
+    "name": "S3 storage",
+    "endpoint": "https://s3.example.com",
+    "region": "us-east-1",
+    "bucket": "my-bucket",
+    "path_style": true,
+    "prefix": "",
+    "screens": [
+        {
+            "screen": "UPLOAD",
+            "id": "upload",
+            "name": null,
+            "root": null,
+            "disabled_capabilities": []
+        },
+        {
+            "screen": "FILESYSTEM",
+            "id": "filesystem",
+            "name": null,
+            "root": null,
+            "disabled_capabilities": []
+        }
+    ],
+    "meta": {
+        "id": "example.s3",
+        "version": 1,
+        "update_url": null,
+        "min_app_version": null,
+        "author": ""
+    }
+}

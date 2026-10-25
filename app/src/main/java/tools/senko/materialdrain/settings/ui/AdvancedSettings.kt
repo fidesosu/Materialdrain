@@ -119,7 +119,6 @@ fun SettingsEnvironment.ProviderHostsSection() {
         Spacer(modifier = Modifier.height(8.dp))
         // A complete config to fill in, for each kind of host the app speaks, opened in the editor
         Text("New host", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        val context = LocalContext.current
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -127,13 +126,6 @@ fun SettingsEnvironment.ProviderHostsSection() {
             ProviderConfigTemplates.Kind.entries.forEach { kind ->
                 AssistChip(onClick = { viewModel.startNewHost(ProviderConfigTemplates.text(kind)) }, label = { Text(kind.label) })
             }
-            AssistChip(
-                onClick = {
-                    runCatching { context.assets.open("pixeldrain.json").bufferedReader().use { it.readText() } }
-                        .onSuccess { viewModel.startNewHost(it) }
-                },
-                label = { Text("REST API (from Pixeldrain)") }
-            )
         }
         Spacer(modifier = Modifier.height(12.dp))
         OutlinedTextField(

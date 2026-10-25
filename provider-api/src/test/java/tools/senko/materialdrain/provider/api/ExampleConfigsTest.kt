@@ -21,6 +21,19 @@ class ExampleConfigsTest {
         }
     }
 
+    /** After changing a template, write its file again from [ProviderConfigTemplates.text]. */
+    @Test
+    fun `each template's example file is the template`() {
+        mapOf(
+            ProviderConfigTemplates.Kind.WEBDAV to "webdav.json",
+            ProviderConfigTemplates.Kind.S3 to "s3.json",
+            ProviderConfigTemplates.Kind.SMB to "smb.json",
+            ProviderConfigTemplates.Kind.REST to "rest.json"
+        ).forEach { (kind, file) ->
+            assertEquals(file, ProviderConfigTemplates.text(kind).trim(), File(examplesDir, file).readText().replace("\r\n", "\n").trim())
+        }
+    }
+
     @Test
     fun `the pixeldrain example has every generic endpoint`() {
         val config = ProviderConfigCodec.decode(File(examplesDir, "pixeldrain.json").readText()) as GenericRestConfig

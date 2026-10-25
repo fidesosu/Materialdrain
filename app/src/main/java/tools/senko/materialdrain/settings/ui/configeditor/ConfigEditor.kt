@@ -867,7 +867,7 @@ internal fun helpText(spec: FieldSpec, defaultText: String? = spec.default?.disp
 // ---- Previews ----
 
 /** The bundled example config of each kind the form knows (docs/provider-configs, which are the app's assets). */
-private val ExampleConfigFiles = mapOf("webdav" to "nextcloud.json", "s3" to "minio.json", "smb" to "smb.json", "generic_rest" to "pixeldrain.json")
+private val ExampleConfigFiles = mapOf("webdav" to "webdav.json", "s3" to "s3.json", "smb" to "smb.json", "generic_rest" to "rest.json")
 
 /** The text of the example [file]; an empty object when the preview can't read it. */
 @Composable
@@ -890,7 +890,7 @@ private fun ConfigEditorPreview(kind: String, error: String? = null) {
     }
 }
 
-/** The first page of a WebDAV host's config (Nextcloud): its basics, and a row for each of its other parts. */
+/** The first page of a WebDAV host's config: its basics, and a row for each of its other parts. */
 @ScreenPreviews
 @Composable
 private fun ConfigEditorWebDavPreview() = ConfigEditorPreview("webdav")
@@ -903,7 +903,7 @@ private fun ConfigEditorS3Preview() = ConfigEditorPreview("s3")
 @Composable
 private fun ConfigEditorSmbPreview() = ConfigEditorPreview("smb")
 
-/** A REST host (Pixeldrain's own config), with why the last save was refused at the top. */
+/** A REST host (the example API), with why the last save was refused at the top. */
 @ScreenPreviews
 @Composable
 private fun ConfigEditorRestPreview() = ConfigEditorPreview("generic_rest", error = "The base URL has to use https.")
