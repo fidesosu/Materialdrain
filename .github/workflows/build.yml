@@ -80,6 +80,11 @@ jobs:
       - name: Run tests
         run: ./gradlew test
 
+      # Android's own checks, of every module: an error (a call which doesn't exist on some Android version the app runs
+      # on, a wrong constant...) fails the build; the warnings are in the report
+      - name: Lint
+        run: ./gradlew lintDebug
+
       # A pull request gets a debug build to try, kept for a while on the run's page
       - name: Build debug APK
         if: github.event_name == 'pull_request'
