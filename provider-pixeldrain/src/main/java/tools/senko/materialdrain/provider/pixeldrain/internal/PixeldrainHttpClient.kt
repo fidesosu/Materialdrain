@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.provider.pixeldrain.internal
 
+import tools.senko.materialdrain.provider.api.addHttpInterceptors
 import android.content.Context
 import android.net.Uri
 import tools.senko.materialdrain.provider.api.queryContentSize
@@ -86,6 +87,7 @@ class PixeldrainHttpClient {
         .connectTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(0, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS)
+        .addHttpInterceptors()
         .build()
 
     internal val json = Json {

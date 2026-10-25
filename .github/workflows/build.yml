@@ -7,7 +7,8 @@
 # The version comes from baseVersion and the release tags (see app/build.gradle.kts): main's builds are the next
 # release, e.g. 1.6.3, and dev's add "-dev." and the commits since the last release, e.g. 1.6.4-dev.5. So the
 # checkouts take the whole history and the tags (fetch-depth: 0).
-# The website's download page lists these releases (website branch).
+# The website's download page lists these releases (website branch). A 1.X.0 release also takes new screenshots of the
+# app for it (screenshots.yml).
 #
 # Only a change to what goes into the APK builds it: the app, the provider modules it's made of, the example configs
 # it bundles, and the build's own settings. Anything else (the README, this workflow) doesn't, nor do Markdown files
@@ -95,6 +96,8 @@ jobs:
     needs: test
     if: github.event_name != 'pull_request' && (github.ref_name == 'main' || github.ref_name == 'dev')
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.apk.outputs.version }}
     permissions:
       # To create the release, and to move the dev-build tag
       contents: write
@@ -198,3 +201,12 @@ jobs:
       - name: Remove the release key
         if: always()
         run: rm -f materialdrain-release.jks
+
+  # A new base version's first release (1.X.0): new screenshots of the app for the website (see screenshots.yml)
+  screenshots:
+    needs: publish
+    if: github.ref_name == 'main' && endsWith(needs.publish.outputs.version, '.0')
+    permissions:
+      contents: write
+      actions: write
+    uses: ./.github/workflows/screenshots.yml

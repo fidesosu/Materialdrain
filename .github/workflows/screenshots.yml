@@ -1,0 +1,89 @@
+#file: noinspection SpellCheckingInspection
+# Takes the screenshots of the app (app/src/androidTest, see ScreenshotTest) on a Pixel 8 emulator, light and dark, and
+# puts them on the website branch, in docs/images/screenshots/light and dark, where the README and the docs show them
+# from the website. Then builds the website, as a push made here doesn't start its workflow by itself.
+# Run by the build workflow for each new 1.X.0 release (a new base version), and by "Run workflow" on the Actions tab.
+name: Screenshots
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+# One at a time: both push to the website branch
+concurrency:
+  group: screenshots
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    permissions:
+      # To push the pictures to the website branch
+      contents: write
+      # To start the website's build
+      actions: write
+    steps:
+      # The whole history and the tags, which the version is worked out from (see app/build.gradle.kts)
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - run: chmod +x gradlew
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+
+      # The emulator runs far faster with the processor's virtualization, which the runner has but doesn't allow by default
+      - name: Allow the emulator to use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Take the screenshots
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_8
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: ./gradlew :app:recordScreenshots
+
+      - name: Keep the screenshots with the run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: app/build/screenshots
+
+      - name: Put them on the website branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || git rev-parse --short HEAD)
+          git fetch --quiet origin website
+          git worktree add --quiet site origin/website
+          rm -rf site/docs/images/screenshots
+          mkdir -p site/docs/images/screenshots
+          cp -r app/build/screenshots/light app/build/screenshots/dark site/docs/images/screenshots/
+          cd site
+          git add --all docs/images/screenshots
+          if git diff --cached --quiet; then
+            echo "The screenshots haven't changed."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet --message "Screenshots of ${version}"
+          git push --quiet origin HEAD:website
+          gh workflow run site.yml --ref website

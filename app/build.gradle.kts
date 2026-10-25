@@ -96,6 +96,8 @@ android {
         buildConfigField("long", "COMMIT_TIME", "${commitEpochSeconds}L")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // The screenshots are saved through it (see Screenshots.capture in androidTest)
+        testInstrumentationRunnerArguments["useTestStorageService"] = "true"
     }
 
     signingConfigs {
@@ -152,6 +154,8 @@ android {
                 it.maxHeapSize = "4096m"
             }
         }
+        // For the screenshots (app/src/androidTest, see recordScreenshots below): nothing is caught halfway
+        animationsDisabled = true
     }
     packaging {
         resources {
@@ -228,7 +232,31 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.androidx.test.uiautomator)
+    androidTestImplementation(libs.androidx.test.services.storage)
+    androidTestUtil(libs.androidx.test.services)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation(libs.androidx.core.splashscreen)
+}
+
+// The pictures of the app for the README and the docs (app/src/androidTest), taken on the emulator or phone that's
+// connected (adb), and copied to app/build/screenshots (light/ and dark/), even when some failed (a failed one leaves
+// failed-*.png there to show why). CI starts a Pixel 8 emulator for them; locally, start one first
+val copyScreenshots = tasks.register<Copy>("copyScreenshots") {
+    from(layout.buildDirectory.dir("outputs/connected_android_test_additional_output")) {
+        include("**/screenshots/**/*.png")
+        // From .../screenshots/light/files.png to light/files.png
+        eachFile { path = path.substringAfter("screenshots/") }
+        includeEmptyDirs = false
+    }
+    into(layout.buildDirectory.dir("screenshots"))
+}
+tasks.matching { it.name == "connectedDebugAndroidTest" }.configureEach { finalizedBy(copyScreenshots) }
+tasks.register("recordScreenshots") {
+    group = "verification"
+    description = "Takes the screenshots of the app (app/src/androidTest) and puts them in app/build/screenshots."
+    dependsOn("connectedDebugAndroidTest")
 }

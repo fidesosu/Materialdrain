@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.hosts
 
+import tools.senko.materialdrain.provider.api.addHttpInterceptors
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
@@ -97,6 +98,7 @@ class HostHealth(
         .followRedirects(false)
         .followSslRedirects(false)
         .retryOnConnectionFailure(false)
+        .addHttpInterceptors()
         .build()
 
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
