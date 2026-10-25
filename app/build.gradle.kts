@@ -191,29 +191,16 @@ dependencies {
     // Only Icons itself: the icons the app uses are its own (see ui/icons/AppIcons.kt), not all of material-icons-extended
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.biometric)
-    implementation(libs.androidx.compose.foundation) // This line is un-commented
-    implementation(libs.androidx.lifecycle.viewmodel.compose) // Added ViewModel Compose
-    implementation(libs.coil.compose) // Added Coil for image loading
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.coil.compose)
     implementation(libs.coil.gif)
-    implementation(libs.core.ktx) // Added for GIF support with Coil
-    implementation(libs.google.android.material) // Added Material Components for XML themes
-
-    // Ktor Client Dependencies
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.cio)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.serialization.kotlinx.json)
-    implementation(libs.ktor.client.auth)
-    implementation(libs.ktor.client.logging) // Optional but good for debugging
-    implementation(libs.ktor.client.okhttp)
+    implementation(libs.androidx.core.ktx)
+    // The window's theme (themes.xml) and the colour utilities the app's own colours are made with (see ui/theme/Color.kt)
+    implementation(libs.google.android.material)
 
     implementation(libs.okhttp)
-
-    // implementation("org.chromium.net:cronet-embedded:119.6045.31")
-    // implementation("com.google.android:cronet-transport-for-okhttp:5.1.0")
-
-    // Kotlinx Serialization runtime (needed for Ktor's JSON serialization)
-    implementation(libs.kotlinx.serialization.json.v163)
+    implementation(libs.kotlinx.serialization.json)
 
     // Media3 (ExoPlayer)
     implementation(libs.androidx.media3.exoplayer)

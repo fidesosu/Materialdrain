@@ -26,10 +26,10 @@ kotlin {
 dependencies {
     implementation(project(":provider-api"))
     implementation(libs.okhttp)
-    implementation(libs.kotlinx.serialization.json.v163)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.okhttp)
-    testImplementation("com.squareup.okhttp3:mockwebserver:5.1.0")
+    testImplementation(libs.okhttp.mockwebserver)
 }

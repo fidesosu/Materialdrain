@@ -25,8 +25,8 @@ kotlin {
 dependencies {
     implementation(project(":provider-api"))
     // SMB client (LGPL-3.0): the SMB 2/3 protocol, with NTLM sign-in and SMB 3 encryption
-    implementation("eu.agno3.jcifs:jcifs-ng:2.1.10")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation(libs.jcifs.ng)
+    implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
 }

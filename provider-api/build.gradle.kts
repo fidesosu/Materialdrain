@@ -29,7 +29,7 @@ kotlin {
 }
 
 dependencies {
-    implementation(libs.kotlinx.serialization.json.v163)
+    implementation(libs.kotlinx.serialization.json)
     // OkHttp's types are part of HttpInterceptors, which every module's clients use
     api(libs.okhttp)
     testImplementation(libs.junit)

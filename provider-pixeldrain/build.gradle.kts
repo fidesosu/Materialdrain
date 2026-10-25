@@ -32,7 +32,7 @@ dependencies {
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.ktor.client.logging)
     implementation(libs.okhttp)
-    implementation(libs.kotlinx.serialization.json.v163)
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
 }

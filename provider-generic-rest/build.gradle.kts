@@ -31,15 +31,11 @@ kotlin {
 dependencies {
     implementation(project(":provider-api"))
 
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.okhttp)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.serialization.kotlinx.json)
-    implementation(libs.ktor.client.logging)
     implementation(libs.okhttp)
-    implementation(libs.kotlinx.serialization.json.v163)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
     testImplementation(libs.okhttp)
-    testImplementation("com.squareup.okhttp3:mockwebserver:5.1.0")
+    testImplementation(libs.okhttp.mockwebserver)
 }
