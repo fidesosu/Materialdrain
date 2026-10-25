@@ -13,8 +13,9 @@ import android.graphics.pdf.PdfRenderer
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.ParcelFileDescriptor
-import android.provider.OpenableColumns
 import android.util.Log
+import android.system.OsConstants
+import android.system.Os
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -294,19 +295,10 @@ class UploadViewModel(
 
         try {
             newMimeType = context.contentResolver.getType(uri)
-            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                    newFileName = cursor.getString(nameIndex)
-                    if (!cursor.isNull(sizeIndex)) {
-                        newFileSizeBytes = cursor.getLong(sizeIndex)
-                    } else {
-                        Log.w(TAG, "File size is unavailable for URI: $uri")
-                        newFileSizeBytes = null
-                    }
-                }
-            }
+            // Either may be missing: an app's provider needn't give them
+            val info = readContentUriInfo(context, uri)
+            newFileName = info.displayName
+            newFileSizeBytes = info.sizeBytes
 
             if (isTextFile(newFileName.orEmpty(), newMimeType)) {
                 try {
@@ -389,19 +381,25 @@ class UploadViewModel(
 
             if (newMimeType == "application/vnd.android.package-archive") {
                 var tempApkFile: File? = null
+                var descriptor: ParcelFileDescriptor? = null
                 try {
-                    // PackageManager needs a file path, so copy from URI to a temp file if it's a content URI
+                    // PackageManager needs a file path. A file opened from the URI has one of its own (/proc/self/fd/…),
+                    // so the APK (often hundreds of MB) needn't be copied; only one which isn't a real file (a stream
+                    // an app writes as it's read) is copied to the cache first
                     val apkPath = if (uri.scheme == "content") {
-                        val tempFileName = "temp_apk_preview_${System.currentTimeMillis()}.apk"
-                        tempApkFile = File(context.cacheDir, tempFileName)
-                        context.contentResolver.openInputStream(uri)?.use { input ->
-                            FileOutputStream(tempApkFile).use { output ->
-                                input.copyTo(output)
+                        descriptor = context.contentResolver.openFileDescriptor(uri, "r")
+                        val opened = descriptor?.let { "/proc/self/fd/${it.fd}" }
+                        if (opened != null && runCatching { OsConstants.S_ISREG(Os.fstat(descriptor.fileDescriptor).st_mode) }.getOrDefault(false)) {
+                            opened
+                        } else {
+                            tempApkFile = File(context.cacheDir, "temp_apk_preview_${System.currentTimeMillis()}.apk")
+                            context.contentResolver.openInputStream(uri)?.use { input ->
+                                FileOutputStream(tempApkFile).use { output -> input.copyTo(output) }
                             }
+                            tempApkFile.absolutePath
                         }
-                        tempApkFile.absolutePath
                     } else {
-                        uri.path // Assume it's already a file path
+                        uri.path // Already a file path
                     }
 
                     apkPath?.let {
@@ -429,7 +427,8 @@ class UploadViewModel(
                     Log.e(TAG, "Error extracting APK info: ${e.message}", e)
                     newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve APK details."
                 } finally {
-                    tempApkFile?.delete() // Clean up temp file
+                    descriptor?.close()
+                    tempApkFile?.delete()
                 }
             }
         } catch (e: Exception) {
