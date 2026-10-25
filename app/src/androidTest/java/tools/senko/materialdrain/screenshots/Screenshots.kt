@@ -12,9 +12,9 @@ import androidx.test.services.storage.TestStorage
 object Screenshots {
     private val automation get() = InstrumentationRegistry.getInstrumentation().uiAutomation
 
-    private fun shell(command: String) {
-        ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes() }
-    }
+    /** Runs [command] as adb's shell does (settings, cmd, locksettings...), and returns what it printed. */
+    fun shell(command: String): String =
+        ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes().decodeToString() }
 
     /** SystemUI's demo mode: 12:00, full battery and signal, no notifications. */
     fun cleanStatusBar() {

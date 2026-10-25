@@ -66,9 +66,13 @@ class FakePixeldrain : Interceptor {
         Triple("mIxtape3", "Mixtape", listOf("nDrive05", "oWaves06", "mCoffe12"))
     )
 
+    /** The path of every request asked so far ("/api/user/files"), for tests of what the app fetches when (see AppLockSecurityTest). */
+    val requests: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
+
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val url = request.url
+        requests += url.encodedPath
         val path = url.encodedPathSegments.map { java.net.URLDecoder.decode(it, "UTF-8") }
         val api = if (path.firstOrNull() == "api") path.drop(1) else null
         val answer: Answer? = when {
