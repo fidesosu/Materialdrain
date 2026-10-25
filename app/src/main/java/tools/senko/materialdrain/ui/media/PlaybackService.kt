@@ -25,6 +25,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import tools.senko.materialdrain.ui.icons.filled.MusicNote
 import androidx.compose.material.icons.Icons
@@ -36,6 +38,11 @@ import androidx.media3.common.ForwardingPlayer
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.session.SessionCommand
+import androidx.media3.common.FlagSet
+import android.app.KeyguardManager
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import tools.senko.materialdrain.AppContainer
 import androidx.media3.session.SessionError
 import androidx.media3.session.SessionResult
 import kotlin.random.Random
@@ -66,12 +73,77 @@ import com.google.common.util.concurrent.ListenableFuture
 @androidx.annotation.OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
+    private var player: LockScreenPrivatePlayer? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    /**
+     * Whether the song is kept from the device's lock screen now: while the app lock is on, from the screen going off
+     * until the device is unlocked. What plays is then "Materialdrain" to everything that shows it (the lock screen's
+     * player, which reads the session whatever the notification says, and the notification), and the system's controls
+     * can't read the queue; they still play, pause and skip.
+     */
+    private var hiddenFromLockScreen = false
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val lockOn = AppContainer.get(application).appSettings.biometricLock.value
+            when (intent.action) {
+                Intent.ACTION_SCREEN_OFF -> {
+                    unlockWatch?.cancel()
+                    hiddenFromLockScreen = lockOn
+                    player?.hidden = hiddenFromLockScreen
+                    applyLockScreenPrivacy()
+                }
+                Intent.ACTION_USER_PRESENT -> showOnUnlock()
+                // On: the lock screen, until the device is unlocked
+                else -> watchForUnlock()
+            }
+        }
+    }
+
+    /**
+     * While the screen is on and the song hidden: whether the device is unlocked yet, every half second. The broadcast of
+     * it can come seconds late (or not to this app), and listening to the lock itself is only for the system's apps.
+     */
+    private var unlockWatch: Job? = null
+
+    private fun watchForUnlock() {
+        unlockWatch?.cancel()
+        if (!hiddenFromLockScreen) return
+        val keyguard = getSystemService(KeyguardManager::class.java)
+        unlockWatch = scope.launch {
+            while (keyguard.isKeyguardLocked) delay(UNLOCK_CHECK_MS)
+            showOnUnlock()
+        }
+    }
+
+    private fun showOnUnlock() {
+        unlockWatch?.cancel()
+        if (!hiddenFromLockScreen) return
+        hiddenFromLockScreen = false
+        player?.hidden = false
+        applyLockScreenPrivacy()
+    }
+
+    /** What the system's controls may do: play, pause and seek, never choose what plays, nor read the queue while it's hidden. */
+    private fun systemPlayerCommands(): Player.Commands =
+        MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon()
+            .remove(Player.COMMAND_SET_MEDIA_ITEM)
+            .remove(Player.COMMAND_CHANGE_MEDIA_ITEMS)
+            .apply { if (hiddenFromLockScreen) remove(Player.COMMAND_GET_TIMELINE) }
+            .build()
+
+    private fun applyLockScreenPrivacy() {
+        val session = session ?: return
+        session.connectedControllers.filter { it.packageName != packageName }.forEach {
+            session.setAvailableCommands(it, MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS, systemPlayerCommands())
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         val exoPlayer = createPlayer(this, isVideo = false)
-        session = MediaSession.Builder(this, ReshufflingPlayer(exoPlayer))
+        val player = LockScreenPrivatePlayer(ReshufflingPlayer(exoPlayer)).also { player = it }
+        session = MediaSession.Builder(this, player)
             .setBitmapLoader(CoverBitmapLoader(this, scope))
             .setCallback(object : MediaSession.Callback {
                 // The service is exported for the system's media controls (the notification, the lock screen, headsets
@@ -89,11 +161,7 @@ class PlaybackService : MediaSessionService() {
                     if (!controller.isTrusted && !session.isMediaNotificationController(controller)) {
                         return MediaSession.ConnectionResult.reject()
                     }
-                    val commands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon()
-                        .remove(Player.COMMAND_SET_MEDIA_ITEM)
-                        .remove(Player.COMMAND_CHANGE_MEDIA_ITEMS)
-                        .build()
-                    return MediaSession.ConnectionResult.AcceptedResultBuilder(session).setAvailablePlayerCommands(commands).build()
+                    return MediaSession.ConnectionResult.AcceptedResultBuilder(session).setAvailablePlayerCommands(systemPlayerCommands()).build()
                 }
 
                 override fun onCustomCommand(
@@ -122,6 +190,12 @@ class PlaybackService : MediaSessionService() {
                 )
             })
             .build()
+        val screen = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_USER_PRESENT)
+        }
+        ContextCompat.registerReceiver(this, screenReceiver, screen, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
@@ -135,6 +209,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        unregisterReceiver(screenReceiver)
         scope.cancel()
         session?.run {
             player.release()
@@ -142,6 +217,47 @@ class PlaybackService : MediaSessionService() {
         }
         session = null
         super.onDestroy()
+    }
+}
+
+/**
+ * The player as the session shows it: while [hidden], what plays has no name of its own ("Materialdrain", "Playing") and
+ * no cover, for the device's lock screen (see PlaybackService.hiddenFromLockScreen). Everything that shows it is told when
+ * that changes, as for a song's metadata changing.
+ */
+@UnstableApi
+private class LockScreenPrivatePlayer(player: Player) : ForwardingPlayer(player) {
+    private val listeners = mutableListOf<Player.Listener>()
+
+    var hidden = false
+        set(value) {
+            if (field == value) return
+            field = value
+            val metadata = mediaMetadata
+            val events = Player.Events(FlagSet.Builder().add(Player.EVENT_MEDIA_METADATA_CHANGED).build())
+            listeners.toList().forEach {
+                it.onMediaMetadataChanged(metadata)
+                it.onEvents(this, events)
+            }
+        }
+
+    override fun addListener(listener: Player.Listener) {
+        listeners += listener
+        super.addListener(listener)
+    }
+
+    override fun removeListener(listener: Player.Listener) {
+        listeners -= listener
+        super.removeListener(listener)
+    }
+
+    override fun getMediaMetadata(): MediaMetadata = if (hidden) HIDDEN_METADATA else super.getMediaMetadata()
+
+    override fun getCurrentMediaItem(): MediaItem? =
+        super.getCurrentMediaItem()?.let { if (hidden) it.buildUpon().setMediaMetadata(HIDDEN_METADATA).build() else it }
+
+    private companion object {
+        val HIDDEN_METADATA: MediaMetadata = MediaMetadata.Builder().setTitle("Materialdrain").setArtist("Playing").build()
     }
 }
 
@@ -198,6 +314,9 @@ internal fun rememberPlaybackController(): MediaController? {
     }
     return controller
 }
+
+/** How often the song hidden on the lock screen looks whether the device is unlocked yet (see PlaybackService.unlockWatch). */
+private const val UNLOCK_CHECK_MS = 500L
 
 /** The size of a song's picture in the notification, in pixels. */
 private const val ART_PX = 512

@@ -475,8 +475,9 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         items = listOf(
             SettingsItem.Toggle(
                 title = "Lock with fingerprint or face",
-                info = if (Build.VERSION.SDK_INT >= 33) "Needs a screen lock on this device. The recent apps don't show Materialdrain while it's on."
-                else "Needs a screen lock on this device. While it's on, screenshots of Materialdrain come out black, which keeps it out of the recent apps too.",
+                info = (if (Build.VERSION.SDK_INT >= 33) "Needs a screen lock on this device. The recent apps don't show Materialdrain while it's on."
+                else "Needs a screen lock on this device. While it's on, screenshots of Materialdrain come out black, which keeps it out of the recent apps too.") +
+                    " The device's lock screen doesn't show which files transfer or which song plays.",
                 isChecked = { appSettings.biometricLock.collectAsState().value },
                 // Turned on only where there's something to unlock with; off always, whatever the device has
                 onCheckedChange = { if (!it || appSettings.biometricLockAvailable()) appSettings.setBiometricLock(it) },

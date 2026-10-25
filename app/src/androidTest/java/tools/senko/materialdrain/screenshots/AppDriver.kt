@@ -40,14 +40,17 @@ class AppDriver {
      */
     fun unlockDevice() {
         val keyguard = InstrumentationRegistry.getInstrumentation().targetContext.getSystemService(KeyguardManager::class.java)
-        if (!keyguard.isKeyguardLocked) return
-        Screenshots.shell("input keyevent KEYCODE_WAKEUP")
-        Screenshots.shell("wm dismiss-keyguard")
-        Thread.sleep(1_000)
-        if (keyguard.isKeyguardLocked) {
-            Screenshots.shell("input text $DEVICE_PIN")
-            Screenshots.shell("input keyevent KEYCODE_ENTER")
-            Thread.sleep(1_500)
+        // A few tries: the PIN typed while the lock screen's keypad is still coming up is lost
+        repeat(3) {
+            if (!keyguard.isKeyguardLocked) return
+            Screenshots.shell("input keyevent KEYCODE_WAKEUP")
+            Screenshots.shell("wm dismiss-keyguard")
+            Thread.sleep(1_000)
+            if (keyguard.isKeyguardLocked) {
+                Screenshots.shell("input text $DEVICE_PIN")
+                Screenshots.shell("input keyevent KEYCODE_ENTER")
+                Thread.sleep(1_500)
+            }
         }
     }
 
