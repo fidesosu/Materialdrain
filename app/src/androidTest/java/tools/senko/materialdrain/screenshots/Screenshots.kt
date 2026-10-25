@@ -2,6 +2,7 @@ package tools.senko.materialdrain.screenshots
 
 import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
+import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.services.storage.TestStorage
 
@@ -38,7 +39,11 @@ object Screenshots {
         // Lets the last frame (and pictures fading in) settle first
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
         Thread.sleep(300)
-        val bitmap = automation.takeScreenshot() ?: error("no screenshot for $name")
+        // None while the app blocks screenshots (FLAG_SECURE: the setting, or the app lock before Android 13)
+        val bitmap = automation.takeScreenshot() ?: run {
+            Log.w("Screenshots", "no picture of $name: screenshots are blocked")
+            return
+        }
         TestStorage().openOutputFile("screenshots/$name.png").use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 }
