@@ -231,6 +231,7 @@ class AppDriver {
         /** The device's PIN while the lock tests run, which they set and remove. */
         const val DEVICE_PIN = "1234"
 
-        private val sharedFake = FakePixeldrain()
+        // Put in place by FakeHostRunner before the app starts
+        internal val sharedFake = FakePixeldrain()
     }
 }

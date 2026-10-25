@@ -5,6 +5,18 @@ import android.content.Context
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.os.CancellationSignal
+import android.util.Log
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.ProxyFileDescriptorCallback
+import android.os.storage.StorageManager
+import android.system.ErrnoException
+import android.system.OsConstants
+import kotlin.concurrent.thread
+import tools.senko.materialdrain.provider.api.ErrorCodes
+import tools.senko.materialdrain.provider.api.ProviderError
+import tools.senko.materialdrain.ui.media.HostRequestAuth
+import tools.senko.materialdrain.ui.media.RangedReader
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
@@ -23,9 +35,14 @@ import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.provider.api.StorageProvider
 import tools.senko.materialdrain.settings.isSearchIndex
 import tools.senko.materialdrain.util.parseDateTime
-import java.io.File
 import java.io.FileNotFoundException
 import java.util.concurrent.ConcurrentHashMap
+
+private const val TAG = "HostDocuments"
+
+/** How much of a file another app reads one request fetches, and how many of those are kept: 8 MB. */
+private const val DOCUMENT_BLOCK = 512 * 1024
+private const val DOCUMENT_BLOCKS_KEPT = 16
 
 private val DEFAULT_ROOT_PROJECTION = arrayOf(
     Root.COLUMN_ROOT_ID, Root.COLUMN_DOCUMENT_ID, Root.COLUMN_TITLE, Root.COLUMN_SUMMARY, Root.COLUMN_FLAGS, Root.COLUMN_ICON
@@ -38,8 +55,8 @@ private val DEFAULT_DOCUMENT_PROJECTION = arrayOf(
 
 /**
  * The hosts with folders, in the system's file picker (and the Files app): other apps can open their files as they open
- * the device's own (Files and transfers, Show hosts in the file picker). Only to read: a file is fetched whole when it's
- * opened, into the app's cache, which it leaves as soon as the other app has it.
+ * the device's own (Files and transfers, Show hosts in the file picker). Only to read: a file is fetched as the other app
+ * reads it, never all of it first (see [openDocument]).
  *
  * Off by default, and nothing is shown while the fingerprint lock is on, as the picker doesn't ask for it. A document's id
  * is its host's id and its path, "host|path".
@@ -148,21 +165,75 @@ class HostDocumentsProvider : DocumentsProvider() {
         return parent.isEmpty() || child.startsWith("$parent/")
     }
 
+    /**
+     * A file for another app to read, without fetching all of it first. From a host which sends parts of a file, each part
+     * is fetched as the app reads there (a video player can jump about); from one which doesn't, the file comes as it's
+     * downloaded, from the start on, through a pipe.
+     */
     override fun openDocument(documentId: String, mode: String, signal: CancellationSignal?): ParcelFileDescriptor {
         if (mode != "r") throw UnsupportedOperationException("The hosts can only be read from here")
         val (provider, path) = hostOf(documentId)
         val browse = provider.browse ?: throw FileNotFoundException("No folders on this host")
-        val dir = File(requireNotNull(context).cacheDir, "documents").apply { mkdirs() }
-        val file = File.createTempFile("open", null, dir)
-        try {
-            val result = runBlocking(Dispatchers.IO) {
-                file.outputStream().use { out -> browse.download(path, out) { _, _ -> signal?.throwIfCanceled() } }
+        signal?.throwIfCanceled()
+        rangedReader(documentId, provider, path)?.let { reader ->
+            val thread = HandlerThread("document-$documentId").apply { start() }
+            val storage = requireNotNull(context).getSystemService(StorageManager::class.java)
+            return storage.openProxyFileDescriptor(ParcelFileDescriptor.MODE_READ_ONLY, RangedCallback(reader, thread), Handler(thread.looper))
+        }
+        // Read in order, as it comes: the other app's end of the pipe gets an error when the download fails
+        val (read, write) = ParcelFileDescriptor.createReliablePipe()
+        thread(name = "document-$documentId") {
+            val result = try {
+                ParcelFileDescriptor.AutoCloseOutputStream(write).use { out ->
+                    runBlocking(Dispatchers.IO) { browse.download(path, out) { _, _ -> signal?.throwIfCanceled() } }
+                }
+            } catch (e: Exception) {
+                ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: "The download stopped"))
             }
-            if (result is ApiResponse.Error) throw FileNotFoundException(result.error.message)
-            // Opened, the file can go: the other app reads it through what's opened, and nothing is left behind
-            return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-        } finally {
-            file.delete()
+            if (result is ApiResponse.Error) runCatching { write.closeWithError(result.error.message) }
+        }
+        return read
+    }
+
+    /**
+     * Reads the file of [path] in parts, when the host gives it an address of its own and answers a range there; null
+     * when it doesn't, or the address isn't one the app's client can fetch.
+     */
+    private fun rangedReader(documentId: String, provider: StorageProvider, path: String): RangedReader? {
+        val node = known[documentId] ?: run {
+            listChildren(documentId.substringBefore('|'), provider, path.substringBeforeLast('/', ""))
+            known[documentId]
+        } ?: return null
+        val url = runCatching { provider.rawContentUrl(node) }.getOrNull()?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
+        val client = HostRequestAuth.client
+        if (url == null || client == null) {
+            Log.d(TAG, "read as it comes: ${if (url == null) "no address of its own" else "no client yet"}")
+            return null
+        }
+        val reader = RangedReader(client, url, provider.requestHeaders(url), DOCUMENT_BLOCK, DOCUMENT_BLOCKS_KEPT)
+        // The first part says whether the host sends parts at all
+        return try {
+            reader.size()
+            reader
+        } catch (e: Exception) {
+            Log.d(TAG, "read as it comes from ${url.substringBefore("?")}: ${e.message}")
+            null
+        }
+    }
+
+    /** What another app reads of a file opened in parts: each read fetched by [reader], on [thread], which ends with it. */
+    private class RangedCallback(private val reader: RangedReader, private val thread: HandlerThread) : ProxyFileDescriptorCallback() {
+        override fun onGetSize(): Long = reader.size()
+
+        override fun onRead(offset: Long, size: Int, data: ByteArray): Int = try {
+            reader.readAt(offset, data, 0, size).coerceAtLeast(0)
+        } catch (e: Exception) {
+            throw ErrnoException("read", OsConstants.EIO)
+        }
+
+        override fun onRelease() {
+            reader.close()
+            thread.quitSafely()
         }
     }
 

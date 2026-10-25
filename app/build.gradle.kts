@@ -95,7 +95,8 @@ android {
         versionName = computedVersionName
         buildConfigField("long", "COMMIT_TIME", "${commitEpochSeconds}L")
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // The made-up host of the emulator tests in place before the app starts (see FakeHostRunner)
+        testInstrumentationRunner = "tools.senko.materialdrain.screenshots.FakeHostRunner"
         // The screenshots are saved through it (see Screenshots.capture in androidTest)
         testInstrumentationRunnerArguments["useTestStorageService"] = "true"
     }

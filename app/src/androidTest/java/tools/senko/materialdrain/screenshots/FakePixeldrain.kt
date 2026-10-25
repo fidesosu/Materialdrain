@@ -73,6 +73,10 @@ class FakePixeldrain : Interceptor {
     /** The Range header of each request which had one, for tests of downloads going on (see DownloadRetryTest). */
     val ranges: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
 
+    /** Whether the host answers a range with the whole file, as some hosts do (see DocumentsProviderTest). */
+    @Volatile
+    var ignoreRanges = false
+
     /** The file whose next download (of all of it) stops halfway, as a connection that drops; null for none. */
     @Volatile
     var breakNextDownloadOf: String? = null
@@ -81,6 +85,7 @@ class FakePixeldrain : Interceptor {
         val request = chain.request()
         val url = request.url
         requests += url.encodedPath
+        Log.v(TAG, "asked: ${request.method} $url ${request.header("Range").orEmpty()}")
         request.header("Range")?.let { ranges += it }
         val path = url.encodedPathSegments.map { java.net.URLDecoder.decode(it, "UTF-8") }
         val api = if (path.firstOrNull() == "api") path.drop(1) else null
@@ -111,7 +116,7 @@ class FakePixeldrain : Interceptor {
             return answer.brokenHalfway(request)
         }
         return (answer ?: Answer(404, "application/json", """{"success": false, "value": "not_found"}""".toByteArray()))
-            .toResponse(request)
+            .toResponse(if (ignoreRanges) request.newBuilder().removeHeader("Range").build() else request)
     }
 
     private fun filesystem(path: String, query: Set<String>): Answer? {
@@ -129,7 +134,12 @@ class FakePixeldrain : Interceptor {
 
     private fun listing(path: String): String {
         val crumbs = path.split('/').runningReduce { a, b -> "$a/$b" }
-        val breadcrumb = crumbs.joinToString { """{"type": "dir", "path": "/$it", "name": ${q(it.substringAfterLast('/'))}}""" }
+        // The folders down to this one, with the fields Pixeldrain sends for every entry
+        val breadcrumb = crumbs.joinToString {
+            """{"type": "dir", "path": "/$it", "name": ${q(it.substringAfterLast('/'))}, "created": "${daysAgo(60)}",
+                "modified": "${daysAgo(3)}", "mode_string": "drwxr-xr-x", "mode_octal": "755", "created_by": "sam",
+                "file_size": 0, "file_type": "", "sha256_sum": ""}"""
+        }
         val children = folders.getValue(path).mapIndexed { i, entry ->
             val dir = entry.endsWith("/")
             val name = entry.removeSuffix("/")
@@ -138,7 +148,8 @@ class FakePixeldrain : Interceptor {
             val size = if (dir) 0 else known?.size ?: (1_800_000L + name.length * 97_000L)
             """{"type": "${if (dir) "dir" else "file"}", "path": ${q("/$path/$name")}, "name": ${q(name)}, "file_size": $size,
                 "file_type": "$mime", "mime_type": "$mime", "created": "${daysAgo(40L + i)}", "modified": "${daysAgo(2L + i)}",
-                "id": ${known?.let { q(it.id) } ?: "null"}}"""
+                "mode_string": "${if (dir) "drwxr-xr-x" else "-rw-r--r--"}", "mode_octal": "${if (dir) "755" else "644"}",
+                "created_by": "sam", "sha256_sum": "", "id": ${known?.let { q(it.id) } ?: "null"}}"""
         }
         return """{"path": [$breadcrumb], "base_index": ${crumbs.size - 1}, "children": [${children.joinToString()}],
             "permissions": {"owner": true, "read": true, "write": true, "delete": true}, "context": {"premium_transfer": true}}"""
