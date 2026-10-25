@@ -32,6 +32,10 @@ private const val FIRST_RESULT_NOTIFICATION_ID = 100
 
 const val ACTION_CANCEL_ALL_TRANSFERS = "tools.senko.materialdrain.action.CANCEL_ALL_TRANSFERS"
 
+/** "Try again" on a failed transfer's notification, which [EXTRA_NOTIFICATION_ID] names (see TransferRegistry.retry). */
+const val ACTION_RETRY_TRANSFER = "tools.senko.materialdrain.action.RETRY_TRANSFER"
+const val EXTRA_NOTIFICATION_ID = "notification_id"
+
 /**
  * Builds the transfer notifications. Three separate channels are used so that the user can tune each
  * kind in the Android notification settings (importance, sound, vibration, lock screen, badge, ...).
@@ -160,7 +164,8 @@ class TransferNotifier(private val context: Context) {
         notify(PROGRESS_NOTIFICATION_ID, buildProgressNotification(transfers))
     }
 
-    fun notifyResult(info: TransferInfo, outcome: TransferOutcome, message: String?, openUri: Uri?, mimeType: String?) {
+    /** The notification of a finished transfer, with "Try again" when it failed and [canRetry]; returns its id. */
+    fun notifyResult(info: TransferInfo, outcome: TransferOutcome, message: String?, openUri: Uri?, mimeType: String?, canRetry: Boolean = false): Int {
         val failed = outcome == TransferOutcome.FAILED
         val verb = if (info.kind == TransferKind.UPLOAD) "Upload" else "Download"
 
@@ -175,6 +180,7 @@ class TransferNotifier(private val context: Context) {
 
         val channel = if (failed) CHANNEL_TRANSFER_FAILED else CHANNEL_TRANSFER_COMPLETE
         val icon = if (info.kind == TransferKind.UPLOAD) R.drawable.icon_upload else R.drawable.icon_download
+        val id = resultIds.getAndIncrement()
         val notification = NotificationCompat.Builder(context, channel)
             .setColor(iconColor())
             .setSmallIcon(icon)
@@ -184,10 +190,21 @@ class TransferNotifier(private val context: Context) {
             .setContentIntent(contentIntent)
             .setAutoCancel(true)
             .setCategory(if (failed) NotificationCompat.CATEGORY_ERROR else NotificationCompat.CATEGORY_STATUS)
+            .apply { if (failed && canRetry) addAction(0, "Try again", retryIntent(id)) }
             .let { privateOnLockScreen(it, channel, icon, if (failed) "$verb failed" else "$verb complete") }
             .build()
-        notify(resultIds.getAndIncrement(), notification)
+        notify(id, notification)
+        return id
     }
+
+    private fun retryIntent(notificationId: Int): PendingIntent {
+        val intent = Intent(context, TransferService::class.java)
+            .setAction(ACTION_RETRY_TRANSFER)
+            .putExtra(EXTRA_NOTIFICATION_ID, notificationId)
+        return PendingIntent.getService(context, notificationId, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+    }
+
+    fun cancel(id: Int) = NotificationManagerCompat.from(context).cancel(id)
 
     private fun notify(id: Int, notification: Notification) {
         // Without the permission the foreground service still keeps the transfer alive, just silently

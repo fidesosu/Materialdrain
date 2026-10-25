@@ -38,6 +38,9 @@ class TransferRegistry(context: Context) {
 
     private val cancelHandlers = ConcurrentHashMap<String, () -> Unit>()
 
+    /** How to start a failed transfer again, by the id of its notification's "Try again" (see [retry]). */
+    private val retryHandlers = ConcurrentHashMap<Int, () -> Unit>()
+
     /** Set by the activity; result notifications are only needed when the user is not looking at the app. */
     @Volatile
     var appInForeground: Boolean = false
@@ -66,15 +69,29 @@ class TransferRegistry(context: Context) {
 
     /**
      * Ends a transfer. [message] describes the result (or the error), [openUri]/[mimeType] let the
-     * notification of a finished download open the file.
+     * notification of a finished download open the file. A failed one with [retry] gets a "Try again" which calls it.
      */
-    fun finish(id: String, outcome: TransferOutcome, message: String? = null, openUri: Uri? = null, mimeType: String? = null) {
+    fun finish(
+        id: String,
+        outcome: TransferOutcome,
+        message: String? = null,
+        openUri: Uri? = null,
+        mimeType: String? = null,
+        retry: (() -> Unit)? = null
+    ) {
         cancelHandlers.remove(id)
         val info = _active.value[id] ?: return
         _active.update { it - id }
         if (outcome != TransferOutcome.CANCELLED && !appInForeground) {
-            notifier.notifyResult(info, outcome, message, openUri, mimeType)
+            val notificationId = notifier.notifyResult(info, outcome, message, openUri, mimeType, canRetry = retry != null)
+            if (retry != null) retryHandlers[notificationId] = retry
         }
+    }
+
+    /** "Try again" on the notification [notificationId]: its transfer starts again, and the notification goes. */
+    fun retry(notificationId: Int) {
+        notifier.cancel(notificationId)
+        retryHandlers.remove(notificationId)?.invoke()
     }
 
     fun cancelAll() {

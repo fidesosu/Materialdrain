@@ -520,6 +520,7 @@ fun MaterialdrainScreen() {
                 when (val action = message.action) {
                     is UiMessageAction.OpenDownload -> openDownloadedFile(context, action.download)
                     is UiMessageAction.Undo -> action.undo()
+                    is UiMessageAction.Retry -> action.retry()
                     null -> Unit
                 }
             }

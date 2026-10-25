@@ -10,6 +10,7 @@ import android.graphics.pdf.PdfDocument
 import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import okhttp3.Interceptor
+import okio.buffer
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Protocol
 import okhttp3.Request
@@ -69,10 +70,18 @@ class FakePixeldrain : Interceptor {
     /** The path of every request asked so far ("/api/user/files"), for tests of what the app fetches when (see AppLockSecurityTest). */
     val requests: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
 
+    /** The Range header of each request which had one, for tests of downloads going on (see DownloadRetryTest). */
+    val ranges: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
+
+    /** The file whose next download (of all of it) stops halfway, as a connection that drops; null for none. */
+    @Volatile
+    var breakNextDownloadOf: String? = null
+
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val url = request.url
         requests += url.encodedPath
+        request.header("Range")?.let { ranges += it }
         val path = url.encodedPathSegments.map { java.net.URLDecoder.decode(it, "UTF-8") }
         val api = if (path.firstOrNull() == "api") path.drop(1) else null
         val answer: Answer? = when {
@@ -96,6 +105,11 @@ class FakePixeldrain : Interceptor {
         }
         if (answer == null) Log.w(TAG, "not answered: ${request.method} $url")
         else Log.d(TAG, "${answer.code} ${request.method} $url ${request.header("Range").orEmpty()}")
+        val name = api?.takeIf { it.size == 2 && it[0] == "file" }?.let { byId[it[1]]?.name }
+        if (answer != null && name != null && name == breakNextDownloadOf && request.header("Range") == null) {
+            breakNextDownloadOf = null
+            return answer.brokenHalfway(request)
+        }
         return (answer ?: Answer(404, "application/json", """{"success": false, "value": "not_found"}""".toByteArray()))
             .toResponse(request)
     }
@@ -228,6 +242,25 @@ class FakePixeldrain : Interceptor {
     }.toByteArray()
 
     private class Answer(val code: Int, val type: String, val body: ByteArray) {
+        /** All of it promised, but the connection drops after half. */
+        fun brokenHalfway(request: Request): Response {
+            val half = okio.Buffer().write(body, 0, body.size / 2)
+            val source = object : okio.ForwardingSource(half) {
+                override fun read(sink: okio.Buffer, byteCount: Long): Long {
+                    val read = super.read(sink, byteCount)
+                    if (read < 0) throw java.io.IOException("The connection dropped (FakePixeldrain.breakNextDownloadOf)")
+                    return read
+                }
+            }
+            val responseBody = object : okhttp3.ResponseBody() {
+                override fun contentType() = type.toMediaType()
+                override fun contentLength() = body.size.toLong()
+                override fun source() = source.buffer()
+            }
+            return Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(200).message("OK")
+                .header("Content-Type", type).header("Accept-Ranges", "bytes").body(responseBody).build()
+        }
+
         fun toResponse(request: Request): Response {
             // A range (the players read files in parts) gets just that part
             val range = request.header("Range")?.let { Regex("""bytes=(\d+)-(\d*)""").find(it) }

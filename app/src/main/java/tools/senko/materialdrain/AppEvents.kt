@@ -14,6 +14,9 @@ sealed class UiMessageAction(val label: String) {
     /** Opens a finished download. */
     data class OpenDownload(val download: OpenableDownload) : UiMessageAction("Open")
 
+    /** Starts again what failed, e.g. a download. */
+    class Retry(val retry: () -> Unit) : UiMessageAction("Try again")
+
     /** Takes back what was just done, e.g. a song closed from the miniplayer. */
     class Undo(val undo: () -> Unit) : UiMessageAction("Undo")
 }

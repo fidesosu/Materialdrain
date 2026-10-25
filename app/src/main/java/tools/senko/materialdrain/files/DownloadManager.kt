@@ -5,6 +5,9 @@ import tools.senko.materialdrain.provider.api.ErrorCodes
 import android.app.Application
 import android.content.ContentResolver
 import android.content.ContentValues
+import android.content.Context
+import java.util.concurrent.ConcurrentHashMap
+import tools.senko.materialdrain.ui.media.HostRequestAuth
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -72,6 +75,10 @@ private const val SHARED_FOLDER = "shared"
 
 /** How long a file shared with another app is kept, for that app to read it, before the next share clears it. */
 private const val SHARED_KEEP_MS = 24L * 60 * 60 * 1000
+
+/** Where the entries of unfinished downloads kept for a retry are listed (see DownloadManager.PartialDownload). */
+private const val PARTIAL_DOWNLOADS_PREFS = "partial_downloads"
+private const val PARTIAL_DOWNLOADS_KEY = "entries"
 
 /** The authority of the app's FileProvider for those files (see AndroidManifest.xml). */
 internal const val FILE_PROVIDER_SUFFIX = ".files"
@@ -307,6 +314,50 @@ class DownloadManager(
         _confirmation.value = null
     }
 
+    /** A download that failed on its own (not one of a batch), which "Try again" starts again, from [partial] when it can. */
+    private class FailedDownload(val node: StorageNode, val folder: String?, val partial: PartialDownload?)
+
+    /**
+     * What a failed download left in Downloads: its entry, still pending (other apps don't see it), with what came before
+     * it stopped, and the file's address on the host, which the rest is asked from.
+     */
+    private class PartialDownload(val uri: Uri, val url: String)
+
+    private val failed = ConcurrentHashMap<String, FailedDownload>()
+
+    /** The entries of [PartialDownload]s, kept until they're finished or deleted: a run that ends first leaves them behind */
+    private val partialPrefs = application.getSharedPreferences(PARTIAL_DOWNLOADS_PREFS, Context.MODE_PRIVATE)
+
+    init {
+        // Left by a run before this one: nothing goes on from them any more
+        val left = partialPrefs.getStringSet(PARTIAL_DOWNLOADS_KEY, emptySet()).orEmpty()
+        if (left.isNotEmpty()) scope.launch(Dispatchers.IO) { left.forEach { forgetPartial(Uri.parse(it), delete = true) } }
+    }
+
+    private fun rememberPartial(uri: Uri) = synchronized(partialPrefs) {
+        val now = partialPrefs.getStringSet(PARTIAL_DOWNLOADS_KEY, emptySet()).orEmpty()
+        partialPrefs.edit().putStringSet(PARTIAL_DOWNLOADS_KEY, now + uri.toString()).apply()
+    }
+
+    /** No longer kept for a retry: finished, or (with [delete]) given up, its unfinished file deleted. */
+    private fun forgetPartial(uri: Uri, delete: Boolean) {
+        synchronized(partialPrefs) {
+            val now = partialPrefs.getStringSet(PARTIAL_DOWNLOADS_KEY, emptySet()).orEmpty()
+            if (uri.toString() in now) partialPrefs.edit().putStringSet(PARTIAL_DOWNLOADS_KEY, now - uri.toString()).apply()
+        }
+        if (delete) runCatching { application.contentResolver.delete(uri, null, null) }
+    }
+
+    /** How much of a [PartialDownload] is there, or null when its entry is gone. */
+    private fun partialSize(uri: Uri): Long? =
+        runCatching { application.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } }.getOrNull()
+
+    /** Starts the download that failed with [key] again: from where it stopped, when the host can send the rest. */
+    fun retry(key: String) {
+        val download = failed.remove(key) ?: return
+        start(download.node, queue = null, batchId = null, folder = download.folder, partial = download.partial)
+    }
+
     /** Drops the download waiting in [confirmation]; nothing is downloaded. */
     fun dismissConfirmation() {
         _confirmation.value = null
@@ -433,8 +484,13 @@ class DownloadManager(
      * Starts the download and returns its job. When [queue] is given, cancelling this download cancels the queue too.
      * [folder] is where in Download it goes, below where downloads go (see downloadEntryValues).
      */
-    fun download(node: StorageNode, queue: Job? = null, batchId: String? = null, folder: String? = null): Job {
+    fun download(node: StorageNode, queue: Job? = null, batchId: String? = null, folder: String? = null): Job =
+        start(node, queue, batchId, folder, partial = null)
+
+    private fun start(node: StorageNode, queue: Job?, batchId: String?, folder: String?, partial: PartialDownload?): Job {
         val key = node.key
+        // A new download of a file that failed before starts over: what that one left is deleted
+        if (partial == null) failed.remove(key)?.partial?.let { old -> scope.launch(Dispatchers.IO) { forgetPartial(old.uri, delete = true) } }
         val size = node.size ?: 0L
 
         _downloads.update { state ->
@@ -457,22 +513,31 @@ class DownloadManager(
             var downloadSuccessful = false
             var outcome = TransferOutcome.FAILED
             var outcomeMessage: String? = null
+            // Failed, with what came kept for a retry to go on from (see PartialDownload)
+            var keepPartial = false
 
             try {
-                _downloads.value.active[key]?.let {
-                    targetUri = it.targetUri
-                }
-                if (targetUri == null) {
-                    val (uri, stream) = prepareDownloadTargetUriAndStream(node.name, folder)
-                    targetUri = uri
-                    outputStream = stream
+                // Going on from where a failed try stopped: its entry in Downloads, and how much of the file is there
+                val resumeFrom = partial?.let { p -> partialSize(p.uri)?.let { size -> p to size } }
+                if (partial != null && resumeFrom == null) forgetPartial(partial.uri, delete = true)
+                if (resumeFrom != null) {
+                    targetUri = resumeFrom.first.uri
                 } else {
-                    application.contentResolver.openOutputStream(targetUri)?.let {
-                        outputStream = BufferedOutputStream(it, DOWNLOAD_WRITE_BUFFER_BYTES)
+                    _downloads.value.active[key]?.let {
+                        targetUri = it.targetUri
+                    }
+                    if (targetUri == null) {
+                        val (uri, stream) = prepareDownloadTargetUriAndStream(node.name, folder)
+                        targetUri = uri
+                        outputStream = stream
+                    } else {
+                        application.contentResolver.openOutputStream(targetUri)?.let {
+                            outputStream = BufferedOutputStream(it, DOWNLOAD_WRITE_BUFFER_BYTES)
+                        }
                     }
                 }
 
-                if (targetUri == null || outputStream == null) {
+                if (targetUri == null || (outputStream == null && resumeFrom == null)) {
                     throw IOException("Failed to prepare or re-open download target in MediaStore.")
                 }
 
@@ -508,7 +573,17 @@ class DownloadManager(
                     }
                 }
 
-                val response = downloadNode(provider, node, outputStream!!, onProgress)
+                val response = if (resumeFrom != null) {
+                    val (resumed, offset) = resumeFrom
+                    val client = HostRequestAuth.client ?: throw IOException("The download can't go on yet.")
+                    downloadRest(client, resumed.url, provider.requestHeaders(resumed.url), offset, { append ->
+                        val stream = application.contentResolver.openOutputStream(resumed.uri, if (append) "wa" else "wt")
+                            ?: throw IOException("Failed to re-open the download in MediaStore.")
+                        BufferedOutputStream(stream, DOWNLOAD_WRITE_BUFFER_BYTES)
+                    }, onProgress)
+                } else {
+                    downloadNode(provider, node, outputStream!!, onProgress)
+                }
                 // A host which turns the stopped copy into an error of its own: it was still a cancel
                 ensureActive()
                 when (response) {
@@ -544,6 +619,13 @@ class DownloadManager(
                     "Download error for '${node.name}': ${e.localizedMessage ?: "Unexpected error"}"
                 }
                 outcomeMessage = errorMsg
+                if (e !is CancellationException && batchId == null) {
+                    // What came is kept when the host can send the rest of the file (a plain file, at an address of its own)
+                    val url = targetUri?.takeIf { node.richDetails !is ZipDownloadDetails && node.richDetails !is ArchiveEntryDetails }
+                        ?.let { runCatching { provider.rawContentUrl(node) }.getOrNull() }
+                    keepPartial = url != null
+                    failed[key] = FailedDownload(node, folder, url?.let { PartialDownload(targetUri!!, it) })
+                }
                 val hadDownload = _downloads.value.active.containsKey(key)
                 updateDownload(key) {
                     it.copy(
@@ -557,7 +639,9 @@ class DownloadManager(
                         downloadedBytes = if (e is CancellationException) 0L else it.downloadedBytes
                     )
                 }
-                if (hadDownload && e !is CancellationException) messages.show("Download failed: $errorMsg", long = true)
+                if (hadDownload && e !is CancellationException) {
+                    messages.show("Download failed: $errorMsg", long = true, action = if (batchId == null) UiMessageAction.Retry { retry(key) } else null)
+                }
             } finally {
                 try {
                     outputStream?.close()
@@ -565,12 +649,20 @@ class DownloadManager(
                     Log.e(TAG, "Error closing output stream for ${node.name}: ${e.message}", e)
                 }
                 targetUri?.let {
-                    // NonCancellable: a cancelled coroutine could otherwise not clean up the partial file
-                    withContext(NonCancellable) { finalizeMediaStoreEntry(it, downloadSuccessful) }
+                    if (keepPartial) {
+                        rememberPartial(it)
+                    } else {
+                        forgetPartial(it, delete = false)
+                        // NonCancellable: a cancelled coroutine could otherwise not clean up the partial file
+                        withContext(NonCancellable) { finalizeMediaStoreEntry(it, downloadSuccessful) }
+                    }
                 }
                 // Reported after the file was finalized, so the notification (and the snackbar's Open) can open it
                 val openMimeType = downloadedFileMimeType(node.name)
-                if (batchId == null) transfers.finish(transferId, outcome, outcomeMessage, if (downloadSuccessful) targetUri else null, openMimeType)
+                if (batchId == null) transfers.finish(
+                    transferId, outcome, outcomeMessage, if (downloadSuccessful) targetUri else null, openMimeType,
+                    retry = if (outcome == TransferOutcome.FAILED) ({ retry(key) }) else null
+                )
                 if (downloadSuccessful) {
                     messages.show(
                         outcomeMessage.orEmpty(),
