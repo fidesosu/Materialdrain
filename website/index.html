@@ -40,7 +40,8 @@
           <h1><img class="logo" src="/icon.svg" alt="" width="44" height="44">Materialdrain</h1>
           <p class="lead">An Android app for Pixeldrain and your other file hosts: WebDAV, S3, SMB shares and any REST
             API.</p>
-          <!-- A few of the things in the documentation's "What it can do" (docs/index.md) -->
+          <!-- A few of the things in the documentation's "What it can do" (docs/index.md), as plain text: they aren't
+               links -->
           <ul class="features" aria-label="What it can do">
             <li>Search through every subfolder</li>
             <li>Previews of images, video, audio, text and archives</li>
@@ -64,24 +65,34 @@
         <div class="cards">
           <div class="build" id="stable">
             <a class="card primary" href="https://github.com/fidesosu/Materialdrain/releases/latest">
-              <span class="card-title">Stable</span>
+              <span class="card-head">
+                <span class="card-title">Stable</span>
+                <span class="card-action">Download APK</span>
+              </span>
               <span class="card-version" data-field="version">The latest release</span>
-              <span class="card-text" data-field="meta">From the main branch.</span>
+              <span class="card-text" data-field="meta">&nbsp;</span>
+              <span class="card-note">The tested version, from the main branch.</span>
             </a>
             <p class="build-extra small" data-field="extra"></p>
           </div>
           <div class="build" id="dev">
             <a class="card" href="https://github.com/fidesosu/Materialdrain/releases/tag/dev-build">
-              <span class="card-title">Nightly</span>
+              <span class="card-head">
+                <span class="card-title">Nightly</span>
+                <span class="card-action">Download APK</span>
+              </span>
               <span class="card-version" data-field="version">The newest build</span>
-              <span class="card-text" data-field="meta">From the dev branch: the latest changes, and maybe bugs.</span>
+              <span class="card-text" data-field="meta">&nbsp;</span>
+              <span class="card-note">Rebuilt with every change to the dev branch: the newest features, and maybe
+                bugs.</span>
             </a>
             <p class="build-extra small" data-field="extra"></p>
           </div>
         </div>
         <p class="small" id="releases-status"></p>
         <p class="small install">Android 10 or newer: open the APK on your phone to install it. A newer build installs
-          over an older one, and keeps your settings. <a href="/docs/user-guide/#installing">How to install</a></p>
+          over an older one, and keeps your settings. <a href="/docs/user-guide/#installing">How to install</a> ·
+          <a href="/docs/user-guide/what-you-get/">What you're installing</a></p>
       </section>
 
       <section class="older" aria-labelledby="older-title">

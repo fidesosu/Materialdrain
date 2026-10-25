@@ -7,9 +7,10 @@
 (() => {
   const REPO = "fidesosu/Materialdrain";
   const DEV_TAG = "dev-build";
-  const OLDER_SHOWN = 8;
+  const OLDER_SHOWN = 4;
   // How often an open page looks for a newer list: the server's own checks are 5 minutes apart
   const RECHECK_MILLIS = 60 * 1000;
+  const SERVER_CHECK_MILLIS = 5 * 60 * 1000;
   // Several missed checks in a row: the page says the newest builds may be missing
   const STALE_MILLIS = 20 * 60 * 1000;
 
@@ -79,7 +80,7 @@
       card.removeAttribute("href");
       card.setAttribute("aria-disabled", "true");
       field("version").textContent = "Not published yet";
-      field("meta").textContent = "";
+      field("meta").textContent = "\u00a0";
       field("extra").replaceChildren();
       return;
     }
@@ -130,21 +131,29 @@
     fillOlder(stable.slice(1));
   }
 
-  // "Checked GitHub 2 min 5 s ago", counting up from when the list was read from GitHub: by the server, or by this page
-  // when it had to ask GitHub itself
+  // "Next check in 3:12", counting down to the server's next read of GitHub, 5 minutes after its last (its timer can
+  // be up to 30 seconds late). Once that's due, the page asks for the list every 10 seconds until it's newer. A list
+  // this page read from GitHub itself has no next check. The tooltip has when it was last read
   let checkedAt = null;
+  let askedAt = 0;
   function tick() {
     if (checkedAt === null) return;
     const label = document.getElementById("releases-refreshed");
-    const seconds = Math.max(0, Math.floor((Date.now() - checkedAt) / 1000));
-    const h = Math.floor(seconds / 3600), m = Math.floor(seconds / 60) % 60, s = seconds % 60;
-    const ago = seconds < 5 ? "just now"
-      : seconds < 60 ? `${s} s ago`
-      : seconds < 3600 ? `${m} min ${s} s ago`
-      : `${h} h ${m} min ago`;
+    const left = Math.ceil((checkedAt + SERVER_CHECK_MILLIS - Date.now()) / 1000);
+    if (fromGitHub) {
+      label.textContent = "Read from GitHub when the page opened";
+    } else if (Date.now() - checkedAt > STALE_MILLIS) {
+      // The server's checks are failing: the warning below says so, and the page looks again each minute
+      label.textContent = "Couldn't check GitHub lately";
+    } else if (left > 0) {
+      label.textContent = `Next check in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+    } else {
+      label.textContent = "Checking GitHub…";
+      if (Date.now() - askedAt > 10 * 1000) refresh();
+    }
     const when = new Date(checkedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-    label.textContent = `Checked GitHub ${ago}`;
-    label.title = new Date(checkedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
+    label.title = "Last checked " +
+      new Date(checkedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
     // The server checks every 5 minutes: this much older, its checks are failing (its journal says why). A list the
     // page read from GitHub itself is only as old as the visit
     document.getElementById("releases-status").textContent = !fromGitHub && Date.now() - checkedAt > STALE_MILLIS
@@ -177,6 +186,7 @@
   async function refresh() {
     if (loading || fromGitHub || document.hidden) return;
     loading = true;
+    askedAt = Date.now();
     try {
       const { at, releases, fromServer } = await load();
       fromGitHub = !fromServer;

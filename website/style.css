@@ -61,18 +61,18 @@ main {
   gap: 28px;
 }
 
-/* The title, with the links to the documentation and the source at its side */
+/* The title, with the links to the documentation and the source at its side, level with the title */
 .top {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: 16px 32px;
 }
 
 /* The title's side takes what the links leave, so they stay beside it until there's no room for both */
 .top > div { flex: 1 1 420px; }
-.top-links { display: flex; gap: 8px; flex-wrap: wrap; flex: none; }
+.top-links { display: flex; gap: 8px; flex-wrap: wrap; flex: none; margin-top: 4px; }
 .top-links a {
   padding: 8px 16px;
   border-radius: 999px;
@@ -118,22 +118,19 @@ h2 {
 
 .lead { font-size: 1.15rem; color: var(--text-muted); margin: 0; }
 
-/* A few things the app does, as a row of small labels under the line about it */
+/* A few things the app does, as one line of plain text under the line about it with a dot between each (on a phone,
+   one a line): there's nothing to click, so nothing that looks like a button */
 .features {
   list-style: none;
   padding: 0;
-  margin: 12px 0 0;
+  margin: 8px 0 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0 10px;
+  font-size: 0.95rem;
+  color: var(--accent-muted);
 }
-.features li {
-  font-size: 0.85rem;
-  padding: 3px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-}
+.features li + li::before { content: "·"; margin-right: 10px; }
 .small { font-size: 0.9rem; color: var(--text-muted); }
 
 a { color: var(--link-color); text-underline-offset: 3px; }
@@ -190,8 +187,8 @@ a:focus-visible, button:focus-visible {
 /* A card with its release notes and checksum under it; the card takes the height the line leaves */
 .build { display: flex; flex-direction: column; gap: 8px; }
 .build .card { flex: 1; }
-.build-extra { margin: 0 4px; }
-.build-extra:empty { display: none; }
+/* Holds its line's height while it's empty, so nothing below moves when the notes and checksum come in */
+.build-extra { margin: 0 4px; min-height: 1.6em; }
 .build-extra code { font-size: 0.85rem; color: var(--text-main); }
 
 /* Copying a checksum: a small button, the size of the line's text */
@@ -210,9 +207,15 @@ a:focus-visible, button:focus-visible {
 /* How to install, under the cards */
 .install { margin: 12px 0 0; }
 
+/* The build's name, and what pressing the card does at the other end of its line */
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .card-title { font-size: 1.3rem; font-weight: 650; }
+.card-action { font-size: 0.9rem; font-weight: 600; white-space: nowrap; }
+.card.empty .card-action { display: none; }
 .card-version { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .card-text { font-size: 0.9rem; opacity: 0.8; }
+/* What the build is, which stays once the date has come in */
+.card-note { font-size: 0.9rem; opacity: 0.8; margin-top: 4px; }
 
 /* The older versions side by side, a small tile each: the version, then when it was made and how big it is */
 .versions {
@@ -233,11 +236,14 @@ a:focus-visible, button:focus-visible {
   border: 1px solid var(--border-subtle);
 }
 .version-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+/* Muted, and underlined only when pointed at: one on every tile is a lot of underlines */
+.version-head .small { color: var(--text-muted); text-decoration: none; }
+.version-head .small:hover { color: var(--link-hover); text-decoration: underline; }
 .versions .version-head > a:first-child { font-weight: 600; font-variant-numeric: tabular-nums; }
 .version-meta { color: var(--text-muted); font-size: 0.9rem; }
 .versions li.version-meta { background: none; border: none; padding: 0; }
 
-/* Wide enough: four a row, so the eight shown (see releases.js) make two full rows */
+/* Wide enough: four a row, so the four shown (see releases.js) make one full row */
 @media (min-width: 960px) {
   .versions { grid-template-columns: repeat(4, 1fr); }
 }
@@ -246,6 +252,9 @@ a:focus-visible, button:focus-visible {
 @media (max-width: 640px) {
   main { padding: 32px 20px; justify-content: flex-start; gap: 32px; }
   h1 { font-size: 2.25rem; }
+  /* The things it does, one a line: wrapped, the dots between them would start the lines */
+  .features { flex-direction: column; gap: 2px; }
+  .features li + li::before { content: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -257,5 +266,5 @@ a:focus-visible, button:focus-visible {
 #releases-status:empty { display: none; }
 #releases-status { margin: 12px 0 0; color: var(--yellow); }
 
-/* Counts up every second: the digits keep their width so the line doesn't shift */
+/* Counts down every second: the digits keep their width so the line doesn't shift */
 #releases-refreshed { font-variant-numeric: tabular-nums; }
