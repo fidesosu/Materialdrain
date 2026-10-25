@@ -3,3 +3,5 @@ site/
 _site/
 # MkDocs for preview.ps1, installed there the first time
 .venv/
+# Python's compiled copy of hooks/, made by each build
+__pycache__/
