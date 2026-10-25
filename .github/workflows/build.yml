@@ -7,6 +7,7 @@
 # The version comes from baseVersion and the release tags (see app/build.gradle.kts): main's builds are the next
 # release, e.g. 1.6.3, and dev's add "-dev." and the commits since the last release, e.g. 1.6.4-dev.5. So the
 # checkouts take the whole history and the tags (fetch-depth: 0).
+# Both carry update.json next to the APK, which the app checks for a newer version (.github/scripts/update_json.py).
 # The website's download page lists these releases (website branch). A 1.X.0 release also takes new screenshots of the
 # app for it (screenshots.yml).
 #
@@ -155,6 +156,10 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "file=$file" >> "$GITHUB_OUTPUT"
 
+      # What the app reads to offer this release as an update, with the changes it brings (see the script)
+      - name: Describe the update
+        run: python3 .github/scripts/update_json.py "${{ steps.apk.outputs.file }}" app/build/outputs/apk/release/output-metadata.json update.json
+
       - name: Publish the stable release
         if: github.ref_name == 'main'
         env:
@@ -171,11 +176,11 @@ jobs:
               echo "::error::Version ${VERSION} already belongs to another commit (${tagged:-unknown}); its release is left as it is."
               exit 1
             fi
-            gh release upload "$tag" "$FILE" --clobber
+            gh release upload "$tag" "$FILE" update.json --clobber
           else
             # The notes list what changed since the release before, not since the development build
             previous=$(gh release list --exclude-pre-releases --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName // empty')
-            gh release create "$tag" "$FILE" --target "$GITHUB_SHA" --title "Materialdrain ${VERSION}" --latest \
+            gh release create "$tag" "$FILE" update.json --target "$GITHUB_SHA" --title "Materialdrain ${VERSION}" --latest \
               --generate-notes ${previous:+--notes-start-tag "$previous"}
           fi
 
@@ -194,13 +199,13 @@ jobs:
           git push --force origin "refs/tags/$tag"
           if gh release view "$tag" > /dev/null 2>&1; then
             gh release edit "$tag" --title "$title" --notes "$notes" --prerelease
-            gh release upload "$tag" "$FILE" --clobber
+            gh release upload "$tag" "$FILE" update.json --clobber
             # The APKs of the builds before it
-            gh release view "$tag" --json assets --jq '.assets[].name' | grep -vxF "$FILE" | while read -r old; do
+            gh release view "$tag" --json assets --jq '.assets[].name' | grep -vxF -e "$FILE" -e update.json | while read -r old; do
               gh release delete-asset "$tag" "$old" --yes
             done
           else
-            gh release create "$tag" "$FILE" --target "$GITHUB_SHA" --title "$title" --notes "$notes" --prerelease
+            gh release create "$tag" "$FILE" update.json --target "$GITHUB_SHA" --title "$title" --notes "$notes" --prerelease
           fi
 
       - name: Remove the release key

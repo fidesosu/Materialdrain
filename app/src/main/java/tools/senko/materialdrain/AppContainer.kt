@@ -78,6 +78,9 @@ class AppContainer private constructor(application: Application) {
     /** What the app would load by itself waits to be asked for, when it's on, see DataSaver. */
     val dataSaver = tools.senko.materialdrain.settings.DataSaver(application, appSettings, appScope)
 
+    /** Newer versions of the app, from its GitHub releases (Settings → About, and the check on opening). */
+    val appUpdates = tools.senko.materialdrain.update.AppUpdates(application, appSettings, uiMessages, holdBackground = { dataSaver.active.value })
+
     /** Whether each host answers, for the host switcher. With the data saver, only when asked (see HostHealth.checkAll). */
     val hostHealth = HostHealth(application, providerConfigStore, appScope, holdBackground = { dataSaver.holdHostChecks.value })
 

@@ -128,6 +128,7 @@ import tools.senko.materialdrain.ui.components.CenteredTextMessage
 import tools.senko.materialdrain.ui.components.snackbarMotion
 import tools.senko.materialdrain.ui.components.TransferProgress
 import tools.senko.materialdrain.ui.components.TransferStatusBar
+import tools.senko.materialdrain.update.UpdateSheet
 import tools.senko.materialdrain.upload.UploadItemStatus
 import tools.senko.materialdrain.upload.UploadScreenContent
 import tools.senko.materialdrain.upload.UploadViewModel
@@ -502,6 +503,10 @@ fun MaterialdrainScreen() {
             }
         }
     }
+
+    // A newer version, when the setting is on (see AppUpdates.checkOnOpening). Not before the app lock is opened: none of
+    // this screen is composed while it's shut
+    LaunchedEffect(Unit) { appContainer.appUpdates.checkOnOpening() }
 
     // The ViewModels' messages for the snackbar, one after another (see UiMessages)
     LaunchedEffect(Unit) {
@@ -945,6 +950,19 @@ fun MaterialdrainScreen() {
             uploadViewModel = uploadViewModel,
             fileInfoViewModel = fileInfoViewModel
         )
+
+        // A newer version, found on opening or by "Check for updates" (see AppUpdates)
+        val updates = appContainer.appUpdates
+        updates.offered.collectAsState().value?.let { update ->
+            UpdateSheet(
+                update = update,
+                installed = updates.installed,
+                download = updates.download.collectAsState().value,
+                onUpdate = { updates.install(update) },
+                onLater = { updates.dismiss() },
+                onSkip = { updates.skip(update) }
+            )
+        }
     }
     }
 }

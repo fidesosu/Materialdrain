@@ -74,7 +74,7 @@ private const val SHARED_FOLDER = "shared"
 private const val SHARED_KEEP_MS = 24L * 60 * 60 * 1000
 
 /** The authority of the app's FileProvider for those files (see AndroidManifest.xml). */
-private const val FILE_PROVIDER_SUFFIX = ".files"
+internal const val FILE_PROVIDER_SUFFIX = ".files"
 
 /**
  * The extensions of files which are compressed already (pictures, videos, songs, archives): zipped on the device, they

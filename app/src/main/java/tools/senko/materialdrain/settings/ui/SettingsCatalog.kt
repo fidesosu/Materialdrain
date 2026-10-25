@@ -20,6 +20,9 @@ import tools.senko.materialdrain.ui.icons.filled.Folder
 import tools.senko.materialdrain.ui.icons.filled.Info
 import tools.senko.materialdrain.ui.icons.filled.Language
 import tools.senko.materialdrain.ui.icons.filled.Lock
+import tools.senko.materialdrain.ui.icons.filled.Refresh
+import tools.senko.materialdrain.AppContainer
+import android.app.Application
 import tools.senko.materialdrain.ui.icons.filled.NewReleases
 import tools.senko.materialdrain.ui.icons.filled.Notifications
 import tools.senko.materialdrain.ui.icons.filled.Palette
@@ -514,6 +517,28 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         },
         items = listOf(
             SettingsItem.Custom { AboutSection() },
+            SettingsItem.Header("Updates"),
+            SettingsItem.Action(
+                title = "Check for updates",
+                summary = "And see what's new",
+                icon = Icons.Filled.Refresh,
+                onClick = { context -> AppContainer.get(context.applicationContext as Application).appUpdates.checkNow() }
+            ),
+            SettingsItem.Toggle(
+                title = "Check when the app opens",
+                summary = "Shows what a new version brings",
+                info = "Looks on GitHub, where the app is released, at most every 6 hours. Not while the data saver holds what the app loads by itself.",
+                isChecked = { appSettings.checkUpdatesOnOpening.collectAsState().value },
+                onCheckedChange = { appSettings.setCheckUpdatesOnOpening(it) }
+            ),
+            // Not under the switch above: "Check for updates" follows it too
+            SettingsItem.Toggle(
+                title = "Include development builds",
+                summary = "Newer, and may have bugs",
+                info = "Development builds have the newest changes first, before they come in a stable release.",
+                isChecked = { appSettings.includeDevUpdates.collectAsState().value },
+                onCheckedChange = { appSettings.setIncludeDevUpdates(it) }
+            ),
             SettingsItem.Header("Links"),
             SettingsItem.Action(
                 title = "Website",

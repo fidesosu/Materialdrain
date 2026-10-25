@@ -83,6 +83,10 @@ private const val DOWNLOAD_SUBFOLDER_PREF = "download_subfolder"
 private const val DOCUMENTS_PROVIDER_PREF = "documents_provider"
 private const val BLOCK_SCREENSHOTS_PREF = "block_screenshots"
 private const val LOCK_TIMEOUT_PREF = "lock_timeout_seconds"
+private const val CHECK_UPDATES_ON_OPENING_PREF = "check_updates_on_opening"
+private const val INCLUDE_DEV_UPDATES_PREF = "include_dev_updates"
+private const val SKIPPED_UPDATE_CODE_PREF = "skipped_update_code"
+private const val LAST_UPDATE_CHECK_PREF = "last_update_check"
 
 /** The choices for [AppSettings.searchResultLimit]; 0 is no limit. */
 val SEARCH_RESULT_LIMITS = listOf(0, 200, 50, 20)
@@ -597,6 +601,34 @@ class AppSettings(context: Context) {
     var lastTabId: String?
         get() = prefs.getString(LAST_TAB_PREF, null)
         set(value) = prefs.edit { if (value == null) remove(LAST_TAB_PREF) else putString(LAST_TAB_PREF, value) }
+
+    // ---- Updates (see AppUpdates) ----
+
+    private val checkUpdatesOnOpeningPref = booleanSetting(CHECK_UPDATES_ON_OPENING_PREF, true)
+    /** Looks for a newer version when the app opens (at most every few hours), and offers it. On by default. */
+    val checkUpdatesOnOpening: StateFlow<Boolean> = checkUpdatesOnOpeningPref.flow
+
+    fun setCheckUpdatesOnOpening(enabled: Boolean) = checkUpdatesOnOpeningPref.set(enabled)
+
+    // A development build looks for the next ones from the start: whoever installed one wants them
+    private val includeDevUpdatesPref = booleanSetting(
+        INCLUDE_DEV_UPDATES_PREF,
+        runCatching { appContext.packageManager.getPackageInfo(appContext.packageName, 0).versionName }.getOrNull()?.contains("-dev.") == true
+    )
+    /** The development builds count as updates too, not only the stable releases. */
+    val includeDevUpdates: StateFlow<Boolean> = includeDevUpdatesPref.flow
+
+    fun setIncludeDevUpdates(enabled: Boolean) = includeDevUpdatesPref.set(enabled)
+
+    /** The versionCode of the update the user chose to skip: the check on opening doesn't offer it again. */
+    var skippedUpdateCode: Long
+        get() = prefs.getLong(SKIPPED_UPDATE_CODE_PREF, 0L)
+        set(value) = prefs.edit { putLong(SKIPPED_UPDATE_CODE_PREF, value) }
+
+    /** When the app last looked for updates, in milliseconds since 1970. */
+    var lastUpdateCheck: Long
+        get() = prefs.getLong(LAST_UPDATE_CHECK_PREF, 0L)
+        set(value) = prefs.edit { putLong(LAST_UPDATE_CHECK_PREF, value) }
 
     /** Whether the app has asked for the notification permission (Android 13+) already: it asks only once. */
     var askedNotificationPermission: Boolean

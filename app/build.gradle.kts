@@ -152,6 +152,8 @@ android {
             all {
                 it.systemProperties["robolectric.pixelCopyRenderMode"] = "hardware"
                 it.maxHeapSize = "4096m"
+                // Robolectric reaches into the JDK's file descriptors for the sockets of a test server (UpdateCheckTest)
+                it.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
             }
         }
         // For the screenshots (app/src/androidTest, see recordScreenshots below): nothing is caught halfway
@@ -210,6 +212,8 @@ dependencies {
     implementation(libs.androidx.media3.session)
 
     testImplementation(libs.junit)
+    // Serves GitHub's releases to the update check (see UpdateCheckTest)
+    testImplementation(libs.okhttp.mockwebserver)
     // Draws the previews in a test (see roborazzi above)
     testImplementation(libs.roborazzi.compose.preview.scanner.support)
     testImplementation(libs.robolectric)
