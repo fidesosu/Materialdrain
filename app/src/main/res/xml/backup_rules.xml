@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+   What a backup leaves out on Android 10 and 11; Android 12 and up read data_extraction_rules.xml instead, which leaves out
+   the same. See https://developer.android.com/guide/topics/data/autobackup
 -->
 <full-backup-content>
     <!-- The login and the provider credentials are encrypted with a Keystore key which is not part of a backup -->
