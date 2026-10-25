@@ -56,8 +56,11 @@ class AppContainer private constructor(application: Application) {
     /** Work which belongs to the process rather than to a screen. */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    /** The snackbar messages of the ViewModels, see UiMessages. */
+    val uiMessages = UiMessages()
+
     /** Locks the app behind a fingerprint, face or screen lock, when the setting is on. */
-    val appLock = tools.senko.materialdrain.auth.AppLock(appSettings)
+    val appLock = tools.senko.materialdrain.auth.AppLock(appSettings, uiMessages)
 
     /** Files another app shared with Materialdrain, waiting for the screen they go into (see App.kt's sharedUpload). */
     val pendingShares = kotlinx.coroutines.flow.MutableStateFlow<List<android.net.Uri>>(emptyList())
@@ -65,8 +68,6 @@ class AppContainer private constructor(application: Application) {
     /** A link, a shortcut or shared text the app was opened with, waiting for the screen (and the unlock), see PendingOpen. */
     val pendingOpen = kotlinx.coroutines.flow.MutableStateFlow<PendingOpen?>(null)
 
-    /** The snackbar messages of the ViewModels, see UiMessages. */
-    val uiMessages = UiMessages()
 
     /** Files which were changed, so the screens showing them reload, see ContentChanges. */
     val contentChanges = ContentChanges()

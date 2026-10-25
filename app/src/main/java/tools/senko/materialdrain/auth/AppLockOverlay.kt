@@ -38,9 +38,9 @@ fun AppLockOverlay(activity: FragmentActivity, appLock: AppLock) {
     val locked by appLock.locked.collectAsState()
     if (!locked) return
 
-    LaunchedEffect(Unit) { showUnlockPrompt(activity) { appLock.unlock() } }
+    LaunchedEffect(Unit) { showUnlockPrompt(activity, appLock) }
 
-    LockedScreen(onUnlock = { showUnlockPrompt(activity) { appLock.unlock() } })
+    LockedScreen(onUnlock = { showUnlockPrompt(activity, appLock) })
 }
 
 /** What covers the app while it's locked, taking every touch; [onUnlock] asks for the lock again. */
@@ -74,11 +74,19 @@ fun LockedScreen(onUnlock: () -> Unit) {
     }
 }
 
-/** The system prompt for a fingerprint, face or the screen lock. [onUnlocked] runs when it succeeds. */
-fun showUnlockPrompt(activity: FragmentActivity, onUnlocked: () -> Unit) {
+/**
+ * The system prompt for a fingerprint, face or the screen lock, which unlocks [appLock] when it succeeds. When it can't
+ * be shown at all (the screen lock was removed meanwhile), the lock is checked again rather than left shut for good.
+ */
+fun showUnlockPrompt(activity: FragmentActivity, appLock: AppLock) {
     val callback = object : BiometricPrompt.AuthenticationCallback() {
         override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-            onUnlocked()
+            appLock.unlock()
+        }
+
+        // Closed by the user, or impossible: the locked screen stays, with its Unlock button, unless nothing can open it
+        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+            appLock.promptFailed()
         }
     }
     BiometricPrompt(activity, ContextCompat.getMainExecutor(activity), callback).authenticate(

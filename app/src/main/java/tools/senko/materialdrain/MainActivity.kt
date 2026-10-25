@@ -1,5 +1,6 @@
 package tools.senko.materialdrain
 
+import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -21,7 +22,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import android.view.WindowManager
 import tools.senko.materialdrain.ui.theme.MaterialdrainTheme
 import tools.senko.materialdrain.ui.theme.isDarkTheme
@@ -39,8 +40,8 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val container = AppContainer.get(application)
-        // Before the first frame, so not even that one can be captured (see the setting below for changes)
-        applyScreenshotBlock(container.appSettings.blockScreenshots.value)
+        // Before the first frame, so not even that one can be captured (see the settings below for changes)
+        applyScreenshotBlock(container.appSettings.blockScreenshots.value, container.appSettings.biometricLock.value)
         // Added before any screen's handler, so it only gets the back press when no screen takes it (the newest
         // enabled handler goes first). The first press at the top level says so, a second one closes the app; with
         // the confirmation turned off (Look and feel), the first one does
@@ -78,17 +79,18 @@ class MainActivity : FragmentActivity() {
                 )
             }
             val blockScreenshots by container.appSettings.blockScreenshots.collectAsState()
-            LaunchedEffect(blockScreenshots) { applyScreenshotBlock(blockScreenshots) }
+            val lockOn by container.appSettings.biometricLock.collectAsState()
+            LaunchedEffect(blockScreenshots, lockOn) { applyScreenshotBlock(blockScreenshots, lockOn) }
             val locked by container.appLock.locked.collectAsState()
+            // Where the app is while it's locked: its screens are kept (what's open, scrolled to...), not drawn
+            val screens = rememberSaveableStateHolder()
             CompositionLocalProvider(LocalOverscrollFactory provides null) {
                 MaterialdrainTheme(theme, darkTheme = dark) {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        // While locked, the app under the lock screen is out of the accessibility tree too: the lock covers
-                        // it on the screen, but accessibility services (and adb's uiautomator dump) would still read it,
-                        // and could press its buttons
-                        Box(modifier = Modifier.fillMaxSize().then(if (locked) Modifier.clearAndSetSemantics { } else Modifier)) {
-                            MaterialdrainScreen()
-                        }
+                        // While locked, the app isn't there at all, only the lock: nothing of it is drawn or read (by
+                        // accessibility services too), its dialogs and menus (windows of their own, which the lock
+                        // can't cover) are closed, and nothing is loaded from the host until it's unlocked
+                        if (!locked) screens.SaveableStateProvider("app") { MaterialdrainScreen() }
                         AppLockOverlay(this@MainActivity, container.appLock)
                     }
                 }
@@ -113,16 +115,24 @@ class MainActivity : FragmentActivity() {
             Intent.ACTION_SEND_MULTIPLE -> sharedStreams(intent)
             else -> return
         }
-        if (uris.isNotEmpty()) container.pendingShares.value = uris
+        // Only files of other apps: a share naming one of this app's own (file:// in its data, or its own providers)
+        // would have it read, and upload, its private files
+        val shared = uris.filter { it.scheme == ContentResolver.SCHEME_CONTENT && it.authority?.startsWith(packageName) != true }
+        if (shared.isNotEmpty()) container.pendingShares.value = shared
     }
 
     /**
      * Screenshots, screen recordings (adb's too) and the recent apps' picture of the app show nothing while [block] is on
      * (Privacy and security). Its dialogs and menus take the flag from this window.
+     *
+     * With the app lock on ([lock]), the recent apps don't show it either: their picture is taken as the app leaves, before
+     * it locks. Android 13 and up can leave out just that picture; before, only the same flag as [block] can.
      */
-    private fun applyScreenshotBlock(block: Boolean) {
-        if (block) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    private fun applyScreenshotBlock(block: Boolean, lock: Boolean) {
+        val secure = block || (lock && Build.VERSION.SDK_INT < 33)
+        if (secure) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(!lock)
     }
 
     @Suppress("DEPRECATION")

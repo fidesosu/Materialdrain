@@ -476,9 +476,11 @@ class AppSettings(context: Context) {
         HostDocumentsProvider.notifyRootsChanged(appContext)
     }
 
+    /** What the lock can ask for on this device: BIOMETRIC_SUCCESS, or why not (see BiometricManager.canAuthenticate). */
+    fun biometricLockStatus(): Int = BiometricManager.from(appContext).canAuthenticate(LOCK_AUTHENTICATORS)
+
     /** Whether this device has a fingerprint, face or screen lock to ask for. */
-    fun biometricLockAvailable(): Boolean =
-        BiometricManager.from(appContext).canAuthenticate(LOCK_AUTHENTICATORS) == BiometricManager.BIOMETRIC_SUCCESS
+    fun biometricLockAvailable(): Boolean = biometricLockStatus() == BiometricManager.BIOMETRIC_SUCCESS
 
     private val searchResultLimitPref = intSetting(SEARCH_RESULT_LIMIT_PREF, 0)
     /**

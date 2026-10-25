@@ -6,6 +6,7 @@ import tools.senko.materialdrain.ui.VibrationStrength
 import tools.senko.materialdrain.ui.icons.filled.Vibration
 import android.content.ActivityNotFoundException
 import android.content.Context
+import android.os.Build
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.material.icons.Icons
@@ -473,9 +474,11 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
         items = listOf(
             SettingsItem.Toggle(
                 title = "Lock with fingerprint or face",
-                info = "Needs a screen lock on this device.",
+                info = if (Build.VERSION.SDK_INT >= 33) "Needs a screen lock on this device. The recent apps don't show Materialdrain while it's on."
+                else "Needs a screen lock on this device. While it's on, screenshots of Materialdrain come out black, which keeps it out of the recent apps too.",
                 isChecked = { appSettings.biometricLock.collectAsState().value },
-                onCheckedChange = { if (appSettings.biometricLockAvailable()) appSettings.setBiometricLock(it) },
+                // Turned on only where there's something to unlock with; off always, whatever the device has
+                onCheckedChange = { if (!it || appSettings.biometricLockAvailable()) appSettings.setBiometricLock(it) },
                 children = listOf(
                     SettingsItem.Choice(
                         title = "Lock after",
