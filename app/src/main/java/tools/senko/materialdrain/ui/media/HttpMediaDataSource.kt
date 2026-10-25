@@ -67,7 +67,8 @@ class HttpMediaDataSource(
         client.newCall(request).execute().use { response ->
             // Only a range: a whole file (200) could be a video of gigabytes
             if (response.code == 416) return ByteArray(0)
-            if (response.code != 206) throw IOException("HTTP ${response.code} instead of a range for $url")
+            // Not the address in the message, which goes to the log: on some hosts it opens the file (see SmbContentServer)
+            if (response.code != 206) throw IOException("HTTP ${response.code} instead of a range from ${request.url.host}")
             size = response.header("Content-Range")?.substringAfter('/')?.toLongOrNull() ?: size
             return response.body.bytes().also { blocks[index] = it }
         }

@@ -33,3 +33,10 @@
 -keep class org.bouncycastle.jcajce.provider.symmetric.AES* { *; }
 -dontwarn org.bouncycastle.**
 -dontwarn org.slf4j.**
+
+# The debug and verbose lines of the log are for development: a release build leaves them out (with what they'd say,
+# such as the requests made), so they can't end up in a bug report
+-assumenosideeffects class android.util.Log {
+    public static int d(...);
+    public static int v(...);
+}

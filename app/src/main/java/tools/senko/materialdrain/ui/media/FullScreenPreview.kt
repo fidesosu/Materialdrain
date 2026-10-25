@@ -1,7 +1,6 @@
 package tools.senko.materialdrain.ui.media
 
 import android.net.Uri
-import android.os.Build
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -319,7 +318,7 @@ internal fun DarkDialogBars() {
     val dialogWindow = (view.parent as? DialogWindowProvider)?.window
     SideEffect {
         dialogWindow?.let { window ->
-            if (Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
+            window.isNavigationBarContrastEnforced = false
             WindowCompat.getInsetsController(window, view).apply {
                 isAppearanceLightStatusBars = false
                 isAppearanceLightNavigationBars = false

@@ -1,6 +1,7 @@
 package tools.senko.materialdrain.transfer
 
 import android.Manifest
+import android.app.Application
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationChannelGroup
@@ -14,6 +15,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import tools.senko.materialdrain.AppContainer
 import tools.senko.materialdrain.R
 import java.util.concurrent.atomic.AtomicInteger
 import tools.senko.materialdrain.util.formatEta
@@ -81,6 +83,19 @@ class TransferNotifier(private val context: Context) {
      */
     private fun iconColor(): Int = ContextCompat.getColor(context, R.color.pixeldrain_icon)
 
+    /**
+     * While the app lock is on, what [builder] shows on a secure lock screen: only [summary] (with no file names), until
+     * the device is unlocked. Without the lock, as the system's own setting has it.
+     */
+    private fun privateOnLockScreen(builder: NotificationCompat.Builder, channel: String, icon: Int, summary: String) = builder.apply {
+        val app = context.applicationContext as Application
+        if (!AppContainer.get(app).appSettings.biometricLock.value) return@apply
+        setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+        setPublicVersion(
+            NotificationCompat.Builder(context, channel).setColor(iconColor()).setSmallIcon(icon).setContentTitle(summary).build()
+        )
+    }
+
     /** The ongoing notification of the foreground service, summarising every running transfer. */
     fun buildProgressNotification(transfers: List<TransferInfo>): Notification {
         val builder = NotificationCompat.Builder(context, CHANNEL_TRANSFER_PROGRESS)
@@ -127,10 +142,12 @@ class TransferNotifier(private val context: Context) {
             if (eta != null) add("${formatEta(eta)} left")
         }.joinToString(" · ")
 
+        val icon = if (onlyDownloads) R.drawable.icon_download else R.drawable.icon_upload
         builder
-            .setSmallIcon(if (onlyDownloads) R.drawable.icon_download else R.drawable.icon_upload)
+            .setSmallIcon(icon)
             .setContentTitle(title)
             .setContentText(details.ifEmpty { "Starting…" })
+        privateOnLockScreen(builder, CHANNEL_TRANSFER_PROGRESS, icon, if (transfers.size == 1) "1 transfer running" else "${transfers.size} transfers running")
         if (total != null) {
             builder.setProgress(100, (transferred * 100 / total).coerceIn(0L, 100L).toInt(), false)
         } else {
@@ -156,15 +173,18 @@ class TransferNotifier(private val context: Context) {
             openAppIntent()
         }
 
-        val notification = NotificationCompat.Builder(context, if (failed) CHANNEL_TRANSFER_FAILED else CHANNEL_TRANSFER_COMPLETE)
+        val channel = if (failed) CHANNEL_TRANSFER_FAILED else CHANNEL_TRANSFER_COMPLETE
+        val icon = if (info.kind == TransferKind.UPLOAD) R.drawable.icon_upload else R.drawable.icon_download
+        val notification = NotificationCompat.Builder(context, channel)
             .setColor(iconColor())
-            .setSmallIcon(if (info.kind == TransferKind.UPLOAD) R.drawable.icon_upload else R.drawable.icon_download)
+            .setSmallIcon(icon)
             .setContentTitle(if (failed) "$verb failed" else "$verb complete")
             .setContentText(message ?: info.title)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message ?: info.title))
             .setContentIntent(contentIntent)
             .setAutoCancel(true)
             .setCategory(if (failed) NotificationCompat.CATEGORY_ERROR else NotificationCompat.CATEGORY_STATUS)
+            .let { privateOnLockScreen(it, channel, icon, if (failed) "$verb failed" else "$verb complete") }
             .build()
         notify(resultIds.getAndIncrement(), notification)
     }

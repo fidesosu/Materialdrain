@@ -5,7 +5,6 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.ServiceCompat
@@ -77,7 +76,7 @@ class TransferService : Service() {
                 this,
                 PROGRESS_NOTIFICATION_ID,
                 notification,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             )
             true
         } catch (e: Exception) {
