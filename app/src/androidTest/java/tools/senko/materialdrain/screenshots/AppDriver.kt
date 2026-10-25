@@ -1,6 +1,7 @@
 package tools.senko.materialdrain.screenshots
 
 import android.app.Application
+import android.app.KeyguardManager
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
@@ -33,8 +34,26 @@ class AppDriver {
     var scenario: ActivityScenario<MainActivity>? = null
         private set
 
+    /**
+     * Opens the device's own lock screen if it's showing (the lock tests give the device a PIN, [DEVICE_PIN], and a slow
+     * emulator may lock itself meanwhile), so the app can be reached.
+     */
+    fun unlockDevice() {
+        val keyguard = InstrumentationRegistry.getInstrumentation().targetContext.getSystemService(KeyguardManager::class.java)
+        if (!keyguard.isKeyguardLocked) return
+        Screenshots.shell("input keyevent KEYCODE_WAKEUP")
+        Screenshots.shell("wm dismiss-keyguard")
+        Thread.sleep(1_000)
+        if (keyguard.isKeyguardLocked) {
+            Screenshots.shell("input text $DEVICE_PIN")
+            Screenshots.shell("input keyevent KEYCODE_ENTER")
+            Thread.sleep(1_500)
+        }
+    }
+
     /** Signs in to the made-up account and sets [setup], without starting the app (see [launch]). */
     fun prepare(setup: AppSettings.() -> Unit = {}) {
+        unlockDevice()
         // Before the first HTTP client is built, which AppContainer does
         HttpInterceptors.all = listOf(sharedFake)
         // Signed in as sam: the built-in Pixeldrain with a session, the active host (the bundled config) with a password
@@ -208,7 +227,10 @@ class AppDriver {
         Thread.sleep(400)
     }
 
-    private companion object {
-        val sharedFake = FakePixeldrain()
+    companion object {
+        /** The device's PIN while the lock tests run, which they set and remove. */
+        const val DEVICE_PIN = "1234"
+
+        private val sharedFake = FakePixeldrain()
     }
 }

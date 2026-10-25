@@ -18,7 +18,7 @@ import tools.senko.materialdrain.screenshots.AppDriver
 import tools.senko.materialdrain.screenshots.Screenshots
 
 /** The device's screen lock while these run, which the app lock asks for. */
-internal const val PIN = "1234"
+internal const val PIN = AppDriver.DEVICE_PIN
 
 /**
  * What the app lock keeps from being seen or read until it's unlocked: the files on screen (also in dialogs and menus,
@@ -60,6 +60,7 @@ class AppLockSecurityTest {
         Thread.sleep(1500)
         val context = ApplicationProvider.getApplicationContext<Context>()
         val launch = requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
+        app.unlockDevice()
         context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         Thread.sleep(1500)
     }
