@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.compat
 
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Build
@@ -130,5 +131,27 @@ class ThemeCompatTest {
             "A dark frame while the app is light (lightness of the middle of the screen: ${seen.joinToString { "%.2f".format(it) }}); see compat/api$api/a3-darkest-frame.png",
             seen.all { it > 0.5f }
         )
+    }
+
+    /**
+     * The app light on a dark system: from Android 12 Android itself knows the app is light (see
+     * MainActivity.applyNightMode), so its splash screen and the system's popups over it (the text toolbar) are light too.
+     * Before 12 they follow the system. (A test can't start the app from nothing: it runs in the app's process.)
+     */
+    @Test
+    fun androidKnowsTheAppIsLight() {
+        Screenshots.shell("cmd uimode night yes")
+        app.start { setThemeMode(ThemeMode.LIGHT) }
+        app.tapTab("Files")
+        app.waitText("Sunset over the bay")
+        // Setting it makes the activity again: the one there now has the app's light
+        Thread.sleep(1_000)
+        app.waitText("Sunset over the bay")
+        var night = true
+        app.scenario!!.onActivity {
+            night = it.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+        }
+        if (api >= 31) assertTrue("The activity's configuration is still night while the app is light", !night)
+        capture("light-app-configuration")
     }
 }

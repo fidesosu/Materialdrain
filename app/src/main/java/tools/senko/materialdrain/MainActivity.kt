@@ -24,6 +24,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import android.view.WindowManager
+import android.app.UiModeManager
+import android.graphics.drawable.ColorDrawable
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.toArgb
+import tools.senko.materialdrain.ui.theme.ThemeMode
 import tools.senko.materialdrain.ui.theme.MaterialdrainTheme
 import tools.senko.materialdrain.ui.theme.isDarkTheme
 
@@ -78,6 +83,7 @@ class MainActivity : FragmentActivity() {
                     navigationBarStyle = SystemBarStyle.auto(LIGHT_NAVIGATION_SCRIM, DARK_NAVIGATION_SCRIM) { dark }
                 )
             }
+            LaunchedEffect(theme.mode) { applyNightMode(theme.mode) }
             val blockScreenshots by container.appSettings.blockScreenshots.collectAsState()
             val lockOn by container.appSettings.biometricLock.collectAsState()
             LaunchedEffect(blockScreenshots, lockOn) { applyScreenshotBlock(blockScreenshots, lockOn) }
@@ -86,6 +92,10 @@ class MainActivity : FragmentActivity() {
             val screens = rememberSaveableStateHolder()
             CompositionLocalProvider(LocalOverscrollFactory provides null) {
                 MaterialdrainTheme(theme, darkTheme = dark) {
+                    // The window behind the app has its background too: what shows before the first frame and while the
+                    // activity is made again (the window's own theme follows the system, which can be the other one)
+                    val background = MaterialTheme.colorScheme.background
+                    LaunchedEffect(background) { window.setBackgroundDrawable(ColorDrawable(background.toArgb())) }
                     Box(modifier = Modifier.fillMaxSize()) {
                         // While locked, the app isn't there at all, only the lock: nothing of it is drawn or read (by
                         // accessibility services too), its dialogs and menus (windows of their own, which the lock
@@ -133,6 +143,23 @@ class MainActivity : FragmentActivity() {
         if (secure) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(!lock)
+    }
+
+    /**
+     * Tells Android whether the app is light or dark (Look and feel), from Android 12 on: its splash screen and the system's
+     * popups over it (the text selection toolbar) then match the app instead of the system, from the next start on too.
+     * Before 12 they follow the system. Android makes the activity again when this changes what it is.
+     */
+    private fun applyNightMode(mode: ThemeMode) {
+        if (Build.VERSION.SDK_INT < 31) return
+        val uiModeManager = getSystemService(UiModeManager::class.java) ?: return
+        val night = when (mode) {
+            ThemeMode.SYSTEM -> UiModeManager.MODE_NIGHT_AUTO
+            ThemeMode.LIGHT -> UiModeManager.MODE_NIGHT_NO
+            ThemeMode.DARK -> UiModeManager.MODE_NIGHT_YES
+        }
+        // Always set: getNightMode() is the system's, not what the app set last time. The same value changes nothing
+        uiModeManager.setApplicationNightMode(night)
     }
 
     @Suppress("DEPRECATION")
