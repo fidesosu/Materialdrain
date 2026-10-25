@@ -1,0 +1,19 @@
+{#-
+  The line at the end of each page, in place of Material's own: when the page was last changed, and the app's newest
+  release then (see hooks/page_info.py, which works them out).
+-#}
+{% set info = page.meta.page_info if page.meta else none %}
+{% if info %}
+  <aside class="md-source-file">
+    <span class="md-source-file__fact">
+      <span class="md-icon">{% include ".icons/material/clock-edit-outline.svg" %}</span>
+      Last updated <time datetime="{{ info.iso }}">{{ info.date }}</time>{% if info.uncommitted %} (not committed yet){% endif %}
+    </span>
+    {% if info.release %}
+      <span class="md-source-file__fact" title="The newest stable release when this page was last changed">
+        <span class="md-icon">{% include ".icons/material/cellphone-arrow-down.svg" %}</span>
+        For Materialdrain {{ info.release }}{% if info.nightly %}, and the Nightly build where it says so{% endif %}
+      </span>
+    {% endif %}
+  </aside>
+{% endif %}

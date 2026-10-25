@@ -163,10 +163,16 @@ The details page (`files/FileDetailsScreen.kt`) picks one preview by the file's 
 | An archive (`zip`, `7z`, `rar`, `tar`, `tgz`, `apk`) on a host that can look inside | `ArchiveContents` | `files/ArchiveContents.kt` |
 | `image/*` | `InlineImagePreview` | `ui/media/ImagePreview.kt` |
 | `video/*` | `InlineVideoPreview`, then the fullscreen player | `ui/media/VideoPlayer.kt` |
-| `audio/*` | `AudioPlayerPreview` | `ui/media/AudioPlayer.kt` |
-| A PDF (`application/pdf`, or a `.pdf` name) | `InlinePdfPreview`, then `FullScreenPdfDialog` | `ui/media/PdfPreview.kt` |
-| Text | `CodePreview` | `ui/components/CodePreview.kt` |
+| `audio/*` | `AudioPlayerPreview`, the song's card | `ui/media/AudioPlayer.kt` |
+| A PDF (`application/pdf`, or a `.pdf` name) | `InlinePdfPreview` | `ui/media/PdfPreview.kt` |
+| Markdown | `MarkdownPreview` | `ui/components/MarkdownPreview.kt`, parsed by `files/Markdown.kt` |
+| Other text | `CodePreview` | `ui/components/CodePreview.kt` |
 | Anything else with a thumbnail | The thumbnail in a card | |
+
+The badge at a preview's corner opens it over the whole screen in `FullScreenFileDialog` (`ui/media/FullScreenPreview.kt`):
+one dialog for every kind, a page per file, in the app's dark colours whatever theme it's in. With **Swipe between
+files**, a swipe sideways goes to the next file of the same kind (`FileGroup`), which comes in like a page; a page the
+data saver held back loads as soon as it's shown, as going to it is asking for it.
 
 ### Images
 
@@ -180,9 +186,9 @@ when the full image arrives. Blurring needs Android 12; before that the backdrop
 
 ### Fullscreen
 
-`FullScreenMediaPreviewDialog` (`ui/media/FullScreenPreview.kt`) is a dialog that covers the whole screen, under the
-system bars. Images go in a `ZoomableBox`: pinch to zoom, drag to pan, double-tap to zoom in and out, tap beside the
-picture to close. The image is decoded at most 3072 px on a side (`maxPixels`), so a huge photo doesn't fill the
+A picture's page of `FullScreenFileDialog` (and `FullScreenMediaPreviewDialog`, the Upload screen's, which only has
+pictures and videos) puts it in a `ZoomableBox`: pinch to zoom, drag to pan, double-tap to zoom in and out, tap beside
+the picture to close. The image is decoded at most 3072 px on a side (`maxPixels`), so a huge photo doesn't fill the
 memory. Videos open `FullscreenVideoPlayer`.
 
 Images use `FilterQuality.None` in the preview and fullscreen, so pixel art and zoomed-in pictures stay sharp instead
@@ -204,8 +210,44 @@ glance at costs no data. The inline video preview is just the thumbnail with a p
 fullscreen.
 
 `MediaControls.kt` has the shared controls: `MediaIconButton`, `MediaTextButton` (e.g. the playback speed) and
-`MediaSeekBar`, which grows thicker while pressed, seeks on a tap and scrubs on a drag. The video player's settings
-menu has **Loop** (one choice for all videos, `AppSettings.loopVideos`) and the playback speed.
+`MediaSeekBar`, which grows thicker while pressed, seeks on a tap and scrubs on a drag.
+
+**The video player** (`FullscreenVideoPlayer`) takes its touches itself: a tap shows or hides the controls, a double
+tap skips back or on at the sides (by **Skip by**, `SEEK_STEPS`) and plays or pauses in the middle, holding it plays at
+2× (`HOLD_SPEED`), a pinch zooms up to 4× (`MAX_VIDEO_ZOOM`). With **Brightness and volume swipes**, a swipe up or down
+changes the brightness on the left and the volume on the right, and sideways seeks; without them, a sideways swipe is
+left to the swipe between files. Its settings menu (`VideoSettingsMenu`) has **Loop** (one choice for all videos,
+`AppSettings.loopVideos`), **Speed**, **Subtitles** and **Audio** where the video has them, and **Open in another app**.
+The rotate button turns the activity, which doesn't restart for it (`configChanges` in the manifest), so the video
+goes on. Where each video was left is kept in `util/VideoPositions.kt` (the last 200, in preferences of their own,
+not backed up).
+
+### Songs in the background
+
+With **Play songs in the background**, a song plays in `PlaybackService` (`ui/media/PlaybackService.kt`), a Media3
+`MediaSessionService` that outlives the details and the app's screen, with its controls in the notification and on
+the lock screen. The details' song card reaches it through a `MediaController` (`rememberPlaybackController`); the
+item's id is the song's address.
+
+- **The queue** (`SongQueue.kt`): a song played from its details takes the songs of the list it was opened from, in its
+  order, up to 100 on each side (`QUEUE_REACH`). *Add to queue* puts more at its end. `BackgroundSong` follows the
+  player's song and queue for the screens, with its repeat mode and shuffle; the service shuffles anew each time
+  shuffle is turned on, with the song playing first, and takes a queue rearranged while shuffled as a command of its
+  own.
+- **Tags** (`SongTags.kt`): a song's title, artist and album, and what kind of file it is, are read out of the file the
+  way its cover is (only the parts needed), a couple of songs at a time, and kept on disk. The songs around the one
+  playing are read ahead, so a skip shows the next title at once.
+- **Pictures**: `CoverBitmapLoader` gives the notification and lock screen their covers through the app's own image
+  loader, which reads what Media3's can't (`audiocover://`, a host's pictures behind its login); a song without one
+  shows its file tile (`rememberPlaceholderArt`).
+- **The miniplayer** (`MiniPlayer.kt`, `BackgroundMiniPlayer`) floats above the navigation bar. It follows the finger:
+  sideways skips (the next song peeking in beside it), down closes the song (`closeSong`, with an Undo where that's
+  on), up pulls the player open. `AudioPlayerView` (`AudioPlayerView.kt`) is the player over the whole app, or the
+  compact card the miniplayer grows into (`CompactMorph` moves the cover and title from the one's place to the
+  other's); `AudioPlayerSheetState` keeps how far open it is, and survives the activity being made again.
+- **Exported, but only so far**: the service is exported, as the system's media controls need to reach it. Another app
+  connected to it can play, pause, skip and seek, but not choose what plays, so it can't have the player load an
+  address of its choosing.
 
 ### Text
 
@@ -222,10 +264,17 @@ Then:
 A bigger file shows "File is too large … for text preview" instead. The whole file is downloaded into memory through
 the same `downloadNodeTo` as a normal download, so it works for every host.
 
-On the details page, `CodePreview` shows the start in a box up to 200 dp high. Its fullscreen button opens
-`CodeFullscreen`: numbered lines, wrapping or sideways scrolling (starting from the **Wrap long lines** setting), and a
-button to copy everything. Only the lines on screen are laid out, and the colouring is worked out off the main thread,
-so long files stay smooth.
+On the details page, `CodePreview` shows the start in a 16:9 card, the size of the other previews, scrolling inside,
+with what it is and how long ("JSON · 120 lines", "first 30 of 400 lines") over its bottom corner. While it loads it's
+the same card, so nothing below it moves when the text comes in. Its badge opens `CodeFullscreenContent`: numbered
+lines, wrapping or sideways scrolling (starting from the **Wrap long lines** setting), **Find in the text** (each match
+lit, stepped through with the arrows), bigger or smaller text, and copying all of it, or the lines picked with a long
+press on a line's number and a tap on another. Only the lines on screen are laid out, and the colouring is worked out
+off the main thread, so long files stay smooth; past `MAX_COLOURED_LENGTH` a text is shown without colours.
+
+A Markdown file is shown as it's meant to look: `parseMarkdown` (`files/Markdown.kt`, plain Kotlin) turns it into
+blocks (headings, lists with tasks, quotes, code, tables), which `MarkdownPreview` draws in the same card, and full
+screen with a button to its source. Links to the web open in the browser.
 
 The Upload screen has its own, simpler preview (`InlineTextPreview` in `ui/media/TextPreview.kt`): the first 4096
 characters of the picked file.
@@ -258,6 +307,12 @@ listing is read off the main thread.
 inside can only be saved, not opened: `downloadArchiveEntry` starts an ordinary download, and `downloadNodeTo` reads
 the entry with `ArchiveOps.read`.
 
+A host with no `ArchiveOps` of its own, whose files can be read in parts (WebDAV, S3, and SMB through the app's own
+server), gets the app's own for zips (`DeviceZipArchives`, `files/DeviceArchives.kt`; `.zip`, `.cbz`, `.jar`, `.apk`).
+It reads only the zip's directory at its end, in a few range requests, and for a file of it, only that file's part.
+Stored and deflated files are read, as nearly every zip has; a file with a password isn't. A host that doesn't answer
+for parts of a file can't be looked inside this way, which is said rather than the whole archive being downloaded.
+
 ### PDFs
 
 Android's `PdfRenderer` draws a PDF's pages, but only from a whole file on the device, so a PDF is loaded into the app's
@@ -279,7 +334,7 @@ square instead of crashing the layout.
 
 - **In the details**, `InlinePdfPreview` is a card like the other previews: the top of the first page, the number of
   pages, and a tap opens it full screen. While it loads it shows how far along it is.
-- **Full screen**, `FullScreenPdfDialog` shows every page in a `LazyColumn`, scrolled with a finger and zoomed with two
+- **Full screen**, `PdfFullscreenContent` (a page of `FullScreenFileDialog`) shows every page in a `LazyColumn`, scrolled with a finger and zoomed with two
   (or a double tap, up to 5×). Zooming lays the pages out wider rather than stretching them, so scrolling keeps up with
   the finger, and each page is drawn again, sharp, once the zoom has settled (200 ms).
 - A password-protected PDF can't be opened by `PdfRenderer`; it says so instead.

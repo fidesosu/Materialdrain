@@ -133,12 +133,16 @@ bytes left divided by that speed, or `null` when the total or the speed isn't kn
 
 ### Picking files
 
-There are two places to upload from:
+There are three places to upload from:
 
-- **The Upload screen** (`UploadViewModel`). One file shows a preview (its text, a song's details and cover, a video
-  frame, a PDF's page count, an APK's icon). Several files make a queue of `UploadItem`s. Typed text is written to a
-  temporary file in the cache, uploaded, and deleted again. A host without flat storage (WebDAV, S3, SMB) gets the
-  upload in the top folder of the host (its `rootPath`) through `browse.upload`.
+- **The Upload screen** (`UploadViewModel`), a tab only on a host with nowhere else to upload to (see
+  [Tabs come from the host](interface.md#tabs-come-from-the-host)). One file shows a preview (its text, a song's details
+  and cover, a video frame, a PDF's page count, an APK's icon). Several files make a queue of `UploadItem`s. Typed text
+  is written to a temporary file in the cache, uploaded, and deleted again. A host without flat storage (WebDAV, S3,
+  SMB) gets the upload in the top folder of the host (its `rootPath`) through `browse.upload`.
+- **The Files screen**, **New → Upload** in its ⋮ menu (`UploadViewModel.uploadNow`): the files are read and queued as
+  picked files are, then sent at once as new files of the host. How it went is said on the snackbar, as there's no
+  Upload screen to show it.
 - **The Filesystem screen** (`FilesystemViewModel.onFilesPickedForUpload`). Files go into the open folder. If a name
   already exists there, the upload waits in `pendingUpload` until you confirm overwriting.
 
@@ -160,8 +164,8 @@ of its columns. A `file://` URI reads `File.lastModified()` directly.
 
 ### Order and parallelism
 
-The setting **Settings → Uploads → Upload in the order the files were changed** (`AppSettings.uploadInModifiedOrder`,
-off by default) decides how a queue goes up.
+The setting **Settings → Files → Upload by last change** (`AppSettings.uploadInModifiedOrder`, off by default)
+decides how a queue goes up.
 
 | Setting | Upload screen | Filesystem screen |
 | --- | --- | --- |
@@ -192,21 +196,21 @@ takes the `EXTRA_STREAM` URIs and puts them in `AppContainer.pendingShares`. It'
 activity is `singleTask`: there is one copy of the app, in its own task, and a share always reaches it. With `singleTop`,
 a share could start a second copy on top of the sharing app, which the share could miss.
 
-`App.kt` watches that flow. When files are waiting and the app isn't locked, it opens the Upload screen, hands the
-files to `uploadViewModel.onFilesSelected`, and empties the flow:
+`App.kt` watches that flow. The files wait for the place they go into, which the user browses to: every browse
+screen shows a `DestinationBar` for them (see [Shared files and moves](interface.md#shared-files-and-moves)), whose
+**Upload here** sends them into the open folder (`FilesystemViewModel.onFilesPickedForUpload`) or, on the Files screen,
+as new files of the host (`UploadViewModel.uploadNow`), and then empties the flow. The ✕ empties it without uploading.
+Opened on a page without the bar (the settings, a file's details), the app goes to the first tab that takes them.
 
-```kotlin
-// A share waits for the unlock: nothing uploads while the app is locked
-LaunchedEffect(pendingShares, appLocked) {
-    if (pendingShares.isNotEmpty() && !appLocked) {
-        navigateTo(Screen.Upload)
-        uploadViewModel.onFilesSelected(pendingShares, context)
-        appContainer.pendingShares.value = emptyList()
-    }
-}
-```
+A host with only an Upload tab has no such place, so there the files go to that tab as picked ones
+(`uploadViewModel.onFilesSelected`). Either way nothing is uploaded before a button is pressed, nor while the app is
+locked, which covers the screens.
 
-The shared files are queued, not uploaded right away. You still press **Upload**, with the active host.
+Shared text (`ACTION_SEND` with `EXTRA_TEXT`) goes through `PendingOpen` (`AppIntents.kt`): a Pixeldrain link in it
+opens that file or list; other text is written to a text file in the cache (`sharedTextFile`), which then waits like a
+shared file. Those files are cleared once they're a day old. The launcher's Upload shortcut and the Quick Settings
+tile (`UploadTileService`) open the Upload tab, or, on a host without one, the system's picker, whose files wait the
+same way.
 
 ### Cancelling
 
@@ -283,20 +287,54 @@ or by path (`browse.download`).
 downloads can run into a host's download limits. The batch is one transfer with one total and one result. Each file
 is its own job (not a child of the batch's), and cancelling the batch cancels the current file too.
 
+### Folders
+
+`downloadItems` (`DownloadManager`) downloads what's picked in a folder browser, files and folders alike, in one of two
+`DownloadStyle`s: `SEPARATELY`, each file on its own with its folders made again in Download around it
+(`Download/Photos/2026/…`), or `ZIP`, all of it in one archive. The folders are looked through first, one after
+another, for their files. When that finds more than 100 files (`LARGE_DOWNLOAD_FILES`) or 1 GB
+(`LARGE_DOWNLOAD_BYTES`), the download waits in `confirmation`, which the app asks about: a folder can hold far more
+than it looks.
+
 ### As a zip
 
-`downloadFilesAsZip` asks the host for one archive instead, when it can: every file needs an id, none can be a folder,
-and the host needs `ProviderCapability.ARCHIVE_DOWNLOAD` (Pixeldrain has it). Otherwise it falls back to
-`downloadFilesSequentially`.
+`downloadAsZip` asks the host for one archive, when it can, in one of two ways:
 
-The files are split into chunks of at most 100 (`MAX_FILES_PER_ZIP`). Each chunk becomes a stand-in `StorageNode`
-whose id is the chunk's ids joined by commas, named `name.zip` or `name (part 2).zip`. `downloadNodeTo` spots the
-comma (file ids never contain one) and calls `fileStore.downloadArchive` instead of `download`.
+- **A folder** of a host with `ProviderCapability.FOLDER_ARCHIVE_DOWNLOAD` is zipped by the host:
+  `BrowseOps.downloadFolderArchive` (Pixeldrain's `?bulk_download`; a REST config's `browse_download_archive`).
+- **Several files with ids** on a host with `ProviderCapability.ARCHIVE_DOWNLOAD` (Pixeldrain): the files are split
+  into chunks of at most 100 (`MAX_FILES_PER_ZIP`). Each chunk becomes a stand-in `StorageNode` whose id is the chunk's
+  ids joined by commas, named `name.zip` or `name (part 2).zip`. `downloadNodeTo` spots the comma (file ids never
+  contain one) and calls `fileStore.downloadArchive` instead of `download`.
+
+Anything else is zipped on the device as it downloads (`zipOnDevice`): each file goes straight from the host into the
+archive, nothing is kept meanwhile, and a second file of the same name in one folder gets the next free name. Files
+that are compressed already (pictures, videos, songs, archives) are only stored, as compressing them again would take
+time and save next to nothing.
+
+### Names in Download
+
+A download keeps the name the host gives the file, created with the generic type (`application/octet-stream`) so
+MediaStore doesn't add an extension of its own; the media scan gives it its type from the name once it's done.
+Characters a file name can't have are replaced by `_`. A name already taken gets the next one of `nextDuplicateName`:
+`senko.jpg` → `senko (1).jpg`, `senko (2).jpg` → `senko (3).jpg`, `archive.tar.gz` → `archive (1).tar.gz`. MediaStore's
+own renaming would give `archive.tar (1).gz`, and as the app can't see what other apps put in Download, each name is
+tried, and an entry MediaStore renamed is deleted for the next. **Download into** can put everything under
+`Download/Materialdrain` (`AppSettings.downloadSubfolder`).
+
+### Sharing a file
+
+A host whose files have no link (SMB, a private WebDAV) shares the file itself: `DownloadManager.shareFile` downloads
+it into the cache (`cache/shared/`, a transfer like any download, which can be cancelled), then hands it to the share
+sheet through the app's `FileProvider`, which only gives out that folder (`res/xml/shared_files.xml`). Files shared
+before are cleared once they're a day old, so the app they went to has had the time to read them.
 
 ### Opening a download
 
-When a download finishes, the snackbar has an **Open** button. `openDownloadedFile` (`files/OpenDownloaded.kt`) sends
-an `ACTION_VIEW` intent with the saved URI, the file's type and `FLAG_GRANT_READ_URI_PERMISSION`, so an APK opens the
+When a download finishes, the snackbar has an **Open** button (and with **Open downloads when done**, a single file is
+opened by itself). `openDownloadedFile` (`files/OpenDownloaded.kt`) sends an `ACTION_VIEW` intent with the saved URI,
+the type of its name's extension (`downloadedFileMimeType`; any app when it isn't known) and
+`FLAG_GRANT_READ_URI_PERMISSION`, so an APK opens the
 installer and a zip opens an archive app. If no app can open it, a toast says so. The installer only takes an APK
 from an app that declares `REQUEST_INSTALL_PACKAGES`; without it, it closes at once without a word. Android asks the user
 once to allow installs from Materialdrain.

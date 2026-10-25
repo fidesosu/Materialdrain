@@ -80,7 +80,7 @@ Everything that shows a file works from a URL: the image loader, the video and a
 | Interface | For | Operations |
 | --- | --- | --- |
 | `FileStoreOps` | A flat store of files addressed by id, like Pixeldrain's `/file` API | `upload`, `download`, `fileInfo`, `delete`, `downloadArchive` (default: not supported) |
-| `BrowseOps` | Folders and paths | `list(path)`, `upload`, `download`, `createDirectory`, `rename`, `delete(path, recursive)`, `importFiles` (default: not supported) |
+| `BrowseOps` | Folders and paths | `list(path)`, `upload`, `download`, `createDirectory`, `rename`, `delete(path, recursive)`, `importFiles` and `downloadFolderArchive` (default: not supported) |
 | `FileListOps` | One flat "everything on the account" listing | `list()` |
 | `ListOps` | Named lists of files (Pixeldrain's lists) | `lists`, `listContents`, `create`, `update`, `delete` |
 | `ArchiveOps` | Looking inside an archive on the host without downloading it | `canOpen(archive)`, `list(archive, inside)`, `read(archive, entryPath, ...)` |
@@ -91,6 +91,10 @@ Everything that shows a file works from a URL: the image loader, the video and a
 by whichever of `{path}` and `{id}` its `archive_info` endpoint asks for. The file details only offer an archive's
 contents where `canOpen` is true, instead of failing. A file read out of an archive keeps where it came from in
 `ArchiveEntryDetails(archive, entryPath)`, which a download reads it back through.
+
+A host with no `ArchiveOps` of its own still gets zips looked inside, by the app (`DeviceZipArchives` in
+`files/DeviceArchives.kt`), where its files can be read in parts: WebDAV, S3, and SMB through the app's own server.
+See [Archives](media.md#archives).
 
 `FileListOps` and `BrowseOps` are kept apart on purpose. A host can upload, download and delete by id without any
 way to ask what's already there; `fileList` being null is how that's told apart from a host that lists per folder.
@@ -113,6 +117,7 @@ Transfers take an `OutputStream` (downloads) or a content `Uri` and a `Context` 
 | `USER_QUOTA` | `AccountOps` |
 | `RICH_FILE_STATS` | Extra details such as views and downloads (`PixeldrainRichDetails`) |
 | `ARCHIVE_DOWNLOAD` | Several files as one zip (`FileStoreOps.downloadArchive`) |
+| `FOLDER_ARCHIVE_DOWNLOAD` | A folder and everything in it as one zip, made by the host (`BrowseOps.downloadFolderArchive`). Without it, the app zips the files itself |
 | `ARCHIVE_BROWSE` | Looking inside archives (`ArchiveOps`) |
 | `SEARCH`, `PERMISSIONS` | Declared, but no host claims them yet |
 
@@ -150,7 +155,7 @@ fun resolveScreens(screens: List<ScreenConfig>?, capabilities: Set<ProviderCapab
 | Two tabs with one id | Shown once, where the first is listed (`screenProblems` says so, for the editor and the import) |
 | `"filesystem"` | Read as `FILESYSTEM`: `ScreenEntrySerializer` trims and upper-cases names |
 
-A `ScreenConfig` has its kind (`screen`), and optionally an `id`, a `name`, a `root` and `disabledCapabilities`:
+A `ScreenConfig` has its kind (`screen`), and optionally an `id`, a `name`, a `root`, `disabledCapabilities` and an `icon` (a name of `TabIcons`, in the app's `Navigation.kt`):
 
 - `tabId` is its `id`, or the kind in lower case (`"filesystem"`). Two tabs of one kind need ids of their own; the app
   keeps a tab's state (its open folder, its scroll position) by it.
@@ -163,7 +168,7 @@ just its name, so exported configs stay short. `disabledCapabilities` only ever 
 and `ARCHIVE_BROWSE`, for the tab they were opened from.
 
 The built-in Pixeldrain host has no config, so it doesn't go through `resolveScreens`: `App.kt` builds its tabs from
-its capabilities directly. See [Screens follow the host](architecture.md#screens-follow-the-host).
+its capabilities directly (`rememberHostTabs` in `HostTabs.kt`). See [Screens follow the host](architecture.md#screens-follow-the-host).
 
 ### The models
 
@@ -310,7 +315,7 @@ Ktor client running on top of it for the JSON calls. Uploads and downloads strea
 classes have their own `ApiResponse`, which the provider maps to the `provider-api` one.
 
 - **Capabilities:** `UPLOAD`, `DOWNLOAD`, `DELETE`, `FILE_INFO`, `BROWSE`, `MKDIR`, `RENAME`, `SHARE_LINK`,
-  `RICH_FILE_STATS`, `LISTS`, `ENUMERATE`, `ARCHIVE_DOWNLOAD`, `ARCHIVE_BROWSE`. `SEARCH` and `PERMISSIONS` are left out
+  `RICH_FILE_STATS`, `LISTS`, `ENUMERATE`, `ARCHIVE_DOWNLOAD`, `ARCHIVE_BROWSE`, `FOLDER_ARCHIVE_DOWNLOAD` (`?bulk_download`). `SEARCH` and `PERMISSIONS` are left out
   on purpose: the API has them, but nothing in the app calls them, *"so claiming the capability here would be a promise
   the UI can't keep."* `account` is null.
 - **Root:** `rootPath` is `me`, the account's own filesystem.
@@ -336,6 +341,7 @@ decided by which endpoint names the config has:
 | `user_lists` | `LISTS` | `lists` |
 | `user_info` | `USER_QUOTA` | `account` |
 | `download_archive` | `ARCHIVE_DOWNLOAD` | |
+| `browse_download_archive` | `FOLDER_ARCHIVE_DOWNLOAD` | |
 | `archive_info` | `ARCHIVE_BROWSE` | `archives` (`archive_file` reads one file) |
 | `raw_id` or `browse_download` | `SHARE_LINK` | |
 
@@ -412,12 +418,12 @@ an existing kind: `grep -rn "SmbConfig\|ProviderKind.SMB\|\"smb\"" --include=*.k
    `credentials: () -> Credentials`. Set `capabilities` honestly, leave the ops it can't do null, return every failure
    as an `ApiResponse.Error` and rethrow `CancellationException`.
 6. **The registry**: a branch in `ProviderRegistry.build` (`app/.../provider/ProviderRegistry.kt`).
-7. **The config editor**: a `fooSections` list in `app/.../preferences/configeditor/ConfigSchema.kt`, and a branch in
+7. **The config editor**: a `fooSections` list in `app/.../settings/ui/configeditor/ConfigSchema.kt`, and a branch in
    `sectionsFor` and `kindLabel`. `ConfigSchemaTest` fails if the template has a field the form doesn't describe.
 8. **The template**: an entry in `ProviderConfigTemplates.Kind` and a branch in `config(kind)`. It becomes a **New
    host** button in **Settings → Hosts** by itself.
 9. **The rest of the app** that names each kind:
-    - `preferences/AdvancedSettings.kt`: `kindLabel`, and the host card's sign-in fields. S3 and SMB have a branch of
+    - `settings/ui/AdvancedSettings.kt`: `kindLabel`, and the host card's sign-in fields. S3 and SMB have a branch of
       their own there (a key pair, or a username and password, and no API key); every other kind gets its fields from
       `passwordAuth`: a sign-in form for `LOGIN`, a username and password for `BASIC`, and an API key;
     - `hosts/HostSwitcher.kt`: the icon and label for the `ProviderKind`, whether it needs a sign-in, and the address

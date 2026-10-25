@@ -134,9 +134,9 @@ floating under it as cards of their own.
 
 ### The result limit
 
-All matches are shown by default. **Settings → Search → Most results shown** sets a limit for slower devices:
+All matches are shown by default. **Settings → Files → Search result limit** sets a limit for slower devices:
 `AppSettings.searchResultLimit`, one of `SEARCH_RESULT_LIMITS` (`0`, `200`, `50`, `20`; `0` is no limit), chosen with
-the radio buttons of `SearchResultLimitSection` in `preferences/SearchSettings.kt`.
+a `SettingsItem.Choice` in `settings/ui/SettingsCatalog.kt`.
 
 With a limit, `SearchModal` shows the first that many matches (`matches.take(resultLimit)`) and counts the rest in a
 pill under them: *+N more matches*. The matching and sorting still cover every candidate, so the ones shown are the

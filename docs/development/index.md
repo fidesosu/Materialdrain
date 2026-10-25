@@ -173,14 +173,14 @@ Nobody sets the version by hand. `app/build.gradle.kts` makes it from the time o
 
 | | Made of | Example |
 | --- | --- | --- |
-| `versionName` | `1.4.`, then the commit's date and time in UTC as `yyyyMMdd.HHmm`, then `-dev` for builds of `dev` | `1.4.20261009.1530` |
-| `versionCode` | The minutes from the start of 2025 (UTC) to the commit | `931170` |
+| `versionName` | `1.5.`, then the commit's date and time in UTC as `yyyyMMdd.HHmm`, then `-dev` for builds of `dev` | `1.5.20261014.1558` |
+| `versionCode` | The minutes from the start of 2025 (UTC) to the commit | `938398` |
 
 - **Every newer commit gets a higher version code**, so a newer build always installs over an older one. That goes
   for stable and dev builds alike: they share the `applicationId`, so you can switch between them.
 - **The commit's time, not the build's.** Building the same commit again gives the same version, so a rebuild on CI
   replaces the APK of its release instead of making a new one.
-- **`1.4`** is `baseVersion`. Change it only for a big step.
+- **`1.5`** is `baseVersion`. Change it only for a big step.
 - The `-dev` suffix comes from the `VERSION_SUFFIX` environment variable, which the workflow sets on `dev`.
 - Without git (a source download, say), the current time is used instead.
 

@@ -37,8 +37,9 @@ into the app; the old and insecure SMB 1 is never used.
 | **Browsing** | Folders and files, with sizes and last modified dates |
 | **Changes** | Upload, new folder, rename, move, delete. The top of the share itself can't be deleted |
 | **Thumbnails** | Photos (HEIC too), a frame of each video and songs' album covers, made on the phone and kept in its cache |
-| **Previews** | Images, video and audio (streamed, with seeking), text |
-| **Share links** | None: an SMB share has no web address |
+| **Previews** | Images, video and audio (streamed, with seeking), text, PDFs |
+| **Inside zips** :nightly: | A zip's contents in its details, and its files saved one by one: only the parts of the zip needed are read |
+| **Share links** | None: an SMB share has no web address. *Share file* :nightly: sends the file itself instead |
 
 A share has no web address for its files, while the app's image viewer and players work from addresses. So the app
 gives them one itself, from a small server on the phone that only the phone can reach. How that works is in

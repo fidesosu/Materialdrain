@@ -50,7 +50,11 @@ and in what order (the tabs follow it).
 
 A screen the host can't back is left out rather than shown broken. Two tabs with the same id (see
 [Several tabs of one kind](#several-tabs-of-one-kind)) count once, where the first of them is listed. When only one
-screen is left, the tabs are hidden and it's simply shown.
+screen is left, the tabs are hidden and it's simply shown. With more than five, the bottom bar shows four and
+**More**, a menu of the rest.
+
+In the Nightly build :nightly:, `UPLOAD` only shows on a host that has neither `FILES` nor `FILESYSTEM`: those upload
+from their own ⋮ menu, and take files shared to the app, so an Upload tab beside them would do nothing more.
 
 | Screen | What it is | A REST API needs | WebDAV, S3, SMB |
 | --- | --- | --- | --- |
@@ -70,6 +74,7 @@ A screen can also be written as an object:
 | `name` | the screen's own | The tab's label and the title, e.g. `"Media"` for a Filesystem screen that's really one share |
 | `root` | the whole host | A Filesystem tab's folder, under the host's top folder (`root_path`, `prefix`, `browse_root`): it opens there and can't go above it |
 | `disabled_capabilities` | `[]` | Actions this screen doesn't offer, even though the host can do them |
+| `icon` :nightly: | the screen's own | The tab's icon, by name: `upload`, `files`, `folder`, `drive`, `storage`, `server`, `cloud`, `sync`, `list`, `photo`, `image`, `video`, `music`, `document`, `code`, `archive`, `backup`, `shared` or `key`. Another name keeps the screen's own |
 
 ```json
 "screens": [
@@ -91,8 +96,8 @@ one NAS, each opening at its own folder, with its own name and actions:
 ```json
 "screens": [
   "UPLOAD",
-  { "screen": "FILESYSTEM", "id": "media", "name": "Media", "root": "Media" },
-  { "screen": "FILESYSTEM", "id": "backups", "name": "Backups", "root": "Backups", "disabled_capabilities": ["DELETE"] }
+  { "screen": "FILESYSTEM", "id": "media", "name": "Media", "root": "Media", "icon": "video" },
+  { "screen": "FILESYSTEM", "id": "backups", "name": "Backups", "root": "Backups", "icon": "backup", "disabled_capabilities": ["DELETE"] }
 ]
 ```
 

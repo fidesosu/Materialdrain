@@ -27,11 +27,13 @@ for back.
 | --- | --- | --- |
 | `Screen` | `Navigation.kt` | Every screen: `Upload`, `Files`, `Filesystem`, `FileDetail`, `Lists`, `Settings` |
 | `HostScreen.toScreen()` | `Navigation.kt` | Maps provider-api's `HostScreen` to the app's `Screen`. The one place the two meet, as provider-api can't see the app module |
-| `Tab` | `Navigation.kt` | One tab of the host: a `Screen` of its kind and its entry in the config (`ScreenConfig`), with its `id` and `title` |
-| `BottomNavigationBar` | `Navigation.kt` | A Material `NavigationBar` with one item per tab of `navBarOrder` |
-| `FabDetails` | `Navigation.kt` | What the extended FAB shows for a screen: icon, text, action |
+| `Tab` | `Navigation.kt` | One tab of the host: a `Screen` of its kind and its entry in the config (`ScreenConfig`), with its `id`, `title` and icon (`TabIcons`) |
+| `rememberHostTabs` | `HostTabs.kt` | The tabs of the active host, worked out again when a config changes |
+| `BottomNavigationBar`, `AppNavigationRail`, `TabStrip` | `Navigation.kt` | The three ways of showing the tabs: a bar, a rail at the side of a wide screen, and the dots of the swipe navigation |
+| `FabDetails`, `screenFab`, `AppFab` | `AppFab.kt` | The screen's floating button: Upload on the Upload screen, Save in the settings categories that have it |
+| `AppDialog` | `AppDialogs.kt` | The app-wide dialogs: a big download to confirm, the delete confirmation |
 | `TransferBarSlot` | `App.kt` | The progress bar under the top bar (see [TransferStatusBar](#transferstatusbar)) |
-| `lastScreen`, `lastTabId` | `settings/AppSettings.kt` | The screen and tab the app was on, so it opens there again |
+| `lastScreen`, `lastTabId` | `settings/AppSettings.kt` | The screen and tab the app was on, so it opens there again (unless **Open on** names one) |
 
 Screen changes animate with `AnimatedContent`: a vertical slide in tab order, or a quick crossfade with reduced motion
 (see [Reduced motion](#reduced-motion-and-the-other-locals)). Its state is a `Shown`: the screen, the tab and the host.
@@ -43,23 +45,30 @@ top kept on the space (`expandFrom` / `shrinkTowards = Alignment.Top`), so the p
 
 ### Tabs come from the host
 
-Which tabs exist is decided by the active host, not by the app. `App.kt` works it out each time the configs change:
+Which tabs exist is decided by the active host, not by the app. `rememberHostTabs` (`HostTabs.kt`) works it out each
+time the configs change:
 
 ```mermaid
 flowchart LR
     A[Active host] --> B{Built-in Pixeldrain?}
-    B -- yes --> C["Capabilities:<br/>Upload, then ENUMERATE → Files,<br/>LISTS → Lists, BROWSE → Filesystem"]
+    B -- yes --> C["Capabilities:<br/>ENUMERATE → Files,<br/>LISTS → Lists, BROWSE → Filesystem"]
     B -- no --> D["resolveScreens(config.screens, capabilities)"]
-    C --> E[navBarOrder]
+    C --> E{"Files or Filesystem?"}
     D --> E
-    E --> F[Bottom bar / FAB menu]
+    E -- yes --> F[Upload left out]
+    E -- no --> G[Upload kept]
+    F --> H[navBarOrder]
+    G --> H
 ```
 
 - **A config** picks its screens with `screens` (see [Screens](../hosts/config-format.md#screens)).
   `resolveScreens` in provider-api keeps them in the config's order and drops the ones the host can't back.
-- **The built-in Pixeldrain host** isn't a config, so it gets Upload and then whatever its capabilities allow.
-- **A screen's config entry** can rename the tab (`Tab.title`) and take capabilities away from it
-  (`disabledCapabilities`, passed to `BrowserScreen`, and to the file details through `FileInfoViewModel.setTabLimits`).
+- **The built-in Pixeldrain host** isn't a config, so it gets whatever its capabilities allow.
+- **The Upload tab** is only kept on a host with nowhere else to upload to. The Files and Filesystem screens upload from
+  their ⋮ menu (**New → Upload**) and take shared files (see [Shared files and moves](#shared-files-and-moves)).
+- **A screen's config entry** can rename the tab (`Tab.title`), give it an icon (`TabIcons`, by name) and take
+  capabilities away from it (`disabledCapabilities`, passed to `BrowserScreen`, and to the file details through
+  `FileInfoViewModel.setTabLimits`).
 - **Several tabs of one kind** are told apart by `Tab.id`. The bar selects a `Tab`, not a `Screen`: `currentTabId`
   says which tab of the current screen's kind is shown (`tabOf(screen)`), and falls back to the first of that kind.
 - **A screen the new host doesn't offer** falls back to the first one it does. This runs when the host changes and when
@@ -69,37 +78,29 @@ flowchart LR
 
 ### One screen hides the bar
 
-With a single screen there is nothing to switch between, so the bar would only take space. The bottom bar is shown
-only when `navBarOrder.size > 1` (and not on the file details). The same rule hides the navigation FAB.
+With a single screen there is nothing to switch between, so the bar would only take space. The bottom bar (or the tab
+strip) is shown only when `navBarOrder.size > 1`, not on the file details, and not where the rail is.
 
 Without the bottom bar, the file screens and the details are drawn down to the screen's edge, under the see-through
 system navigation bar. `LocalBottomInset` tells the lists how much room to leave after their last item, so it can still
 be scrolled clear of the bar.
 
-### The navigation FAB menu
+### The three kinds of tabs
 
-`navmenu/` holds a prototype: a round button in a bottom corner that opens a small window of destinations, instead of
-the bottom bar. It's off by default and turned on in **Settings → Developer → FAB navigation prototype**
-(`AppSettings.navPrototype`).
-
-| File | What's in it |
-| --- | --- |
-| `NavFabMenu.kt` | `NavFabMenu` (the button, the dim, the window), `NavFab` (swipe sideways to move it), `NavMenuWindow` |
-| `NavMenus.kt` | `NavMenu`, `NavMenuSection`, `NavMenuItem`, `NavFabPosition` (start, center, end), and the menus themselves |
-
-- The window is bottom-anchored: a reversed `LazyColumn`, so the pinned row sits right above the button (and the
-  thumb), and earlier sections are a scroll away.
-- A swipe moves the button exactly one spot, only once the finger lifts, and only if it was released within
-  `SWIPE_TIMEOUT_MILLIS` of starting to move. The spot is saved in `AppSettings.navFabPosition`.
-- The window grows out of the button's corner; with reduced motion it only fades. On Android 12 and up the screen
-  behind it is blurred (`navMenuBlur` in `App.kt`).
-- It shows the menu picked in **Developer → Preview navigation as**: **This host** (the active host's tabs, as the
-  bottom bar has them, so a second Filesystem tab can be reached too) or `TrueNasMockNavMenu`, a mock with dozens of
-  entries to see how the window copes. Mock items have no `tab` and only highlight when tapped.
+- **`BottomNavigationBar`**: up to five tabs (`MAX_BAR_TABS`); with more, the fifth place is **More**, a menu of the
+  rest, which shows the one of them that's open. **Tab labels** off shows only the chosen tab's name.
+- **`AppNavigationRail`**: the tabs at the side, where the screen is at least 600 dp wide (`isWideScreen`), as a bar
+  along the bottom would stretch its few tabs far apart. It scrolls when there are more than fit.
+- **`TabStrip`**, with **Look and feel → Navigation → Swipes** (`AppSettings.gestureNavigation`): no bar, only a thin
+  row with a dot per tab, the shown one wider and in the accent colour. Tabs change with a swipe sideways across the
+  page (`Modifier.sidewaysSwipe`, `ui/components/SidewaysSwipe.kt`), along the row (a tab for every `StripStep`, with a
+  light vibration each), or a tap on a dot. Every dot has the same room (`DotPitch`), so the shown one grows and
+  shrinks from its middle without moving the others. **Swipe between tabs** gives the bottom bar the same sideways
+  swipe.
 
 ### The host switcher
 
-On the browse screens (Upload, Files, Lists, Filesystem) the top bar has no title. `HostSwitcher`
+On the browse screens (Files, Lists, Filesystem, and Upload where it's a tab) the top bar has no title. `HostSwitcher`
 (`hosts/HostSwitcher.kt`) sits in its place: a floating card with the active host's icon, a status badge and its name.
 Tapping it opens an [`AppMenu`](#appmenu) of every host (`hostOptions`: the built-in Pixeldrain first, then the configs
 in the order they were added), each with its address, whether it answers and whether it's signed in.
@@ -112,6 +113,26 @@ in the order they were added), each with its address, whether it answers and whe
 - Choosing a host calls `ProviderConfigStore.setActive`. The gear, or **Sign in**, opens that host's settings;
   **Manage hosts** opens **Settings → Hosts**.
 
+### The ⋮ menu of a screen
+
+The top bar's ⋮ (in `App.kt`) is the same menu on every screen but a file's details and the settings, which have
+none. `ScreenMenuEntries` (`browser/BrowserControls.kt`) lays it out in the order its entries are reached for:
+
+1. what's done with the page shown: the screen's `ScreenAction`s of `ScreenActionGroup.PAGE` (an open list's
+   **Download all**, a folder's **Download this folder**, **Select**);
+2. **New**, a page of the `ScreenActionGroup.NEW` ones (the Files screen's **Upload**; the Filesystem's **Upload**,
+   **New folder** and **Import files by ID**, each where the host and the tab's config allow it);
+3. **Sort by**, for a sortable list: `SortMenuEntries`, the field it's sorted on with its direction. Choosing the field
+   already sorted on flips it (`AppSettings.changeSortOrder`);
+4. **View**: `ViewMenuEntries`, from the screen's `ViewChoice` (rows, grid or Smart, compact rows, for its subfolders
+   too, and back to the defaults; see [How a list looks](#how-a-list-looks));
+5. **Settings**.
+
+A `ScreenAction` with `choices` (Download: **Separately** or **As one ZIP**) opens a page of those instead of acting.
+The pages are `AppMenuPages`; every page is measured even while another is shown, so the menu keeps one width and
+only its height changes. Sort by and View stay open while choosing, so the change can be seen. `BrowserScreen` hands
+its actions and view up through `onActionsChange`, keyed by the page shown.
+
 ## BrowserScreen
 
 `browser/BrowserScreen.kt` is the one screen behind the Files, Lists and Filesystem tabs. `App.kt` passes a
@@ -119,13 +140,13 @@ in the order they were added), each with its address, whether it answers and whe
 
 | `BrowserMode` | Lists | Above the list | Opening an entry |
 | --- | --- | --- | --- |
-| `FILES` | The account's files, flat (`FileInfoViewModel.displayedFiles`) | Sort row | Its details |
-| `LISTS` | The lists as folders, one level deep; inside one, its files (`ListViewModel`) | Inside a list: sort row, the list's title, **All (ZIP)** | A list opens it; a file opens its details |
-| `FILESYSTEM` | Folders and files (`FilesystemViewModel.displayedChildren`) | Sort row with **New**, the path | A folder goes into it; a file opens its details |
+| `FILES` | The account's files, flat (`FileInfoViewModel.displayedFiles`) | Status cards | Its details |
+| `LISTS` | The lists as folders, one level deep; inside one, its files (`ListViewModel`) | Inside a list: its title | A list opens it; a file opens its details |
+| `FILESYSTEM` | Folders and files (`FilesystemViewModel.displayedChildren`), folders first unless that's off | The path, status cards | A folder goes into it; a file opens its details |
 
 Everything that differs between the modes is a `when (mode)` near the top of the function: the entries, the loading
-and error state, the refresh, the search candidates and the selection actions. The list itself, pull to refresh, the
-empty and error states and the `DotScrollbar` are shared.
+and error state, the refresh, the search candidates, the selection actions and the ⋮ menu's actions. The list itself,
+pull to refresh, the empty and error states and the `DotScrollbar` are shared.
 
 Details worth knowing before changing it:
 
@@ -134,61 +155,78 @@ Details worth knowing before changing it:
 - **A refresh keeps the scroll position**, unless it turned up a file that wasn't listed before: then it jumps to the
   top, where the new file is.
 - **Back** leaves the selection first, then the open list, then goes up a folder.
-- **Scroll positions survive** visits to other screens: the `LazyListState`s live in `App.kt`, not in the screen.
-- **Filesystem actions** (upload, new folder, import by id) are in the screen itself, not a FAB, so they work the same
-  with the bottom bar and with the navigation prototype.
+- **Scroll positions survive** visits to other screens: the `LazyListState`s live in `App.kt` (`TabScrollStates`), not
+  in the screen.
 
-### The sort row
+### The status cards
 
-`SortControls` in `browser/BrowserControls.kt` is the row of floating cards above the list:
+`StatusCards` in `browser/BrowserControls.kt` is the row of floating cards above the list, for what's going on:
+**Cancel**, while a transfer the bar above shows runs, and **Thumbnails**, while the data saver holds them back. The
+row is only there while one of them is, and grows out of the header and shrinks back into it as they come and go.
 
-- **Sort by** opens an `AppMenu` with `SortOptions` (Name, Size, Date). Choosing the field already sorted on flips the
-  direction (`AppSettings.changeSortOrder`). The menu stays open, so the effect can be seen and flipped again.
-- **Cancel** appears while a transfer the bar above shows is running, and stops it.
-- **New** holds the screen's `SortRowAction`s (on the Filesystem: *Upload*, *New folder*, *Import files by ID*, each
-  where the host and the screen's config allow it) in its own `AppMenu`, lined up with the card's end.
+The cards size themselves. `statusCardNeeds()` measures what each card needs to show all of itself, from its text as
+it's drawn (with `rememberTextMeasurer`) plus its icon and padding. Each shown card then gets a share of the row as big
+as its share of what they both need, so one alone fills the row, and one appearing beside it makes room for itself.
 
-The cards size themselves. `sortRowNeeds()` measures what each card needs to show all of itself, from its text as it's
-drawn (with `rememberTextMeasurer`) plus its icons and padding. *Sort by* measures the longest field name, so it never
-changes size between fields. Each shown card then gets a share of the row as big as its share of what they all need:
+### How a list looks
 
-```kotlin
-val visibleNeeds = needs.filterIndexed { i, _ -> shown[i] }
-val room = maxWidth - SortRowGap * (visibleNeeds.size - 1)
-val scale = room / visibleNeeds.fold(0.dp) { sum, need -> sum + need }
-```
-
-So *Sort by* alone fills the row, beside *New* they split it by content, and a *Cancel* appearing makes room for itself.
-The widths animate with a spring, and on a narrow screen every card gives way alike, its text ending in "…".
+A list is rows, a grid of big pictures (`FileGridItem` in `ui/components/FileListItem.kt`), or Smart: the grid when
+more than half of its files are pictures or videos (`smartLayoutIsGrid`). Rows can be compact. **Look and feel → Grid**
+and **Compact rows** are the defaults; a folder, screen or open list can have its own (`ViewLook`, chosen in the ⋮
+menu's View page), kept in `AppSettings.viewLooks` by its `viewKey` (the host, the tab and the folder or list). A
+Filesystem folder's look can be for its subfolders too: those without their own take the nearest such folder's above
+them (`inheritedPath`). A look is kept as a short string: the layout's name, then `1`, `0` or `-` for compact, then `r`
+for the subfolders.
 
 ### The selection bar
 
-A long-press (or *Select* in an entry's menu) starts selecting. `BrowserScreen` keeps the selected keys, and
-`SelectionActionBar` (`files/SelectionBar.kt`) is the bar at the bottom while selecting:
+A long-press (or *Select* in the ⋮ menu) starts selecting. `BrowserScreen` keeps the selected keys, in the order they
+were selected, and `SelectionActionBar` (`files/SelectionBar.kt`) is the bar at the bottom while selecting:
 
-- It takes a list of `SelectionAction`s (label, icon, action, `enabled`, `destructive`). The first three
-  (`ICON_ACTIONS`) are icons, the rest go into an `AppMenu` behind a ⋮.
-- `SelectionBarHeight` (72 dp) is public so the FAB and the snackbar can rise by the same amount.
-- Its colour runs on under the system navigation bar; its buttons stay above it (`LocalBottomInset`).
+- It takes a list of `SelectionAction`s (label, icon, action, `enabled`, `destructive`, `choices`). The first three
+  (`ICON_ACTIONS`) are icons, the rest go into an `AppMenu` behind a ⋮. An action with `choices` is a menu of them.
+- It's a `FloatingBottomBar`: a card in the snackbar's look, kept off the sides and above the system navigation bar or
+  the miniplayer. `SelectionBarHeight` is public so the FAB and the snackbar can rise by the same amount.
 - Entries that disappear (deleted, moved, filtered out) are dropped from the selection.
 
-Which actions there are is built per mode in `BrowserScreen`: download, move and delete on the Filesystem; download as
-ZIP, add to a list, delete, add to the filesystem and remove from this list on Files and Lists. Each is left out when
-the host or the screen's config doesn't allow it.
+Which actions there are is built per mode in `BrowserScreen`: download (one file on its own; several, or a folder,
+**Separately** or **As one ZIP**), move and delete on the Filesystem; download, delete, add to a list, add to the
+filesystem and remove from this list on Files and Lists; and everywhere, while songs play in the background, **Add to
+queue** in the order they were selected, and **Select all**. Each is left out when the host or the screen's config
+doesn't allow it.
+
+### Shared files and moves
+
+`DestinationBar` (`browser/SharedUploadBar.kt`) is a bar in the selection bar's place for something waiting for the
+folder it goes into, which the user browses to. It takes a `DestinationRequest`: what waits, where it would go from
+here (or why it can't), and the button that sends it there.
+
+- **Shared files** (`AppContainer.pendingShares`, from `MainActivity`'s share intents, the Upload shortcut and the
+  tile): `App.kt` turns them into a `SharedUpload`, which every browse screen shows. **Upload here** uploads them into
+  the open folder, or as new files of the host on the Files screen. A host with only an Upload tab takes them there as
+  picked files instead. Nothing uploads before the button is pressed, nor while the app is locked.
+- **Moves** (`FilesystemViewModel.pendingMove`, from *Move* in a menu or the selection bar): **Move here** moves them
+  into the open folder, which can't be one of those being moved.
+- **Links and text** (`AppContainer.pendingOpen`, a `PendingOpen` from `AppIntents.kt`): a Pixeldrain file or list link
+  opens it on the built-in Pixeldrain, a shortcut opens its screen, and other shared text becomes a text file that
+  waits like a shared one. They wait for the unlock too.
 
 ### File details
 
 `FileInfoDetailsCard` in `files/FileDetailsScreen.kt` is the details page. From the top:
 
-- **The preview**, chosen by `StorageNode.previewMimeType()`: an image, a video, a song, the colored start of a text
-  file (`CodePreview`), or an archive's contents (`ArchiveContents`). See [Thumbnails and previews](media.md).
-- **The header**: the whole name (selectable), with the tile of the file's kind when the preview doesn't already show
-  its picture.
-- **The actions**: the download button (tap twice to start, shows progress while it runs, opens the file when done),
-  then share, copy link and delete.
+- **The preview**, chosen by `StorageNode.previewMimeType()`: an image, a video, a song, a text (`CodePreview`, or
+  `MarkdownPreview` for Markdown), a PDF, or an archive's contents (`ArchiveContents`). See
+  [Thumbnails and previews](media.md).
+- **The header**: the whole name (selectable), after the tile of the file's kind, which stays when the preview shows
+  the file's own picture.
+- **The actions** (`ActionRow`): the download button (tap twice to start, shows progress while it runs, opens the file
+  when done), then Share (the link, or the file itself where it has none) and Delete as buttons of their own.
 - **The details**: size, type, dates, Pixeldrain's views and downloads (`StatsRow`), ids and links, each copyable.
 
-The top bar's ⋮ on this screen is in `App.kt`, as an `AppMenu`.
+The details have no ⋮ menu: their own buttons do what's done with the file. With **Swipe between files**, a swipe
+sideways goes to the next file of the list they were opened from (`FileInfoViewModel.hasNeighbour`); the page that's
+left is a picture of itself (`PageSwap`, `ui/components/PageTransition.kt`), which slides out under the next one.
 
 ## The design system
 
@@ -218,8 +256,7 @@ Surface(
 ) { /* … */ }
 ```
 
-The navigation prototype's window and the file details' cards use their own values in the same spirit (24 dp and
-94% alpha; `DetailCardShape` at 20 dp).
+The file details' cards use their own values in the same spirit (`DetailCardShape` at 20 dp).
 
 ### AppMenu
 
@@ -313,8 +350,7 @@ The `Box` should hold only the button: the menu measures that box to place itsel
 
 `AppSnackbarHost` in `SharedSnackbar.kt` replaces Material's `SnackbarHost`. It shows and hides the snackbar itself so
 it can animate in and out, keeps the last message while that one leaves, and grows upward. Every snackbar has one look:
-rounded corners, the label type and the FAB's height, at full width. When the navigation prototype's button sits at an
-edge, the snackbar shares its row and leaves the button's space free. Each message gets its own `SwipeToDismissBox`
+rounded corners, the label type and the FAB's height, at full width. Each message gets its own `SwipeToDismissBox`
 (`DismissibleSnackbar`), as a swipe state handed to an already laid-out box crashes in the lookahead pass.
 `snackbarMotion(reduceMotion)` is the one motion for the snackbar and for the buttons that lift above it, so they move
 together; it's instant with reduced motion.

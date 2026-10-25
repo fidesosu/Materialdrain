@@ -24,7 +24,11 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      # All of the history and the tags: each page says when it was last changed, and the app's newest release then
+      # (hooks/page_info.py)
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:

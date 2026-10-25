@@ -21,10 +21,18 @@ not_in_nav: |
 validation:
   anchors: warn
 
+# The line at the end of each page (when it was last changed, and the app's version then) and the Nightly labels: see
+# hooks/page_info.py, and overrides/ for the part of the theme it changes
+hooks:
+  - hooks/page_info.py
+
 theme:
   name: material
-  # The app's icon, the home page's (website/icon.svg), which is served from the root of the same site
+  custom_dir: overrides
+  # The app's icon, the home page's (website/icon.svg), which is served from the root of the same site: in the tab, and
+  # in the header instead of Material's book
   favicon: /icon.svg
+  logo: /icon.svg
   # Dark only, in the site's own palette (docs/stylesheets/extra.css, the same as website/style.css)
   palette:
     scheme: slate
@@ -73,6 +81,7 @@ nav:
       - The screens: user-guide/screens.md
       - Settings: user-guide/settings.md
       - Troubleshooting: user-guide/troubleshooting.md
+      - What you're installing: user-guide/what-you-get.md
   - Hosts:
       - hosts/index.md
       - The config format: hosts/config-format.md

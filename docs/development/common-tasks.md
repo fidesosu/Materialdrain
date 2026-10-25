@@ -9,61 +9,61 @@ under `app/src/main/java/tools/senko/materialdrain/`; the other modules say so. 
 A setting lives in `AppSettings`, is shown by the settings catalog, and reaches the screens either through a ViewModel
 or through a `CompositionLocal`.
 
-1. **Store it** in `settings/AppSettings.kt`. Add a preference key at the top of the file, then a private
-   `MutableStateFlow` read from the preferences with its default, a public `StateFlow` with a KDoc that says what it
-   does and what the default is, and a setter that writes both:
+1. **Store it** in `settings/AppSettings.kt`. Add a preference key at the top of the file, then a private `Pref` made
+   by `booleanSetting(key, default)` (or `intSetting`, `enumSetting`), a public `StateFlow` with a KDoc that says what
+   it does and what the default is, and a setter:
 
     ```kotlin
-    private const val COMPACT_ROWS_PREF = "compact_rows"
+    private const val SHOW_HIDDEN_PREF = "show_hidden"
 
-    private val _compactRows = MutableStateFlow(prefs.getBoolean(COMPACT_ROWS_PREF, false))
-    /** Shows the file lists with smaller rows. Off by default. */
-    val compactRows: StateFlow<Boolean> = _compactRows.asStateFlow()
+    private val showHiddenPref = booleanSetting(SHOW_HIDDEN_PREF, false)
+    /** Files whose names start with a dot are listed too. Off by default. */
+    val showHidden: StateFlow<Boolean> = showHiddenPref.flow
 
-    fun setCompactRows(enabled: Boolean) {
-        prefs.edit { putBoolean(COMPACT_ROWS_PREF, enabled) }
-        _compactRows.value = enabled
-    }
+    fun setShowHidden(enabled: Boolean) = showHiddenPref.set(enabled)
     ```
 
-    `compactRows` is an example name, not a real setting. An enum goes through the private `enumPref(key, default)`
-    helper, as `sortField` and `navFabPosition` do.
+    `showHidden` is an example name, not a real setting. A `Pref` writes the preferences and its flow together, so the
+    two never disagree.
 
-2. **Show it** in `preferences/SettingsCatalog.kt`: add an item to the `items` of the right `SettingsCategory`. A switch
-   is a `SettingsItem.Toggle`; `isChecked` runs while composing, so it collects the flow and stays up to date. `info`
-   is the explanation behind its ⓘ, and `children` are settings of its own, indented under it and out of reach while
-   it's off:
+2. **Show it** in `settings/ui/SettingsCatalog.kt`: add an item to the `items` of the right `SettingsCategory`. A
+   switch is a `SettingsItem.Toggle`; `isChecked` runs while composing, so it collects the flow and stays up to date.
+   `info` is the explanation behind its ⓘ, and `children` are settings of its own, indented under it and out of reach
+   while it's off:
 
     ```kotlin
     SettingsItem.Toggle(
-        title = "Compact rows",
-        summary = "Smaller rows, so more files fit on the screen.",
-        isChecked = { appSettings.compactRows.collectAsState().value },
-        onCheckedChange = { appSettings.setCompactRows(it) }
+        title = "Show hidden files",
+        summary = "Names starting with a dot",
+        isChecked = { appSettings.showHidden.collectAsState().value },
+        onCheckedChange = { appSettings.setShowHidden(it) }
     )
     ```
 
-    A few options side by side (segmented buttons) are a `SettingsItem.Choice`, like **Most search results**. Anything
-    else is a `SettingsItem.Custom` with a `SettingsEnvironment.XSection()` composable in a file of its own.
+    A few options side by side (segmented buttons) are a `SettingsItem.Choice`, like **Search result limit**; a button
+    is a `SettingsItem.Action`, like **Try it**; a heading inside a page is a `SettingsItem.Header`, as Look and feel's
+    are. Anything else is a `SettingsItem.Custom` with a composable of its own, like the `ThemeColorPicker`. Keep the
+    texts short: a title of a few words, a summary of one line.
 
-3. **A new category** is a new `SettingsCategory(id, title, summary, icon, items)` in the `SettingsCatalog` list, in the
-   order it should appear. Nothing else needs to change: `SettingsScreen.kt` renders every category and item from the
-   catalog. Leave `hasSaveButton` false; only the Account's API key is saved with the button.
+3. **A new category** is a new `SettingsCategory(id, title, summary, icon, tone, items)` in the `SettingsCatalog` list,
+   in the order it should appear, with a `status` for the end of its tile if it has one. Nothing else needs to change:
+   `SettingsScreen.kt` renders every category and item from the catalog. Leave `hasSaveButton` false; only the
+   Account's API key is saved with the button.
 
 4. **If an item needs something the settings don't have** (another ViewModel, say), add it to `SettingsEnvironment` in
-   `preferences/SettingsModel.kt` and pass it where `SettingsScreenContent` builds the environment.
+   `settings/ui/SettingsModel.kt` and pass it where `SettingsScreenContent` builds the environment.
 
 5. **Make it reach the screen**, one of two ways:
     - **A ViewModel reads it.** The ViewModels get `AppSettings` from `ViewModelFactory`; collect the flow in `init`, as
       `FilesystemViewModel` does with `hideSearchIndex`, or `combine` it, as the sort order is.
     - **A composable deep in the tree reads it.** Add a `CompositionLocal` to `ui/LocalSettings.kt` with its default and
-      a KDoc. In `MaterialdrainScreen()` (`App.kt`), collect the flow
-      (`val compactRows by appContainer.appSettings.compactRows.collectAsState()`) and add
-      `LocalCompactRows provides compactRows` to the `CompositionLocalProvider`. Read it with `LocalCompactRows.current`.
-      This is how `LocalBlurredBackdrop` and `LocalTextWrap` work. A screen that already gets `appSettings` (like
-      `BrowserScreen`) can just collect the flow itself.
+      a KDoc. In `MaterialdrainScreen()` (`App.kt`), collect the flow and add `LocalShowHidden provides showHidden` to
+      the `CompositionLocalProvider`. Read it with `LocalShowHidden.current`. This is how `LocalBlurredBackdrop` and
+      `LocalTextWrap` work; settings read together go in one class, as `LocalPlayerSettings` (Media) and
+      `LocalListLook` (the file lists' look) do. A screen that already gets `appSettings` (like `BrowserScreen`) can
+      just collect the flow itself.
 
-6. **Document it** in the website's `docs/user-guide/settings.md`.
+6. **Document it** in the website's `docs/user-guide/settings.md`, marked `:nightly:` until it's in a stable release.
 
 ## Adding a menu or a menu item
 
@@ -97,9 +97,9 @@ Material's `DropdownMenu`, and don't restyle one menu on its own: change `AppMen
 | A file of the Files screen or of a list | `FileItemMenu` in `files/FileActions.kt` |
 | A file or folder of the Filesystem | `FilesystemMenu` in `browser/BrowserScreen.kt` |
 | A list in the lists overview | `ListFolderMenu` in `browser/BrowserScreen.kt` |
-| The file details' ⋮ | The `actions` of the top bar in `App.kt` |
+| A file's details | Their own buttons: `ActionRow` in `files/FileDetailsScreen.kt` (they have no ⋮) |
 | The selection bar | A `SelectionAction` in `selectionActions` in `BrowserScreen` (the first three are icons, the rest the menu) |
-| **New** in the sort row | A `SortRowAction` in the `actions` passed to `SortControls` |
+| The ⋮ at the top of a screen | A `ScreenAction` in `screenActions` in `BrowserScreen`: `ScreenActionGroup.PAGE` for what's done with the page, `NEW` for **New** (see [The ⋮ menu of a screen](interface.md#the-menu-of-a-screen)) |
 | The host switcher | `HostSwitcher` in `hosts/HostSwitcher.kt` |
 
 ## Adding a REST endpoint name
@@ -129,7 +129,7 @@ by the config editor (which offers it), and by the documentation.
    implement it or leave it out. See [Hosts in code](providers.md). The interface reads capabilities, never guesses
    from which operations exist.
 5. **Offer it in the editor**: add an `EndpointInfo(name, area, help, placeholders)` to `KnownEndpoints` in
-   `preferences/configeditor/ConfigSchema.kt`, next to the endpoints of the same area. The `area` is the heading it's
+   `settings/ui/configeditor/ConfigSchema.kt`, next to the endpoints of the same area. The `area` is the heading it's
    grouped under (`"Files tab"`, `"Upload tab"`, `"Filesystem tab"`, `"Lists tab"`, `"Account"`,
    `"Previews and links"`); a name the editor doesn't know shows under *Other*, and **Add an endpoint** only offers
    known ones. A new `response_map` key the provider reads goes into `responseFieldSuggestions` in the same file.
@@ -161,7 +161,7 @@ the class; the editor and the documentation are written by hand.
    up there by itself. Set an example value in `ProviderConfigTemplates.config(kind)` only if the default doesn't show
    what the field is for.
 3. **Describe it for the editor**: add a `FieldSpec` to the kind's sections in
-   `preferences/configeditor/ConfigSchema.kt` (`webDavSections`, `s3Sections`, `smbSections`, `genericRestSections`).
+   `settings/ui/configeditor/ConfigSchema.kt` (`webDavSections`, `s3Sections`, `smbSections`, `genericRestSections`).
    Give the JSON name as `key`, a short `label`, a one-line `help`, the `kind` (`Text`, `Number`, `Toggle`, `Choice`,
    `Group`), and the same `default` as the data class, as a `JsonPrimitive`. Set `common = true` only for fields most
    configs need; the rest are under **More options**. `ConfigSchemaTest` fails until every field of every template has

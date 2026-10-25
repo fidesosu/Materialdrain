@@ -69,7 +69,7 @@ The app module does depend on every host module, but it only names their classes
 | --- | --- |
 | `provider/ProviderRegistry.kt` | Builds the right `StorageProvider` for each kind of config |
 | `AppContainer.kt` | Creates the built-in `PixeldrainStorageProvider`, and tells `SmbContentServer` where to cache thumbnails |
-| `auth/SessionManager.kt`, `preferences/AuthViewModel.kt` | The Pixeldrain account login, which has no equivalent on other hosts |
+| `auth/SessionManager.kt`, `settings/ui/AuthViewModel.kt` | The Pixeldrain account login, which has no equivalent on other hosts |
 
 Everything else, from the Files screen to the transfer notifications, works the same for every host.
 
@@ -79,22 +79,22 @@ All packages are under `tools.senko.materialdrain`.
 
 | Package | What it holds |
 | --- | --- |
-| (top level) | `MainActivity`, `App.kt` (the Compose shell), `Navigation.kt`, `AppContainer`, `ViewModelFactory` |
-| `browser` | `BrowserScreen`, the one screen behind Files, Lists and Filesystem, its controls and the search results |
-| `files` | The Files screen's ViewModel (`FileInfoViewModel`), the file details page, file menus, sorting, archive contents, text highlighting |
+| (top level) | `MainActivity`, `App.kt` (the Compose shell), `Navigation.kt` and `HostTabs.kt` (the tabs), `AppFab.kt`, `AppDialogs.kt`, `AppIntents.kt` (links, shortcuts and shared text), `UploadTileService` (the Quick Settings tile), `AppContainer`, `ViewModelFactory` |
+| `browser` | `BrowserScreen`, the one screen behind Files, Lists and Filesystem, its controls (the ⋮ menu, the status cards, search), the search results, and the bar for shared files and moves |
+| `files` | The Files screen's ViewModel (`FileInfoViewModel`), the file details page, file menus, the selection bar, sorting, downloads (`DownloadManager`), archive contents and the device's own zip reading (`DeviceArchives`), text highlighting, Markdown |
 | `filesystem` | `FilesystemViewModel`: folder browsing, uploads into folders, the folder tree index for search. One per Filesystem tab of a host |
 | `upload` | The Upload screen and `UploadViewModel` |
 | `lists` | `ListViewModel`: lists of files and their contents |
 | `transfer` | `TransferRegistry` (every running upload and download), the foreground `TransferService`, notifications, speed |
 | `provider` | `ProviderRegistry`, `ProviderConfigStore`, `ProviderUpdater`, the bundled Pixeldrain config, error messages |
-| `preferences` | The settings screens and their catalog, the account login, the custom hosts (`AdvancedSettings.kt`) |
-| `preferences/configeditor` | The config editor and `ConfigSchema.kt`, which describes every field of every kind |
-| `settings` | `AppSettings`: the app's own choices (sorting, animations, last screen, ...) |
+| `settings/ui` | The settings screens and their catalog, the account and its login, the custom hosts (`AdvancedSettings.kt`), the theme's colour picker |
+| `settings/ui/configeditor` | The config editor and `ConfigSchema.kt`, which describes every field of every kind |
+| `settings` | `AppSettings`: the app's own choices (sorting, the theme, the lists' looks, the players, last screen, ...), and the data saver |
 | `auth` | `SessionManager` (the Pixeldrain key), `KeystoreCipher`, the app lock |
 | `hosts` | The host switcher in the top bar, and `HostHealth`, which checks whether each host answers |
-| `navmenu` | The floating navigation menu prototype (Developer settings) |
-| `ui/components` | Shared widgets: menus, dialogs, file rows, snackbars, the transfer status bar |
-| `ui/media` | Previews and players: images, animated images, video, audio, text, media covers |
+| `documents` | `HostDocumentsProvider`: the hosts in the system's file picker |
+| `ui/components` | Shared widgets: menus, dialogs, file rows and tiles, snackbars, the transfer status bar, the text and Markdown previews, sideways swipes |
+| `ui/media` | Previews and players: images, animated images, video, PDFs, songs (the background `PlaybackService`, the miniplayer, the players, the queue, songs' tags), media covers |
 | `ui/theme` | Colours, type and the `MaterialdrainTheme` |
 | `util` | Small helpers: date parsing, formatting, content URI info, the media cache |
 

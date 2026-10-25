@@ -12,9 +12,9 @@ screens are the same for every host; the config decides which of them appear and
 
 | Kind | For | Screens it can have |
 | --- | --- | --- |
-| [`webdav`](webdav.md) | Nextcloud, ownCloud, TrueNAS, and any WebDAV server | Upload, Filesystem |
-| [`s3`](s3.md) | MinIO, Backblaze B2, Cloudflare R2, Wasabi, AWS S3, and any S3-compatible bucket | Upload, Filesystem |
-| [`smb`](smb.md) | Windows shares, Samba, and NAS shares (SMB 2 and 3) | Upload, Filesystem |
+| [`webdav`](webdav.md) | Nextcloud, ownCloud, TrueNAS, and any WebDAV server | Filesystem (and Upload in a stable release) |
+| [`s3`](s3.md) | MinIO, Backblaze B2, Cloudflare R2, Wasabi, AWS S3, and any S3-compatible bucket | Filesystem (and Upload in a stable release) |
+| [`smb`](smb.md) | Windows shares, Samba, and NAS shares (SMB 2 and 3) | Filesystem (and Upload in a stable release) |
 | [`generic_rest`](rest-api.md) (a REST API) | Any HTTP API, described request by request. Pixeldrain itself can be one | Upload, Files, Lists, Filesystem |
 
 WebDAV, S3 and SMB speak a standard protocol, which is built into the app: a config only says where the host is. A
@@ -53,7 +53,7 @@ Each host in **Settings → Hosts** has a card with:
 
 ## Switching hosts
 
-The **host switcher** at the top of the Upload, Files, Lists and Filesystem screens shows the host in use, with a dot
+The **host switcher** at the top of the screens with files shows the host in use, with a badge
 for whether it answers. Tap it for every host, each with its address, whether it answers (and how fast), and whether
 you're signed in; tap one to use it. The hosts are checked ahead of time (when the app starts, every few minutes while
 it's open, and when the network changes), so the switcher already knows when you open it.

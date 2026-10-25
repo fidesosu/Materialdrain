@@ -161,6 +161,7 @@ Each name unlocks a part of the app; leave out what your API can't do. A file wi
 | --- | --- | --- |
 | `browse_list` | `{path}` | Listing one folder. Turns on the **Filesystem** tab |
 | `browse_download` | `{path}` | Downloading a file by its path |
+| `browse_download_archive` :nightly: | `{path}` | A folder and everything in it as one zip, made by the host (Pixeldrain: `/filesystem/{path}?bulk_download`). Without it, the app makes the zip itself as it downloads the files |
 | `browse_upload` | `{path}`, `{make_parents}` | Uploading into a folder; `{path}` is the new file's path |
 | `browse_thumbnail` | `{path}` | A file's thumbnail, by its path |
 | `browse_mkdir` | `{path}`, `{action}` | Making a folder; `{action}` is `mkdir`, or `mkdirall` to make the folders leading to it too |

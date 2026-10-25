@@ -93,6 +93,24 @@
   --md-code-hl-variable-color: var(--accent-highlight);
 }
 
+/* Buttons: Material colours a plain one with the header's colour, nearly the page's own, so it was hard to see. A rose
+   edge and text instead, filled when pointed at; the primary one is filled from the start, like the home page's Stable */
+.md-typeset .md-button {
+  color: var(--link-color);
+  border-color: var(--border-focus);
+}
+.md-typeset .md-button--primary {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--text-inverse);
+}
+.md-typeset .md-button:hover,
+.md-typeset .md-button:focus {
+  background-color: var(--link-hover);
+  border-color: var(--link-hover);
+  color: var(--text-inverse);
+}
+
 /* Links brighten when pointed at */
 .md-typeset a:hover,
 .md-typeset a:focus {
@@ -122,4 +140,42 @@
 .md-typeset .note > .admonition-title::before,
 .md-typeset .note > summary::before {
   background-color: var(--accent-primary);
+}
+
+/* What only the Nightly build has so far (:nightly: in a page, see hooks/page_info.py): a small yellow label, like the
+   home page's warning */
+.md-typeset .nightly {
+  display: inline-block;
+  padding: 0 0.5em;
+  border: 1px solid var(--yellow);
+  border-radius: 999px;
+  color: var(--yellow);
+  font-size: 0.75em;
+  font-weight: 600;
+  line-height: 1.5;
+  vertical-align: 0.1em;
+  white-space: nowrap;
+  cursor: help;
+}
+
+/* The line at the end of each page: when it was last changed, and the app's version then */
+.md-source-file {
+  color: var(--text-muted);
+}
+
+/* A phone. A name in a table's code breaks only where hooks/page_info.py lets it (pixeldrain_ / secure_prefs), not at
+   whichever letter the cell ends ("pixeldrai" / "n_prefs"); one with nowhere to break makes the table scroll sideways.
+   The front page's two buttons stack at the full width, rather than at two widths one over the other */
+@media screen and (max-width: 44.9375em) {
+  .md-typeset table:not([class]) code {
+    word-break: normal;
+    overflow-wrap: normal;
+  }
+  .md-typeset .md-button {
+    display: block;
+    text-align: center;
+  }
+  .md-typeset .md-button + .md-button {
+    margin-top: 0.6rem;
+  }
 }

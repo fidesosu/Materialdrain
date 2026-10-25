@@ -44,9 +44,10 @@ see [Sign-in](sign-in.md).
 | | |
 | --- | --- |
 | **Browsing** | Folders and files, with sizes and last modified dates |
-| **Changes** | Upload (into the open folder, or into `root_path` from the Upload screen), new folder, rename, move, delete |
+| **Changes** | Upload (into the open folder, or into `root_path` from the Upload screen in a stable release), new folder, rename, move, delete |
 | **Thumbnails** | Photos (the photo itself, scaled down on the phone), video frames and album covers, read from the files |
-| **Previews** | Images, video and audio (streamed, with seeking), text |
-| **Share links** | None: WebDAV has no public links |
+| **Previews** | Images, video and audio (streamed, with seeking), text, PDFs |
+| **Inside zips** :nightly: | A zip's contents in its details, and its files saved one by one: only the parts of the zip needed are read |
+| **Share links** | None: WebDAV has no public links. *Share file* :nightly: sends the file itself instead |
 
 The sign-in is only ever sent to addresses under `base_url`.

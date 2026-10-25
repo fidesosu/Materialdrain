@@ -1,3 +1,5 @@
 # What a local build of the site leaves behind (mkdocs build, or the workflow's steps run by hand)
 site/
 _site/
+# MkDocs for preview.ps1, installed there the first time
+.venv/

@@ -8,8 +8,8 @@ Paths below are under `app/src/main/java/tools/senko/materialdrain/` unless they
 
 ## What is stored where
 
-Everything is in plain `SharedPreferences` files, private to the app (`Context.MODE_PRIVATE`). There's no database and
-no DataStore.
+Everything is in plain `SharedPreferences` files, private to the app (`Context.MODE_PRIVATE`), and a few files of the
+app's own. There's no database and no DataStore.
 
 | File | Written by | Holds | Encrypted |
 | --- | --- | --- | --- |
@@ -17,18 +17,23 @@ no DataStore.
 | `pixeldrain_secure_prefs` | `SessionManager` | The Pixeldrain login session's key and username, and the manually entered API key | The keys, yes |
 | `provider_prefs` | `ProviderConfigStore` | Every host config with its update state, and which host is active | No (configs hold no secrets) |
 | `provider_secure_prefs` | `ProviderConfigStore` | The sign-in of each host: API key, username, password, session token | Yes, every value |
+| `video_positions` | `VideoPositions` (`util/VideoPositions.kt`) | Where each of the last 200 videos was left, by its address | No |
+| `bundled_configs` | `BundledProviderConfigs.kt` | Whether the bundled Pixeldrain config was imported once already | No |
+| `files/account_avatars/` | `AccountAvatar.kt` | The account picture chosen in the app, cropped | No |
 
 The file names start with "pixeldrain" because the app began as a Pixeldrain client. They're kept so existing
 installs keep their data.
 
-Caches (thumbnails, the media cache) are in the app's cache folder; see
-[Thumbnails and previews](media.md#caching). Downloads go to the phone's Download folder; see
+Caches are in the app's cache folder, which Android may clear: thumbnails, video frames and covers, the media cache,
+songs' tags (`song-tags`), the last PDFs (`pdf-preview`), and for a moment, files on their way to another app
+(`shared`, `documents`, `shared_text`); see [Thumbnails and previews](media.md#caching). Downloads go to the phone's Download folder; see
 [Uploads and downloads](transfers.md#where-files-go).
 
 ### Settings
 
-`settings/AppSettings.kt` reads each setting once into a `MutableStateFlow` and writes it back with `prefs.edit { }`
-when it changes. The screens collect the flows, so a change shows everywhere at once. Nothing in it is secret.
+`settings/AppSettings.kt` reads each setting once into a `Pref` (a `MutableStateFlow` that writes itself back with
+`prefs.edit { }` when it changes). The screens collect the flows, so a change shows everywhere at once. Nothing in it is
+secret.
 
 ### Host configs
 
@@ -114,7 +119,7 @@ callers then treat the value as not set: `SessionManager` discards an unreadable
 
 The manifest allows Android's backup (`android:allowBackup="true"`), but `res/xml/backup_rules.xml` (Android 11 and
 older) and `res/xml/data_extraction_rules.xml` (Android 12 and later, for both cloud backup and device-to-device
-transfer) exclude all four files:
+transfer) exclude the four main files, and `video_positions`, which is only of use on this device:
 
 ```xml
 <!-- The login and the provider credentials are encrypted with a Keystore key which is not part of a backup -->
@@ -133,12 +138,16 @@ Why each one:
 - **`provider_prefs`** holds the hosts. Restored without their sign-ins, they would only half work, and their update
   state (`etag`, the pending update) belongs to this install.
 
-In practice, a backup restores nothing of the app's own data. After moving to a new phone, export your configs from
-the old one and import them again.
+In practice, a backup restores nothing of the app's settings, hosts or sign-ins. After moving to a new phone, export
+your configs from the old one and import them again.
+
+What the rules don't name is backed up as Android does by default: `bundled_configs` (a flag, so on a phone restored
+from a backup the bundled Pixeldrain config isn't imported again), and, in the Nightly build, `files/account_avatars/`
+(the account picture, which the app calls "only kept on this device"). The caches never are.
 
 ## App lock
 
-**Settings → Security → Lock with fingerprint or face** (`AppSettings.biometricLock`, off by default) puts the app
+**Settings → Privacy and security → Lock with fingerprint or face** (`AppSettings.biometricLock`, off by default) puts the app
 behind Android's `BiometricPrompt`. It accepts a strong biometric or the device's screen lock
 (`BIOMETRIC_STRONG or DEVICE_CREDENTIAL`), so it works on phones without a fingerprint reader. The switch only turns
 on when the device has one of them set up (`biometricLockAvailable()`).
@@ -147,22 +156,43 @@ on when the device has one of them set up (`biometricLockAvailable()`).
 
 ```kotlin
 fun onStarted() {
-    val wasAway = stoppedAt?.let { SystemClock.elapsedRealtime() - it > LOCK_AFTER_BACKGROUND_MS } ?: true
+    val timeoutMs = settings.lockTimeoutSeconds.value * 1000L
+    val wasAway = stoppedAt?.let { SystemClock.elapsedRealtime() - it >= timeoutMs } ?: true
     if (settings.biometricLock.value && wasAway) _locked.value = true
     if (!settings.biometricLock.value) _locked.value = false
 }
 ```
 
-- It locks when the app is opened, and again when it comes back after more than **30 seconds** in the background
-  (`LOCK_AFTER_BACKGROUND_MS`). A quick switch to another app and back doesn't ask again; that would be tiring for no
-  gain.
+- It locks when the app is opened, and again when it comes back after **Lock after** in the background
+  (`AppSettings.lockTimeoutSeconds`, one of `LOCK_TIMEOUTS`: every time, 30 seconds, 1 or 5 minutes). A quick switch
+  to another app and back doesn't ask again, unless it's set to every time; that would be tiring for no gain. (A
+  stable release has a fixed 30 seconds.)
 - It uses `elapsedRealtime`, which can't be changed by setting the clock.
 - `AppLockOverlay` covers the whole app while it's locked and takes every touch, so nothing underneath can be used
   until the prompt succeeds.
 - A file shared from another app waits in `pendingShares` until the app is unlocked. Nothing uploads while it's locked
   (see [Uploads and downloads](transfers.md#files-shared-from-another-app)).
 
+- While it's on, the hosts aren't in the system's file picker (`HostDocumentsProvider` shows none), as the picker
+  doesn't ask for it.
+
 Transfers keep running while the app is locked. The lock protects what's on the screen, not the work in progress.
+
+**Block screenshots** (`AppSettings.blockScreenshots`) sets `FLAG_SECURE` on the window (`MainActivity`): screenshots
+and screen recordings come out black, adb's `screencap` too, and the recent apps show the app blank.
+
+## What other apps can reach
+
+Only what the manifest opens up, each as narrowly as it can be:
+
+| What | Who can reach it | What it gives |
+| --- | --- | --- |
+| `MainActivity`'s share and link filters | Any app | Files and text to upload, a Pixeldrain link to open. Nothing is uploaded without a button pressed, nor while the app is locked |
+| `HostDocumentsProvider` | Only the system (`MANAGE_DOCUMENTS`), for the app the user picks a file in | The hosts with folders, read only, while **Show hosts in the file picker** is on and the app isn't locked. A file is fetched whole into the cache when it's opened, and leaves it once the other app has it |
+| The `FileProvider` (`.files`) | Only an app a share was granted to | The one file shared, from `cache/shared/` (`res/xml/shared_files.xml`), nothing else |
+| `PlaybackService` | Any app that controls media (the system's controls, a watch, a car) | Play, pause, skip and seek the song playing. Not what it plays: a connected app can't make the player load an address of its choosing |
+| `UploadTileService` | Only the system (`BIND_QUICK_SETTINGS_TILE`) | Opening the app to upload, after the phone is unlocked |
+| `TransferService` | Nothing outside the app (`exported="false"`) | |
 
 ## Credentials only go to their host
 

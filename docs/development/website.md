@@ -12,8 +12,11 @@ documentation** at `/docs/`. Both are made from the `website` branch, which shar
 | `mkdocs.yml` | The documentation's settings: the theme, the Markdown extensions and the navigation |
 | `docs/requirements.txt` | The exact versions of MkDocs and Material the site is built with |
 | `docs/stylesheets/extra.css` | The documentation's colours, the same palette as `website/style.css` |
+| `hooks/page_info.py` | Adds to every page as it's built: the line at its end (when it was last changed, and the app's version then), the Nightly labels, and where a name in a table may break over lines on a phone |
+| `overrides/` | The parts of the theme the site changes: `partials/source-file.html`, which shows that line |
 | `docs/server-setup/` | How the server serves the site, and the files it needs. Not published |
 | `.github/workflows/site.yml` | Builds the site on every push to `website`, into the `site` branch |
+| `preview.ps1` | Builds the whole site as the workflow does and serves it locally (see [Previewing it](#previewing-it)) |
 
 Why a branch of its own: the documentation changes far more often than the app, and a change to it should never start
 an app build or appear in the app's history. The app's branches (`main`, `dev`) hold only the app; see
@@ -58,7 +61,23 @@ can only write the site's folder and the releases' one. Setting up a server is d
 
 ## Previewing it
 
-You need Python 3 (the workflow uses 3.12). From the root of a checkout of `website`:
+You need Python 3 (the workflow uses 3.12). The simplest way, on Windows or anywhere with PowerShell, is the script at
+the root of the branch:
+
+```powershell
+./preview.ps1
+```
+
+It builds the whole site as the workflow does, into `_site`, with `--strict`, and serves it at
+http://127.0.0.1:8000: the home page at `/`, the documentation at `/docs/`, as on the real site. It also reads the
+releases from GitHub into `_site/releases.json`, as the server's sync does. Run it again after a change. The first time,
+it makes a virtual environment in `.venv` with the versions in `docs/requirements.txt` (again whenever that file
+changes). `-Port 8080` serves on another port, `-NoServe` only builds, and `-Offline` leaves out the releases, so the
+home page asks GitHub itself.
+
+What it can't show is what only nginx does: the 404 pages, and the headers for caching and security.
+
+By hand, from the root of a checkout of `website`:
 
 ```bash
 python3 -m venv .venv
@@ -82,7 +101,7 @@ python3 -m http.server --directory website 8001
 ```
 
 Its **Documentation** link (`/docs/`) only works on the real site, or if you run the workflow's two build commands and
-serve `_site` instead. `site/` and `_site/` are in `.gitignore`.
+serve `_site` instead, which `preview.ps1` does. `site/`, `_site/` and `.venv/` are in `.gitignore`.
 
 The versions in `docs/requirements.txt` are pinned, so a new release of MkDocs or Material can't change or break the
 site without anyone noticing. Raise them on purpose, and check the build when you do.
@@ -180,6 +199,36 @@ A few of them, written out:
 
     Renders as: Press ++ctrl+c++ to copy.
 
+### Stable and Nightly
+
+The pages describe the app as it is on `dev`, the Nightly build. Whatever it has that the newest stable release
+doesn't yet is marked with `:nightly:`, written where the label should be, which `hooks/page_info.py` turns into a small
+yellow **Nightly** with a tooltip:
+
+```markdown
+| **Compact player** :nightly: | The player opens as a card a third of the screen high |
+```
+
+Mark the feature, not every mention of it: a whole table under a marked heading needs no label on each row. When a
+stable release has those changes, take the labels out (`grep -rn ":nightly:" docs`), and the sentences that say how a
+stable release differs ("In a stable release, …").
+
+### The line at the end of a page
+
+Every page ends with when it was last changed and the newest stable release then: *Last updated 23 October 2026 · For
+Materialdrain 1.5.20261014.1558*, and *and the Nightly build where it says so* on a page with Nightly labels.
+`hooks/page_info.py` works both out from git, at build time:
+
+- **The date** is the page's last commit in this branch (`git log -1 --follow`), so it changes only when the page does.
+  A page with changes not committed yet says so, with today's date, as in a local preview.
+- **The version** is the newest of the app's release tags (`v…`) whose commit is no newer than that date. The tags are
+  on the commits the releases were built from, which share this repository, so nothing is asked of GitHub. A page last
+  changed before a release still names the older one, which is the point: it says which version it was written for.
+
+The workflow checks out the whole history and the tags for it (`fetch-depth: 0`); a shallow checkout would give every
+page the date of the last commit and no version. `overrides/partials/source-file.html` replaces Material's own line
+with this one.
+
 The theme's features (`mkdocs.yml`, `theme.features`) add instant page loads, tabs for the top-level sections,
 "back to top", search suggestions, a copy button on every code block, and tabs that switch together across a page
 when they have the same title (`content.tabs.link`).
@@ -223,9 +272,10 @@ only lists them, and every download comes straight from GitHub.
    `/releases.json` (a local preview, or a server not set up for it yet) the page asks GitHub once, itself.
 3. Drafts and releases without an `.apk` are left out.
 4. **Stable** is the newest release that isn't a pre-release and isn't tagged `dev-build`. **Nightly** is the
-   release tagged `dev-build`, the development build (it's rebuilt with every push to `dev`, not once a night). Up to 8 older stable releases are listed under **Older versions** ("None yet." when
+   release tagged `dev-build`, the development build (it's rebuilt with every push to `dev`, not once a night). Up to 4 older stable releases are listed under **Older versions** ("None yet." when
    there are none).
-5. Each card links straight to its APK, and shows the version, the date and the size. The version is read from the
+5. Each card links straight to its APK ("Download APK" at the end of its title's line), and shows the version, the
+   date and the size, and a line on what the build is, which stays after the date comes in. The version is read from the
    APK's name (`Materialdrain-1.4.20261009.1530.apk` gives `1.4.20261009.1530`); releases from before the build
    workflow named their APKs differently, so for those it's the tag without its `v`. The date is when the APK was
    uploaded, not when the release was published: the `dev-build` release is published once and then only edited, so
@@ -234,11 +284,13 @@ only lists them, and every download comes straight from GitHub.
    with a button that copies all of it, to check a download against. GitHub records the checksum (`digest`) of
    uploads since mid-2025; for older ones the line has only the notes. The older versions have *What's new* beside
    their version, and their checksum in the version's tooltip.
-7. **Checked GitHub … ago** beside the Download heading counts up, every second, from when the server last read the
-   list from GitHub (or the page did, when it had to ask itself). Its tooltip has the exact time. A time much older
-   than 5 minutes means the server's checks are failing: `journalctl -u materialdrain-site-sync.service` says why.
-   From 20 minutes the page says so too, under the cards, since a newer build may be missing. When the list couldn't
-   be loaded it stays empty.
+7. **Next check in …** beside the Download heading counts down, by the second, to the server's next read of the list
+   from GitHub: 5 minutes after its last, which is when `releases.json` was written. Its tooltip has the time of the
+   last one. Once that's due it says *Checking GitHub…*, and the page asks for the list every 10 seconds until the
+   server's is newer (its timer can be up to 30 seconds late). When the page had to ask GitHub itself, there's no next
+   check, and it says so. From 20 minutes without a check the server's checks are failing
+   (`journalctl -u materialdrain-site-sync.service` says why): the line says *Couldn't check GitHub lately*, and under
+   the cards the page says a newer build may be missing. When the list couldn't be loaded it stays empty.
 
 If neither the server's list nor GitHub can be read, the page says so and the cards keep their plain links to the
 releases page, which are in the HTML from the start. So the page works, if more plainly, without the
@@ -266,14 +318,15 @@ keyboard.
 On a computer the home page fits one screen, without a sidebar: `main` is up to 1200 px wide, at least as tall as the
 window, and centres its content top to bottom.
 
-- **The top**: the icon and title, its line, and a row of a few things the app does (`.features`, taken from
-  [What it can do](../index.md#what-it-can-do)), with the Documentation and Source code links beside them (`.top`,
-  `.top-links`). The links go under the title only when there's no room for both.
+- **The top**: the icon and title, its line, and a few things the app does as one line of plain text (`.features`,
+  taken from [What it can do](../index.md#what-it-can-do)), with the Documentation and Source code links level with
+  the title (`.top`, `.top-links`). The links go under the title only when there's no room for both.
 - **Download**: the Stable and Nightly cards side by side, as wide as the page, each with its notes and checksum under
-  it (`.build`), then a line on installing.
-- **Older versions**: a grid of tiles (`.versions`), four to a row from 960 px wide, so the 8 shown make two full rows;
+  it (`.build`), then a line on installing, with links to how and to
+  [What you're installing](../user-guide/what-you-get.md). The notes-and-checksum line keeps its height while it's
+  empty, so nothing moves when the list comes in.
+- **Older versions**: a grid of tiles (`.versions`), four to a row from 960 px wide, so the 4 shown make one full row;
   narrower, as many as fit. "All releases on GitHub" is at the end of the heading's line (`.section-head`).
 
-All of it fits 1280 × 720, even with the warning about the server's checks; a fourth feature, or a second line of
-any kind, no longer does. Under 640 px wide (a phone) the page starts at the top, everything stacks, and it scrolls.
-Showing more than 8 older versions (`OLDER_SHOWN` in `releases.js`) adds rows, and may no longer fit a small screen.
+All of it fits 1280 × 720, even with the warning about the server's checks. Under 640 px wide (a phone) the page starts at the top, everything stacks, and it scrolls.
+Showing more than 4 older versions (`OLDER_SHOWN` in `releases.js`) adds rows; 8 still fit 1280 × 720.
