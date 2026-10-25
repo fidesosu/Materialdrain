@@ -14,6 +14,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import tools.senko.materialdrain.UiMessages
 import tools.senko.materialdrain.settings.AppSettings
 
@@ -23,6 +24,7 @@ import tools.senko.materialdrain.settings.AppSettings
  * GitHub's releases are served by a MockWebServer.
  */
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class UpdateCheckTest {
 
     private val installed = InstalledBuild("1.6.2", versionCode = 1000, commitTime = 5000, updatable = true, isDev = false)
