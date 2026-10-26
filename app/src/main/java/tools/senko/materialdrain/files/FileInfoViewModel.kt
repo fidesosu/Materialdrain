@@ -49,6 +49,7 @@ import android.net.Uri
 import tools.senko.materialdrain.provider.api.StorageProvider
 import tools.senko.materialdrain.provider.api.StorageRef
 import tools.senko.materialdrain.util.formatSize
+import tools.senko.materialdrain.R
 
 internal const val MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES = 1 * 1024 * 1024 // 1MB
 private const val MAX_TEXT_PREVIEW_DISPLAY_LENGTH = 8 * 1024 // 8KB
@@ -344,7 +345,7 @@ class FileInfoViewModel(
         node: StorageNode,
         outputStream: OutputStream,
         onProgress: (Long, Long?) -> Unit
-    ): ApiResponse<Long> = downloadNode(provider(), node, outputStream, onProgress)
+    ): ApiResponse<Long> = downloadNode(provider(), node, outputStream, application.resources, onProgress)
 
     /**
      * Loads the text of [fileInfo] for its preview, up to [limit] bytes: a bigger one says so, and (under the limit of
@@ -366,7 +367,7 @@ class FileInfoViewModel(
             _uiState.update {
                 it.copy(
                     isLoadingTextPreview = false, textPreviewContent = null, textPreviewFullContent = null,
-                    textPreviewErrorMessage = "Too big to preview (max $maxSize).",
+                    textPreviewErrorMessage = application.getString(R.string.files_too_big_to_preview_max, maxSize),
                     textPreviewCanLoadAnyway = canLoadAnyway
                 )
             }
@@ -390,7 +391,7 @@ class FileInfoViewModel(
                 _uiState.update {
                     it.copy(
                         isLoadingTextPreview = false,
-                        textPreviewErrorMessage = "Too big to preview (max $maxSize).",
+                        textPreviewErrorMessage = application.getString(R.string.files_too_big_to_preview_max, maxSize),
                         textPreviewCanLoadAnyway = limit < MAX_TEXT_LOAD_ANYWAY_BYTES
                     )
                 }
@@ -413,7 +414,7 @@ class FileInfoViewModel(
                     _uiState.update {
                         it.copy(
                             isLoadingTextPreview = false,
-                            textPreviewErrorMessage = response.error.message.ifBlank { "Error fetching text preview." }
+                            textPreviewErrorMessage = response.error.message.ifBlank { application.getString(R.string.files_error_fetching_text_preview) }
                         )
                     }
                 }
@@ -519,7 +520,7 @@ class FileInfoViewModel(
 
     fun fetchFileInfo(fileId: String) {
         if (fileId.isBlank()) {
-            _uiState.update { it.copy(fileInfoErrorMessage = "Enter a file ID.", isLoadingFileInfo = false) }
+            _uiState.update { it.copy(fileInfoErrorMessage = application.getString(R.string.files_enter_a_file_id), isLoadingFileInfo = false) }
             return
         }
         fileInfoJob?.cancel()
@@ -528,7 +529,7 @@ class FileInfoViewModel(
         fileInfoJob = viewModelScope.launch {
             val store = provider().fileStore
             if (store == null) {
-                _uiState.update { it.copy(isLoadingFileInfo = false, fileInfoErrorMessage = "This host can't show file details by id.") }
+                _uiState.update { it.copy(isLoadingFileInfo = false, fileInfoErrorMessage = application.getString(R.string.files_this_host_can_t_show)) }
                 return@launch
             }
             when (val response = store.fileInfo(StorageRef(id = fileId))) {
@@ -542,7 +543,7 @@ class FileInfoViewModel(
                     _uiState.update {
                         it.copy(
                             isLoadingFileInfo = false,
-                            fileInfoErrorMessage = response.error.message.ifBlank { "Unknown error fetching file info" },
+                            fileInfoErrorMessage = response.error.message.ifBlank { application.getString(R.string.files_unknown_error_fetching_file_info) },
                             fileInfo = null
                         )
                     }
@@ -573,11 +574,11 @@ class FileInfoViewModel(
      * the tab it's opened from leaves that out.
      */
     fun showsArchive(node: StorageNode): Boolean =
-        isArchiveName(node.name) && ProviderCapability.ARCHIVE_BROWSE !in tabLimits && archivesOf(provider())?.canOpen(node.ref) == true
+        isArchiveName(node.name) && ProviderCapability.ARCHIVE_BROWSE !in tabLimits && archivesOf(provider(), application.resources)?.canOpen(node.ref) == true
 
     /** Lists the folder [inside] of the [archive] for the details, see FileDetailsScreen. */
     private fun loadArchive(archive: StorageRef, inside: String) {
-        val archives = archivesOf(provider()) ?: return
+        val archives = archivesOf(provider(), application.resources) ?: return
         archiveJob?.cancel()
         _uiState.update { it.copy(archive = ArchiveView(archive, inside, entries = null, error = null)) }
         archiveJob = viewModelScope.launch {
@@ -595,7 +596,7 @@ class FileInfoViewModel(
                         )
                     )
                     is ApiResponse.Error -> state.copy(
-                        archive = ArchiveView(archive, inside, entries = null, error = result.error.message.ifBlank { "This file can't be opened as an archive." })
+                        archive = ArchiveView(archive, inside, entries = null, error = result.error.message.ifBlank { application.getString(R.string.files_this_file_can_t_be) })
                     )
                 }
             }
@@ -616,7 +617,7 @@ class FileInfoViewModel(
                 it.copy(
                     isLoadingFileInfo = false,
                     fileInfo = null,
-                    fileInfoErrorMessage = "Folders have no file details."
+                    fileInfoErrorMessage = application.getString(R.string.files_folders_have_no_file_details)
                 )
             }
             clearTextPreviewStates()
@@ -683,7 +684,7 @@ class FileInfoViewModel(
     fun fetchUserFiles() {
         val files = provider().fileList
         if (files == null) {
-            _uiState.update { it.copy(userFilesListErrorMessage = "This host has no list of its files.", isLoadingUserFiles = false) }
+            _uiState.update { it.copy(userFilesListErrorMessage = application.getString(R.string.files_this_host_has_no_list), isLoadingUserFiles = false) }
             return
         }
         if (needsKeyButMissing()) {
@@ -699,7 +700,7 @@ class FileInfoViewModel(
                     _uiState.update { it.copy(isLoadingUserFiles = false, userFilesList = response.data.children) }
                 }
                 is ApiResponse.Error -> {
-                    val errorMsg = response.error.forDisplay().ifBlank { "Unknown error fetching user files" }
+                    val errorMsg = response.error.forDisplay().ifBlank { application.getString(R.string.files_unknown_error_fetching_user_files) }
                     ProviderLog.e("Files", "loading the file list failed (${response.error.code}): $errorMsg")
                     _uiState.update {
                         it.copy(
@@ -729,7 +730,7 @@ class FileInfoViewModel(
         val node = _uiState.value.nodeToDelete ?: return
         if (needsKeyButMissing()) {
             _uiState.update { it.copy(initiateDeleteFile = false, apiKeyMissingError = true) }
-            messages.show("Log in to delete files.", long = true)
+            messages.show(application.getString(R.string.files_log_in_to_delete_files), long = true)
             return
         }
         _uiState.update { it.copy(isLoadingDeleteFile = true) }
@@ -749,7 +750,7 @@ class FileInfoViewModel(
                             fileInfo = if (it.fileInfo?.key == node.key) null else it.fileInfo
                         )
                     }
-                    messages.show("File deleted successfully.")
+                    messages.show(application.getString(R.string.files_file_deleted_successfully))
                     _fileDeleted.trySend(Unit)
                     // A deleted file has to disappear from the folder or list it was shown in too
                     contentChanges.notifyChanged()
@@ -763,7 +764,7 @@ class FileInfoViewModel(
                             nodeToDelete = null
                         )
                     }
-                    messages.show("Delete failed: ${response.error.message.ifBlank { "Unknown error deleting file." }}", long = true)
+                    messages.show(application.getString(R.string.files_delete_failed, response.error.message.ifBlank { "Unknown error deleting file." }), long = true)
                 }
             }
         }
@@ -779,10 +780,10 @@ class FileInfoViewModel(
         val id = node.ref.id
         return try {
             if (id != null) {
-                val store = current.fileStore ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't delete files by id."))
+                val store = current.fileStore ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, application.getString(R.string.files_this_host_can_t_delete)))
                 store.delete(StorageRef(id = id))
             } else {
-                val browse = current.browse ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't delete this file."))
+                val browse = current.browse ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, application.getString(R.string.files_this_host_can_t_delete_2)))
                 browse.delete(node.ref.path, recursive = node.isDirectory)
             }
         } catch (e: CancellationException) {
@@ -790,7 +791,7 @@ class FileInfoViewModel(
         } catch (e: Exception) {
             coroutineContext.ensureActive()
             ProviderLog.e("Files", "deleting '${node.name}' failed: ${e.message}", e)
-            ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: "The host couldn't be reached."))
+            ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: application.getString(R.string.files_the_host_couldn_t_be)))
         }
     }
 
@@ -848,12 +849,12 @@ class FileInfoViewModel(
                 is ApiResponse.Success -> {
                     val files = response.data.files
                     when {
-                        files.isEmpty() -> messages.show("\"${list.title}\" has no files.")
+                        files.isEmpty() -> messages.show(application.getString(R.string.files_has_no_files, list.title))
                         style == DownloadStyle.ZIP -> downloadManager.downloadAsZip(files, list.title)
                         else -> downloadManager.downloadSequentially(files, title = list.title)
                     }
                 }
-                is ApiResponse.Error -> messages.show("Couldn't open \"${list.title}\": ${response.error.message}", long = true)
+                is ApiResponse.Error -> messages.show(application.getString(R.string.files_couldn_t_open, list.title, response.error.message), long = true)
             }
         }
     }
@@ -906,9 +907,9 @@ class FileInfoViewModel(
                 )
             }
             if (failures.isEmpty()) {
-                finishBulkOperation(if (deletedKeys.size == 1) "File deleted." else "${deletedKeys.size} files deleted.")
+                finishBulkOperation(if (deletedKeys.size == 1) application.getString(R.string.files_file_deleted) else application.getString(R.string.files_files_deleted, deletedKeys.size))
             } else {
-                finishBulkOperation(null, "Deleted ${deletedKeys.size} of ${targets.size} files. Failed: ${failureSummary(failures)}")
+                finishBulkOperation(null, application.getString(R.string.files_deleted_of_files_failed, deletedKeys.size, targets.size, failureSummary(failures)))
             }
         }
     }
@@ -920,13 +921,13 @@ class FileInfoViewModel(
         viewModelScope.launch {
             val browse = provider().browse
             val response = browse?.importFiles(directoryPath, ids)
-                ?: ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't add files to a folder."))
+                ?: ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, application.getString(R.string.files_this_host_can_t_add)))
             when (response) {
                 is ApiResponse.Success -> finishBulkOperation(
-                    (if (ids.size == 1) "File added to " else "${ids.size} files added to ") + directoryPath.trim('/')
+                    (if (ids.size == 1) application.getString(R.string.files_file_added_to) else application.getString(R.string.files_files_added_to, ids.size)) + directoryPath.trim('/')
                 )
                 is ApiResponse.Error -> finishBulkOperation(
-                    null, "Could not add the files: ${response.error.message.ifBlank { "unknown error" }}"
+                    null, application.getString(R.string.files_could_not_add_the_files, response.error.message.ifBlank { "unknown error" })
                 )
             }
         }
@@ -938,11 +939,11 @@ class FileInfoViewModel(
         viewModelScope.launch {
             val lists = provider().lists
             val response = lists?.create(title, ids)
-                ?: ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host has no lists."))
+                ?: ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, application.getString(R.string.files_this_host_has_no_lists)))
             when (response) {
-                is ApiResponse.Success -> finishBulkOperation("List created" + linkSuffix(response.data))
+                is ApiResponse.Success -> finishBulkOperation(application.getString(R.string.files_list_created) + linkSuffix(response.data))
                 is ApiResponse.Error -> finishBulkOperation(
-                    null, "Could not create the list: ${response.error.message.ifBlank { "unknown error" }}"
+                    null, application.getString(R.string.files_could_not_create_the_list, response.error.message.ifBlank { "unknown error" })
                 )
             }
         }
@@ -955,7 +956,7 @@ class FileInfoViewModel(
     /** The lists of the user which can be changed, for choosing the list to add files to. */
     suspend fun loadEditableLists(): ApiResponse<List<FileList>> {
         if (needsKeyButMissing()) return ApiResponse.Error(ProviderError(ErrorCodes.API_KEY_MISSING, API_KEY_MISSING))
-        val lists = provider().lists ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host has no lists."))
+        val lists = provider().lists ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, application.getString(R.string.files_this_host_has_no_lists)))
         return when (val response = lists.lists()) {
             is ApiResponse.Success -> ApiResponse.Success(response.data.filter { it.canEdit })
             is ApiResponse.Error -> ApiResponse.Error(response.error)
@@ -973,9 +974,9 @@ class FileInfoViewModel(
             }
             finishListOperation(result) {
                 when {
-                    added == 0 -> "Everything was in \"${list.title}\" already."
-                    added == 1 -> "1 file added to \"${list.title}\"."
-                    else -> "$added files added to \"${list.title}\"."
+                    added == 0 -> application.getString(R.string.files_everything_was_in_already, list.title)
+                    added == 1 -> application.getString(R.string.files_1_file_added_to, list.title)
+                    else -> application.getString(R.string.files_files_added_to_2, added, list.title)
                 } + it
             }
         }
@@ -995,9 +996,9 @@ class FileInfoViewModel(
             }
             finishListOperation(result) {
                 when {
-                    result is ListRewrite.Deleted -> "The list \"${list.title}\" was deleted, it had no files left."
-                    removed == 1 -> "1 file removed from \"${list.title}\"."
-                    else -> "$removed files removed from \"${list.title}\"."
+                    result is ListRewrite.Deleted -> application.getString(R.string.files_the_list_was_deleted_it, list.title)
+                    removed == 1 -> application.getString(R.string.files_1_file_removed_from, list.title)
+                    else -> application.getString(R.string.files_files_removed_from, removed, list.title)
                 } + it
             }
         }
@@ -1018,17 +1019,17 @@ class FileInfoViewModel(
      * when a step fails. A rebuilt list has a new id, so its old links stop working.
      */
     private suspend fun rewriteList(list: FileList, transform: (current: List<String>) -> List<String>): ListRewrite {
-        val lists = provider().lists ?: return ListRewrite.Failed("This host has no lists.")
+        val lists = provider().lists ?: return ListRewrite.Failed(application.getString(R.string.files_this_host_has_no_lists))
         val current = when (val response = lists.listContents(list.id)) {
             is ApiResponse.Success -> response.data.files.mapNotNull { it.ref.id }
-            is ApiResponse.Error -> return ListRewrite.Failed("Could not read the list: ${response.error.message}")
+            is ApiResponse.Error -> return ListRewrite.Failed(application.getString(R.string.files_could_not_read_the_list, response.error.message))
         }
         val newIds = transform(current)
         if (newIds == current) return ListRewrite.Updated
         if (newIds.isEmpty()) {
             return when (val response = lists.delete(list.id)) {
                 is ApiResponse.Success -> ListRewrite.Deleted
-                is ApiResponse.Error -> ListRewrite.Failed("Could not delete the list: ${response.error.message}")
+                is ApiResponse.Error -> ListRewrite.Failed(application.getString(R.string.files_could_not_delete_the_list, response.error.message))
             }
         }
 
@@ -1041,17 +1042,17 @@ class FileInfoViewModel(
         if (ErrorCodes.isNetworkError(code) ||
             code in setOf(ErrorCodes.FORBIDDEN, ErrorCodes.AUTHENTICATION_REQUIRED, ErrorCodes.API_KEY_MISSING)
         ) {
-            return ListRewrite.Failed("Could not change the list: ${updateError.message}")
+            return ListRewrite.Failed(application.getString(R.string.files_could_not_change_the_list, updateError.message))
         }
 
         val newId = when (val created = lists.create(list.title, newIds)) {
             is ApiResponse.Success -> created.data
-            is ApiResponse.Error -> return ListRewrite.Failed("Could not change the list: ${created.error.message}")
+            is ApiResponse.Error -> return ListRewrite.Failed(application.getString(R.string.files_could_not_change_the_list, created.error.message))
         }
         return when (val deleted = lists.delete(list.id)) {
             is ApiResponse.Success -> ListRewrite.Replaced(newId)
             is ApiResponse.Error -> ListRewrite.Failed(
-                "Saved as a new list. The old one couldn't be deleted: ${deleted.error.message}"
+                application.getString(R.string.files_saved_as_a_new_list, deleted.error.message)
             )
         }
     }
@@ -1062,8 +1063,8 @@ class FileInfoViewModel(
             is ListRewrite.Failed -> finishBulkOperation(null, result.message)
             is ListRewrite.Replaced -> finishBulkOperation(
                 message(
-                    provider().listShareUrl(result.newId)?.let { " The list has a new link: $it" }
-                        ?: " The list has a new id: ${result.newId}"
+                    provider().listShareUrl(result.newId)?.let { application.getString(R.string.files_the_list_has_a_new, it) }
+                        ?: application.getString(R.string.files_the_list_has_a_new_2, result.newId)
                 )
             )
             else -> finishBulkOperation(message(""))

@@ -28,16 +28,16 @@ class ViewModelFactory(
             return FilesystemViewModel(application, container.providerRegistry, container.providerConfigStore, container.sessionManager, container.transferRegistry, container.appSettings, container.uiMessages, container.contentChanges) as T
         }
         if (modelClass.isAssignableFrom(ListViewModel::class.java)) {
-            return ListViewModel(container.providerRegistry, container.providerConfigStore, container.sessionManager, container.appSettings, container.contentChanges) as T
+            return ListViewModel(application.resources, container.providerRegistry, container.providerConfigStore, container.sessionManager, container.appSettings, container.contentChanges) as T
         }
         if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
-            return AuthViewModel(container.userApi, container.sessionManager) as T
+            return AuthViewModel(application.resources, container.userApi, container.sessionManager) as T
         }
         if (modelClass.isAssignableFrom(AccountViewModel::class.java)) {
-            return AccountViewModel(container.userApi, container.sessionManager, container.uiMessages) as T
+            return AccountViewModel(application.resources, container.userApi, container.sessionManager, container.uiMessages) as T
         }
         if (modelClass.isAssignableFrom(ProviderSettingsViewModel::class.java)) {
-            return ProviderSettingsViewModel(container.providerConfigStore, container.providerRegistry, container.providerUpdater) as T
+            return ProviderSettingsViewModel(application.resources, container.providerConfigStore, container.providerRegistry, container.providerUpdater) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: " + modelClass.name)
     }

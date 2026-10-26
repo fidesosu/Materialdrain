@@ -74,8 +74,8 @@ class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         /** The channel of the update notifications, made when the first one comes. */
         fun ensureChannel(context: Context) {
             context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-                NotificationChannel(CHANNEL_APP_UPDATES, "App updates", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                    description = "A new version of Materialdrain, from the daily check in the background"
+                NotificationChannel(CHANNEL_APP_UPDATES, context.getString(R.string.update_app_updates), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    description = context.getString(R.string.update_a_new_version_of_materialdrain)
                 }
             )
         }
@@ -92,12 +92,12 @@ class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             val count = update.changes.size
             val notification = NotificationCompat.Builder(context, CHANNEL_APP_UPDATES)
                 .setSmallIcon(R.drawable.icon_download)
-                .setContentTitle("Materialdrain ${update.info.versionName} is out")
+                .setContentTitle(context.getString(R.string.update_materialdrain_is_out, update.info.versionName))
                 .setContentText(
                     when (count) {
-                        0 -> "Tap to see it"
-                        1 -> "1 change · tap to see it"
-                        else -> "$count changes · tap to see them"
+                        0 -> context.getString(R.string.update_tap_to_see_it)
+                        1 -> context.getString(R.string.update_1_change_tap_to_see)
+                        else -> context.getString(R.string.update_changes_tap_to_see_them, count)
                     }
                 )
                 .setContentIntent(PendingIntent.getActivity(context, NOTIFICATION_ID, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))

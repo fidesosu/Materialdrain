@@ -15,6 +15,8 @@ import tools.senko.materialdrain.provider.pixeldrain.internal.LoginResult
 import tools.senko.materialdrain.provider.pixeldrain.internal.PixeldrainUserApi
 import tools.senko.materialdrain.auth.ApiKeySource
 import tools.senko.materialdrain.auth.SessionManager
+import android.content.res.Resources
+import tools.senko.materialdrain.R
 
 data class AuthUiState(
     val loggedInUser: String? = null,
@@ -29,6 +31,8 @@ data class AuthUiState(
 )
 
 class AuthViewModel(
+    /** The app's texts (its messages) */
+    private val resources: Resources,
     private val userApi: PixeldrainUserApi,
     private val sessionManager: SessionManager
 ) : ViewModel() {
@@ -49,7 +53,7 @@ class AuthViewModel(
     fun login(username: String, password: String, totp: String) {
         if (_uiState.value.isBusy) return
         if (username.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "Enter your username or e-mail address.", infoMessage = null) }
+            _uiState.update { it.copy(errorMessage = resources.getString(R.string.settings_enter_your_username_or_e), infoMessage = null) }
             return
         }
         submitLogin(username, password, totp, linkLoginUserId = "", linkLoginId = "")
@@ -62,7 +66,7 @@ class AuthViewModel(
         val userId = uri?.getQueryParameter("link_login_user_id")
         val loginId = uri?.getQueryParameter("link_login_id")
         if (userId.isNullOrBlank() || loginId.isNullOrBlank()) {
-            _uiState.update { it.copy(errorMessage = "Paste the whole link from the e-mail.", infoMessage = null) }
+            _uiState.update { it.copy(errorMessage = resources.getString(R.string.settings_paste_the_whole_link_from), infoMessage = null) }
             return
         }
         submitLogin(username, password, totp, userId, loginId)
@@ -79,12 +83,12 @@ class AuthViewModel(
                             AuthUiState(
                                 loggedInUser = username.trim(),
                                 activeSource = sessionManager.activeSource(),
-                                infoMessage = "Logged in as ${username.trim()}."
+                                infoMessage = resources.getString(R.string.settings_logged_in_as_2, username.trim())
                             )
                         }
                     }
                     LoginResult.LoginLinkSent -> _uiState.update {
-                        it.copy(isBusy = false, loginLinkSent = true, infoMessage = "Login link sent. Paste it below.")
+                        it.copy(isBusy = false, loginLinkSent = true, infoMessage = resources.getString(R.string.settings_login_link_sent_paste_it))
                     }
                 }
                 is ApiResponse.Error -> _uiState.update {
@@ -109,7 +113,7 @@ class AuthViewModel(
             _uiState.update {
                 AuthUiState(
                     activeSource = sessionManager.activeSource(),
-                    infoMessage = if (serverResult is ApiResponse.Error) "Logged out here. The server couldn't end the session." else "Logged out."
+                    infoMessage = if (serverResult is ApiResponse.Error) resources.getString(R.string.settings_logged_out_here_the_server) else resources.getString(R.string.settings_logged_out)
                 )
             }
         }
@@ -123,9 +127,9 @@ class AuthViewModel(
             it.copy(
                 errorMessage = null,
                 infoMessage = when {
-                    apiKey.isBlank() -> "API key removed."
-                    sessionManager.activeSource() == ApiKeySource.LOGIN -> "API key saved. It's used after you log out."
-                    else -> "API key saved."
+                    apiKey.isBlank() -> resources.getString(R.string.settings_api_key_removed)
+                    sessionManager.activeSource() == ApiKeySource.LOGIN -> resources.getString(R.string.settings_api_key_saved_it_s)
+                    else -> resources.getString(R.string.settings_api_key_saved)
                 }
             )
         }
@@ -137,15 +141,15 @@ class AuthViewModel(
     }
 
     private fun describeLoginError(error: FileUploadResponse): String = when (error.value) {
-        "user_not_found" -> "No account exists with this username or e-mail address."
-        "password_incorrect" -> "The password is not correct."
-        "no_login_method_available" -> "Enter a password: this account has no e-mail."
-        "otp_required" -> "Enter the code from your authenticator app."
-        "otp_incorrect" -> "The one-time password is not correct."
-        "login_link_already_sent" -> "A link was already sent. Wait for it to expire."
-        "invalid_login_link" -> "This login link is not valid, it may have expired."
-        "invalid_email_address" -> "The e-mail address is not valid."
-        "ip_rate_limit_reached" -> "Too many login attempts, try again later."
-        else -> error.message ?: error.value ?: "Login failed."
+        "user_not_found" -> resources.getString(R.string.settings_no_account_exists_with_this)
+        "password_incorrect" -> resources.getString(R.string.settings_the_password_is_not_correct)
+        "no_login_method_available" -> resources.getString(R.string.settings_enter_a_password_this_account)
+        "otp_required" -> resources.getString(R.string.settings_enter_the_code_from_your)
+        "otp_incorrect" -> resources.getString(R.string.settings_the_one_time_password_is)
+        "login_link_already_sent" -> resources.getString(R.string.settings_a_link_was_already_sent)
+        "invalid_login_link" -> resources.getString(R.string.settings_this_login_link_is_not)
+        "invalid_email_address" -> resources.getString(R.string.settings_the_e_mail_address_is)
+        "ip_rate_limit_reached" -> resources.getString(R.string.settings_too_many_login_attempts_try)
+        else -> error.message ?: error.value ?: resources.getString(R.string.settings_login_failed)
     }
 }

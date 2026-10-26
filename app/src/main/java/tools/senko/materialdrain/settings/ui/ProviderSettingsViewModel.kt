@@ -24,6 +24,8 @@ import tools.senko.materialdrain.provider.api.ProviderConfigCodec
 import tools.senko.materialdrain.provider.api.ProviderValidationResult
 import tools.senko.materialdrain.provider.api.SensitiveChange
 import tools.senko.materialdrain.provider.api.screenProblems
+import android.content.res.Resources
+import tools.senko.materialdrain.R
 
 /** An update which needs the user's go-ahead: it changes where credentials go, and/or discards their edits. */
 data class UpdateApproval(
@@ -70,6 +72,8 @@ data class ProviderSettingsUiState(
 
 /** Backs the "Custom host settings" section of the Advanced settings tab. */
 class ProviderSettingsViewModel(
+    /** The app's texts (its messages) */
+    private val resources: Resources,
     private val configStore: ProviderConfigStore,
     private val registry: ProviderRegistry,
     private val updater: ProviderUpdater
@@ -102,15 +106,15 @@ class ProviderSettingsViewModel(
     fun importConfig(text: String): Boolean {
         val source = ConfigSource.of(text)
         if (source == null) {
-            val reason = ProviderConfigCodec.explainFailure(text) ?: "it couldn't be read"
-            _uiState.update { it.copy(importError = "Not a valid config: $reason.") }
+            val reason = ProviderConfigCodec.explainFailure(text) ?: resources.getString(R.string.settings_it_couldn_t_be_read)
+            _uiState.update { it.copy(importError = resources.getString(R.string.settings_not_a_valid_config, reason)) }
             return false
         }
         // The newly imported host is the one the Files, Lists and Filesystem screens use
         configStore.setActive(configStore.import(source))
         // It works, but not all of its tabs show: said under the field, rather than left to be found out
         val problems = screenProblems(source.config.screens)
-        _uiState.update { it.copy(importError = problems.takeIf { p -> p.isNotEmpty() }?.joinToString(" ", prefix = "Added. ")) }
+        _uiState.update { it.copy(importError = problems.takeIf { p -> p.isNotEmpty() }?.joinToString(" ", prefix = resources.getString(R.string.settings_added))) }
         return true
     }
 
@@ -235,8 +239,8 @@ class ProviderSettingsViewModel(
     private fun sourceOrError(text: String): ConfigSource? {
         val source = ConfigSource.of(text)
         if (source == null) {
-            val reason = ProviderConfigCodec.explainFailure(text) ?: "it couldn't be read"
-            _uiState.update { it.copy(editError = "This config can't be used yet: $reason.") }
+            val reason = ProviderConfigCodec.explainFailure(text) ?: resources.getString(R.string.settings_it_couldn_t_be_read)
+            _uiState.update { it.copy(editError = resources.getString(R.string.settings_this_config_can_t_be, reason)) }
         }
         return source
     }
@@ -313,23 +317,23 @@ class ProviderSettingsViewModel(
 
     private fun applyUpdate(id: String) {
         updater.applyPending(id)
-        _uiState.update { it.copy(checkMessages = it.checkMessages + (id to "Updated"), validation = it.validation - id) }
+        _uiState.update { it.copy(checkMessages = it.checkMessages + (id to resources.getString(R.string.settings_updated)), validation = it.validation - id) }
     }
 
     fun revert(id: String) {
         configStore.revert(id)
         _uiState.update {
-            it.copy(checkMessages = it.checkMessages + (id to "Reverted to the previous version, auto-update is off"), validation = it.validation - id)
+            it.copy(checkMessages = it.checkMessages + (id to resources.getString(R.string.settings_reverted_to_the_previous_version)), validation = it.validation - id)
         }
     }
 
     private fun describe(outcome: CheckOutcome): String = when (outcome) {
-        CheckOutcome.UpToDate -> "Up to date"
+        CheckOutcome.UpToDate -> resources.getString(R.string.settings_up_to_date)
         is CheckOutcome.UpdateAvailable ->
-            if (outcome.sensitiveChanges.isEmpty()) "Version ${outcome.version} is available"
-            else "Version ${outcome.version} needs your approval"
-        is CheckOutcome.NeedsNewerApp -> "Update needs app version ${outcome.minAppVersion}"
-        is CheckOutcome.Failed -> "Couldn't check: ${outcome.message}"
-        CheckOutcome.NoUpdateUrl -> "This config has no update URL"
+            if (outcome.sensitiveChanges.isEmpty()) resources.getString(R.string.settings_version_is_available, outcome.version)
+            else resources.getString(R.string.settings_version_needs_your_approval, outcome.version)
+        is CheckOutcome.NeedsNewerApp -> resources.getString(R.string.settings_update_needs_app_version, outcome.minAppVersion)
+        is CheckOutcome.Failed -> resources.getString(R.string.settings_couldn_t_check, outcome.message)
+        CheckOutcome.NoUpdateUrl -> resources.getString(R.string.settings_this_config_has_no_update)
     }
 }

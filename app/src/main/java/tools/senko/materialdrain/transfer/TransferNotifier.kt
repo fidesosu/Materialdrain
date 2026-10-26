@@ -46,25 +46,25 @@ class TransferNotifier(private val context: Context) {
 
     fun ensureChannels() {
         val manager = context.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannelGroup(NotificationChannelGroup(CHANNEL_GROUP_TRANSFERS, "Transfers"))
+        manager.createNotificationChannelGroup(NotificationChannelGroup(CHANNEL_GROUP_TRANSFERS, context.getString(R.string.upload_transfers)))
 
         // Silent by default: this notification is shown for as long as a transfer runs
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_TRANSFER_PROGRESS, "Transfer progress", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Shown while files are being uploaded or downloaded"
+            NotificationChannel(CHANNEL_TRANSFER_PROGRESS, context.getString(R.string.upload_transfer_progress), NotificationManager.IMPORTANCE_LOW).apply {
+                description = context.getString(R.string.upload_shown_while_files_are_being)
                 group = CHANNEL_GROUP_TRANSFERS
                 setShowBadge(false)
             }
         )
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_TRANSFER_COMPLETE, "Completed transfers", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "When a transfer finishes in the background"
+            NotificationChannel(CHANNEL_TRANSFER_COMPLETE, context.getString(R.string.upload_completed_transfers), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = context.getString(R.string.upload_when_a_transfer_finishes_in)
                 group = CHANNEL_GROUP_TRANSFERS
             }
         )
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_TRANSFER_FAILED, "Failed transfers", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "When a transfer fails in the background"
+            NotificationChannel(CHANNEL_TRANSFER_FAILED, context.getString(R.string.upload_failed_transfers), NotificationManager.IMPORTANCE_HIGH).apply {
+                description = context.getString(R.string.upload_when_a_transfer_fails_in)
                 group = CHANNEL_GROUP_TRANSFERS
             }
         )
@@ -114,7 +114,7 @@ class TransferNotifier(private val context: Context) {
         if (transfers.isEmpty()) {
             return builder
                 .setSmallIcon(R.drawable.icon_upload)
-                .setContentTitle("Finishing transfers")
+                .setContentTitle(context.getString(R.string.upload_finishing_transfers))
                 .setProgress(0, 0, true)
                 .build()
         }
@@ -123,12 +123,12 @@ class TransferNotifier(private val context: Context) {
         val onlyUploads = transfers.all { it.kind == TransferKind.UPLOAD }
         val title = if (transfers.size == 1) {
             val transfer = transfers.first()
-            (if (transfer.kind == TransferKind.UPLOAD) "Uploading " else "Downloading ") + transfer.title
+            (if (transfer.kind == TransferKind.UPLOAD) context.getString(R.string.upload_uploading) else context.getString(R.string.upload_downloading)) + transfer.title
         } else {
             when {
-                onlyUploads -> "Uploading ${transfers.size} items"
-                onlyDownloads -> "Downloading ${transfers.size} items"
-                else -> "${transfers.size} transfers running"
+                onlyUploads -> context.getString(R.string.upload_uploading_items, transfers.size)
+                onlyDownloads -> context.getString(R.string.upload_downloading_items, transfers.size)
+                else -> context.getString(R.string.upload_transfers_running, transfers.size)
             }
         }
 
@@ -150,8 +150,8 @@ class TransferNotifier(private val context: Context) {
         builder
             .setSmallIcon(icon)
             .setContentTitle(title)
-            .setContentText(details.ifEmpty { "Starting…" })
-        privateOnLockScreen(builder, CHANNEL_TRANSFER_PROGRESS, icon, if (transfers.size == 1) "1 transfer running" else "${transfers.size} transfers running")
+            .setContentText(details.ifEmpty { context.getString(R.string.upload_starting) })
+        privateOnLockScreen(builder, CHANNEL_TRANSFER_PROGRESS, icon, if (transfers.size == 1) context.getString(R.string.upload_1_transfer_running) else context.getString(R.string.upload_transfers_running, transfers.size))
         if (total != null) {
             builder.setProgress(100, (transferred * 100 / total).coerceIn(0L, 100L).toInt(), false)
         } else {
@@ -167,7 +167,7 @@ class TransferNotifier(private val context: Context) {
     /** The notification of a finished transfer, with "Try again" when it failed and [canRetry]; returns its id. */
     fun notifyResult(info: TransferInfo, outcome: TransferOutcome, message: String?, openUri: Uri?, mimeType: String?, canRetry: Boolean = false): Int {
         val failed = outcome == TransferOutcome.FAILED
-        val verb = if (info.kind == TransferKind.UPLOAD) "Upload" else "Download"
+        val verb = if (info.kind == TransferKind.UPLOAD) context.getString(R.string.upload_upload) else context.getString(R.string.browser_download)
 
         val contentIntent = if (!failed && openUri != null) {
             val viewIntent = Intent(Intent.ACTION_VIEW)

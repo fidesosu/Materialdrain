@@ -56,6 +56,7 @@ import tools.senko.materialdrain.transfer.estimateEtaSeconds
 import tools.senko.materialdrain.util.readContentUriInfo
 import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.UiMessages
+import tools.senko.materialdrain.R
 
 // SharedPreferences constants
 private const val TAG = "PIXEL_VM_DEBUG" // Tag for Logcat
@@ -170,7 +171,7 @@ class UploadViewModel(
         }
         if (links.isEmpty()) return
         application.getSystemService(ClipboardManager::class.java)
-            ?.setPrimaryClip(ClipData.newPlainText(if (links.size == 1) "Link" else "Links", links.joinToString("\n")))
+            ?.setPrimaryClip(ClipData.newPlainText(if (links.size == 1) application.getString(R.string.files_link) else application.getString(R.string.upload_links), links.joinToString("\n")))
     }
 
     /** Pixeldrain uploads need the login; other hosts take their own credentials. */
@@ -189,7 +190,7 @@ class UploadViewModel(
             } else {
                 // No flat storage to upload into (WebDAV, S3, SMB): the Upload screen uploads into the host's root
                 // folder instead, through the same browse the Filesystem screen uses
-                val browse = provider.browse ?: return UploadResult(false, message = "This host can't receive uploads.")
+                val browse = provider.browse ?: return UploadResult(false, message = application.getString(R.string.upload_this_host_can_t_receive))
                 val root = provider.rootPath.trim('/')
                 browse.upload(if (root.isEmpty()) fileName else "$root/$fileName", uri, application, makeParents = false, onProgress)
             }
@@ -198,7 +199,7 @@ class UploadViewModel(
         } catch (e: Exception) {
             currentCoroutineContext().ensureActive()
             Log.e(TAG, "Upload of $fileName failed: ${e.message}", e)
-            return UploadResult(false, message = e.message ?: "The upload failed.")
+            return UploadResult(false, message = e.message ?: application.getString(R.string.filesystem_the_upload_failed))
         }
         return when (response) {
             is ApiResponse.Success -> UploadResult(true, id = response.data.ref.id)
@@ -313,7 +314,7 @@ class UploadViewModel(
                     }
                 } catch (e: IOException) {
                     Log.e(TAG, "Error reading text content for preview: ${e.message}", e)
-                    newErrorMessage = (newErrorMessage ?: "") + " Could not read file for preview."
+                    newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_could_not_read_file_for)
                 }
             }
 
@@ -332,7 +333,7 @@ class UploadViewModel(
                     newAudioAlbumArt = retriever.embeddedPicture
                 } catch (e: Exception) {
                     Log.e(TAG, "Error extracting audio metadata: ${e.message}", e)
-                    newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve audio metadata."
+                    newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_could_not_retrieve_audio_metadata)
                 } finally {
                     retriever.release()
                 }
@@ -355,7 +356,7 @@ class UploadViewModel(
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error extracting video metadata/thumbnail: ${e.message}", e)
-                    newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve video metadata or thumbnail."
+                    newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_could_not_retrieve_video_metadata)
                 } finally {
                     retriever.release()
                 }
@@ -372,7 +373,7 @@ class UploadViewModel(
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error getting PDF page count: ${e.message}", e)
-                    newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve PDF details."
+                    newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_could_not_retrieve_pdf_details)
                 } finally {
                     renderer?.close()
                     pfd?.close()
@@ -420,12 +421,12 @@ class UploadViewModel(
                                 newApkIcon = baos.toByteArray()
                             }
                         } else {
-                            newErrorMessage = (newErrorMessage ?: "") + " Could not parse APK details."
+                            newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_could_not_parse_apk_details)
                         }
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error extracting APK info: ${e.message}", e)
-                    newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve APK details."
+                    newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_could_not_retrieve_apk_details)
                 } finally {
                     descriptor?.close()
                     tempApkFile?.delete()
@@ -433,10 +434,10 @@ class UploadViewModel(
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error querying file details: ${e.message}", e)
-            newFileName = "Error reading file"
+            newFileName = application.getString(R.string.upload_error_reading_file)
             newFileSizeBytes = null
             newMimeType = null
-            newErrorMessage = (newErrorMessage ?: "") + " Error accessing file details."
+            newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_error_accessing_file_details)
         }
 
         // Each of the details is only read for its own type, so the others are still null here
@@ -654,7 +655,7 @@ class UploadViewModel(
                             updateItem(item.id) { it.copy(status = UploadItemStatus.UPLOADING) }
                             val response = uploadFile(item.name, item.uri) { sent, _ ->
                                 // Called from inside the host's sending loop: a cancelled upload stops there
-                                if (job?.isActive == false) throw CancellationException("The upload was cancelled")
+                                if (job?.isActive == false) throw CancellationException(application.getString(R.string.filesystem_the_upload_was_cancelled))
                                 synchronized(lock) { bytesPerItem[item.id] = sent }
                                 updateItem(item.id) { it.copy(uploadedBytes = sent) }
                             }
@@ -664,7 +665,7 @@ class UploadViewModel(
                                     it.copy(status = UploadItemStatus.DONE, uploadedBytes = item.sizeBytes ?: it.uploadedBytes, fileId = response.id)
                                 }
                             } else {
-                                val message = response.message ?: "Upload failed."
+                                val message = response.message ?: application.getString(R.string.upload_upload_failed_2)
                                 updateItem(item.id) { it.copy(status = UploadItemStatus.FAILED, uploadedBytes = 0L, errorMessage = message) }
                             }
                         }
@@ -678,17 +679,17 @@ class UploadViewModel(
                 )
                 val failed = _uiState.value.queuedItems.count { it.id in batchIds && it.status == UploadItemStatus.FAILED }
                 if (failed > 0) {
-                    outcomeMessage = "$failed of ${batch.size} uploads failed."
+                    outcomeMessage = application.getString(R.string.upload_of_uploads_failed, failed, batch.size)
                 } else {
                     outcome = TransferOutcome.COMPLETED
-                    outcomeMessage = if (batch.size == 1) "${batch.first().name} was uploaded." else "${batch.size} files were uploaded."
+                    outcomeMessage = if (batch.size == 1) application.getString(R.string.upload_was_uploaded, batch.first().name) else application.getString(R.string.upload_files_were_uploaded, batch.size)
                 }
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         uploadSpeedBytesPerSec = 0L,
                         uploadEtaSeconds = null,
-                        errorMessage = if (failed > 0 && fromScreen) "$failed of ${batch.size} failed. Tap Upload to retry." else null
+                        errorMessage = if (failed > 0 && fromScreen) application.getString(R.string.upload_of_failed_tap_upload_to, failed, batch.size) else null
                     )
                 }
                 if (!fromScreen) {
@@ -735,7 +736,7 @@ class UploadViewModel(
             _uiState.update {
                 it.copy(
                     isLoading = false,
-                    errorMessage = "Pick a file or enter text.",
+                    errorMessage = application.getString(R.string.upload_pick_a_file_or_enter),
                     pickedFile = null,
                     uploadTotalSizeBytes = null,
                     textToUpload = ""
@@ -779,7 +780,7 @@ class UploadViewModel(
             val job = coroutineContext[Job]
             val progressCallback: (bytesSent: Long, totalBytes: Long?) -> Unit = { bytesSent, receivedTotalBytes ->
                 // Called from inside the host's sending loop: a cancelled upload stops there
-                if (job?.isActive == false) throw CancellationException("The upload was cancelled")
+                if (job?.isActive == false) throw CancellationException(application.getString(R.string.filesystem_the_upload_was_cancelled))
                 val speed = speedTracker.update(bytesSent)
                 val total = receivedTotalBytes ?: _uiState.value.uploadTotalSizeBytes
                 val eta = estimateEtaSeconds(total, bytesSent, speed)
@@ -797,7 +798,7 @@ class UploadViewModel(
 
             val response: UploadResult? = try {
                 if (currentPickedFile != null) {
-                    operationType = "file from URI"
+                    operationType = application.getString(R.string.upload_file_from_uri)
                     val fileName = currentFileNameForUpload ?: "pixeldrain_upload_${System.currentTimeMillis()}"
                     uploadFile(fileName, currentPickedFile.uri, progressCallback)
                 } else if (currentTextToUpload.isNotBlank()) {
@@ -816,7 +817,7 @@ class UploadViewModel(
             } catch (e: Exception) {
                 Log.e(TAG, "Upload failed for $operationType. Exception: ${e.message}", e)
                 _uiState.update {
-                    it.copy(isLoading = false, errorMessage = "Upload failed: ${e.message ?: "Unknown error"}")
+                    it.copy(isLoading = false, errorMessage = application.getString(R.string.upload_upload_failed_3, e.message ?: "Unknown error"))
                 }
                 null
             }
@@ -841,22 +842,22 @@ class UploadViewModel(
                         it.copy(
                             isLoading = false,
                             uploadResult = response,
-                            errorMessage = response.message ?: "Upload failed."
+                            errorMessage = response.message ?: application.getString(R.string.upload_upload_failed_2)
                         )
                     }
                 }
             } else { 
                 if (_uiState.value.isLoading) {
                      _uiState.update {
-                        it.copy(isLoading = false, errorMessage = it.errorMessage ?: "No answer from the host.")
+                        it.copy(isLoading = false, errorMessage = it.errorMessage ?: application.getString(R.string.upload_no_answer_from_the_host))
                     }
                 }
             }
             _uiState.update { it.copy(uploadSpeedBytesPerSec = 0L, uploadEtaSeconds = null) }
             if (response?.success == true) {
-                transfers.finish(transferId, TransferOutcome.COMPLETED, "${currentFileNameForUpload ?: "Text"} was uploaded.")
+                transfers.finish(transferId, TransferOutcome.COMPLETED, application.getString(R.string.upload_was_uploaded, currentFileNameForUpload ?: "Text"))
             } else {
-                transfers.finish(transferId, TransferOutcome.FAILED, response?.message ?: "The upload failed.")
+                transfers.finish(transferId, TransferOutcome.FAILED, response?.message ?: application.getString(R.string.filesystem_the_upload_failed))
             }
         }
     }

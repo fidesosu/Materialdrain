@@ -23,14 +23,16 @@ import java.nio.charset.Charset
 import java.util.zip.Inflater
 import java.util.zip.InflaterInputStream
 import kotlin.coroutines.cancellation.CancellationException
+import android.content.res.Resources
+import tools.senko.materialdrain.R
 
 /**
  * How the app looks inside the archives of [provider]: the host's own way ([StorageProvider.archives]), or, for a host
  * with none whose files can be read in parts (SMB through the app's own server, WebDAV, S3), the app's own for zips (see
  * [DeviceZipArchives]). Null where neither can.
  */
-fun archivesOf(provider: StorageProvider): ArchiveOps? =
-    provider.archives ?: if (ProviderCapability.BROWSE in provider.capabilities) DeviceZipArchives(provider) else null
+fun archivesOf(provider: StorageProvider, resources: Resources): ArchiveOps? =
+    provider.archives ?: if (ProviderCapability.BROWSE in provider.capabilities) DeviceZipArchives(provider, resources) else null
 
 /** The extensions of the archives [DeviceZipArchives] reads: zips, under whatever name they go by. */
 private val ZIP_EXTENSIONS = setOf("zip", "cbz", "jar", "apk")
@@ -65,7 +67,7 @@ internal class ZipItem(
  * A host which doesn't answer for parts of a file (no ranges) can't be looked inside this way: that's said, rather than
  * the whole archive being downloaded for it.
  */
-class DeviceZipArchives(private val provider: StorageProvider) : ArchiveOps {
+class DeviceZipArchives(private val provider: StorageProvider, private val resources: Resources) : ArchiveOps {
 
     override fun canOpen(archive: StorageRef): Boolean =
         archive.path.substringAfterLast('.', "").lowercase() in ZIP_EXTENSIONS && urlOf(archive) != null
@@ -104,10 +106,10 @@ class DeviceZipArchives(private val provider: StorageProvider) : ArchiveOps {
     ): ApiResponse<Long> = reading {
         val path = entryPath.trimStart('/')
         val item = directoryOf(archive).firstOrNull { it.path == path }
-            ?: return@reading ApiResponse.Error(ProviderError(ErrorCodes.NOT_FOUND, "That file isn't in the archive."))
-        if (item.encrypted) return@reading ApiResponse.Error(ProviderError("encrypted_entry", "This file of the archive has a password."))
+            ?: return@reading ApiResponse.Error(ProviderError(ErrorCodes.NOT_FOUND, resources.getString(R.string.files_that_file_isn_t_in)))
+        if (item.encrypted) return@reading ApiResponse.Error(ProviderError("encrypted_entry", resources.getString(R.string.files_this_file_of_the_archive)))
         if (item.method != 0 && item.method != 8) {
-            return@reading ApiResponse.Error(ProviderError("unsupported_zip_compression", "This file of the archive is compressed in a way the app can't read."))
+            return@reading ApiResponse.Error(ProviderError("unsupported_zip_compression", resources.getString(R.string.files_this_file_of_the_archive_2)))
         }
         val url = urlOf(archive) ?: return@reading noAddress()
         // The local header has its own name and extra field lengths, which can differ from the directory's
@@ -163,7 +165,7 @@ class DeviceZipArchives(private val provider: StorageProvider) : ArchiveOps {
                 break
             }
         }
-        if (at < 0) throw ArchiveFailure(ProviderError("not_a_zip", "This file isn't a zip archive."))
+        if (at < 0) throw ArchiveFailure(ProviderError("not_a_zip", resources.getString(R.string.files_this_file_isn_t_a)))
         val endOffset = size - (end.limit() - at)
         var count = u16(end, at + 10).toLong()
         var directorySize = u32(end, at + 12)
@@ -179,7 +181,7 @@ class DeviceZipArchives(private val provider: StorageProvider) : ArchiveOps {
                 directoryOffset = record.getLong(48)
             }
         }
-        if (directorySize > MAX_DIRECTORY_BYTES) throw ArchiveFailure(ProviderError("archive_too_large", "This archive has too many files to look through here."))
+        if (directorySize > MAX_DIRECTORY_BYTES) throw ArchiveFailure(ProviderError("archive_too_large", resources.getString(R.string.files_this_archive_has_too_many)))
         val directory = range(url, directoryOffset, directorySize.toInt()).order(ByteOrder.LITTLE_ENDIAN)
         val items = ArrayList<ZipItem>(count.coerceAtMost(100_000L).toInt())
         var p = 0
@@ -246,14 +248,14 @@ class DeviceZipArchives(private val provider: StorageProvider) : ArchiveOps {
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000
-        connection.setRequestProperty("Range", rangeHeader)
+        connection.setRequestProperty(resources.getString(R.string.files_range), rangeHeader)
         // The bytes as they are on the host, so the range is of the file itself
-        connection.setRequestProperty("Accept-Encoding", "identity")
+        connection.setRequestProperty(resources.getString(R.string.files_accept_encoding), "identity")
         provider.requestHeaders(url).forEach { (name, value) -> connection.setRequestProperty(name, value) }
         val code = connection.responseCode
         if (code != HttpURLConnection.HTTP_PARTIAL) {
             connection.disconnect()
-            throw if (code == HttpURLConnection.HTTP_OK) noRanges() else ArchiveFailure(ProviderError(ErrorCodes.NETWORK_ERROR, "The host answered with HTTP $code."))
+            throw if (code == HttpURLConnection.HTTP_OK) noRanges() else ArchiveFailure(ProviderError(ErrorCodes.NETWORK_ERROR, resources.getString(R.string.files_the_host_answered_with_http, code)))
         }
         return connection
     }
@@ -267,7 +269,7 @@ class DeviceZipArchives(private val provider: StorageProvider) : ArchiveOps {
         } catch (e: ArchiveFailure) {
             ApiResponse.Error(e.error)
         } catch (e: IOException) {
-            ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: "The archive couldn't be read."))
+            ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: resources.getString(R.string.files_the_archive_couldn_t_be)))
         } catch (e: RuntimeException) {
             // A directory whose numbers point outside of it
             ApiResponse.Error(broken().error)
@@ -276,11 +278,11 @@ class DeviceZipArchives(private val provider: StorageProvider) : ArchiveOps {
 
     private class ArchiveFailure(val error: ProviderError) : Exception(error.message)
 
-    private fun noRanges() = ArchiveFailure(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't open archives without downloading them."))
+    private fun noRanges() = ArchiveFailure(ProviderError(ErrorCodes.NOT_SUPPORTED, resources.getString(R.string.files_this_host_can_t_open)))
 
-    private fun noAddress() = ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "Couldn't reach this archive."))
+    private fun noAddress() = ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, resources.getString(R.string.files_couldn_t_reach_this_archive)))
 
-    private fun broken() = ApiResponse.Error(ProviderError("invalid_zip_file", "This archive is either not valid or damaged."))
+    private fun broken() = ApiResponse.Error(ProviderError("invalid_zip_file", resources.getString(R.string.files_this_archive_is_either_not)))
 
     private fun u16(buffer: ByteBuffer, at: Int): Int = buffer.getShort(at).toInt() and 0xFFFF
 

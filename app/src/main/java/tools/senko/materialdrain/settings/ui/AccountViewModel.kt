@@ -26,6 +26,8 @@ import java.time.YearMonth
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import android.content.res.Resources
+import tools.senko.materialdrain.R
 
 /** Something which is loaded from the account. */
 sealed interface Loadable<out T> {
@@ -82,6 +84,8 @@ data class AccountUiState(
  * the snackbar (see UiMessages).
  */
 class AccountViewModel(
+    /** The app's texts (its messages) */
+    private val resources: Resources,
     private val userApi: PixeldrainUserApi,
     private val sessionManager: SessionManager,
     private val uiMessages: UiMessages
@@ -222,7 +226,7 @@ class AccountViewModel(
 
     // ---- Profile ----
 
-    fun changeUsername(username: String) = change(AccountTask.PROFILE, mapOf("username" to username.trim()), "Username changed to ${username.trim()}.")
+    fun changeUsername(username: String) = change(AccountTask.PROFILE, mapOf("username" to username.trim()), resources.getString(R.string.settings_username_changed_to, username.trim()))
 
     // ---- Sharing ----
 
@@ -239,20 +243,20 @@ class AccountViewModel(
     /** [domains] separated by spaces, commas or new lines. */
     fun setEmbedDomains(domains: String) {
         val list = domains.split(' ', ',', '\n').map(String::trim).filter(String::isNotEmpty).joinToString(" ")
-        change(AccountTask.SHARING, mapOf("embed_domains" to list), if (list.isEmpty()) "No site can embed your files now." else "Embed domains saved.")
+        change(AccountTask.SHARING, mapOf("embed_domains" to list), if (list.isEmpty()) resources.getString(R.string.settings_no_site_can_embed_your) else resources.getString(R.string.settings_embed_domains_saved))
     }
 
     /** [bytes] 0 for no cap of your own. */
     fun setTransferCap(bytes: Long) =
-        change(AccountTask.SHARING, mapOf("transfer_cap" to bytes.toString()), if (bytes == 0L) "Transfer cap removed." else "Transfer cap saved.")
+        change(AccountTask.SHARING, mapOf("transfer_cap" to bytes.toString()), if (bytes == 0L) resources.getString(R.string.settings_transfer_cap_removed) else resources.getString(R.string.settings_transfer_cap_saved))
 
     fun setAffiliate(username: String) =
-        change(AccountTask.SHARING, mapOf("affiliate_user_name" to username.trim()), if (username.isBlank()) "Affiliate removed." else "Affiliate saved.")
+        change(AccountTask.SHARING, mapOf("affiliate_user_name" to username.trim()), if (username.isBlank()) resources.getString(R.string.settings_affiliate_removed) else resources.getString(R.string.settings_affiliate_saved))
 
     // ---- Plan and credit ----
 
     /** [plan] is prepaid or prepaid_lite. */
-    fun activatePlan(plan: String, label: String) = change(AccountTask.PLAN, mapOf("subscription" to plan), "$label is now your plan.")
+    fun activatePlan(plan: String, label: String) = change(AccountTask.PLAN, mapOf("subscription" to plan), resources.getString(R.string.settings_is_now_your_plan, label))
 
     /** Makes an invoice and opens its checkout in the browser. */
     fun addCredit(amountEur: Long, network: String, country: String) {
@@ -267,7 +271,7 @@ class AccountViewModel(
                         put("checkout_country", country.trim().uppercase())
                         put("checkout_provider", network)
                     })
-                    uiMessages.show("Credit is added once paid.", long = true)
+                    uiMessages.show(resources.getString(R.string.settings_credit_is_added_once_paid), long = true)
                     loadInvoices()
                     loadUser(quietly = true)
                 }
@@ -291,7 +295,7 @@ class AccountViewModel(
     // ---- File viewer branding ----
 
     fun saveBranding(fields: Map<String, String>) = perform(AccountTask.BRANDING, { userApi.setFileCustomization(key, fields) }) {
-        uiMessages.show("File viewer saved.")
+        uiMessages.show(resources.getString(R.string.settings_file_viewer_saved))
     }
 
     // ---- Helpers ----

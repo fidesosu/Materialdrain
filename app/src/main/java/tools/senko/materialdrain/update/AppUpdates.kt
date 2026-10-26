@@ -27,6 +27,7 @@ import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
+import tools.senko.materialdrain.R
 
 /** Where the releases are: GitHub's download links, which need no API (and have no rate limit). */
 const val RELEASES_URL = "https://github.com/fidesosu/Materialdrain/releases"
@@ -198,14 +199,14 @@ class AppUpdates(
         try {
             // An update downloaded before is installed by now, or not wanted any more
             updatesDir.listFiles()?.forEach { it.delete() }
-            val stable = fetch("$releasesUrl/latest/download/update.json")
-            val dev = if (settings.includeDevUpdates.value) fetch("$releasesUrl/download/dev-build/update.json") else null
+            val stable = fetch(appContext.getString(R.string.update_latest_download_update_json, releasesUrl))
+            val dev = if (settings.includeDevUpdates.value) fetch(appContext.getString(R.string.update_download_dev_build_update_json, releasesUrl)) else null
             settings.lastUpdateCheck = System.currentTimeMillis()
             chooseUpdate(installed, stable, dev, releasesUrl)?.let { UpdateResult.Available(it) } ?: UpdateResult.UpToDate
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            UpdateResult.Failed(e.message ?: "Couldn't reach GitHub.")
+            UpdateResult.Failed(e.message ?: appContext.getString(R.string.update_couldn_t_reach_github))
         }
     }
 
@@ -213,9 +214,9 @@ class AppUpdates(
     private fun fetch(url: String): UpdateInfo? {
         client.newCall(Request.Builder().url(url).build()).execute().use { response ->
             if (response.code == 404) return null
-            if (!response.isSuccessful) throw IOException("GitHub answered HTTP ${response.code}.")
+            if (!response.isSuccessful) throw IOException(appContext.getString(R.string.update_github_answered_http, response.code))
             val body = response.body
-            if (body.contentLength() > MAX_UPDATE_JSON_BYTES) throw IOException("The release's description is too large.")
+            if (body.contentLength() > MAX_UPDATE_JSON_BYTES) throw IOException(appContext.getString(R.string.update_the_release_s_description_is))
             return json.decodeFromString<UpdateInfo>(body.string())
         }
     }
@@ -241,8 +242,8 @@ class AppUpdates(
             try {
                 when (val result = check()) {
                     is UpdateResult.Available -> _offered.value = result.update
-                    UpdateResult.UpToDate -> messages.show("Materialdrain is up to date.")
-                    is UpdateResult.Failed -> messages.show("Couldn't look for updates: ${result.message}", long = true)
+                    UpdateResult.UpToDate -> messages.show(appContext.getString(R.string.update_materialdrain_is_up_to_date))
+                    is UpdateResult.Failed -> messages.show(appContext.getString(R.string.update_couldn_t_look_for_updates, result.message), long = true)
                 }
             } finally {
                 _checking.value = false
@@ -276,7 +277,7 @@ class AppUpdates(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _download.value = UpdateDownload.Failed(e.message ?: "The download failed.")
+                _download.value = UpdateDownload.Failed(e.message ?: appContext.getString(R.string.update_the_download_failed))
             }
         }
     }
@@ -288,7 +289,7 @@ class AppUpdates(
         val digest = MessageDigest.getInstance("SHA-256")
         client.newBuilder().callTimeout(0, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).build()
             .newCall(Request.Builder().url(update.apkUrl).build()).execute().use { response ->
-                if (!response.isSuccessful) throw IOException("GitHub answered HTTP ${response.code}.")
+                if (!response.isSuccessful) throw IOException(appContext.getString(R.string.update_github_answered_http, response.code))
                 val total = response.body.contentLength().takeIf { it > 0 } ?: update.info.size.takeIf { it > 0 }
                 response.body.byteStream().use { input ->
                     partial.outputStream().use { output ->
@@ -308,16 +309,16 @@ class AppUpdates(
         val sha256 = digest.digest().joinToString("") { "%02x".format(it) }
         if (!sha256.equals(update.info.sha256, ignoreCase = true)) {
             partial.delete()
-            throw IOException("The downloaded file isn't the one the release describes. Try again.")
+            throw IOException(appContext.getString(R.string.update_the_downloaded_file_isn_t))
         }
         // The installer would say so too, less clearly: another app, or not newer than this one
         val archive = appContext.packageManager.getPackageArchiveInfo(partial.path, 0)
         if (archive?.packageName != appContext.packageName || archive.longVersionCode <= installed.versionCode) {
             partial.delete()
-            throw IOException("The downloaded file isn't a newer Materialdrain.")
+            throw IOException(appContext.getString(R.string.update_the_downloaded_file_isn_t_2))
         }
         target.delete()
-        if (!partial.renameTo(target)) throw IOException("Couldn't save the update.")
+        if (!partial.renameTo(target)) throw IOException(appContext.getString(R.string.update_couldn_t_save_the_update))
         return target
     }
 }

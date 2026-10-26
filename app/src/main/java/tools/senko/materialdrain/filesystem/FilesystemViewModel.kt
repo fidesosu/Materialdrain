@@ -51,6 +51,7 @@ import tools.senko.materialdrain.transfer.TransferRegistry
 import tools.senko.materialdrain.transfer.TransferSpeedTracker
 import tools.senko.materialdrain.transfer.estimateEtaSeconds
 import tools.senko.materialdrain.util.readContentUriInfo
+import tools.senko.materialdrain.R
 
 private const val TAG_FS_VM = "FilesystemViewModel"
 /** How many folders are listed at once while indexing the folder tree: quick, without flooding the host. */
@@ -286,7 +287,7 @@ class FilesystemViewModel(
             )
         }
         if (provider.browse == null) {
-            _uiState.update { it.copy(isLoading = false, errorMessage = "This host can't browse files.") }
+            _uiState.update { it.copy(isLoading = false, errorMessage = application.getString(R.string.filesystem_this_host_can_t_browse)) }
         } else if (provider.kind != ProviderKind.PIXELDRAIN || sessionManager.currentApiKey().isNotBlank()) {
             // The folder last open in this tab, or its root when there is none (or it can't be listed any more)
             val saved = appSettings.filesystemPath(pathKey)
@@ -323,7 +324,7 @@ class FilesystemViewModel(
     fun fetchPathContent(path: String, fallbackToRoot: Boolean = false) {
         val provider = provider()
         val browse = provider.browse ?: run {
-            _uiState.update { it.copy(isLoading = false, errorMessage = "This host can't browse files.") }
+            _uiState.update { it.copy(isLoading = false, errorMessage = application.getString(R.string.filesystem_this_host_can_t_browse)) }
             return
         }
         val root = rootPath(provider)
@@ -486,7 +487,7 @@ class FilesystemViewModel(
     fun createFolder(name: String) {
         val folderName = name.trim()
         if (!isValidNodeName(folderName)) {
-            reportOperationError("A folder name can't be empty or contain a slash.")
+            reportOperationError(application.getString(R.string.filesystem_a_folder_name_can_t))
             return
         }
         runModification { browse -> browse?.createDirectory(joinPath(currentDir(), folderName), makeParents = false) ?: notBrowsable() }
@@ -495,7 +496,7 @@ class FilesystemViewModel(
     fun renameEntry(entry: StorageNode, newName: String) {
         val name = newName.trim()
         if (!isValidNodeName(name)) {
-            reportOperationError("A name can't be empty or contain a slash.")
+            reportOperationError(application.getString(R.string.filesystem_a_name_can_t_be))
             return
         }
         if (name == entry.name) return
@@ -507,7 +508,7 @@ class FilesystemViewModel(
         val destination = normalizePath(destinationDirectory, rootPath(provider()))
         val source = entry.ref.path.trim('/')
         if (destination == source || destination.startsWith("$source/")) {
-            reportOperationError("A folder can't be moved into itself.")
+            reportOperationError(application.getString(R.string.filesystem_a_folder_can_t_be))
             return
         }
         if (destination == source.substringBeforeLast('/', "")) return // already there
@@ -556,7 +557,7 @@ class FilesystemViewModel(
             val source = entry.ref.path.trim('/')
             when {
                 destination == source || destination.startsWith("$source/") ->
-                    ApiResponse.Error(ProviderError("circular_dependency", "A folder can't be moved into itself."))
+                    ApiResponse.Error(ProviderError("circular_dependency", application.getString(R.string.filesystem_a_folder_can_t_be)))
                 destination == source.substringBeforeLast('/', "") ->
                     ApiResponse.Success(Unit) // already in that folder
                 else -> browse.rename(entry.ref.path, joinPath(destination, entry.name), makeParents = false).discard()
@@ -586,7 +587,7 @@ class FilesystemViewModel(
             _uiState.update { it.copy(isModifying = false) }
             if (succeeded > 0) messages.show(if (succeeded == 1) "1 item $pastTense." else "$succeeded items $pastTense.")
             if (failures.isNotEmpty()) {
-                messages.show(failures.take(3).joinToString("\n") + if (failures.size > 3) "\nand ${failures.size - 3} more failed" else "", long = true)
+                messages.show(failures.take(3).joinToString("\n") + if (failures.size > 3) application.getString(R.string.filesystem_and_more_failed, failures.size - 3) else "", long = true)
             }
             forgetFolderTree()
             fetchPathContent(dir)
@@ -603,7 +604,7 @@ class FilesystemViewModel(
     /** The folders inside [path], for the folder picker. */
     suspend fun listSubdirectories(path: String): ApiResponse<List<StorageNode>> {
         val provider = provider()
-        val browse = provider.browse ?: return ApiResponse.Error(ProviderError("not_browsable", "This host can't browse files."))
+        val browse = provider.browse ?: return ApiResponse.Error(ProviderError("not_browsable", application.getString(R.string.filesystem_this_host_can_t_browse)))
         return when (val response = browse.list(normalizePath(path, rootPath(provider)))) {
             is ApiResponse.Success -> ApiResponse.Success(
                 response.data.children.filter { it.isDirectory }.sortedBy { it.name.lowercase() }
@@ -616,7 +617,7 @@ class FilesystemViewModel(
     fun importFilesById(fileIds: List<String>) {
         val ids = fileIds.map { it.trim() }.filter { it.isNotEmpty() }
         if (ids.isEmpty()) {
-            reportOperationError("Enter at least one file ID.")
+            reportOperationError(application.getString(R.string.filesystem_enter_at_least_one_file))
             return
         }
         val dir = currentDir()
@@ -638,7 +639,7 @@ class FilesystemViewModel(
             val response = modifying { operation(browse) }
             _uiState.update { it.copy(isModifying = false) }
             when (response) {
-                is ApiResponse.Success -> messages.show("Done.")
+                is ApiResponse.Success -> messages.show(application.getString(R.string.filesystem_done))
                 is ApiResponse.Error -> messages.show(describeError(response.error), long = true)
             }
             forgetFolderTree()
@@ -659,10 +660,10 @@ class FilesystemViewModel(
         } catch (e: Exception) {
             currentCoroutineContext().ensureActive()
             ProviderLog.e("Filesystem", "a change failed: ${e.message}", e)
-            ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: "The host couldn't be reached."))
+            ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: application.getString(R.string.files_the_host_couldn_t_be)))
         }
 
-    private fun notBrowsable(): ApiResponse<Unit> = ApiResponse.Error(ProviderError("not_browsable", "This host can't browse files."))
+    private fun notBrowsable(): ApiResponse<Unit> = ApiResponse.Error(ProviderError("not_browsable", application.getString(R.string.filesystem_this_host_can_t_browse)))
 
     private fun <T> ApiResponse<T>.discard(): ApiResponse<Unit> = when (this) {
         is ApiResponse.Success -> ApiResponse.Success(Unit)
@@ -675,18 +676,18 @@ class FilesystemViewModel(
 
     private fun describeError(error: ProviderError): String {
         val hint = when (error.code) {
-            "node_already_exists" -> "An item with this name already exists."
-            ErrorCodes.DIRECTORY_NOT_EMPTY -> "The folder is not empty."
-            "permission_denied" -> "You don't have permission to do this here."
-            "path_not_found" -> "The path does not exist (anymore)."
-            "cannot_modify_root_dir" -> "The root folder can't be modified."
-            "circular_dependency" -> "A folder can't be moved into itself."
-            ErrorCodes.AUTHENTICATION_REQUIRED -> "Log in or check your API key in Settings."
-            "user_out_of_space" -> "Your account has run out of storage space."
-            "list_file_not_found" -> "One of the file IDs does not exist."
+            "node_already_exists" -> application.getString(R.string.filesystem_an_item_with_this_name)
+            ErrorCodes.DIRECTORY_NOT_EMPTY -> application.getString(R.string.filesystem_the_folder_is_not_empty)
+            "permission_denied" -> application.getString(R.string.filesystem_you_don_t_have_permission)
+            "path_not_found" -> application.getString(R.string.filesystem_the_path_does_not_exist)
+            "cannot_modify_root_dir" -> application.getString(R.string.filesystem_the_root_folder_can_t)
+            "circular_dependency" -> application.getString(R.string.filesystem_a_folder_can_t_be)
+            ErrorCodes.AUTHENTICATION_REQUIRED -> application.getString(R.string.filesystem_log_in_or_check_your)
+            "user_out_of_space" -> application.getString(R.string.filesystem_your_account_has_run_out)
+            "list_file_not_found" -> application.getString(R.string.filesystem_one_of_the_file_ids)
             else -> null
         }
-        return hint ?: error.message.ifBlank { "Unknown error." }
+        return hint ?: error.message.ifBlank { application.getString(R.string.filesystem_unknown_error) }
     }
 
     // --- Uploading ---
@@ -757,7 +758,7 @@ class FilesystemViewModel(
                 items.forEachIndexed { index, item ->
                     val response = uploadOne(browse, joinPath(dir, item.name), item.uri) { sent ->
                         // Called from inside the host's sending loop: a cancelled upload stops there
-                        if (job?.isActive == false) throw kotlinx.coroutines.CancellationException("The upload was cancelled")
+                        if (job?.isActive == false) throw kotlinx.coroutines.CancellationException(application.getString(R.string.filesystem_the_upload_was_cancelled))
                         val overall = completedBytes + sent
                         val speed = speedTracker.update(overall)
                         transfers.progress(transferId, overall, totalBytes, speed, estimateEtaSeconds(totalBytes, overall, speed))
@@ -781,17 +782,17 @@ class FilesystemViewModel(
                 }
                 if (failures.isEmpty()) {
                     outcome = TransferOutcome.COMPLETED
-                    outcomeMessage = if (uploaded == 1) "1 file was uploaded to $dir." else "$uploaded files were uploaded to $dir."
+                    outcomeMessage = if (uploaded == 1) application.getString(R.string.filesystem_1_file_was_uploaded_to, dir) else application.getString(R.string.filesystem_files_were_uploaded_to, uploaded, dir)
                 } else {
-                    outcomeMessage = "${failures.size} of ${items.size} uploads failed: ${failures.first()}"
+                    outcomeMessage = application.getString(R.string.filesystem_of_uploads_failed, failures.size, items.size, failures.first())
                 }
                 _uploadProgress.value = null
-                if (uploaded > 0) messages.show(if (uploaded == 1) "1 file uploaded." else "$uploaded files uploaded.")
+                if (uploaded > 0) messages.show(if (uploaded == 1) application.getString(R.string.filesystem_1_file_uploaded) else application.getString(R.string.filesystem_files_uploaded, uploaded))
                 if (failures.isNotEmpty()) messages.show(failures.joinToString("\n"), long = true)
             } catch (e: CancellationException) {
                 outcome = TransferOutcome.CANCELLED
                 _uploadProgress.value = null
-                messages.show(if (uploaded > 0) "Cancelled after $uploaded uploads." else "Upload cancelled.")
+                messages.show(if (uploaded > 0) application.getString(R.string.filesystem_cancelled_after_uploads, uploaded) else application.getString(R.string.filesystem_upload_cancelled))
                 throw e
             } finally {
                 transfers.finish(transferId, outcome, outcomeMessage)
@@ -813,7 +814,7 @@ class FilesystemViewModel(
         } catch (e: Exception) {
             currentCoroutineContext().ensureActive()
             ProviderLog.e("Filesystem", "uploading to '$path' failed: ${e.message}", e)
-            ApiResponse.Error(ProviderError("upload_failed", e.message ?: "The upload failed."))
+            ApiResponse.Error(ProviderError("upload_failed", e.message ?: application.getString(R.string.filesystem_the_upload_failed)))
         }
 
     companion object {

@@ -51,11 +51,11 @@ internal fun rememberPreviewSettings(signedIn: Boolean = true): SettingsEnvironm
         val registry = ProviderRegistry(configStore, pixeldrain) { Credentials(apiKey = session.currentApiKey()) }
         SettingsEnvironment(
             appSettings = AppSettings(context),
-            authViewModel = AuthViewModel(PreviewUserApi, session),
-            accountViewModel = AccountViewModel(PreviewUserApi, session, UiMessages()),
+            authViewModel = AuthViewModel(context.resources, PreviewUserApi, session),
+            accountViewModel = AccountViewModel(context.resources, PreviewUserApi, session, UiMessages()),
             apiKeyInput = "",
             onApiKeyInputChange = {},
-            providerSettingsViewModel = ProviderSettingsViewModel(configStore, registry, ProviderUpdater(configStore, OkHttpClient(), appVersion = 0))
+            providerSettingsViewModel = ProviderSettingsViewModel(context.resources, configStore, registry, ProviderUpdater(configStore, OkHttpClient(), appVersion = 0))
         )
     }
 }

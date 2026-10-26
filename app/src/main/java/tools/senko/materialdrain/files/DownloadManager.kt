@@ -6,6 +6,7 @@ import android.app.Application
 import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
+import android.content.res.Resources
 import java.util.concurrent.ConcurrentHashMap
 import tools.senko.materialdrain.ui.media.HostRequestAuth
 import android.net.Uri
@@ -61,6 +62,7 @@ import tools.senko.materialdrain.transfer.TransferRegistry
 import tools.senko.materialdrain.transfer.TransferSpeedTracker
 import tools.senko.materialdrain.transfer.estimateEtaSeconds
 import tools.senko.materialdrain.util.formatSize
+import tools.senko.materialdrain.R
 
 private const val TAG = "DownloadManager"
 private const val DOWNLOAD_WRITE_BUFFER_BYTES = 256 * 1024
@@ -174,25 +176,26 @@ internal suspend fun downloadNode(
     provider: StorageProvider,
     node: StorageNode,
     outputStream: OutputStream,
+    resources: Resources,
     onProgress: (Long, Long?) -> Unit
 ): ApiResponse<Long> {
     // A zip of several things of the host: made by the host, or here as they're downloaded
     (node.richDetails as? ZipDownloadDetails)?.let { zip ->
-        if (!zip.hostMade) return zipOnDevice(provider, zip.entries, outputStream, onProgress)
+        if (!zip.hostMade) return zipOnDevice(provider, zip.entries, outputStream, resources, onProgress)
         val browse = provider.browse
-            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't download folders."))
+            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, resources.getString(R.string.files_this_host_can_t_download)))
         return browse.downloadFolderArchive(zip.folderPath.orEmpty(), outputStream, onProgress)
     }
     // A file inside an archive is read from the archive
     (node.richDetails as? ArchiveEntryDetails)?.let { entry ->
-        val archives = archivesOf(provider)
-            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't look inside archives."))
+        val archives = archivesOf(provider, resources)
+            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, resources.getString(R.string.files_this_host_can_t_look)))
         return archives.read(entry.archive, entry.entryPath, outputStream, onProgress)
     }
     val id = node.ref.id
     return if (id != null) {
         val store = provider.fileStore
-            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't download files by id."))
+            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, resources.getString(R.string.files_this_host_can_t_download_2)))
         // Several ids joined by commas (see DownloadManager.downloadAsZip) are one archive; file ids never contain commas
         if (',' in id) {
             store.downloadArchive(id.split(',').map { StorageRef(id = it) }, outputStream, onProgress)
@@ -201,7 +204,7 @@ internal suspend fun downloadNode(
         }
     } else {
         val browse = provider.browse
-            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't download this file."))
+            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, resources.getString(R.string.files_this_host_can_t_download_3)))
         browse.download(node.ref.path, outputStream, onProgress)
     }
 }
@@ -215,6 +218,7 @@ private suspend fun zipOnDevice(
     provider: StorageProvider,
     entries: List<ZipDownloadEntry>,
     outputStream: OutputStream,
+    resources: Resources,
     onProgress: (Long, Long?) -> Unit
 ): ApiResponse<Long> {
     val files = entries.mapNotNull { it.node }
@@ -236,7 +240,7 @@ private suspend fun zipOnDevice(
             zip.setLevel(if (extension in STORED_EXTENSIONS) Deflater.NO_COMPRESSION else Deflater.BEST_SPEED)
             zip.putNextEntry(ZipEntry(entry.path))
             val before = done
-            when (val response = downloadNode(provider, node, KeptOpen(zip)) { read, _ -> onProgress(before + read, total) }) {
+            when (val response = downloadNode(provider, node, KeptOpen(zip), resources) { read, _ -> onProgress(before + read, total) }) {
                 is ApiResponse.Success -> done += response.data
                 is ApiResponse.Error -> return ApiResponse.Error(response.error.copy(message = "${node.name}: ${response.error.message}"))
             }
@@ -397,7 +401,7 @@ class DownloadManager(
                 if (outputStream == null && uri != null) {
                     contentResolver.delete(uri, null, null)
                     uri = null
-                    throw IOException("Failed to open output stream for $uri")
+                    throw IOException(application.getString(R.string.files_failed_to_open_output_stream, uri))
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to prepare download target for '$fileName': ${e.message}", e)
@@ -538,7 +542,7 @@ class DownloadManager(
                 }
 
                 if (targetUri == null || (outputStream == null && resumeFrom == null)) {
-                    throw IOException("Failed to prepare or re-open download target in MediaStore.")
+                    throw IOException(application.getString(R.string.files_failed_to_prepare_or_re))
                 }
 
                 updateDownload(key) { it.copy(status = DownloadStatus.DOWNLOADING, targetUri = targetUri) }
@@ -548,7 +552,7 @@ class DownloadManager(
                 val onProgress: (Long, Long?) -> Unit = { bytesRead, totalBytes ->
                     // Called from inside the host's copy loop, which keeps reading until the file ends unless it's
                     // stopped: a cancelled download stops here, whatever the host's own code does with cancelling
-                    if (job?.isActive == false) throw CancellationException("The download was cancelled")
+                    if (job?.isActive == false) throw CancellationException(application.getString(R.string.files_the_download_was_cancelled))
                     val progress = if (totalBytes != null && totalBytes > 0) {
                         (bytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
                     } else 0f
@@ -575,14 +579,14 @@ class DownloadManager(
 
                 val response = if (resumeFrom != null) {
                     val (resumed, offset) = resumeFrom
-                    val client = HostRequestAuth.client ?: throw IOException("The download can't go on yet.")
+                    val client = HostRequestAuth.client ?: throw IOException(application.getString(R.string.files_the_download_can_t_go))
                     downloadRest(client, resumed.url, provider.requestHeaders(resumed.url), offset, { append ->
                         val stream = application.contentResolver.openOutputStream(resumed.uri, if (append) "wa" else "wt")
-                            ?: throw IOException("Failed to re-open the download in MediaStore.")
+                            ?: throw IOException(application.getString(R.string.files_failed_to_re_open_the))
                         BufferedOutputStream(stream, DOWNLOAD_WRITE_BUFFER_BYTES)
                     }, onProgress)
                 } else {
-                    downloadNode(provider, node, outputStream!!, onProgress)
+                    downloadNode(provider, node, outputStream!!, application.resources, onProgress)
                 }
                 // A host which turns the stopped copy into an error of its own: it was still a cancel
                 ensureActive()
@@ -590,7 +594,7 @@ class DownloadManager(
                     is ApiResponse.Success -> {
                         downloadSuccessful = true
                         val bytesCopied = response.data
-                        val message = "Downloaded ${node.name}"
+                        val message = application.getString(R.string.files_downloaded, node.name)
                         outcome = TransferOutcome.COMPLETED
                         outcomeMessage = message
                         updateDownload(key) {
@@ -605,7 +609,7 @@ class DownloadManager(
                         }
                     }
                     is ApiResponse.Error -> {
-                        throw IOException(response.error.message.ifBlank { "Download failed." })
+                        throw IOException(response.error.message.ifBlank { application.getString(R.string.files_download_failed) })
                     }
                 }
             } catch (e: Exception) {
@@ -613,10 +617,10 @@ class DownloadManager(
                 outcome = if (e is CancellationException) TransferOutcome.CANCELLED else TransferOutcome.FAILED
                 val errorMsg = if (e is CancellationException) {
                     Log.i(TAG, "Download for $key was cancelled by scope.")
-                    "Download for '${node.name}' was cancelled."
+                    application.getString(R.string.files_download_for_was_cancelled, node.name)
                 } else {
                     Log.e(TAG, "Error during file download process for $key: ${e.message}", e)
-                    "Download error for '${node.name}': ${e.localizedMessage ?: "Unexpected error"}"
+                    application.getString(R.string.files_download_error_for, node.name, e.localizedMessage ?: "Unexpected error")
                 }
                 outcomeMessage = errorMsg
                 if (e !is CancellationException && batchId == null) {
@@ -640,7 +644,7 @@ class DownloadManager(
                     )
                 }
                 if (hadDownload && e !is CancellationException) {
-                    messages.show("Download failed: $errorMsg", long = true, action = if (batchId == null) UiMessageAction.Retry { retry(key) } else null)
+                    messages.show(application.getString(R.string.files_download_failed_2, errorMsg), long = true, action = if (batchId == null) UiMessageAction.Retry { retry(key) } else null)
                 }
             } finally {
                 try {
@@ -741,8 +745,8 @@ class DownloadManager(
                     else -> TransferOutcome.FAILED
                 }
                 val message = when (outcome) {
-                    TransferOutcome.COMPLETED -> "${files.size} files downloaded."
-                    TransferOutcome.FAILED -> "$savedFiles of ${files.size} files downloaded."
+                    TransferOutcome.COMPLETED -> application.getString(R.string.files_files_downloaded, files.size)
+                    TransferOutcome.FAILED -> application.getString(R.string.files_of_files_downloaded, savedFiles, files.size)
                     TransferOutcome.CANCELLED -> null
                 }
                 transfers.finish(batchId, outcome, message)
@@ -825,7 +829,7 @@ class DownloadManager(
         val provider = provider()
         val browse = provider.browse
         if (browse == null) {
-            messages.show("This host can't download folders.")
+            messages.show(application.getString(R.string.files_this_host_can_t_download))
             return
         }
         if (style == DownloadStyle.ZIP && items.size == 1 && ProviderCapability.FOLDER_ARCHIVE_DOWNLOAD in provider.capabilities) {
@@ -843,16 +847,16 @@ class DownloadManager(
             return
         }
         scope.launch {
-            messages.show(if (folders.size == 1) "Looking through \"${folders.single().name}\"…" else "Looking through ${folders.size} folders…")
+            messages.show(if (folders.size == 1) application.getString(R.string.files_looking_through, folders.single().name) else application.getString(R.string.files_looking_through_folders, folders.size))
             val tree = withContext(Dispatchers.IO) { walk(browse, items) }
             if (tree.failedFolders > 0) {
                 messages.show(
-                    if (tree.failedFolders == 1) "A folder couldn't be opened: its files are left out." else "${tree.failedFolders} folders couldn't be opened: their files are left out.",
+                    if (tree.failedFolders == 1) application.getString(R.string.files_a_folder_couldn_t_be) else application.getString(R.string.files_folders_couldn_t_be_opened, tree.failedFolders),
                     long = true
                 )
             }
             if (tree.files.isEmpty() && (style == DownloadStyle.SEPARATELY || tree.emptyFolders.isEmpty())) {
-                messages.show("There are no files in it to download.")
+                messages.show(application.getString(R.string.files_there_are_no_files_in))
                 return@launch
             }
             val start = {
@@ -936,8 +940,8 @@ class DownloadManager(
                 val speedTracker = TransferSpeedTracker()
                 val self = coroutineContext[Job]
                 val response = BufferedOutputStream(target.outputStream(), DOWNLOAD_WRITE_BUFFER_BYTES).use { out ->
-                    downloadNode(provider, node, out) { read, total ->
-                        if (self?.isActive == false) throw CancellationException("The share was cancelled")
+                    downloadNode(provider, node, out, application.resources) { read, total ->
+                        if (self?.isActive == false) throw CancellationException(application.getString(R.string.files_the_share_was_cancelled))
                         val speed = speedTracker.update(read)
                         transfers.progress(transferId, read, total, speed, estimateEtaSeconds(total ?: node.size, read, speed))
                     }
@@ -946,7 +950,7 @@ class DownloadManager(
                 when (response) {
                     is ApiResponse.Success -> {
                         outcome = TransferOutcome.COMPLETED
-                        message = "'${node.name}' is ready to share."
+                        message = application.getString(R.string.files_is_ready_to_share, node.name)
                         val uri = FileProvider.getUriForFile(application, application.packageName + FILE_PROVIDER_SUFFIX, target)
                         val send = Intent(Intent.ACTION_SEND)
                             .setType(downloadedFileMimeType(node.name).takeIf { it != "*/*" } ?: "application/octet-stream")
@@ -958,7 +962,7 @@ class DownloadManager(
                             application.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                         }
                     }
-                    is ApiResponse.Error -> throw IOException(response.error.message.ifBlank { "The file couldn't be downloaded." })
+                    is ApiResponse.Error -> throw IOException(response.error.message.ifBlank { application.getString(R.string.files_the_file_couldn_t_be) })
                 }
             } catch (e: Exception) {
                 target.parentFile?.deleteRecursively()
@@ -966,7 +970,7 @@ class DownloadManager(
                     outcome = TransferOutcome.CANCELLED
                 } else {
                     Log.e(TAG, "Sharing ${node.name} failed: ${e.message}", e)
-                    val failure = "Couldn't share '${node.name}': ${e.localizedMessage ?: "Unexpected error"}"
+                    val failure = application.getString(R.string.files_couldn_t_share, node.name, e.localizedMessage ?: "Unexpected error")
                     message = failure
                     messages.show(failure, long = true)
                 }
