@@ -82,6 +82,8 @@ internal fun readAbout(context: Context): AppAbout {
 /** The top of the About page: the app's icon, name and version, the details of this build, and a button to copy them. */
 @Composable
 fun SettingsEnvironment.AboutSection() {
+    // The app's texts, for those its callbacks show
+    val res = LocalContext.current.resources
     val context = LocalContext.current
     val about = remember { readAbout(context) }
     val icon = remember {
@@ -122,7 +124,7 @@ fun SettingsEnvironment.AboutSection() {
 
         OutlinedButton(onClick = {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboard.setPrimaryClip(ClipData.newPlainText("Materialdrain version", about.asText()))
+            clipboard.setPrimaryClip(ClipData.newPlainText(res.getString(R.string.settings_materialdrain_version), about.asText()))
             copied = true
         }) {
             Icon(Icons.Filled.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))

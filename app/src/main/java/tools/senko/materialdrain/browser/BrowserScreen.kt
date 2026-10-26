@@ -125,6 +125,8 @@ fun BrowserScreen(
     /** Told whether a bar is at the bottom of the screen (the selection's, or one waiting for a place), see App.kt */
     onBottomBarChange: (Boolean) -> Unit = {}
 ) {
+    // The app's texts, for those its callbacks show
+    val res = LocalContext.current.resources
     val fsState by filesystemViewModel.uiState.collectAsState()
     val fsDisplayedChildren by filesystemViewModel.displayedChildren.collectAsState()
     val fileState by fileInfoViewModel.uiState.collectAsState()
@@ -294,7 +296,7 @@ fun BrowserScreen(
     val onOpen: (StorageNode) -> Unit = { node ->
         when {
             mode == BrowserMode.FILESYSTEM && node.isDirectory && moving && node.ref.path.trim('/') in movedFolders ->
-                messages.show("\"${node.name}\" is being moved")
+                messages.show(res.getString(R.string.browser_is_being_moved, node.name))
             mode == BrowserMode.FILESYSTEM && node.isDirectory -> filesystemViewModel.navigateToChild(node)
             mode == BrowserMode.LISTS && openedList == null ->
                 listState.lists.firstOrNull { it.id == node.ref.id }?.let { listViewModel.openList(it) }
@@ -311,9 +313,9 @@ fun BrowserScreen(
     // ---- Dialogs ----
     if (showNewFolderDialog) {
         TextInputDialog(
-            title = "New folder",
-            label = "Folder name",
-            confirmLabel = "Create",
+            title = stringResource(R.string.browser_new_folder),
+            label = stringResource(R.string.browser_folder_name),
+            confirmLabel = stringResource(R.string.browser_create),
             onConfirm = {
                 filesystemViewModel.createFolder(it)
                 showNewFolderDialog = false
@@ -323,11 +325,11 @@ fun BrowserScreen(
     }
     if (showImportDialog) {
         TextInputDialog(
-            title = "Import files by ID",
-            label = "File IDs",
-            confirmLabel = "Import",
+            title = stringResource(R.string.browser_import_files_by_id),
+            label = stringResource(R.string.browser_file_ids),
+            confirmLabel = stringResource(R.string.browser_import),
             singleLine = false,
-            supportingText = "Separate IDs with spaces or commas.",
+            supportingText = stringResource(R.string.browser_separate_ids_with_spaces_or),
             onConfirm = {
                 filesystemViewModel.importFilesById(it.split(',', ' ', '\n', '\t'))
                 showImportDialog = false
@@ -337,9 +339,9 @@ fun BrowserScreen(
     }
     entryToRename?.let { entry ->
         TextInputDialog(
-            title = if (entry.isDirectory) "Rename folder" else "Rename file",
-            label = "New name",
-            confirmLabel = "Rename",
+            title = if (entry.isDirectory) stringResource(R.string.browser_rename_folder) else stringResource(R.string.browser_rename_file),
+            label = stringResource(R.string.browser_new_name),
+            confirmLabel = stringResource(R.string.browser_rename),
             initialValue = entry.name,
             onConfirm = {
                 filesystemViewModel.renameEntry(entry, it)
@@ -351,11 +353,11 @@ fun BrowserScreen(
     if (showBulkDelete) {
         val folderCount = selectedEntries.count { it.isDirectory }
         ConfirmDialog(
-            title = "Delete ${selectedEntries.size} items?",
-            text = (if (folderCount > 0) "Folders are deleted with everything inside. " else "") +
-                "This can't be undone." +
+            title = stringResource(R.string.browser_delete_items, selectedEntries.size),
+            text = (if (folderCount > 0) stringResource(R.string.browser_folders_are_deleted_with_everything) else "") +
+                stringResource(R.string.browser_this_can_t_be_undone) +
                 (if (selectedEntries.any { it.isSearchIndex() }) "\n\n$SEARCH_INDEX_DELETE_WARNING" else ""),
-            confirmLabel = "Delete",
+            confirmLabel = stringResource(R.string.browser_delete),
             isDestructive = true,
             onConfirm = {
                 filesystemViewModel.deleteEntries(selectedEntries)
@@ -367,15 +369,15 @@ fun BrowserScreen(
     }
     entryToDelete?.let { entry ->
         ConfirmDialog(
-            title = if (entry.isSearchIndex()) "Delete the search index?" else if (entry.isDirectory) "Delete folder?" else "Delete file?",
+            title = if (entry.isSearchIndex()) stringResource(R.string.browser_delete_the_search_index) else if (entry.isDirectory) stringResource(R.string.browser_delete_folder) else stringResource(R.string.browser_delete_file),
             text = if (entry.isSearchIndex()) {
                 SEARCH_INDEX_DELETE_WARNING
             } else if (entry.isDirectory) {
-                "\"${entry.name}\" and everything inside it will be deleted. This cannot be undone."
+                stringResource(R.string.browser_and_everything_inside_it_will, entry.name)
             } else {
-                "\"${entry.name}\" will be deleted. This cannot be undone."
+                stringResource(R.string.browser_will_be_deleted_this_cannot, entry.name)
             },
-            confirmLabel = if (entry.isSearchIndex()) "Delete anyway" else "Delete",
+            confirmLabel = if (entry.isSearchIndex()) stringResource(R.string.browser_delete_anyway) else stringResource(R.string.browser_delete),
             isDestructive = true,
             onConfirm = {
                 filesystemViewModel.deleteEntry(entry)
@@ -387,10 +389,10 @@ fun BrowserScreen(
     fsState.pendingUpload?.let { pending ->
         val names = pending.conflictingNames
         ConfirmDialog(
-            title = "Replace existing files?",
-            text = "${names.size} files already exist here and will be replaced: " +
+            title = stringResource(R.string.browser_replace_existing_files),
+            text = stringResource(R.string.browser_files_already_exist_here_and, names.size) +
                 names.take(5).joinToString(", ") + if (names.size > 5) ", …" else "",
-            confirmLabel = "Overwrite",
+            confirmLabel = stringResource(R.string.browser_overwrite),
             isDestructive = true,
             onConfirm = { filesystemViewModel.confirmPendingUpload() },
             onDismiss = { filesystemViewModel.cancelPendingUpload() }
@@ -421,7 +423,7 @@ fun BrowserScreen(
                     order = remember(sortField, sortAscending, foldersFirst) { fileComparator(sortField, sortAscending, directoriesFirst = foldersFirst) },
                     resultLimit = resultLimit,
                     thumbnailFor = { fileInfoViewModel.thumbnailFor(it) },
-                    placeholder = "Search this folder and its subfolders",
+                    placeholder = stringResource(R.string.browser_search_this_folder_and_its),
                     onResultClick = onOpen,
                     onDismiss = onDismissSearchModal,
                     locationOf = { node ->
@@ -430,8 +432,8 @@ fun BrowserScreen(
                     },
                     status = when {
                         tree == null -> null
-                        !tree.done -> "Looking through subfolders… ${tree.foldersScanned} so far"
-                        tree.foldersFailed > 0 -> "${tree.foldersFailed} folders couldn't be opened"
+                        !tree.done -> stringResource(R.string.browser_looking_through_subfolders_so_far, tree.foldersScanned)
+                        tree.foldersFailed > 0 -> stringResource(R.string.browser_folders_couldn_t_be_opened, tree.foldersFailed)
                         else -> null
                     }
                 )
@@ -443,7 +445,7 @@ fun BrowserScreen(
                 order = remember(sortField, sortAscending) { fileComparator(sortField, sortAscending) },
                 resultLimit = resultLimit,
                 thumbnailFor = { fileInfoViewModel.thumbnailFor(it) },
-                placeholder = "Search your files",
+                placeholder = stringResource(R.string.browser_search_your_files),
                 onResultClick = onOpen,
                 onDismiss = onDismissSearchModal
             )
@@ -454,7 +456,7 @@ fun BrowserScreen(
                 order = remember(sortField, sortAscending) { fileComparator(sortField, sortAscending) },
                 resultLimit = resultLimit,
                 thumbnailFor = { fileInfoViewModel.thumbnailFor(it) },
-                placeholder = "Search ${openedList.title}",
+                placeholder = stringResource(R.string.browser_search, openedList.title),
                 onResultClick = onOpen,
                 onDismiss = onDismissSearchModal
             )
@@ -475,7 +477,7 @@ fun BrowserScreen(
     // The ones already selected stay first, in their order, then the rest as they're shown
     val toggleAll = { selectedKeys = if (allSelected) emptySet() else selectedKeys + entries.map { it.key } }
     val selectAll = SelectionAction(
-        label = if (allSelected) "Deselect all" else "Select all",
+        label = if (allSelected) stringResource(R.string.browser_deselect_all) else stringResource(R.string.browser_select_all),
         icon = Icons.Filled.SelectAll,
         onClick = toggleAll
     )
@@ -490,14 +492,14 @@ fun BrowserScreen(
         }
     }
     val addSongsToQueue = playback?.let { player ->
-        SelectionAction("Add to queue", Icons.Filled.QueueMusic, {
+        SelectionAction(stringResource(R.string.browser_add_to_queue), Icons.Filled.QueueMusic, {
             val wasEmpty = player.mediaItemCount == 0
             songs.forEach { player.addToQueue(it, placeholderArt) }
             messages.show(
                 when {
-                    wasEmpty -> "Playing ${songs.first().title}" + if (songs.size > 1) " and ${songs.size - 1} more" else ""
-                    songs.size == 1 -> "Added to the queue"
-                    else -> "Added ${songs.size} songs to the queue"
+                    wasEmpty -> res.getString(R.string.browser_playing, songs.first().title) + if (songs.size > 1) " and ${songs.size - 1} more" else ""
+                    songs.size == 1 -> res.getString(R.string.browser_added_to_the_queue)
+                    else -> res.getString(R.string.browser_added_songs_to_the_queue, songs.size)
                 }
             )
             exitSelection()
@@ -510,7 +512,7 @@ fun BrowserScreen(
             // One file is only downloaded; a folder, or several things, each file on its own or all in one zip
             val single = selectedEntries.singleOrNull()
             if (single != null && !single.isDirectory) {
-                add(SelectionAction("Download", Icons.Filled.Download, { fileInfoViewModel.initiateDownloadFile(single); exitSelection() }))
+                add(SelectionAction(stringResource(R.string.browser_download), Icons.Filled.Download, { fileInfoViewModel.initiateDownloadFile(single); exitSelection() }))
             } else {
                 add(downloadChoices(enabled = selectedEntries.isNotEmpty()) { style ->
                     fileInfoViewModel.downloadItems(selectedEntries, style, single?.name ?: folderName)
@@ -518,28 +520,28 @@ fun BrowserScreen(
                 })
             }
             // Then browsed to the folder they go into, in this tab itself (see the move bar below)
-            if (fsState.canWrite) add(SelectionAction("Move", Icons.AutoMirrored.Filled.DriveFileMove, { filesystemViewModel.startMove(selectedEntries); exitSelection() }, enabled = selectedEntries.isNotEmpty() && !fsState.isModifying))
-            if (fsState.canDelete && canDelete) add(SelectionAction("Delete", Icons.Filled.Delete, { showBulkDelete = true }, enabled = selectedEntries.isNotEmpty() && !fsState.isModifying, destructive = true))
+            if (fsState.canWrite) add(SelectionAction(stringResource(R.string.browser_move), Icons.AutoMirrored.Filled.DriveFileMove, { filesystemViewModel.startMove(selectedEntries); exitSelection() }, enabled = selectedEntries.isNotEmpty() && !fsState.isModifying))
+            if (fsState.canDelete && canDelete) add(SelectionAction(stringResource(R.string.browser_delete), Icons.Filled.Delete, { showBulkDelete = true }, enabled = selectedEntries.isNotEmpty() && !fsState.isModifying, destructive = true))
             addSongsToQueue?.let { add(it) }
             add(selectAll)
         }
         BrowserMode.FILES, BrowserMode.LISTS -> buildList {
             // Each file on its own, or all of them in one archive; one file is only downloaded
             if (files.size <= 1) {
-                add(SelectionAction("Download", Icons.Filled.Download, { fileInfoViewModel.downloadFilesSequentially(files); exitSelection() }, enabled = files.isNotEmpty()))
+                add(SelectionAction(stringResource(R.string.browser_download), Icons.Filled.Download, { fileInfoViewModel.downloadFilesSequentially(files); exitSelection() }, enabled = files.isNotEmpty()))
             } else {
                 add(downloadChoices(enabled = true) { style ->
-                    if (style == DownloadStyle.ZIP) fileInfoViewModel.downloadFilesAsZip(files, openedList?.title ?: "Pixeldrain files")
+                    if (style == DownloadStyle.ZIP) fileInfoViewModel.downloadFilesAsZip(files, openedList?.title ?: res.getString(R.string.browser_pixeldrain_files))
                     else fileInfoViewModel.downloadFilesSequentially(files)
                     exitSelection()
                 })
             }
-            if (canDelete) add(SelectionAction("Delete", Icons.Filled.Delete, { actionRequest = FileActionRequest.Delete(files) }, enabled = files.isNotEmpty(), destructive = true))
-            add(SelectionAction("Add to list", Icons.AutoMirrored.Filled.PlaylistAdd, { actionRequest = FileActionRequest.AddToList(files) }, enabled = files.isNotEmpty()))
-            add(SelectionAction("Add to filesystem", Icons.Filled.FolderCopy, { actionRequest = FileActionRequest.AddToFilesystem(files) }, enabled = files.isNotEmpty()))
+            if (canDelete) add(SelectionAction(stringResource(R.string.browser_delete), Icons.Filled.Delete, { actionRequest = FileActionRequest.Delete(files) }, enabled = files.isNotEmpty(), destructive = true))
+            add(SelectionAction(stringResource(R.string.files_add_to_list), Icons.AutoMirrored.Filled.PlaylistAdd, { actionRequest = FileActionRequest.AddToList(files) }, enabled = files.isNotEmpty()))
+            add(SelectionAction(stringResource(R.string.browser_add_to_filesystem), Icons.Filled.FolderCopy, { actionRequest = FileActionRequest.AddToFilesystem(files) }, enabled = files.isNotEmpty()))
             openedList?.takeIf { it.canEdit }?.let { list ->
                 // The list's own file count, not the filtered entries (see the single-item action below)
-                add(SelectionAction("Remove from this list", Icons.Filled.Remove, { actionRequest = FileActionRequest.RemoveFromList(files, list, listState.listFiles.size) }, enabled = files.isNotEmpty()))
+                add(SelectionAction(stringResource(R.string.files_remove_from_this_list), Icons.Filled.Remove, { actionRequest = FileActionRequest.RemoveFromList(files, list, listState.listFiles.size) }, enabled = files.isNotEmpty()))
             }
             addSongsToQueue?.let { add(it) }
             add(selectAll)
@@ -555,7 +557,7 @@ fun BrowserScreen(
             add(
                 ScreenAction(
                     Icons.Filled.Download,
-                    if (listFiles.size > 1) "Download all" else "Download",
+                    if (listFiles.size > 1) stringResource(R.string.browser_download_all) else stringResource(R.string.browser_download),
                     enabled = listFiles.isNotEmpty(),
                     group = ScreenActionGroup.PAGE,
                     choices = if (listFiles.size > 1) {
@@ -573,7 +575,7 @@ fun BrowserScreen(
             add(
                 ScreenAction(
                     Icons.Filled.Download,
-                    "Download this folder",
+                    stringResource(R.string.browser_download_this_folder),
                     group = ScreenActionGroup.PAGE,
                     choices = downloadScreenChoices { style -> fileInfoViewModel.downloadItems(listOf(folder), style, folderName) }
                 ) {}
@@ -581,16 +583,16 @@ fun BrowserScreen(
         }
         // What a long press on an entry starts, for those who don't know it (not the lists overview, which only opens)
         if (entries.isNotEmpty() && !(mode == BrowserMode.LISTS && openedList == null)) {
-            add(ScreenAction(Icons.Filled.CheckBox, "Select", group = ScreenActionGroup.PAGE) { selecting = true })
+            add(ScreenAction(Icons.Filled.CheckBox, stringResource(R.string.browser_select), group = ScreenActionGroup.PAGE) { selecting = true })
         }
         // The Files screen's upload, as the Filesystem's: new files of the host
         if (mode == BrowserMode.FILES && onUploadFiles != null) {
-            add(ScreenAction(Icons.Filled.Upload, "Upload") { filesUploadLauncher.launch("*/*") })
+            add(ScreenAction(Icons.Filled.Upload, stringResource(R.string.upload_upload)) { filesUploadLauncher.launch("*/*") })
         }
         if (mode == BrowserMode.FILESYSTEM && fsState.canWrite) {
-            if (canUploadFs) add(ScreenAction(Icons.Filled.Upload, "Upload", enabled = !fsState.isModifying && fsUploadStatus == null) { filesystemUploadLauncher.launch("*/*") })
-            if (canMkdirFs) add(ScreenAction(Icons.Filled.CreateNewFolder, "New folder", enabled = !fsState.isModifying) { showNewFolderDialog = true })
-            if (fsState.canImport) add(ScreenAction(Icons.Filled.Link, "Import files by ID", enabled = !fsState.isModifying) { showImportDialog = true })
+            if (canUploadFs) add(ScreenAction(Icons.Filled.Upload, stringResource(R.string.upload_upload), enabled = !fsState.isModifying && fsUploadStatus == null) { filesystemUploadLauncher.launch("*/*") })
+            if (canMkdirFs) add(ScreenAction(Icons.Filled.CreateNewFolder, stringResource(R.string.browser_new_folder), enabled = !fsState.isModifying) { showNewFolderDialog = true })
+            if (fsState.canImport) add(ScreenAction(Icons.Filled.Link, stringResource(R.string.browser_import_files_by_id), enabled = !fsState.isModifying) { showImportDialog = true })
         }
     }
     val currentOnActionsChange by rememberUpdatedState(onActionsChange)
@@ -632,10 +634,10 @@ fun BrowserScreen(
         compact = look.compact,
         custom = ownLook != null,
         defaultLabel = when {
-            fallbackLayout == ListLayout.SMART -> "Smart"
-            fallbackLayout == ListLayout.GRID -> "Grid"
-            fallbackCompact -> "Compact rows"
-            else -> "List"
+            fallbackLayout == ListLayout.SMART -> stringResource(R.string.browser_smart)
+            fallbackLayout == ListLayout.GRID -> stringResource(R.string.browser_grid)
+            fallbackCompact -> stringResource(R.string.browser_compact_rows)
+            else -> stringResource(R.string.browser_list)
         },
         onLayout = { layout -> appSettings.setViewLook(shownViewKey, (ownLook ?: ViewLook()).copy(layout = layout)) },
         onCompact = { compact -> appSettings.setViewLook(shownViewKey, (ownLook ?: ViewLook()).copy(compact = compact)) },
@@ -741,7 +743,7 @@ fun BrowserScreen(
                     fileInfoViewModel.queueSongOf(node)?.let { song ->
                         val wasEmpty = player.mediaItemCount == 0
                         player.addToQueue(song, placeholderArt)
-                        messages.show(if (wasEmpty) "Playing ${node.name}" else "Added to the queue")
+                        messages.show(if (wasEmpty) res.getString(R.string.browser_playing, node.name) else res.getString(R.string.browser_added_to_the_queue))
                     }
                 }
             }

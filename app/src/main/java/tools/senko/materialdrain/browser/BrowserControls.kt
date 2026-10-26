@@ -123,6 +123,7 @@ import tools.senko.materialdrain.ui.icons.filled.ViewList
 import tools.senko.materialdrain.settings.ListLayout
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.compose.ui.platform.LocalContext
 
 /** The path at the top of the filesystem: each folder is tappable, and the row scrolls to the end of it. */
 @Composable
@@ -485,7 +486,7 @@ private fun ViewMenuEntries(view: ViewChoice, onBack: () -> Unit) {
     AppMenuItem(
         stringResource(R.string.browser_smart),
         leadingIcon = Icons.Filled.AutoAwesome,
-        supportingText = if (view.smart) stringResource(R.string.browser_here, if (view.grid) "Grid" else "List") else stringResource(R.string.browser_a_grid_for_pictures_and),
+        supportingText = if (view.smart) stringResource(R.string.browser_here, if (view.grid) stringResource(R.string.browser_grid) else stringResource(R.string.browser_list)) else stringResource(R.string.browser_a_grid_for_pictures_and),
         active = view.smart,
         trailingIcon = if (view.smart) Icons.Filled.Check else null,
         onClick = { view.onLayout(ListLayout.SMART) }
@@ -558,13 +559,15 @@ private val SortRowGap = 8.dp
  */
 @Composable
 private fun statusCardNeeds(): List<Dp> {
+    // The app's texts, for those its callbacks show
+    val res = LocalContext.current.resources
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val large = MaterialTheme.typography.labelLarge
     return remember(measurer, density, large) {
         fun textWidth(text: String): Dp = with(density) { measurer.measure(text, large, maxLines = 1).size.width.toDp() }
         val padding = CardPadding * 2
-        listOf(padding + 18.dp + 6.dp + textWidth("Cancel"), padding + 18.dp + 6.dp + textWidth("Thumbnails"))
+        listOf(padding + 18.dp + 6.dp + textWidth(res.getString(R.string.browser_cancel)), padding + 18.dp + 6.dp + textWidth(res.getString(R.string.browser_thumbnails)))
     }
 }
 
@@ -709,7 +712,7 @@ fun SearchModal(
                                         fieldValue = TextFieldValue("")
                                         onQueryChange("")
                                     }) {
-                                        Icon(Icons.Filled.Clear, contentDescription = "Clear search")
+                                        Icon(Icons.Filled.Clear, contentDescription = stringResource(R.string.browser_clear_search))
                                     }
                                 }
                             },
@@ -727,7 +730,7 @@ fun SearchModal(
                                 .focusRequester(focusRequester)
                         )
                         val lines = listOfNotNull(
-                            if (fieldValue.text.isNotBlank()) "Showing ${matches.size} of ${candidates.size}" else null,
+                            if (fieldValue.text.isNotBlank()) stringResource(R.string.browser_showing_of, matches.size, candidates.size) else null,
                             status
                         )
                         if (lines.isNotEmpty()) {
@@ -763,7 +766,7 @@ fun SearchModal(
                     exit = fadeOut() + scaleOut(targetScale = 0.8f)
                 ) {
                     Text(
-                        text = "+${matches.size - shown.size} more matches",
+                        text = stringResource(R.string.browser_more_matches, matches.size - shown.size),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier

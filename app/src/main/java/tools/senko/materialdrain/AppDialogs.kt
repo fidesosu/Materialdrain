@@ -1,5 +1,6 @@
 package tools.senko.materialdrain
 
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,6 +52,8 @@ internal fun AppDialogs(
     uploadViewModel: UploadViewModel,
     fileInfoViewModel: FileInfoViewModel
 ) {
+    // The app's texts, for those its callbacks show
+    val res = LocalContext.current.resources
     dialog?.let { shown ->
         fun close(confirmed: Boolean) {
             onClosed()
@@ -98,7 +101,7 @@ internal fun AppDialogs(
                 val isSearchIndex = fileInfoUiState.nodeToDelete?.isSearchIndex() == true
                 Text(
                     if (isSearchIndex) SEARCH_INDEX_DELETE_WARNING
-                    else "Delete \"${fileInfoUiState.nodeToDelete?.name ?: fileInfoUiState.fileIdToDelete}\"? This can't be undone."
+                    else res.getString(R.string.app_delete_this_can_t_be, fileInfoUiState.nodeToDelete?.name ?: fileInfoUiState.fileIdToDelete)
                 )
             },
             confirmButton = {

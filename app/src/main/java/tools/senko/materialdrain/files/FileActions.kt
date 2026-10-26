@@ -238,9 +238,9 @@ fun FileActionDialogs(
         is FileActionRequest.Delete -> {
             val count = request.files.size
             ConfirmDialog(
-                title = if (count == 1) "Delete file?" else "Delete $count files?",
-                text = "Also removes " + (if (count == 1) "it" else "them") + " from every list. This can't be undone.",
-                confirmLabel = "Delete",
+                title = if (count == 1) stringResource(R.string.browser_delete_file) else stringResource(R.string.files_delete_files, count),
+                text = stringResource(R.string.files_also_removes) + (if (count == 1) "it" else "them") + stringResource(R.string.files_from_every_list_this_can),
+                confirmLabel = stringResource(R.string.browser_delete),
                 isDestructive = true,
                 onConfirm = {
                     handlers.deleteFiles(request.files)
@@ -252,8 +252,8 @@ fun FileActionDialogs(
         }
         is FileActionRequest.AddToFilesystem -> {
             FolderPickerDialog(
-                title = "Add to filesystem",
-                confirmLabel = "Add here",
+                title = stringResource(R.string.browser_add_to_filesystem),
+                confirmLabel = stringResource(R.string.files_add_here),
                 initialPath = handlers.folderRootPath,
                 rootPath = handlers.folderRootPath,
                 rootName = handlers.folderRootName,
@@ -271,10 +271,10 @@ fun FileActionDialogs(
             var creatingNewList by remember { mutableStateOf(false) }
             if (creatingNewList) {
                 TextInputDialog(
-                    title = "Create a list",
-                    label = "List title",
-                    confirmLabel = "Create",
-                    initialValue = "Pixeldrain List",
+                    title = stringResource(R.string.files_create_a_list),
+                    label = stringResource(R.string.files_list_title),
+                    confirmLabel = stringResource(R.string.browser_create),
+                    initialValue = stringResource(R.string.files_pixeldrain_list),
                     onConfirm = { title ->
                         handlers.createList(request.files.mapNotNull { it.ref.id }, title)
                         onStarted()
@@ -299,13 +299,13 @@ fun FileActionDialogs(
             val count = request.files.size
             val deletesList = count >= request.listFileCount
             ConfirmDialog(
-                title = if (count == 1) "Remove file from list?" else "Remove $count files from list?",
+                title = if (count == 1) stringResource(R.string.files_remove_file_from_list) else stringResource(R.string.files_remove_files_from_list, count),
                 text = if (deletesList) {
-                    "This deletes the list \"${request.list.title}\". The files stay on your account."
+                    stringResource(R.string.files_this_deletes_the_list_the, request.list.title)
                 } else {
-                    "The files stay on your account and other lists."
+                    stringResource(R.string.files_the_files_stay_on_your)
                 },
-                confirmLabel = if (deletesList) "Delete list" else "Remove",
+                confirmLabel = if (deletesList) stringResource(R.string.files_delete_list) else stringResource(R.string.settings_remove),
                 isDestructive = deletesList,
                 onConfirm = {
                     handlers.removeFromList(request.list, request.files.mapNotNull { it.ref.id })

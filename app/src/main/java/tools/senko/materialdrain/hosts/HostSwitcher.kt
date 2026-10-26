@@ -74,6 +74,7 @@ import tools.senko.materialdrain.ui.icons.filled.Dns
 import tools.senko.materialdrain.ui.icons.filled.CloudSync
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.compose.ui.platform.LocalContext
 
 /** Whether a host has a sign-in, shown next to its name in the switcher. */
 enum class HostStatus(val label: String) {
@@ -197,6 +198,8 @@ fun HostSwitcher(
     onOpened: () -> Unit,
     onRefresh: () -> Unit,
 ) {
+    // The app's texts, for those its callbacks show
+    val res = LocalContext.current.resources
     var expanded by remember { mutableStateOf(false) }
     val active = hosts.firstOrNull { it.id == activeId } ?: hosts.first()
     val activeCheck = checks[active.id]
@@ -215,7 +218,7 @@ fun HostSwitcher(
             modifier = Modifier
                 .height(SwitcherHeight)
                 .widthIn(min = 150.dp, max = 240.dp)
-                .semantics { contentDescription = "Host: ${active.name}, ${activeCheck.label()}. Tap to switch hosts" }
+                .semantics { contentDescription = res.getString(R.string.app_host_tap_to_switch_hosts, active.name, activeCheck.label()) }
         ) {
             Row(
                 modifier = Modifier.padding(start = 10.dp, end = 8.dp),

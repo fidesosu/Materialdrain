@@ -167,6 +167,8 @@ fun ConfigEditor(
     onSave: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    // The app's texts, for those its callbacks show
+    val res = LocalContext.current.resources
     val schema = configSchema()
     val original = remember(initialText) { ProviderConfigCodec.parseObject(initialText) }
     var root by remember(initialText) { mutableStateOf(original ?: JsonObject(emptyMap())) }
@@ -251,9 +253,9 @@ fun ConfigEditor(
                             } else {
                                 val parsed = ProviderConfigCodec.parseObject(jsonText)
                                 when {
-                                    parsed == null -> jsonError = "The JSON can't be read. Fix it here to use the form."
+                                    parsed == null -> jsonError = res.getString(R.string.settings_the_json_can_t_be)
                                     schema.sectionsFor(parsed.textOf("kind")) == null ->
-                                        jsonError = "Set \"kind\" to generic_rest, webdav, s3 or smb to use the form."
+                                        jsonError = res.getString(R.string.settings_set_kind_to_generic_rest)
                                     else -> {
                                         root = parsed
                                         jsonError = null

@@ -374,6 +374,8 @@ private fun UploadDropZone(enabled: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun UploadResultCard(fileId: String?) {
+    // The app's texts, for those its callbacks show
+    val res = LocalContext.current.resources
     val context = LocalContext.current
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -403,7 +405,7 @@ private fun UploadResultCard(fileId: String?) {
                 }
             }
             if (fileId != null) {
-                IconButton(onClick = { copyToClipboard(context, pixeldrainLink(fileId), "Link copied to clipboard") }) {
+                IconButton(onClick = { copyToClipboard(context, pixeldrainLink(fileId), res.getString(R.string.upload_link_copied_to_clipboard)) }) {
                     Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(R.string.upload_copy_link), tint = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
@@ -426,6 +428,8 @@ private fun QueuedFilesCard(
     onRemove: (Int) -> Unit,
     onClear: () -> Unit
 ) {
+    // The app's texts, for those its callbacks show
+    val res = LocalContext.current.resources
     val context = LocalContext.current
     val doneCount = items.count { it.status == UploadItemStatus.DONE }
     val totalSize = items.sumOf { it.sizeBytes ?: 0L }
@@ -452,7 +456,7 @@ private fun QueuedFilesCard(
                 if (doneCount > 0) {
                     TextButton(onClick = {
                         val links = items.mapNotNull { it.fileId }.joinToString("\n") { pixeldrainLink(it) }
-                        copyToClipboard(context, links, "Links copied to clipboard")
+                        copyToClipboard(context, links, res.getString(R.string.upload_links_copied_to_clipboard))
                     }) { Text(stringResource(R.string.upload_copy_links)) }
                 }
                 TextButton(onClick = onClear, enabled = !isUploading) { Text(stringResource(R.string.upload_clear)) }
@@ -468,6 +472,8 @@ private fun QueuedFilesCard(
 
 @Composable
 private fun QueuedFileRow(item: UploadItem, isUploading: Boolean, onRemove: (Int) -> Unit) {
+    // The app's texts, for those its callbacks show
+    val res = LocalContext.current.resources
     val context = LocalContext.current
     val size = item.sizeBytes?.takeIf { it > 0 }
     val fraction = size?.let { (item.uploadedBytes.toFloat() / it).coerceIn(0f, 1f) }
@@ -511,7 +517,7 @@ private fun QueuedFileRow(item: UploadItem, isUploading: Boolean, onRemove: (Int
         }
         val fileId = item.fileId
         if (item.status == UploadItemStatus.DONE && fileId != null) {
-            IconButton(onClick = { copyToClipboard(context, pixeldrainLink(fileId), "Link copied to clipboard") }) {
+            IconButton(onClick = { copyToClipboard(context, pixeldrainLink(fileId), res.getString(R.string.upload_link_copied_to_clipboard)) }) {
                 Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(R.string.upload_copy_link))
             }
         } else if (!isUploading) {

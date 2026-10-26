@@ -197,6 +197,8 @@ fun FileInfoDetailsCard(
     /** A song's list, which the background player goes on with after it (see AudioPlayerPreview) */
     songQueue: SongQueue? = null
 ) {
+    // The app's texts, for those its callbacks show
+    val res = LocalContext.current.resources
     val localContext = LocalContext.current
     val inPreview = LocalInspectionMode.current
     val coroutineScope = rememberCoroutineScope()
@@ -486,7 +488,7 @@ fun FileInfoDetailsCard(
                         add { DetailRow(Icons.Filled.Visibility, stringResource(R.string.files_last_viewed), formatApiDateTimeString(date), relativeTime(date)) }
                     }
                     folderOf(fileInfo)?.let { folder ->
-                        add { DetailRow(Icons.Filled.Folder, "Folder", folder, collapsedLines = 2, onCopy = { copy("Folder", folder) }) }
+                        add { DetailRow(Icons.Filled.Folder, res.getString(R.string.files_folder), folder, collapsedLines = 2, onCopy = { copy(res.getString(R.string.files_folder), folder) }) }
                     }
                     rich?.let { autoDeleteText(it) }?.let { text ->
                         add { DetailRow(Icons.Filled.AutoDelete, stringResource(R.string.files_deletes_itself), text) }
@@ -511,7 +513,7 @@ fun FileInfoDetailsCard(
                                     value = link.removePrefix("https://"),
                                     collapsedLines = 1,
                                     cutInMiddle = false,
-                                    onCopy = { copy("Link", link) },
+                                    onCopy = { copy(res.getString(R.string.files_link), link) },
                                     onOpen = {
                                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, link.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                                     }

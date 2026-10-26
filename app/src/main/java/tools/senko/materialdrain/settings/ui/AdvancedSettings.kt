@@ -256,6 +256,8 @@ private fun HostCard(
     /** Opened at first: for the previews at the end of the file */
     startExpanded: Boolean = false
 ) {
+    // The app's texts, for those its callbacks show
+    val res = LocalContext.current.resources
     var expanded by rememberSaveable(stored.id) { mutableStateOf(startExpanded) }
     // Asked for from the host switcher: opened, and scrolled to once the settings page has slid in and the card has grown
     val bringIntoView = remember { BringIntoViewRequester() }
@@ -451,7 +453,7 @@ private fun HostCard(
                         TextButton(onClick = {
                             viewModel.exportConfig(stored.id)?.let { text ->
                                 val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboardManager.setPrimaryClip(ClipData.newPlainText("Provider config", text))
+                                clipboardManager.setPrimaryClip(ClipData.newPlainText(res.getString(R.string.settings_provider_config), text))
                             }
                             justCopied = true
                         }) { Text(if (justCopied) stringResource(R.string.settings_copied) else stringResource(R.string.settings_export)) }
@@ -573,7 +575,7 @@ private fun EditNoticeDialog(notice: EditNotice, viewModel: ProviderSettingsView
         title = { Text(stringResource(R.string.settings_this_config_is_edited)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.settings_updates_from_would_replace_your, notice.updateHost ?: "its update URL"))
+                Text(stringResource(R.string.settings_updates_from_would_replace_your, notice.updateHost ?: stringResource(R.string.settings_its_update_url)))
                 if (notice.autoUpdateTurnedOff) {
                     Text(stringResource(R.string.settings_auto_update_is_now_off))
                 }

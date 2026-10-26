@@ -125,6 +125,8 @@ import androidx.compose.ui.res.stringResource
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun MaterialdrainScreen() {
+    // The app's texts, for those its callbacks show
+    val res = LocalContext.current.resources
     var previousScreen by rememberSaveable { mutableStateOf(Screen.Files) }
 
     // The problem shown in a dialog, if any (see AppDialog)
@@ -460,7 +462,7 @@ fun MaterialdrainScreen() {
             .distinctUntilChanged()
             .collect { (failed, error) ->
                 if (failed != null) {
-                    dialog = AppDialog.UploadFailed(failed.message ?: "Unknown error")
+                    dialog = AppDialog.UploadFailed(failed.message ?: res.getString(R.string.app_unknown_error))
                 } else if (error != null && dialog == null && currentScreen == Screen.Upload) {
                     dialog = AppDialog.UploadError(error)
                 }
@@ -785,7 +787,7 @@ fun MaterialdrainScreen() {
                             bottom = if (underNavigationBar) 0.dp else bottomPadding - behindMiniPlayer
                         )
                 ) {
-                    val noScreensMessage = stringResource(R.string.app_has_no_tabs_to_show, activeConfig?.name ?: "This host")
+                    val noScreensMessage = stringResource(R.string.app_has_no_tabs_to_show, activeConfig?.name ?: stringResource(R.string.app_this_host))
                     when (targetScreen) {
                         in BROWSE_SCREENS if noScreensConfigured -> CenteredTextMessage(noScreensMessage)
                         Screen.Upload -> UploadScreenContent(
