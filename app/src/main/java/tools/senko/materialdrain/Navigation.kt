@@ -62,6 +62,7 @@ import tools.senko.materialdrain.ui.HapticKind
 import tools.senko.materialdrain.ui.HapticPlace
 import tools.senko.materialdrain.ui.LocalAppHaptics
 import tools.senko.materialdrain.ui.LocalReduceMotion
+import androidx.compose.ui.res.stringResource
 
 /** The screens of the app. [icon] is null for the one that isn't reached from the navigation, a file's details. */
 enum class Screen(val title: String, private val iconOf: (() -> ImageVector)?) {
@@ -161,7 +162,7 @@ fun BottomNavigationBar(
             NavigationBarItem(
                 icon = {
                     Box {
-                        Icon(openInMore?.icon ?: Icons.Filled.Apps, contentDescription = "More tabs")
+                        Icon(openInMore?.icon ?: Icons.Filled.Apps, contentDescription = stringResource(R.string.app_more_tabs))
                         // Above the bar, as the bar is at the bottom
                         AppMenu(expanded = open, onDismiss = { open = false }, side = MenuSide.Above) {
                             more.forEach { tab ->
@@ -175,7 +176,7 @@ fun BottomNavigationBar(
                         }
                     }
                 },
-                label = { Text(openInMore?.title ?: "More", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                label = { Text(openInMore?.title ?: stringResource(R.string.app_more), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 alwaysShowLabel = alwaysShowLabels,
                 selected = openInMore != null,
                 onClick = { open = true }

@@ -62,6 +62,8 @@ import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.ui.preview.PreviewSamples
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /**
  * An audio player in a card: art, what is playing, a seek bar and the controls. It loads nothing until play is
@@ -271,14 +273,14 @@ private fun AudioPlayerCard(
         val openPlayer = LocalOpenAudioPlayer.current
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                MiniCover(albumArtSource, size = 72.dp, onLoad = onLoadArt, contentDescription = "Album art")
+                MiniCover(albumArtSource, size = 72.dp, onLoad = onLoadArt, contentDescription = stringResource(R.string.media_album_art))
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     title?.let { Text(it, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                     artist?.let { Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     album?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     if (title == null && artist == null && album == null) {
-                        Text("Audio", style = MaterialTheme.typography.titleSmall)
+                        Text(stringResource(R.string.media_audio), style = MaterialTheme.typography.titleSmall)
                     }
                 }
             }
@@ -316,7 +318,7 @@ private fun AudioPlayerCard(
                     )
                     MediaIconButton(
                         icon = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (playing) "Pause" else "Play",
+                        contentDescription = if (playing) stringResource(R.string.media_pause) else stringResource(R.string.media_play),
                         onClick = { startOr(0L) { state?.togglePlayPause() } },
                         container = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -333,7 +335,7 @@ private fun AudioPlayerCard(
                     if (openPlayer != null) {
                         MediaIconButton(
                             icon = Icons.Filled.ExpandLess,
-                            contentDescription = "Open the player",
+                            contentDescription = stringResource(R.string.media_open_the_player),
                             // The player shows the song the background player has: this one, started if it isn't
                             onClick = {
                                 if (own == null) startThisSong?.invoke(0L)
@@ -354,7 +356,7 @@ private fun AudioPlayerCard(
             own?.error?.let { error ->
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
                     Text(error.userMessage(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { own?.retry() }) { Text("Try again") }
+                    TextButton(onClick = { own?.retry() }) { Text(stringResource(R.string.media_try_again)) }
                 }
             }
         }
@@ -402,7 +404,7 @@ private fun AudioPlayerFullContent(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
                 IconButton(onClick = onBack, modifier = Modifier.offset(x = (-12).dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.files_back))
                 }
             }
             // The cover up near the top, as big as fits, square; what room is left over goes under it
@@ -412,12 +414,12 @@ private fun AudioPlayerFullContent(
                     albumArtSource,
                     size = side,
                     shape = AppShapes.Card,
-                    contentDescription = "Album art",
+                    contentDescription = stringResource(R.string.media_album_art),
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
             Text(
-                texts.title ?: "Audio",
+                texts.title ?: stringResource(R.string.media_audio),
                 style = MaterialTheme.typography.headlineSmall,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis

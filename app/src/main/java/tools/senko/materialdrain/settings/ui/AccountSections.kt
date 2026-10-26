@@ -49,6 +49,8 @@ import tools.senko.materialdrain.provider.pixeldrain.internal.UserInfo
 import tools.senko.materialdrain.ui.components.ConfirmDialog
 import tools.senko.materialdrain.ui.components.TextInputDialog
 import tools.senko.materialdrain.util.formatSize
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** A small spinner in a button while what it started runs. */
 @Composable
@@ -62,31 +64,31 @@ internal fun ProfileCard(user: UserInfo, state: AccountUiState, viewModel: Accou
     var renaming by remember { mutableStateOf(false) }
     val busy = AccountTask.PROFILE in state.busy
 
-    AccountCard(title = "Profile") {
-        AccountRow(Icons.Filled.Person, "Username", user.username) {
-            TextButton(onClick = { renaming = true }, enabled = !busy) { if (busy) ButtonSpinner() else Text("Change") }
+    AccountCard(title = stringResource(R.string.settings_profile)) {
+        AccountRow(Icons.Filled.Person, stringResource(R.string.settings_username), user.username) {
+            TextButton(onClick = { renaming = true }, enabled = !busy) { if (busy) ButtonSpinner() else Text(stringResource(R.string.settings_change)) }
         }
         user.emailAddresses.forEachIndexed { index, address ->
             CardDivider()
-            AccountRow(Icons.Filled.Email, if (index == 0) "E-mail" else "Also e-mail", address)
+            AccountRow(Icons.Filled.Email, if (index == 0) "E-mail" else stringResource(R.string.settings_also_e_mail), address)
         }
         if (user.emailAddressPending.isNotBlank()) {
             CardDivider()
-            AccountRow(Icons.Filled.MarkEmailUnread, "Waiting for verification", user.emailAddressPending, supporting = "Open the link in the e-mail")
+            AccountRow(Icons.Filled.MarkEmailUnread, stringResource(R.string.settings_waiting_for_verification), user.emailAddressPending, supporting = stringResource(R.string.settings_open_the_link_in_the))
         }
         CardDivider()
-        AccountRow(Icons.Filled.AlternateEmail, "E-mail addresses", "Add or remove them", supporting = "On pixeldrain.com") {
-            WebsiteLink(WEBSITE_SETTINGS_URL, "Adding and removing e-mail addresses")
+        AccountRow(Icons.Filled.AlternateEmail, stringResource(R.string.settings_e_mail_addresses), stringResource(R.string.settings_add_or_remove_them), supporting = stringResource(R.string.settings_on_pixeldrain_com)) {
+            WebsiteLink(WEBSITE_SETTINGS_URL, stringResource(R.string.settings_adding_and_removing_e_mail))
         }
     }
 
     if (renaming) {
         TextInputDialog(
-            title = "Change username",
-            label = "Username",
-            confirmLabel = "Change",
+            title = stringResource(R.string.settings_change_username),
+            label = stringResource(R.string.settings_username),
+            confirmLabel = stringResource(R.string.settings_change),
             initialValue = user.username,
-            supportingText = "Links to your files stay the same.",
+            supportingText = stringResource(R.string.settings_links_to_your_files_stay),
             onConfirm = { viewModel.changeUsername(it); renaming = false },
             onDismiss = { renaming = false }
         )
@@ -98,22 +100,22 @@ internal fun ProfileCard(user: UserInfo, state: AccountUiState, viewModel: Accou
 /** Two-factor authentication, the password and the API keys, which pixeldrain only lets the website change. */
 @Composable
 internal fun SecurityCard(user: UserInfo) {
-    AccountCard(title = "Security") {
+    AccountCard(title = stringResource(R.string.settings_security)) {
         AccountRow(
             Icons.Filled.Security,
-            "Two-factor authentication",
-            if (user.otpEnabled) "On" else "Off",
-            supporting = "On pixeldrain.com"
+            stringResource(R.string.settings_two_factor_authentication),
+            if (user.otpEnabled) stringResource(R.string.settings_on) else stringResource(R.string.media_off),
+            supporting = stringResource(R.string.settings_on_pixeldrain_com)
         ) {
-            WebsiteLink(WEBSITE_SETTINGS_URL, "Turning two-factor authentication on or off")
+            WebsiteLink(WEBSITE_SETTINGS_URL, stringResource(R.string.settings_turning_two_factor_authentication_on))
         }
         CardDivider()
-        AccountRow(Icons.Filled.Password, "Password", "Change it", supporting = "On pixeldrain.com") {
-            WebsiteLink(WEBSITE_SETTINGS_URL, "Changing your password")
+        AccountRow(Icons.Filled.Password, stringResource(R.string.settings_password), stringResource(R.string.settings_change_it), supporting = stringResource(R.string.settings_on_pixeldrain_com)) {
+            WebsiteLink(WEBSITE_SETTINGS_URL, stringResource(R.string.settings_changing_your_password))
         }
         CardDivider()
-        AccountRow(Icons.Filled.Key, "Sessions and API keys", "See, make and remove them", supporting = "On pixeldrain.com") {
-            WebsiteLink(WEBSITE_API_KEYS_URL, "Managing your sessions and API keys")
+        AccountRow(Icons.Filled.Key, stringResource(R.string.settings_sessions_and_api_keys), stringResource(R.string.settings_see_make_and_remove_them), supporting = stringResource(R.string.settings_on_pixeldrain_com)) {
+            WebsiteLink(WEBSITE_API_KEYS_URL, stringResource(R.string.settings_managing_your_sessions_and_api))
         }
     }
 }
@@ -129,11 +131,11 @@ internal fun SharingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
     val busy = AccountTask.SHARING in state.busy
     val planCap = user.subscription.monthlyTransferCap
 
-    AccountCard(title = "Sharing") {
+    AccountCard(title = stringResource(R.string.settings_sharing)) {
         AccountSwitchRow(
             Icons.Filled.Speed,
-            "Hotlinking",
-            "Fast downloads of your files, paid by you",
+            stringResource(R.string.settings_hotlinking),
+            stringResource(R.string.settings_fast_downloads_of_your_files),
             checked = user.hotlinkingEnabled,
             enabled = !busy,
             onChange = viewModel::setHotlinking
@@ -141,8 +143,8 @@ internal fun SharingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
         CardDivider()
         AccountSwitchRow(
             Icons.Filled.Visibility,
-            "Skip the file viewer",
-            "Links open the file, not pixeldrain's page",
+            stringResource(R.string.settings_skip_the_file_viewer),
+            stringResource(R.string.settings_links_open_the_file_not),
             checked = user.skipFileViewer,
             enabled = !busy,
             onChange = viewModel::setSkipFileViewer
@@ -150,37 +152,37 @@ internal fun SharingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
         CardDivider()
         AccountRow(
             Icons.Filled.Code,
-            "Sites which can embed your files",
+            stringResource(R.string.settings_sites_which_can_embed_your),
             user.fileEmbedDomains.split(' ').filter { it.isNotBlank() }.joinToString(", ").ifBlank { "None" }
         ) {
-            TextButton(onClick = { dialog = SharingDialog.EMBED }, enabled = !busy) { Text("Edit") }
+            TextButton(onClick = { dialog = SharingDialog.EMBED }, enabled = !busy) { Text(stringResource(R.string.settings_edit)) }
         }
         CardDivider()
         AccountRow(
             Icons.Filled.DataUsage,
-            "Monthly transfer cap",
-            if (user.monthlyTransferCap > 0) formatSize(user.monthlyTransferCap) else "The plan's",
-            supporting = if (planCap > 0) "Your plan allows ${formatSize(planCap)} a month" else "Your plan has no cap"
+            stringResource(R.string.settings_monthly_transfer_cap),
+            if (user.monthlyTransferCap > 0) formatSize(user.monthlyTransferCap) else stringResource(R.string.settings_the_plan_s),
+            supporting = if (planCap > 0) stringResource(R.string.settings_your_plan_allows_a_month, formatSize(planCap)) else stringResource(R.string.settings_your_plan_has_no_cap)
         ) {
-            TextButton(onClick = { dialog = SharingDialog.CAP }, enabled = !busy) { Text("Edit") }
+            TextButton(onClick = { dialog = SharingDialog.CAP }, enabled = !busy) { Text(stringResource(R.string.settings_edit)) }
         }
         CardDivider()
         AccountRow(
             Icons.Filled.Handshake,
-            "Affiliate",
-            user.affiliateUserName.ifBlank { "None" },
-            supporting = "Gets a reward for your purchases"
+            stringResource(R.string.settings_affiliate),
+            user.affiliateUserName.ifBlank { stringResource(R.string.common_none) },
+            supporting = stringResource(R.string.settings_gets_a_reward_for_your)
         ) {
-            TextButton(onClick = { dialog = SharingDialog.AFFILIATE }, enabled = !busy) { Text("Edit") }
+            TextButton(onClick = { dialog = SharingDialog.AFFILIATE }, enabled = !busy) { Text(stringResource(R.string.settings_edit)) }
         }
     }
 
     when (dialog) {
         SharingDialog.EMBED -> EditableTextDialog(
-            title = "Sites which can embed your files",
-            label = "Domains",
+            title = stringResource(R.string.settings_sites_which_can_embed_your),
+            label = stringResource(R.string.settings_domains),
             initialValue = user.fileEmbedDomains.split(' ').filter { it.isNotBlank() }.joinToString("\n"),
-            supportingText = "One per line, like example.com.",
+            supportingText = stringResource(R.string.settings_one_per_line_like_example),
             singleLine = false,
             onConfirm = { viewModel.setEmbedDomains(it); dialog = null },
             onDismiss = { dialog = null }
@@ -192,8 +194,8 @@ internal fun SharingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
             onDismiss = { dialog = null }
         )
         SharingDialog.AFFILIATE -> EditableTextDialog(
-            title = "Affiliate",
-            label = "Username",
+            title = stringResource(R.string.settings_affiliate),
+            label = stringResource(R.string.settings_username),
             initialValue = user.affiliateUserName,
             onConfirm = { viewModel.setAffiliate(it); dialog = null },
             onDismiss = { dialog = null }
@@ -219,44 +221,44 @@ internal fun BillingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
     val creditBusy = AccountTask.CREDIT in state.busy
     val planBusy = AccountTask.PLAN in state.busy
 
-    AccountCard(title = "Plan and billing") {
-        AccountRow(Icons.Filled.WorkspacePremium, "Plan", plan.name.ifBlank { "Free" }, supporting = plan.type.takeIf { it.isNotBlank() && !it.equals(plan.name, ignoreCase = true) })
+    AccountCard(title = stringResource(R.string.settings_plan_and_billing)) {
+        AccountRow(Icons.Filled.WorkspacePremium, stringResource(R.string.settings_plan), plan.name.ifBlank { stringResource(R.string.settings_free) }, supporting = plan.type.takeIf { it.isNotBlank() && !it.equals(plan.name, ignoreCase = true) })
         CardDivider()
-        AccountRow(Icons.Filled.AccountBalanceWallet, "Credit", formatEuro(user.balanceMicroEur)) {
-            FilledTonalButton(onClick = { addingCredit = true }, enabled = !creditBusy) { if (creditBusy) ButtonSpinner() else Text("Add credit") }
+        AccountRow(Icons.Filled.AccountBalanceWallet, stringResource(R.string.settings_credit), formatEuro(user.balanceMicroEur)) {
+            FilledTonalButton(onClick = { addingCredit = true }, enabled = !creditBusy) { if (creditBusy) ButtonSpinner() else Text(stringResource(R.string.settings_add_credit)) }
         }
         CardDivider()
         // The plan's limit per upload (subscription.file_size_limit), not the size of a file on the account
         AccountRow(
             Icons.Filled.Straighten,
-            "Upload size limit",
-            if (plan.fileSizeLimit > 0) formatSize(plan.fileSizeLimit) else "No limit",
-            supporting = "Largest upload".takeIf { plan.fileSizeLimit > 0 }
+            stringResource(R.string.settings_upload_size_limit),
+            if (plan.fileSizeLimit > 0) formatSize(plan.fileSizeLimit) else stringResource(R.string.settings_no_limit),
+            supporting = stringResource(R.string.settings_largest_upload).takeIf { plan.fileSizeLimit > 0 }
         )
         CardDivider()
-        AccountRow(Icons.Filled.Timer, "Files are removed", if (plan.fileExpiryDays > 0) "${plan.fileExpiryDays} days after they were last viewed" else "Never")
+        AccountRow(Icons.Filled.Timer, stringResource(R.string.settings_files_are_removed), if (plan.fileExpiryDays > 0) stringResource(R.string.settings_days_after_they_were_last, plan.fileExpiryDays) else stringResource(R.string.settings_never))
         CardDivider()
-        AccountRow(Icons.Filled.Folder, "Filesystem", if (plan.filesystemAccess) "Included" else "Not included")
+        AccountRow(Icons.Filled.Folder, stringResource(R.string.files_filesystem), if (plan.filesystemAccess) stringResource(R.string.settings_included) else stringResource(R.string.settings_not_included))
         if (plan.pricePerTbStorage > 0 || plan.pricePerTbBandwidth > 0) {
             CardDivider()
             AccountRow(
                 Icons.Filled.Storage,
-                "Prices",
-                "${formatEuro(plan.pricePerTbStorage)} per TB stored · ${formatEuro(plan.pricePerTbBandwidth)} per TB transferred"
+                stringResource(R.string.settings_prices),
+                stringResource(R.string.settings_per_tb_stored_per_tb, formatEuro(plan.pricePerTbStorage), formatEuro(plan.pricePerTbBandwidth))
             )
         }
         val otherPlans = PrepaidPlans.filter { it.first != plan.id }
         if (otherPlans.isNotEmpty()) {
             CardButtons {
                 otherPlans.forEach { option ->
-                    OutlinedButton(onClick = { switchingTo = option }, enabled = !planBusy) { if (planBusy) ButtonSpinner() else Text("Switch to ${option.second}") }
+                    OutlinedButton(onClick = { switchingTo = option }, enabled = !planBusy) { if (planBusy) ButtonSpinner() else Text(stringResource(R.string.settings_switch_to, option.second)) }
                 }
             }
         }
 
-        CardSubtitle("Invoices")
+        CardSubtitle(stringResource(R.string.settings_invoices))
         LoadableRows(state.invoices) { invoices ->
-            if (invoices.isEmpty()) CardNote("No invoices yet.")
+            if (invoices.isEmpty()) CardNote(stringResource(R.string.settings_no_invoices_yet))
             invoices.forEachIndexed { index, invoice ->
                 if (index > 0) CardDivider()
                 val open = invoice.status.lowercase() in UnpaidInvoiceStatuses
@@ -270,17 +272,17 @@ internal fun BillingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
                         invoice.vat.takeIf { it > 0 }?.let { "${formatEuro(it)} VAT" }
                     ).joinToString(" · ")
                 ) {
-                    if (open) TextButton(onClick = { viewModel.payInvoice(invoice.id) }) { Text("Pay") }
+                    if (open) TextButton(onClick = { viewModel.payInvoice(invoice.id) }) { Text(stringResource(R.string.settings_pay)) }
                 }
             }
         }
 
-        CardSubtitle("Transactions") { MonthSwitcher(state.transactionsMonth, viewModel::showTransactionsMonth) }
+        CardSubtitle(stringResource(R.string.settings_transactions)) { MonthSwitcher(state.transactionsMonth, viewModel::showTransactionsMonth) }
         LoadableRows(state.transactions) { transactions ->
-            if (transactions.isEmpty()) CardNote("No transactions in ${state.transactionsMonth.format(MonthFormat)}.")
+            if (transactions.isEmpty()) CardNote(stringResource(R.string.settings_no_transactions_in, state.transactionsMonth.format(MonthFormat)))
             transactions.forEachIndexed { index, transaction ->
                 if (index > 0) CardDivider()
-                AccountRow(Icons.AutoMirrored.Filled.ReceiptLong, formatAccountDate(transaction.time), "Balance ${formatEuro(transaction.newBalance)}", supporting = transactionParts(transaction))
+                AccountRow(Icons.AutoMirrored.Filled.ReceiptLong, formatAccountDate(transaction.time), stringResource(R.string.settings_balance, formatEuro(transaction.newBalance)), supporting = transactionParts(transaction))
             }
         }
     }
@@ -296,9 +298,9 @@ internal fun BillingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
     }
     switchingTo?.let { (id, label) ->
         ConfirmDialog(
-            title = "Switch to $label?",
-            text = "Paid from your credit (at least ${formatEuro(1_000_000)}). You have ${formatEuro(user.balanceMicroEur)}.",
-            confirmLabel = "Switch",
+            title = stringResource(R.string.settings_switch_to_2, label),
+            text = stringResource(R.string.settings_paid_from_your_credit_at, formatEuro(1_000_000), formatEuro(user.balanceMicroEur)),
+            confirmLabel = stringResource(R.string.settings_switch),
             onConfirm = { viewModel.activatePlan(id, label); switchingTo = null },
             onDismiss = { switchingTo = null }
         )
@@ -336,8 +338,8 @@ internal fun BrandingCard(user: UserInfo, state: AccountUiState, viewModel: Acco
     }
     val set = BrandingFields.filter { current[it.key].orEmpty().let { value -> value.isNotBlank() && value != "false" } }
 
-    AccountCard(title = "File viewer") {
-        if (set.isEmpty()) CardNote("Your own theme, images and links on pixeldrain's file viewer.")
+    AccountCard(title = stringResource(R.string.settings_file_viewer)) {
+        if (set.isEmpty()) CardNote(stringResource(R.string.settings_your_own_theme_images_and))
         set.forEachIndexed { index, field ->
             if (index > 0) CardDivider()
             AccountRow(
@@ -348,12 +350,12 @@ internal fun BrandingCard(user: UserInfo, state: AccountUiState, viewModel: Acco
                     else -> Icons.AutoMirrored.Filled.Label
                 },
                 field.label,
-                if (field.isSwitch) "Yes" else current[field.key].orEmpty(),
+                if (field.isSwitch) stringResource(R.string.settings_yes) else current[field.key].orEmpty(),
                 monospace = field.key.endsWith("_image")
             )
         }
         CardButtons {
-            OutlinedButton(onClick = { editing = true }, enabled = !busy) { if (busy) ButtonSpinner() else Text("Customize") }
+            OutlinedButton(onClick = { editing = true }, enabled = !busy) { if (busy) ButtonSpinner() else Text(stringResource(R.string.settings_customize)) }
         }
     }
     if (editing) {
@@ -370,9 +372,9 @@ internal fun BrandingCard(user: UserInfo, state: AccountUiState, viewModel: Acco
 /** The files which were removed from the account in a month, and why. */
 @Composable
 internal fun ActivityCard(state: AccountUiState, viewModel: AccountViewModel) {
-    AccountCard(title = "Removed files", action = { MonthSwitcher(state.activityMonth, viewModel::showActivityMonth) }) {
+    AccountCard(title = stringResource(R.string.settings_removed_files), action = { MonthSwitcher(state.activityMonth, viewModel::showActivityMonth) }) {
         LoadableRows(state.activity) { events ->
-            if (events.isEmpty()) CardNote("Nothing was removed from your account in ${state.activityMonth.format(MonthFormat)}.")
+            if (events.isEmpty()) CardNote(stringResource(R.string.settings_nothing_was_removed_from_your, state.activityMonth.format(MonthFormat)))
             events.forEachIndexed { index, event ->
                 if (index > 0) CardDivider()
                 AccountRow(
@@ -404,14 +406,14 @@ private fun activityLabel(event: ActivityEvent): String = when (event.event) {
 /** Deleting the account, which pixeldrain only lets the website do. */
 @Composable
 internal fun DangerCard() {
-    AccountCard(title = "Delete account") {
+    AccountCard(title = stringResource(R.string.settings_delete_account)) {
         AccountRow(
             Icons.Filled.DeleteForever,
-            "Delete my account",
-            "On pixeldrain.com",
-            supporting = "You're logged out everywhere and the account is deleted in 7 days. Logging in again cancels it."
+            stringResource(R.string.settings_delete_my_account),
+            stringResource(R.string.settings_on_pixeldrain_com),
+            supporting = stringResource(R.string.settings_you_re_logged_out_everywhere)
         ) {
-            WebsiteLink(WEBSITE_SETTINGS_URL, "Deleting your account")
+            WebsiteLink(WEBSITE_SETTINGS_URL, stringResource(R.string.settings_deleting_your_account))
         }
     }
 }

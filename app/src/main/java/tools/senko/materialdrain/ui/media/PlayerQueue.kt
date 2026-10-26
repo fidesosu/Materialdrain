@@ -60,6 +60,8 @@ import androidx.media3.common.MediaItem
 import tools.senko.materialdrain.ui.icons.filled.Close
 import tools.senko.materialdrain.ui.icons.filled.PlayArrow
 import tools.senko.materialdrain.ui.theme.AppShapes
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /**
  * A song of the queue dragged by its handle to another place (see [QueueList]): [shown] is the queue as it's shown, the
@@ -197,7 +199,7 @@ internal fun QueueList(song: BackgroundSong, modifier: Modifier = Modifier, shap
                 verticalAlignment = Alignment.Bottom,
                 modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp)
             ) {
-                Text("Queue", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.media_queue), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                 Text(
                     if (shown.size == 1) "1 song" else "${shown.size} songs",
                     style = MaterialTheme.typography.labelMedium,
@@ -307,7 +309,7 @@ private fun QueueRow(
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    tags?.title ?: metadata.title?.toString() ?: "Audio",
+                    tags?.title ?: metadata.title?.toString() ?: stringResource(R.string.media_audio),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = if (playing) FontWeight.SemiBold else null,
                     color = if (playing) colors.primary else colors.onSurface,
@@ -327,12 +329,12 @@ private fun QueueRow(
             // Small and quiet, so it doesn't make the row taller than its cover
             if (!playing) {
                 IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Filled.Close, contentDescription = "Take out of the queue", modifier = Modifier.size(18.dp), tint = colors.onSurfaceVariant)
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.media_take_out_of_the_queue), modifier = Modifier.size(18.dp), tint = colors.onSurfaceVariant)
                 }
             } else {
                 // The one playing: a play sign where the others have their ✕
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = "Playing", modifier = Modifier.size(18.dp), tint = colors.primary)
+                    Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.media_playing), modifier = Modifier.size(18.dp), tint = colors.primary)
                 }
             }
         }

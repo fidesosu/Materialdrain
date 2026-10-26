@@ -81,6 +81,8 @@ import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import tools.senko.materialdrain.ui.preview.PreviewSamples
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** The widest a page is drawn, and the most pixels it has: a zoomed page stays sharp without filling the memory. */
 private const val MAX_PAGE_WIDTH_PX = 2560
@@ -215,7 +217,7 @@ private fun PdfPage(document: PdfPages, index: Int, widthPx: Int, modifier: Modi
         bitmap?.let {
             Image(
                 bitmap = it.asImageBitmap(),
-                contentDescription = "Page ${index + 1}",
+                contentDescription = stringResource(R.string.media_page, index + 1),
                 contentScale = ContentScale.FillBounds,
                 filterQuality = FilterQuality.Medium,
                 modifier = Modifier.fillMaxSize()
@@ -352,13 +354,13 @@ fun PdfFullscreenContent(state: PdfPreviewState?, title: String, onBack: () -> U
         when (state) {
             null -> LinearProgressIndicator(modifier = top)
             is PdfPreviewState.Large -> {
-                FullscreenPdfMessage("Loading the PDF · About ${formatSize(state.totalBytes)}")
+                FullscreenPdfMessage(stringResource(R.string.media_loading_the_pdf_about, formatSize(state.totalBytes)))
                 LinearProgressIndicator(modifier = top)
                 LaunchedEffect(Unit) { onLoad() }
             }
             is PdfPreviewState.Loading -> {
                 val total = state.totalBytes?.takeIf { it > 0 }
-                FullscreenPdfMessage("Loading the PDF · ${formatSize(state.loadedBytes)}" + total?.let { " of ${formatSize(it)}" }.orEmpty())
+                FullscreenPdfMessage(stringResource(R.string.media_loading_the_pdf, formatSize(state.loadedBytes)) + total?.let { " of ${formatSize(it)}" }.orEmpty())
                 if (total != null) {
                     LinearProgressIndicator(progress = { (state.loadedBytes.toFloat() / total).coerceIn(0f, 1f) }, modifier = top)
                 } else {
@@ -381,7 +383,7 @@ fun PdfFullscreenContent(state: PdfPreviewState?, title: String, onBack: () -> U
         }
         MediaIconButton(
             icon = Icons.AutoMirrored.Filled.ArrowBack,
-            contentDescription = "Back",
+            contentDescription = stringResource(R.string.files_back),
             onClick = onBack,
             modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(PdfBarInset),
             size = PdfBarHeight,

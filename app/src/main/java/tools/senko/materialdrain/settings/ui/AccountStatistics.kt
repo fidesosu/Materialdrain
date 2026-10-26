@@ -57,11 +57,13 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.floor
 import kotlinx.coroutines.delay
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** The account's usage over time: which statistic and how far back are picked above the chart. */
 @Composable
 internal fun StatisticsCard(state: AccountUiState, viewModel: AccountViewModel) {
-    AccountCard(title = "Statistics") {
+    AccountCard(title = stringResource(R.string.settings_statistics)) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp)
@@ -88,7 +90,7 @@ internal fun StatisticsCard(state: AccountUiState, viewModel: AccountViewModel) 
             }
         }
         if (state.statistic == UsageStatistic.TRANSFER_PAID) {
-            CardNote("Full-speed downloads of your files.")
+            CardNote(stringResource(R.string.settings_full_speed_downloads_of_your))
         }
     }
 }
@@ -147,7 +149,7 @@ private fun UsageChart(series: TimeSeries?, statistic: UsageStatistic, range: St
     } else {
         DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
     }.withZone(ZoneId.systemDefault())
-    val dayFormat = DateTimeFormatter.ofPattern("d MMM").withZone(ZoneId.systemDefault())
+    val dayFormat = DateTimeFormatter.ofPattern(stringResource(R.string.settings_d_mmm)).withZone(ZoneId.systemDefault())
     fun dateOf(index: Int, formatter: DateTimeFormatter) =
         series?.timestamps?.getOrNull(index)?.let(::parseDateTime)?.let(formatter::format).orEmpty()
 
@@ -193,7 +195,7 @@ private fun UsageChart(series: TimeSeries?, statistic: UsageStatistic, range: St
                 )
             }
             Text(
-                if (peak > 0) "Peak ${format(peak)}" else "",
+                if (peak > 0) stringResource(R.string.settings_peak, format(peak)) else "",
                 style = MaterialTheme.typography.labelMedium,
                 color = colors.onSurfaceVariant
             )
@@ -266,7 +268,7 @@ private fun UsageChart(series: TimeSeries?, statistic: UsageStatistic, range: St
                 )
                 series == null -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center).size(24.dp), strokeWidth = 2.dp)
                 peak == 0L && !loading -> Text(
-                    "Nothing in these days yet",
+                    stringResource(R.string.settings_nothing_in_these_days_yet),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.Center)

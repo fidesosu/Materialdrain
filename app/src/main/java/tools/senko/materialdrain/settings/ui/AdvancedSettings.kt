@@ -82,6 +82,8 @@ import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import tools.senko.materialdrain.provider.api.SensitiveChange
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** "Custom host settings": the list of imported configs, their update state, and importing new ones. */
 @Composable
@@ -92,14 +94,14 @@ fun SettingsEnvironment.ProviderHostsSection() {
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            "Pixeldrain is always there. Switch hosts at the top of the Files screens.",
+            stringResource(R.string.settings_pixeldrain_is_always_there_switch),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         if (uiState.providers.any { it.updateUrl != null }) {
             TextButton(onClick = { viewModel.checkAllForUpdates() }, enabled = uiState.checkingIds.isEmpty()) {
-                Text("Check all for updates")
+                Text(stringResource(R.string.settings_check_all_for_updates))
             }
         }
 
@@ -109,16 +111,16 @@ fun SettingsEnvironment.ProviderHostsSection() {
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Add a custom host", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+        Text(stringResource(R.string.settings_add_a_custom_host), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            "Pick a kind of host, or paste a shared config. Configs never contain passwords.",
+            stringResource(R.string.settings_pick_a_kind_of_host),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(8.dp))
         // A complete config to fill in, for each kind of host the app speaks, opened in the editor
-        Text("New host", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.settings_new_host), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -131,7 +133,7 @@ fun SettingsEnvironment.ProviderHostsSection() {
         OutlinedTextField(
             value = importText,
             onValueChange = { importText = it; viewModel.clearImportError() },
-            label = { Text("Or paste a config") },
+            label = { Text(stringResource(R.string.settings_or_paste_a_config)) },
             modifier = Modifier.fillMaxWidth(),
             minLines = 3
         )
@@ -146,20 +148,20 @@ fun SettingsEnvironment.ProviderHostsSection() {
                 onClick = { viewModel.startNewHost(importText); importText = "" },
                 enabled = importText.isNotBlank(),
                 modifier = Modifier.weight(1f)
-            ) { Text("Review first") }
+            ) { Text(stringResource(R.string.settings_review_first)) }
             Button(
                 onClick = { if (viewModel.importConfig(importText)) importText = "" },
                 enabled = importText.isNotBlank(),
                 modifier = Modifier.weight(1f)
-            ) { Text("Add host") }
+            ) { Text(stringResource(R.string.settings_add_host)) }
         }
     }
 
     uiState.editingId?.let { id ->
         ConfigEditor(
-            title = "Edit host",
+            title = stringResource(R.string.settings_edit_host),
             initialText = remember(id) { viewModel.exportConfig(id).orEmpty() },
-            saveLabel = "Save",
+            saveLabel = stringResource(R.string.settings_save),
             error = uiState.editError,
             onSave = { viewModel.saveEdit(id, it) },
             onDismiss = { viewModel.cancelEdit() }
@@ -167,9 +169,9 @@ fun SettingsEnvironment.ProviderHostsSection() {
     }
     uiState.newHostText?.let { text ->
         ConfigEditor(
-            title = "New host",
+            title = stringResource(R.string.settings_new_host),
             initialText = text,
-            saveLabel = "Add host",
+            saveLabel = stringResource(R.string.settings_add_host),
             error = uiState.editError,
             onSave = { viewModel.saveNewHost(it) },
             onDismiss = { viewModel.cancelEdit() }
@@ -213,14 +215,14 @@ private fun OtpDialog(prompt: OtpPrompt, busy: Boolean, viewModel: ProviderSetti
     val complete = code.length == prompt.digits
     AlertDialog(
         onDismissRequest = { viewModel.cancelOtp() },
-        title = { Text("Two-factor authentication") },
+        title = { Text(stringResource(R.string.settings_two_factor_authentication)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Enter the ${prompt.digits}-digit code from your authenticator app.")
+                Text(stringResource(R.string.settings_enter_the_digit_code_from, prompt.digits))
                 OutlinedTextField(
                     value = code,
                     onValueChange = { code = it.filter(Char::isDigit).take(prompt.digits) },
-                    label = { Text("Code") },
+                    label = { Text(stringResource(R.string.settings_code)) },
                     singleLine = true,
                     isError = prompt.error != null && code == prompt.rejectedCode,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
@@ -228,17 +230,17 @@ private fun OtpDialog(prompt: OtpPrompt, busy: Boolean, viewModel: ProviderSetti
                     modifier = Modifier.fillMaxWidth()
                 )
                 if (code.isNotEmpty() && code == lastPasted) {
-                    Text("Pasted from the clipboard", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.settings_pasted_from_the_clipboard), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 prompt.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
             }
         },
         confirmButton = {
             TextButton(onClick = { viewModel.submitOtp(code) }, enabled = complete && !busy) {
-                if (busy) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp) else Text("Sign in")
+                if (busy) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp) else Text(stringResource(R.string.settings_sign_in))
             }
         },
-        dismissButton = { TextButton(onClick = { viewModel.cancelOtp() }) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = { viewModel.cancelOtp() }) { Text(stringResource(R.string.browser_cancel)) } }
     )
 }
 
@@ -312,28 +314,28 @@ private fun HostCard(
                         color = colors.onSurfaceVariant
                     )
                     val statuses = listOfNotNull(
-                        "Edited".takeIf { stored.isEdited },
-                        pending?.let { "Version ${it.meta?.version ?: 0} available" }
+                        stringResource(R.string.settings_edited).takeIf { stored.isEdited },
+                        pending?.let { stringResource(R.string.settings_version_available, it.meta?.version ?: 0) }
                     )
                     if (statuses.isNotEmpty()) {
                         Text(statuses.joinToString(" · "), style = MaterialTheme.typography.labelMedium, color = colors.tertiary)
                     }
                     signedInAs?.let {
-                        Text("Signed in as $it", style = MaterialTheme.typography.labelMedium, color = colors.primary)
+                        Text(stringResource(R.string.settings_signed_in_as, it), style = MaterialTheme.typography.labelMedium, color = colors.primary)
                     }
                 }
                 if (pending != null) {
                     // Slightly highlighted: a tonal button stands out from the plain edit icon next to it
                     FilledTonalIconButton(onClick = { viewModel.requestApplyUpdate(stored.id) }) {
-                        Icon(Icons.Filled.Download, contentDescription = "Update to version ${pending.meta?.version ?: 0}")
+                        Icon(Icons.Filled.Download, contentDescription = stringResource(R.string.settings_update_to_version, pending.meta?.version ?: 0))
                     }
                 }
                 IconButton(onClick = { viewModel.startEdit(stored.id) }) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit config")
+                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.settings_edit_config))
                 }
                 Icon(
                     if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    contentDescription = if (expanded) stringResource(R.string.settings_collapse) else stringResource(R.string.settings_expand),
                     tint = colors.onSurfaceVariant,
                     modifier = Modifier.padding(end = 8.dp)
                 )
@@ -347,9 +349,9 @@ private fun HostCard(
                     stored.updateUrl?.let { url ->
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Auto-update from ${ConfigUpdates.hostOf(url) ?: url}", style = MaterialTheme.typography.bodyMedium)
+                                Text(stringResource(R.string.settings_auto_update_from, ConfigUpdates.hostOf(url) ?: url), style = MaterialTheme.typography.bodyMedium)
                                 Text(
-                                    "Checked daily. Updates that change where your sign-in goes wait for you.",
+                                    stringResource(R.string.settings_checked_daily_updates_that_change),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = colors.onSurfaceVariant
                                 )
@@ -359,9 +361,9 @@ private fun HostCard(
                     }
 
                     if (keyPairLabels != null) {
-                        Text("Credentials", style = MaterialTheme.typography.labelLarge, color = colors.primary)
+                        Text(stringResource(R.string.settings_credentials), style = MaterialTheme.typography.labelLarge, color = colors.primary)
                         if (!hostType.needsSignIn) {
-                            Text(hostType.noSignInNote ?: "There's nothing to sign in to.", style = MaterialTheme.typography.bodyMedium)
+                            Text(hostType.noSignInNote ?: stringResource(R.string.settings_there_s_nothing_to_sign), style = MaterialTheme.typography.bodyMedium)
                         } else {
                             CredentialFields(
                                 username, { username = it }, password, { password = it },
@@ -370,19 +372,19 @@ private fun HostCard(
                             )
                         }
                     } else {
-                        Text("Sign-in", style = MaterialTheme.typography.labelLarge, color = colors.primary)
+                        Text(stringResource(R.string.settings_sign_in_2), style = MaterialTheme.typography.labelLarge, color = colors.primary)
                         when (passwordMode) {
                             // A session, like signing in to any app: the password is used once, only the session is kept
                             PasswordAuthMode.LOGIN -> if (signedInAs != null) {
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                    Text("Signed in as $signedInAs", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                                    OutlinedButton(onClick = { viewModel.signOut(stored.id) }) { Text("Sign out") }
+                                    Text(stringResource(R.string.settings_signed_in_as, signedInAs), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                                    OutlinedButton(onClick = { viewModel.signOut(stored.id) }) { Text(stringResource(R.string.settings_sign_out)) }
                                 }
                             } else {
                                 val canSignIn = username.isNotBlank() && password.isNotEmpty() && !signingIn
                                 CredentialFields(
                                     username, { username = it }, password, { password = it },
-                                    usernameLabel = "Username or e-mail",
+                                    usernameLabel = stringResource(R.string.settings_username_or_e_mail),
                                     onSignIn = { if (canSignIn) viewModel.signIn(stored.id, username, password) }
                                 )
                                 Button(
@@ -390,7 +392,7 @@ private fun HostCard(
                                     enabled = canSignIn,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    if (signingIn) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) else Text("Sign in")
+                                    if (signingIn) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) else Text(stringResource(R.string.settings_sign_in))
                                 }
                                 uiState.signInErrors[stored.id]?.let {
                                     Text(it, style = MaterialTheme.typography.bodySmall, color = colors.error)
@@ -406,22 +408,22 @@ private fun HostCard(
                             OutlinedTextField(
                                 value = apiKey,
                                 onValueChange = { apiKey = it },
-                                label = { Text("API key") },
+                                label = { Text(stringResource(R.string.settings_api_key)) },
                                 singleLine = true,
                                 visualTransformation = PasswordVisualTransformation(),
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Text(
                                 when (passwordMode) {
-                                    PasswordAuthMode.LOGIN -> "Used while you're not signed in."
-                                    PasswordAuthMode.BASIC -> "Used without a username and password."
-                                    null -> "This host only takes an API key."
+                                    PasswordAuthMode.LOGIN -> stringResource(R.string.settings_used_while_you_re_not)
+                                    PasswordAuthMode.BASIC -> stringResource(R.string.settings_used_without_a_username_and)
+                                    null -> stringResource(R.string.settings_this_host_only_takes_an)
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = colors.onSurfaceVariant
                             )
                         } else {
-                            TextButton(onClick = { showApiKey = true }) { Text("Use an API key instead") }
+                            TextButton(onClick = { showApiKey = true }) { Text(stringResource(R.string.settings_use_an_api_key_instead)) }
                         }
                     }
 
@@ -439,11 +441,11 @@ private fun HostCard(
                             enabled = !busy
                         ) {
                             if (busy) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            else Text(if (passwordMode == PasswordAuthMode.LOGIN && !showApiKey) "Test connection" else "Save & test")
+                            else Text(if (passwordMode == PasswordAuthMode.LOGIN && !showApiKey) stringResource(R.string.settings_test_connection) else stringResource(R.string.settings_save_test))
                         }
                         if (stored.updateUrl != null) {
                             OutlinedButton(onClick = { viewModel.checkForUpdates(stored.id) }, enabled = !checking) {
-                                if (checking) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp) else Text("Check for updates")
+                                if (checking) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp) else Text(stringResource(R.string.settings_check_for_updates))
                             }
                         }
                         TextButton(onClick = {
@@ -452,11 +454,11 @@ private fun HostCard(
                                 clipboardManager.setPrimaryClip(ClipData.newPlainText("Provider config", text))
                             }
                             justCopied = true
-                        }) { Text(if (justCopied) "Copied" else "Export") }
+                        }) { Text(if (justCopied) stringResource(R.string.settings_copied) else stringResource(R.string.settings_export)) }
                         if (stored.previous != null) {
-                            TextButton(onClick = { viewModel.revert(stored.id) }) { Text("Revert update") }
+                            TextButton(onClick = { viewModel.revert(stored.id) }) { Text(stringResource(R.string.settings_revert_update)) }
                         }
-                        TextButton(onClick = { viewModel.remove(stored.id) }) { Text("Remove") }
+                        TextButton(onClick = { viewModel.remove(stored.id) }) { Text(stringResource(R.string.settings_remove)) }
                     }
 
                     uiState.checkMessages[stored.id]?.let {
@@ -507,8 +509,8 @@ private fun CredentialFields(
     onUsernameChange: (String) -> Unit,
     password: String,
     onPasswordChange: (String) -> Unit,
-    usernameLabel: String = "Username",
-    passwordLabel: String = "Password",
+    usernameLabel: String = stringResource(R.string.settings_username),
+    passwordLabel: String = stringResource(R.string.settings_password),
     onSignIn: (() -> Unit)? = null
 ) {
     OutlinedTextField(
@@ -535,32 +537,32 @@ private fun CredentialFields(
 private fun UpdateApprovalDialog(approval: UpdateApproval, viewModel: ProviderSettingsViewModel) {
     AlertDialog(
         onDismissRequest = { viewModel.dismissApproval() },
-        title = { Text("Review update") },
+        title = { Text(stringResource(R.string.settings_review_update)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("${approval.hostName}: version ${approval.fromVersion} → ${approval.toVersion}")
                 if (approval.sensitiveChanges.isNotEmpty()) {
-                    Text("This update changes how your sign-in is sent:")
+                    Text(stringResource(R.string.settings_this_update_changes_how_your))
                     approval.sensitiveChanges.forEach { change ->
                         Text("• ${change.description}", style = MaterialTheme.typography.bodyMedium)
                     }
                     Text(
-                        "Only update if you trust its source.",
+                        stringResource(R.string.settings_only_update_if_you_trust),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 if (approval.clearsToken) {
                     Text(
-                        "Your saved sign-in will be removed.",
+                        stringResource(R.string.settings_your_saved_sign_in_will),
                         color = MaterialTheme.colorScheme.error
                     )
                 }
-                if (approval.discardsEdits) Text("Updating replaces your edits.")
+                if (approval.discardsEdits) Text(stringResource(R.string.settings_updating_replaces_your_edits))
             }
         },
-        confirmButton = { TextButton(onClick = { viewModel.confirmApproval() }) { Text("Update") } },
-        dismissButton = { TextButton(onClick = { viewModel.dismissApproval() }) { Text("Cancel") } }
+        confirmButton = { TextButton(onClick = { viewModel.confirmApproval() }) { Text(stringResource(R.string.settings_update)) } },
+        dismissButton = { TextButton(onClick = { viewModel.dismissApproval() }) { Text(stringResource(R.string.browser_cancel)) } }
     )
 }
 
@@ -568,17 +570,17 @@ private fun UpdateApprovalDialog(approval: UpdateApproval, viewModel: ProviderSe
 private fun EditNoticeDialog(notice: EditNotice, viewModel: ProviderSettingsViewModel) {
     AlertDialog(
         onDismissRequest = { viewModel.dismissEditNotice() },
-        title = { Text("This config is edited") },
+        title = { Text(stringResource(R.string.settings_this_config_is_edited)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Updates from ${notice.updateHost ?: "its update URL"} would replace your edits.")
+                Text(stringResource(R.string.settings_updates_from_would_replace_your, notice.updateHost ?: "its update URL"))
                 if (notice.autoUpdateTurnedOff) {
-                    Text("Auto-update is now off.")
+                    Text(stringResource(R.string.settings_auto_update_is_now_off))
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { viewModel.removeUpdateLink(notice.id) }) { Text("Stop updating") } },
-        dismissButton = { TextButton(onClick = { viewModel.dismissEditNotice() }) { Text("Keep updates") } }
+        confirmButton = { TextButton(onClick = { viewModel.removeUpdateLink(notice.id) }) { Text(stringResource(R.string.settings_stop_updating)) } },
+        dismissButton = { TextButton(onClick = { viewModel.dismissEditNotice() }) { Text(stringResource(R.string.settings_keep_updates)) } }
     )
 }
 

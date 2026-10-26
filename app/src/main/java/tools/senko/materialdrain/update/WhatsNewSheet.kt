@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /**
  * Once after an update: what the version now installed brought since the one before ([changes], newest first), with the
@@ -42,9 +44,9 @@ private fun WhatsNewContent(versionName: String, changes: List<UpdateChange>, on
             .padding(start = 24.dp, end = 24.dp, bottom = 24.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("What's new", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.app_what_s_new), style = MaterialTheme.typography.headlineSmall)
             Text(
-                "Materialdrain $versionName",
+                stringResource(R.string.app_materialdrain, versionName),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -52,7 +54,7 @@ private fun WhatsNewContent(versionName: String, changes: List<UpdateChange>, on
         ChangeList(changes, empty = "")
         Row(modifier = Modifier.fillMaxWidth()) {
             Spacer(Modifier.weight(1f))
-            Button(onClick = onClose) { Text("Got it") }
+            Button(onClick = onClose) { Text(stringResource(R.string.app_got_it)) }
         }
     }
 }

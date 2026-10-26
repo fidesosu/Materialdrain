@@ -72,6 +72,8 @@ import tools.senko.materialdrain.ui.components.AppMenuPreview
 import tools.senko.materialdrain.ui.icons.filled.Storage
 import tools.senko.materialdrain.ui.icons.filled.Dns
 import tools.senko.materialdrain.ui.icons.filled.CloudSync
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** Whether a host has a sign-in, shown next to its name in the switcher. */
 enum class HostStatus(val label: String) {
@@ -289,7 +291,7 @@ private fun HostMenuEntries(
         )
     }
     Spacer(Modifier.height(4.dp))
-    AppMenuItem(text = "Manage hosts", leadingIcon = Icons.Filled.Settings, onClick = onManage)
+    AppMenuItem(text = stringResource(R.string.app_manage_hosts), leadingIcon = Icons.Filled.Settings, onClick = onManage)
 }
 
 /** "Hosts", when they were last checked, and a button to check them all again now. */
@@ -310,12 +312,12 @@ private fun MenuHeader(checks: Collection<HostCheck>, onRefresh: () -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(start = 12.dp)
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text("Hosts", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.app_hosts), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 when {
-                    checking -> "Checking…"
-                    lastChecked != null -> "Checked ${ago(now - lastChecked)}"
-                    else -> "Not checked yet"
+                    checking -> stringResource(R.string.app_checking)
+                    lastChecked != null -> stringResource(R.string.app_checked, ago(now - lastChecked))
+                    else -> stringResource(R.string.app_not_checked_yet)
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -325,7 +327,7 @@ private fun MenuHeader(checks: Collection<HostCheck>, onRefresh: () -> Unit) {
             if (checking) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             } else {
-                Icon(Icons.Filled.Refresh, contentDescription = "Check the hosts again")
+                Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.app_check_the_hosts_again))
             }
         }
     }
@@ -390,10 +392,10 @@ private fun HostRow(
             )
         }
         if (host.status == HostStatus.NOT_SIGNED_IN) {
-            TextButton(onClick = onOpenSettings) { Text("Sign in") }
+            TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings_sign_in)) }
         } else {
             IconButton(onClick = onOpenSettings) {
-                Icon(Icons.Filled.Settings, contentDescription = "Settings of ${host.name}", tint = variant)
+                Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.app_settings_of, host.name), tint = variant)
             }
         }
     }

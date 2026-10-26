@@ -50,6 +50,7 @@ import tools.senko.materialdrain.hosts.Reachability
 import tools.senko.materialdrain.ui.icons.filled.Cloud
 import tools.senko.materialdrain.upload.UploadUiState
 import tools.senko.materialdrain.settings.ui.rememberPreviewSettings
+import androidx.compose.ui.res.stringResource
 
 /**
  * The bar at the top of the app: the screen's title (or, on the browse screens, the host switcher over the middle of the
@@ -109,12 +110,12 @@ internal fun AppTopBar(
             navigationIcon = {
                 when (currentScreen) {
                     Screen.FileDetail, Screen.Settings -> IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.files_back))
                     }
                     // Opposite the settings icon
                     else -> if (searchAvailable) {
                         IconButton(onClick = onSearch) {
-                            Icon(Icons.Filled.Search, contentDescription = "Search")
+                            Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.app_search))
                         }
                     }
                 }
@@ -186,7 +187,7 @@ internal fun ColumnScope.TransferBarSlot(
                 totalBytes = batch.totalBytes,
                 bytesPerSecond = current?.bytesPerSecond ?: 0L,
                 etaSeconds = current?.etaSeconds,
-                label = "${batch.doneFiles} of ${batch.totalFiles} files done"
+                label = stringResource(R.string.app_of_files_done, batch.doneFiles, batch.totalFiles)
             )
         } ?: run {
             val isActive = { download: tools.senko.materialdrain.files.FileDownloadState ->
@@ -205,7 +206,7 @@ internal fun ColumnScope.TransferBarSlot(
                     bytesPerSecond = it.bytesPerSecond,
                     etaSeconds = it.etaSeconds,
                     label = when {
-                        pending -> "Starting download…"
+                        pending -> stringResource(R.string.app_starting_download)
                         currentScreen != Screen.FileDetail -> it.fileName // downloads can be started from lists, name them
                         else -> null
                     }

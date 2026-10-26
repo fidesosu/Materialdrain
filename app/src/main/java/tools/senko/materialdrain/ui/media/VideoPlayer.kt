@@ -137,6 +137,8 @@ import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import tools.senko.materialdrain.ui.components.AppMenuPreview
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 private const val CONTROLS_HIDE_DELAY_MS = 3_000L
 @Composable
@@ -277,15 +279,15 @@ private fun VideoSettingsEntries(page: VideoMenuPage?, onPageChange: (VideoMenuP
     }
     // Each page is measured even while another is shown, so the menu keeps one width
     val speedPage: @Composable ColumnScope.() -> Unit = {
-        back("Speed")
+        back(stringResource(R.string.media_speed))
         PlaybackSpeeds.forEach { option ->
             AppMenuItem(text = speedLabel(option), active = option == choices.speed, onClick = { choices.onSpeed(option) })
         }
     }
     val subtitlesPage: @Composable ColumnScope.() -> Unit = {
         if (choices.subtitles.isNotEmpty()) {
-            back("Subtitles")
-            AppMenuItem(text = "Off", active = choices.subtitles.none { it.selected }, onClick = { choices.onSubtitle(null) })
+            back(stringResource(R.string.media_subtitles))
+            AppMenuItem(text = stringResource(R.string.media_off), active = choices.subtitles.none { it.selected }, onClick = { choices.onSubtitle(null) })
             choices.subtitles.forEach { track ->
                 AppMenuItem(text = track.label, active = track.selected, onClick = { choices.onSubtitle(track) })
             }
@@ -293,7 +295,7 @@ private fun VideoSettingsEntries(page: VideoMenuPage?, onPageChange: (VideoMenuP
     }
     val audioPage: @Composable ColumnScope.() -> Unit = {
         if (choices.audio.size > 1) {
-            back("Audio")
+            back(stringResource(R.string.media_audio))
             choices.audio.forEach { track ->
                 AppMenuItem(text = track.label, active = track.selected, onClick = { choices.onAudio(track) })
             }
@@ -304,13 +306,13 @@ private fun VideoSettingsEntries(page: VideoMenuPage?, onPageChange: (VideoMenuP
         showSecondary = page != null,
         primary = {
             AppMenuItem(
-                text = "Loop",
+                text = stringResource(R.string.media_loop),
                 active = choices.loop,
                 leadingIcon = Icons.Filled.Repeat,
                 onClick = { choices.onLoop(!choices.loop) }
             )
             AppMenuItem(
-                text = "Speed",
+                text = stringResource(R.string.media_speed),
                 leadingIcon = Icons.Filled.Speed,
                 trailingText = speedLabel(choices.speed),
                 trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -318,16 +320,16 @@ private fun VideoSettingsEntries(page: VideoMenuPage?, onPageChange: (VideoMenuP
             )
             if (choices.subtitles.isNotEmpty()) {
                 AppMenuItem(
-                    text = "Subtitles",
+                    text = stringResource(R.string.media_subtitles),
                     leadingIcon = Icons.Filled.Subtitles,
-                    trailingText = choices.subtitles.firstOrNull { it.selected }?.label ?: "Off",
+                    trailingText = choices.subtitles.firstOrNull { it.selected }?.label ?: stringResource(R.string.media_off),
                     trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     onClick = { open(VideoMenuPage.Subtitles) }
                 )
             }
             if (choices.audio.size > 1) {
                 AppMenuItem(
-                    text = "Audio",
+                    text = stringResource(R.string.media_audio),
                     leadingIcon = Icons.Filled.Audiotrack,
                     trailingText = choices.audio.firstOrNull { it.selected }?.label,
                     trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -337,7 +339,7 @@ private fun VideoSettingsEntries(page: VideoMenuPage?, onPageChange: (VideoMenuP
             AppMenuDivider()
             // A player of its own may play what this one can't, or cast it
             AppMenuItem(
-                text = "Open in another app",
+                text = stringResource(R.string.media_open_in_another_app),
                 leadingIcon = Icons.AutoMirrored.Filled.OpenInNew,
                 onClick = choices.onOpenElsewhere
             )
@@ -810,7 +812,7 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                     Text(error.userMessage(), style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.height(12.dp))
                     MediaTextButton(
-                        "Try again",
+                        stringResource(R.string.media_try_again),
                         onClick = { state.retry() },
                         container = colors.onErrorContainer.copy(alpha = 0.12f),
                         contentColor = colors.onErrorContainer
@@ -841,7 +843,7 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
                             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp)
                     ) {
-                        RoundVideoButton(onClick = onBack, contentDescription = "Back", size = 44.dp, container = panelColor) {
+                        RoundVideoButton(onClick = onBack, contentDescription = stringResource(R.string.files_back), size = 44.dp, container = panelColor) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = colors.onSurface)
                         }
                         Text(
@@ -860,7 +862,7 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                                 pan = Offset.Zero
                                 interactions++
                             },
-                            contentDescription = if (fill) "Fit the video in the screen" else "Fill the screen with the video",
+                            contentDescription = if (fill) stringResource(R.string.media_fit_the_video_in_the) else stringResource(R.string.media_fill_the_screen_with_the),
                             size = 44.dp,
                             container = if (fill) colors.primary else panelColor
                         ) {
@@ -869,7 +871,7 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                         if (activity != null) {
                             RoundVideoButton(
                                 onClick = { rotate(); interactions++ },
-                                contentDescription = if (landscape) "Turn to portrait" else "Turn to landscape",
+                                contentDescription = if (landscape) stringResource(R.string.media_turn_to_portrait) else stringResource(R.string.media_turn_to_landscape),
                                 size = 44.dp,
                                 container = panelColor
                             ) {
@@ -879,7 +881,7 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                         Box {
                             RoundVideoButton(
                                 onClick = { menuPage = null; settingsMenuOpen = true },
-                                contentDescription = "Playback settings",
+                                contentDescription = stringResource(R.string.media_playback_settings),
                                 size = 44.dp,
                                 container = panelColor
                             ) {
@@ -920,7 +922,7 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                         val seconds = (stepMs / 1000).toInt()
                         RoundVideoButton(
                             onClick = { state.seekBy(-stepMs); interactions++ },
-                            contentDescription = "Back $seconds seconds",
+                            contentDescription = stringResource(R.string.media_back_seconds, seconds),
                             size = 56.dp,
                             container = panelColor
                         ) {
@@ -933,9 +935,9 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                                 RoundVideoButton(
                                     onClick = { state.togglePlayPause(); interactions++ },
                                     contentDescription = when {
-                                        state.isEnded -> "Replay"
-                                        playing -> "Pause"
-                                        else -> "Play"
+                                        state.isEnded -> stringResource(R.string.media_replay)
+                                        playing -> stringResource(R.string.media_pause)
+                                        else -> stringResource(R.string.media_play)
                                     },
                                     size = 72.dp,
                                     container = colors.primary
@@ -955,7 +957,7 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                         }
                         RoundVideoButton(
                             onClick = { state.seekBy(stepMs); interactions++ },
-                            contentDescription = "Forward $seconds seconds",
+                            contentDescription = stringResource(R.string.media_forward_seconds, seconds),
                             size = 56.dp,
                             container = panelColor
                         ) {

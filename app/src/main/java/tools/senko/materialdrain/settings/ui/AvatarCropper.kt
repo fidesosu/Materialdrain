@@ -52,6 +52,8 @@ import kotlin.math.min
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import java.io.File
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** How far the picture can be zoomed in: the square then shows this share of its shorter side. */
 private const val MAX_ZOOM = 6f
@@ -86,13 +88,13 @@ internal fun AvatarCropper(picture: AvatarPicture, onKeep: (AvatarCrop) -> Unit,
                 .safeDrawingPadding()
         ) {
             Text(
-                "Crop your picture",
+                stringResource(R.string.settings_crop_your_picture),
                 style = MaterialTheme.typography.titleLarge,
                 color = Color.White,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp)
             )
             Text(
-                "Drag to move it, pinch to zoom",
+                stringResource(R.string.settings_drag_to_move_it_pinch),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
@@ -145,7 +147,7 @@ internal fun AvatarCropper(picture: AvatarPicture, onKeep: (AvatarCrop) -> Unit,
                 ) {
                     AsyncImage(
                         model = request,
-                        contentDescription = "The picture to crop",
+                        contentDescription = stringResource(R.string.settings_the_picture_to_crop),
                         contentScale = ContentScale.FillBounds,
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -175,9 +177,9 @@ internal fun AvatarCropper(picture: AvatarPicture, onKeep: (AvatarCrop) -> Unit,
                 horizontalArrangement = Arrangement.End,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                TextButton(onClick = onCancel) { Text("Cancel", color = Color.White) }
+                TextButton(onClick = onCancel) { Text(stringResource(R.string.browser_cancel), color = Color.White) }
                 Spacer(Modifier.width(8.dp))
-                Button(onClick = { onKeep(currentCrop()) }, enabled = areaSize != IntSize.Zero) { Text("Use picture") }
+                Button(onClick = { onKeep(currentCrop()) }, enabled = areaSize != IntSize.Zero) { Text(stringResource(R.string.settings_use_picture)) }
             }
             Spacer(Modifier.height(4.dp))
         }

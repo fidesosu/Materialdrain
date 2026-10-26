@@ -69,6 +69,8 @@ import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.ui.theme.AppShapes
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /**
  * Opens the song player over the whole app (see [AudioPlayerView]), for the song card of a file's details; null where
@@ -380,7 +382,7 @@ internal fun FullPlayer(song: BackgroundSong, onClose: () -> Unit) {
             ) {
                 // Right under repeat and shuffle
                 IconButton(onClick = onClose) {
-                    Icon(Icons.Filled.ExpandMore, contentDescription = "Close the player")
+                    Icon(Icons.Filled.ExpandMore, contentDescription = stringResource(R.string.media_close_the_player))
                 }
                 Spacer(Modifier.weight(1f))
                 QueueButton(showQueue, count = song.queue.size, onClick = { showQueue = !showQueue })

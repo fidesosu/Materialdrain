@@ -69,6 +69,8 @@ import tools.senko.materialdrain.ui.components.pageTransition
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import tools.senko.materialdrain.ui.preview.LongScreenPreviews
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** The corners of the settings' cards and tiles, the same as the app's other cards. */
 private val CardShape = AppShapes.Card
@@ -351,7 +353,7 @@ private fun SettingsItemBlock(item: SettingsItem, environment: SettingsEnvironme
                     if (item.external) {
                         Icon(
                             Icons.AutoMirrored.Filled.OpenInNew,
-                            contentDescription = "Opens outside the app",
+                            contentDescription = stringResource(R.string.settings_opens_outside_the_app),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(end = 8.dp).size(18.dp)
                         )
@@ -463,7 +465,7 @@ private fun InfoButton(unfolded: Boolean, enabled: Boolean, onClick: () -> Unit)
     IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(40.dp)) {
         Icon(
             if (unfolded) Icons.Filled.Info else Icons.Outlined.Info,
-            contentDescription = if (unfolded) "Hide the explanation" else "Explain this setting",
+            contentDescription = if (unfolded) stringResource(R.string.settings_hide_the_explanation) else stringResource(R.string.settings_explain_this_setting),
             tint = if (unfolded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp)
         )

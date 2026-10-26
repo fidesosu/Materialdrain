@@ -33,6 +33,7 @@ import tools.senko.materialdrain.ui.components.OdometerText
 import tools.senko.materialdrain.ui.icons.symbols.SettingsFilled
 import tools.senko.materialdrain.ui.icons.symbols.Symbols
 import tools.senko.materialdrain.ui.icons.symbols.Upload
+import androidx.compose.ui.res.stringResource
 
 private const val SETTINGS_SAVE_TEXT = "Save Settings"
 private const val SETTINGS_SAVED_TEXT = "Settings saved"
@@ -146,7 +147,7 @@ internal fun AppFab(fab: FabDetails?, lift: Dp, reduceMotion: Boolean, onHeightC
                         ) { targetIcon ->
                             Icon(
                                 targetIcon,
-                                contentDescription = details.text ?: "FAB icon",
+                                contentDescription = details.text ?: stringResource(R.string.app_fab_icon),
                                 modifier = Modifier.rotate(iconRotation.value)
                             )
                         }

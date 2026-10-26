@@ -54,6 +54,8 @@ import tools.senko.materialdrain.ui.preview.PreviewSamples
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import tools.senko.materialdrain.ui.theme.DarkTheme
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** What a page of the fullscreen view shows of its file, as far as it has loaded (see [FullScreenFile]). */
 sealed interface FullScreenContent {
@@ -227,7 +229,7 @@ private fun FullScreenPageContent(page: FullScreenFile, apiKey: String?, onDismi
                             fullSource = previewUri,
                             thumbnailSource = null,
                             apiKey = apiKey,
-                            contentDescription = "Fullscreen image preview",
+                            contentDescription = stringResource(R.string.media_fullscreen_image_preview),
                             contentScale = ContentScale.Fit,
                             // Disable filtering to prevent blurring when scaling images (pixel art, zooming)
                             filterQuality = FilterQuality.None,
@@ -278,13 +280,13 @@ private fun HeldPage(what: String, onLoad: () -> Unit) {
     ) {
         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(32.dp))
         Spacer(Modifier.height(12.dp))
-        Text("Loading $what", style = MaterialTheme.typography.labelLarge, color = Color.White)
+        Text(stringResource(R.string.media_loading, what), style = MaterialTheme.typography.labelLarge, color = Color.White)
     }
 }
 
 @Composable
 private fun Unavailable() {
-    Text("Preview unavailable.", color = Color.White)
+    Text(stringResource(R.string.media_preview_unavailable), color = Color.White)
 }
 
 /** A file without a fullscreen view: what it is, its own preview being on its details page. */
@@ -300,7 +302,7 @@ private fun NoFullScreenView(page: FullScreenFile) {
             Text(name, color = Color.White, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         }
         Text(
-            "No fullscreen view for this file.",
+            stringResource(R.string.media_no_fullscreen_view_for_this),
             color = Color.White.copy(alpha = 0.7f),
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center

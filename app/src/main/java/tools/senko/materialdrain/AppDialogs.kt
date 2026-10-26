@@ -15,6 +15,7 @@ import tools.senko.materialdrain.util.formatSize
 import tools.senko.materialdrain.settings.SEARCH_INDEX_DELETE_WARNING
 import tools.senko.materialdrain.settings.isSearchIndex
 import tools.senko.materialdrain.upload.UploadViewModel
+import androidx.compose.ui.res.stringResource
 
 /**
  * A problem the app shows in a dialog. Each kind decides its own title and text, and what closing it clears (see
@@ -76,12 +77,12 @@ internal fun AppDialogs(
     downloadConfirmation?.let { download ->
         val size = download.totalBytes?.let { ", ${formatSize(it)}" }.orEmpty()
         ConfirmDialog(
-            title = "Download ${download.fileCount} files?",
+            title = stringResource(R.string.app_download_files, download.fileCount),
             text = "${download.fileCount} files$size. " + when (download.style) {
-                DownloadStyle.SEPARATELY -> "Saved to Download in their folders."
-                DownloadStyle.ZIP -> "Saved as one ZIP."
+                DownloadStyle.SEPARATELY -> stringResource(R.string.app_saved_to_download_in_their)
+                DownloadStyle.ZIP -> stringResource(R.string.app_saved_as_one_zip)
             },
-            confirmLabel = "Download",
+            confirmLabel = stringResource(R.string.browser_download),
             onConfirm = { fileInfoViewModel.confirmDownload() },
             onDismiss = { fileInfoViewModel.dismissDownloadConfirmation() }
         )
@@ -90,7 +91,7 @@ internal fun AppDialogs(
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { fileInfoViewModel.cancelDeleteFile() },
-            title = { Text("Confirm Deletion") },
+            title = { Text(stringResource(R.string.app_confirm_deletion)) },
             text = {
                 // Read here, so the details' other changes don't redraw the screen behind the dialog
                 val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
@@ -104,10 +105,10 @@ internal fun AppDialogs(
                 Button(
                     onClick = { fileInfoViewModel.confirmDeleteFile() },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete") }
+                ) { Text(stringResource(R.string.browser_delete)) }
             },
             dismissButton = {
-                Button(onClick = { fileInfoViewModel.cancelDeleteFile() }) { Text("Cancel") }
+                Button(onClick = { fileInfoViewModel.cancelDeleteFile() }) { Text(stringResource(R.string.browser_cancel)) }
             }
         )
     }

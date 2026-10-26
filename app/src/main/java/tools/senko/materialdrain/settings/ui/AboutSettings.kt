@@ -41,6 +41,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** What this build of the app is, read from the installed package. */
 internal data class AppAbout(
@@ -94,7 +96,7 @@ fun SettingsEnvironment.AboutSection() {
                 Spacer(Modifier.width(16.dp))
             }
             Column {
-                Text("Materialdrain", style = MaterialTheme.typography.headlineSmall)
+                Text(stringResource(R.string.settings_materialdrain), style = MaterialTheme.typography.headlineSmall)
                 Text(about.versionName, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -111,10 +113,10 @@ fun SettingsEnvironment.AboutSection() {
 
         SelectionContainer {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                AboutRow("Version code", about.versionCode.toString())
-                AboutRow("Commit date", about.committed)
-                AboutRow("Android", "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
-                AboutRow("Package", about.packageName)
+                AboutRow(stringResource(R.string.settings_version_code), about.versionCode.toString())
+                AboutRow(stringResource(R.string.settings_commit_date), about.committed)
+                AboutRow(stringResource(R.string.settings_android), "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+                AboutRow(stringResource(R.string.settings_package), about.packageName)
             }
         }
 
@@ -125,7 +127,7 @@ fun SettingsEnvironment.AboutSection() {
         }) {
             Icon(Icons.Filled.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text(if (copied) "Copied" else "Copy these details")
+            Text(if (copied) stringResource(R.string.settings_copied) else stringResource(R.string.settings_copy_these_details))
         }
     }
 }

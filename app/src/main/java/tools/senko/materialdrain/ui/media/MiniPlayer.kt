@@ -99,6 +99,8 @@ import tools.senko.materialdrain.ui.theme.AppShapes
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.sign
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** How far a swipe on the miniplayer has to go sideways to skip, when it isn't quick. */
 private val SwipeDistance = 72.dp
@@ -530,9 +532,9 @@ internal fun MiniPlayButton(playing: Boolean, buffering: Boolean, failed: Boolea
 @Composable
 internal fun MiniPlayGlyph(playing: Boolean, buffering: Boolean, failed: Boolean) {
     when {
-        failed -> Icon(Icons.Filled.Refresh, contentDescription = "Try again", tint = MaterialTheme.colorScheme.error)
+        failed -> Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.media_try_again), tint = MaterialTheme.colorScheme.error)
         buffering -> CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-        else -> Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (playing) "Pause" else "Play")
+        else -> Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (playing) stringResource(R.string.media_pause) else stringResource(R.string.media_play))
     }
 }
 
@@ -540,7 +542,7 @@ internal fun MiniPlayGlyph(playing: Boolean, buffering: Boolean, failed: Boolean
 @Composable
 internal fun MiniPlayerText(title: String?, artist: String?, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
-        ScrollingText(title ?: "Audio", style = MaterialTheme.typography.titleSmall)
+        ScrollingText(title ?: stringResource(R.string.media_audio), style = MaterialTheme.typography.titleSmall)
         artist?.let {
             ScrollingText(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -632,11 +634,11 @@ internal fun MiniCover(
             .size(size)
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .then(if (onLoad != null) Modifier.clickable(onClickLabel = "Load the cover", onClick = onLoad) else Modifier),
+            .then(if (onLoad != null) Modifier.clickable(onClickLabel = stringResource(R.string.media_load_the_cover), onClick = onLoad) else Modifier),
         contentAlignment = Alignment.Center
     ) {
         when {
-            onLoad != null -> Icon(Icons.Outlined.Image, contentDescription = "Load the cover", modifier = glyph)
+            onLoad != null -> Icon(Icons.Outlined.Image, contentDescription = stringResource(R.string.media_load_the_cover), modifier = glyph)
             art is ByteArray -> when (val decoded = rememberDecoded(art, maxSizePx = with(density) { size.roundToPx() })) {
                 is Decoded.Done -> Image(
                     decoded.bitmap,

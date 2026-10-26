@@ -40,6 +40,8 @@ import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.ui.theme.AppShapes
 import tools.senko.materialdrain.util.formatSize
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** How many changes show before "Show all". */
 private const val CHANGES_SHOWN = 8
@@ -82,10 +84,10 @@ private fun UpdateSheetContent(
             .padding(start = 24.dp, end = 24.dp, bottom = 24.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Materialdrain ${update.info.versionName}", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.app_materialdrain, update.info.versionName), style = MaterialTheme.typography.headlineSmall)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    if (update.isDev) "Development build" else "Stable release",
+                    if (update.isDev) stringResource(R.string.app_development_build) else stringResource(R.string.app_stable_release),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier
@@ -105,10 +107,10 @@ private fun UpdateSheetContent(
         }
 
         Text(
-            "What's new since your version (${installed.versionName})",
+            stringResource(R.string.app_what_s_new_since_your, installed.versionName),
             style = MaterialTheme.typography.titleMedium
         )
-        ChangeList(update.changes, empty = "This version came without a list of its changes.")
+        ChangeList(update.changes, empty = stringResource(R.string.app_this_version_came_without_a))
 
         when (download) {
             is UpdateDownload.Running -> {
@@ -122,16 +124,16 @@ private fun UpdateSheetContent(
                 color = MaterialTheme.colorScheme.error
             )
             UpdateDownload.None -> if (!installed.updatable) Text(
-                "This build is signed for testing, so a release can't install over it: get it from the releases page.",
+                stringResource(R.string.app_this_build_is_signed_for),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            TextButton(onClick = onSkip) { Text("Skip this version") }
+            TextButton(onClick = onSkip) { Text(stringResource(R.string.app_skip_this_version)) }
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = onLater) { Text("Later") }
+            TextButton(onClick = onLater) { Text(stringResource(R.string.app_later)) }
             Spacer(Modifier.width(8.dp))
             Button(
                 enabled = download !is UpdateDownload.Running,
@@ -139,10 +141,10 @@ private fun UpdateSheetContent(
             ) {
                 Text(
                     when {
-                        !installed.updatable -> "Releases"
-                        download is UpdateDownload.Running -> "Downloading"
-                        download is UpdateDownload.Failed -> "Try again"
-                        else -> "Update"
+                        !installed.updatable -> stringResource(R.string.app_releases)
+                        download is UpdateDownload.Running -> stringResource(R.string.app_downloading)
+                        download is UpdateDownload.Failed -> stringResource(R.string.media_try_again)
+                        else -> stringResource(R.string.settings_update)
                     }
                 )
             }
@@ -161,7 +163,7 @@ internal fun ChangeList(changes: List<UpdateChange>, empty: String) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         (if (showAll) changes else changes.take(CHANGES_SHOWN)).forEach { ChangeRow(it) }
         if (!showAll && changes.size > CHANGES_SHOWN) {
-            TextButton(onClick = { showAll = true }) { Text("Show all ${changes.size} changes") }
+            TextButton(onClick = { showAll = true }) { Text(stringResource(R.string.app_show_all_changes, changes.size)) }
         }
     }
 }

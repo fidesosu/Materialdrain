@@ -76,6 +76,8 @@ import tools.senko.materialdrain.ui.components.AppMenuItem
 import tools.senko.materialdrain.ui.components.OverflowMenuButton
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /*
  * The editors of the config editor's form, one per kind of field (see FieldKind): text, numbers, switches, choices,
@@ -111,7 +113,7 @@ private fun TextField(spec: FieldSpec, value: JsonElement?, multiline: Boolean, 
         onValueChange = { onValue(if (it.isEmpty() && !spec.required) null else JsonPrimitive(it)) },
         label = { Text(spec.label) },
         placeholder = (spec.placeholder ?: defaultHint)?.let { { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
-        supportingText = { Text(if (missing) "Needed. ${spec.help}" else helpText(spec)) },
+        supportingText = { Text(if (missing) stringResource(R.string.settings_needed, spec.help) else helpText(spec)) },
         isError = missing,
         singleLine = !multiline,
         minLines = if (multiline) 3 else 1,
@@ -133,7 +135,7 @@ private fun NumberField(spec: FieldSpec, value: JsonElement?, onValue: (JsonElem
         },
         label = { Text(spec.label) },
         placeholder = spec.default?.displayText()?.let { { Text(it) } },
-        supportingText = { Text(if (invalid) "A whole number" else helpText(spec)) },
+        supportingText = { Text(if (invalid) stringResource(R.string.settings_a_whole_number) else helpText(spec)) },
         isError = invalid,
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -159,7 +161,7 @@ private fun StatusCodesField(spec: FieldSpec, value: JsonElement?, onValue: (Jso
         },
         label = { Text(spec.label) },
         placeholder = spec.default?.displayText()?.let { { Text(it) } },
-        supportingText = { Text(if (invalid) "Numbers separated by commas, like 200, 201" else helpText(spec)) },
+        supportingText = { Text(if (invalid) stringResource(R.string.settings_numbers_separated_by_commas_like) else helpText(spec)) },
         isError = invalid,
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -258,8 +260,8 @@ private fun GroupRow(spec: FieldSpec, kind: FieldKind.Group, value: JsonElement?
     NavRow(
         title = spec.label,
         summary = when {
-            spec.canTurnOff && obj == null -> "Off"
-            else -> summaryOf(kind.fields, obj ?: JsonObject(emptyMap())).ifEmpty { "Nothing set yet" }
+            spec.canTurnOff && obj == null -> stringResource(R.string.media_off)
+            else -> summaryOf(kind.fields, obj ?: JsonObject(emptyMap())).ifEmpty { stringResource(R.string.settings_nothing_set_yet) }
         },
         problem = (obj != null || spec.required) && hasProblem(kind.fields, obj ?: JsonObject(emptyMap())),
         onClick = { form.open(Page.OfGroup(spec, kind.fields, path)) }
@@ -316,13 +318,13 @@ private fun KeyValuesField(spec: FieldSpec, kind: FieldKind.KeyValues, value: Js
         TextButton(onClick = { adding = true }, contentPadding = ButtonDefaults.TextButtonWithIconContentPadding) {
             Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Add")
+            Text(stringResource(R.string.settings_add))
         }
     }
 
     if (adding) {
         KeyValueDialog(
-            title = "Add to ${spec.label.lowercase()}",
+            title = stringResource(R.string.settings_add_to, spec.label.lowercase()),
             kind = kind,
             initialKey = null,
             initialValue = "",
@@ -375,11 +377,11 @@ private fun KeyValueDialog(
                 OutlinedTextField(
                     value = key,
                     onValueChange = { key = it },
-                    label = { Text("Name") },
+                    label = { Text(stringResource(R.string.settings_name)) },
                     singleLine = true,
                     isError = clash,
                     supportingText = when {
-                        clash -> ({ Text("Already in the list") })
+                        clash -> ({ Text(stringResource(R.string.settings_already_in_the_list)) })
                         known != null -> ({ Text(known.help) })
                         else -> null
                     },
@@ -389,7 +391,7 @@ private fun KeyValueDialog(
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
-                    label = { Text("Value") },
+                    label = { Text(stringResource(R.string.settings_value)) },
                     singleLine = true,
                     supportingText = kind.valueHint.takeIf { it.isNotEmpty() }?.let { { Text(it) } },
                     textStyle = mono,
@@ -398,7 +400,7 @@ private fun KeyValueDialog(
                 // The names the app reads, filled in with what usually goes with them
                 val unused = kind.suggestions.filter { it.key !in taken }
                 if (initialKey == null && unused.isNotEmpty()) {
-                    Text("Names the app reads", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.settings_names_the_app_reads), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         unused.forEach { suggestion ->
                             FilterChip(
@@ -417,15 +419,15 @@ private fun KeyValueDialog(
         },
         confirmButton = {
             TextButton(onClick = { onSave(trimmed, text) }, enabled = trimmed.isNotEmpty() && !clash) {
-                Text(if (initialKey == null) "Add" else "Save")
+                Text(if (initialKey == null) stringResource(R.string.settings_add) else stringResource(R.string.settings_save))
             }
         },
         dismissButton = {
             Row {
                 onRemove?.let {
-                    TextButton(onClick = it, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Remove") }
+                    TextButton(onClick = it, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(stringResource(R.string.settings_remove)) }
                 }
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_cancel)) }
             }
         }
     )
@@ -528,9 +530,9 @@ private fun ScreensField(spec: FieldSpec, value: JsonElement?, onValue: (JsonEle
                 .toggleable(value = chosen, role = Role.Switch, onValueChange = { on -> onValue(if (on) initialValue(spec) else null) })
         ) {
             Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                Text("Choose the tabs myself", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.settings_choose_the_tabs_myself), style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    if (chosen) "Ticked tabs show in this order." else spec.help,
+                    if (chosen) stringResource(R.string.settings_ticked_tabs_show_in_this) else spec.help,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -601,28 +603,28 @@ private fun ScreenRow(
             Text(
                 listOfNotNull(
                     // A root or an id of its own says more than what the kind of tab is
-                    entry.root?.takeIf { it.isNotBlank() }?.let { "In /${it.trim('/')}" } ?: screen?.help(),
+                    entry.root?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.settings_in, it.trim('/')) } ?: screen?.help(),
                     "id $tabId".takeIf { !entry.id.isNullOrBlank() },
-                    "${entry.disabled.size} left out".takeIf { entry.disabled.isNotEmpty() }
+                    stringResource(R.string.settings_left_out, entry.disabled.size).takeIf { entry.disabled.isNotEmpty() }
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             // What's wrong with the tab, on the tab itself (see screenProblems)
             val problem = when {
-                repeatedId -> "Another tab has the id \"$tabId\": only the first one shows."
-                screen != HostScreen.FILESYSTEM && !entry.root.isNullOrBlank() -> "Root folders only work on Filesystem tabs."
+                repeatedId -> stringResource(R.string.settings_another_tab_has_the_id, tabId)
+                screen != HostScreen.FILESYSTEM && !entry.root.isNullOrBlank() -> stringResource(R.string.settings_root_folders_only_work_on)
                 else -> null
             }
             problem?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
         }
         if (ticked) {
             OverflowMenuButton(contentDescription = "${entry.title()} options") { close ->
-                AppMenuItem("Name, id and actions", leadingIcon = Icons.Filled.Edit, onClick = { close(); editing = true })
-                AppMenuItem("Move up", leadingIcon = Icons.Filled.ArrowUpward, enabled = onUp != null, onClick = { close(); onUp?.invoke() })
-                AppMenuItem("Move down", leadingIcon = Icons.Filled.ArrowDownward, enabled = onDown != null, onClick = { close(); onDown?.invoke() })
+                AppMenuItem(stringResource(R.string.settings_name_id_and_actions), leadingIcon = Icons.Filled.Edit, onClick = { close(); editing = true })
+                AppMenuItem(stringResource(R.string.media_move_up), leadingIcon = Icons.Filled.ArrowUpward, enabled = onUp != null, onClick = { close(); onUp?.invoke() })
+                AppMenuItem(stringResource(R.string.media_move_down), leadingIcon = Icons.Filled.ArrowDownward, enabled = onDown != null, onClick = { close(); onDown?.invoke() })
                 if (onAddAnother != null) {
-                    AppMenuItem("Another ${screen?.label() ?: entry.screen} tab", leadingIcon = Icons.Filled.Add, onClick = { close(); onAddAnother() })
+                    AppMenuItem(stringResource(R.string.settings_another_tab, screen?.label() ?: entry.screen), leadingIcon = Icons.Filled.Add, onClick = { close(); onAddAnother() })
                 }
             }
         }
@@ -636,9 +638,9 @@ private fun ScreenRow(
                     OutlinedTextField(
                         value = entry.name.orEmpty(),
                         onValueChange = { onChange(entry.copy(name = it)) },
-                        label = { Text("Tab name") },
+                        label = { Text(stringResource(R.string.settings_tab_name)) },
                         placeholder = { Text(screen?.label() ?: entry.screen) },
-                        supportingText = { Text("Replaces the tab's name.") },
+                        supportingText = { Text(stringResource(R.string.settings_replaces_the_tab_s_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -646,13 +648,13 @@ private fun ScreenRow(
                         value = entry.id.orEmpty(),
                         // An id is a word: no spaces, so it reads the same in the config
                         onValueChange = { onChange(entry.copy(id = it.replace(Regex("\\s"), "-").ifEmpty { null })) },
-                        label = { Text("Id") },
+                        label = { Text(stringResource(R.string.settings_id)) },
                         placeholder = { Text(entry.screen.lowercase()) },
                         isError = repeatedId,
                         supportingText = {
                             Text(
-                                if (repeatedId) "Another tab has this id. Only the first shows."
-                                else "Needed for a second tab of this kind. Default: ${entry.screen.lowercase()}."
+                                if (repeatedId) stringResource(R.string.settings_another_tab_has_this_id)
+                                else stringResource(R.string.settings_needed_for_a_second_tab, entry.screen.lowercase())
                             )
                         },
                         singleLine = true,
@@ -662,14 +664,14 @@ private fun ScreenRow(
                         OutlinedTextField(
                             value = entry.root.orEmpty(),
                             onValueChange = { onChange(entry.copy(root = it.ifEmpty { null })) },
-                            label = { Text("Root folder") },
-                            placeholder = { Text("The whole host") },
-                            supportingText = { Text("The folder this tab opens at, e.g. Media/Films.") },
+                            label = { Text(stringResource(R.string.settings_root_folder)) },
+                            placeholder = { Text(stringResource(R.string.settings_the_whole_host)) },
+                            supportingText = { Text(stringResource(R.string.settings_the_folder_this_tab_opens)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
-                    Text("Leave out on this tab", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.settings_leave_out_on_this_tab), style = MaterialTheme.typography.labelLarge)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         HideableActions.forEach { (capability, label) ->
                             val hidden = capability in entry.disabled
@@ -682,7 +684,7 @@ private fun ScreenRow(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { editing = false }) { Text("Done") } }
+            confirmButton = { TextButton(onClick = { editing = false }) { Text(stringResource(R.string.common_done)) } }
         )
     }
 }
@@ -694,14 +696,14 @@ private fun ScreenRow(
 private fun EndpointsField(value: JsonElement?, form: FormState, onValue: (JsonElement?) -> Unit) {
     val endpoints = value as? JsonObject ?: JsonObject(emptyMap())
     val known = KnownEndpoints.associateBy { it.name }
-    val byArea = endpoints.keys.groupBy { known[it]?.area ?: "Other" }
-    val areas = KnownEndpoints.map { it.area }.distinct() + "Other"
+    val byArea = endpoints.keys.groupBy { known[it]?.area ?: stringResource(R.string.settings_other) }
+    val areas = KnownEndpoints.map { it.area }.distinct() + stringResource(R.string.settings_other)
     var adding by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (endpoints.isEmpty()) {
             Text(
-                "None yet. Add browse_list for folders or list for a file list.",
+                stringResource(R.string.settings_none_yet_add_browse_list),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error
             )
@@ -716,7 +718,7 @@ private fun EndpointsField(value: JsonElement?, form: FormState, onValue: (JsonE
                     val endpoint = endpoints[name] as? JsonObject ?: JsonObject(emptyMap())
                     NavRow(
                         title = name,
-                        summary = listOfNotNull(endpoint.textOf("method"), endpoint.textOf("path")?.ifBlank { null }).joinToString(" ").ifEmpty { "No path yet" },
+                        summary = listOfNotNull(endpoint.textOf("method"), endpoint.textOf("path")?.ifBlank { null }).joinToString(" ").ifEmpty { stringResource(R.string.settings_no_path_yet) },
                         problem = endpointHasProblem(name, endpoint),
                         monospace = true,
                         onClick = { form.open(Page.OfEndpoint(name)) }
@@ -730,7 +732,7 @@ private fun EndpointsField(value: JsonElement?, form: FormState, onValue: (JsonE
             OutlinedButton(onClick = { adding = true }) {
                 Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Add an endpoint")
+                Text(stringResource(R.string.settings_add_an_endpoint))
             }
         }
         if (adding) {
@@ -752,7 +754,7 @@ private fun EndpointsField(value: JsonElement?, form: FormState, onValue: (JsonE
 private fun AddEndpointDialog(missing: List<EndpointInfo>, onPick: (EndpointInfo) -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add an endpoint") },
+        title = { Text(stringResource(R.string.settings_add_an_endpoint)) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 missing.groupBy { it.area }.forEach { (area, infos) ->
@@ -777,7 +779,7 @@ private fun AddEndpointDialog(missing: List<EndpointInfo>, onPick: (EndpointInfo
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_cancel)) } }
     )
 }
 

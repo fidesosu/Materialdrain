@@ -43,6 +43,8 @@ import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.ui.theme.ThemeColorPresets
 import tools.senko.materialdrain.ui.theme.seededColorScheme
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 private val SwatchSize = 40.dp
 
@@ -65,9 +67,9 @@ fun ThemeColorPicker(selected: Int, enabled: Boolean, onSelect: (Int) -> Unit) {
     var typing by rememberSaveable { mutableStateOf(false) }
     val custom = selected.takeIf { color -> ThemeColorPresets.none { it.second == color } }
     Column(modifier = Modifier.alpha(if (enabled) 1f else 0.38f)) {
-        Text("Colour", style = MaterialTheme.typography.bodyLarge)
+        Text(stringResource(R.string.settings_colour), style = MaterialTheme.typography.bodyLarge)
         Text(
-            if (enabled) "What the app's colours are made from" else "Turn off the wallpaper's colours to choose one",
+            if (enabled) stringResource(R.string.settings_what_the_app_s_colours) else stringResource(R.string.settings_turn_off_the_wallpaper_s),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -79,7 +81,7 @@ fun ThemeColorPicker(selected: Int, enabled: Boolean, onSelect: (Int) -> Unit) {
             ThemeColorPresets.forEach { (name, color) ->
                 Swatch(color, name, chosen = color == selected, enabled = enabled, onClick = { onSelect(color) })
             }
-            Swatch(custom, "Custom", chosen = custom != null, enabled = enabled, onClick = { typing = true }, onType = true)
+            Swatch(custom, stringResource(R.string.settings_custom), chosen = custom != null, enabled = enabled, onClick = { typing = true }, onType = true)
         }
     }
     if (typing) {
@@ -127,13 +129,13 @@ private fun HexColorDialog(initial: Int, onConfirm: (Int) -> Unit, onDismiss: ()
     val parsed = parseHexColor(text)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Custom colour") },
+        title = { Text(stringResource(R.string.settings_custom_colour)) },
         text = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it.take(7) },
-                    label = { Text("Hex code") },
+                    label = { Text(stringResource(R.string.settings_hex_code)) },
                     placeholder = { Text("#6750A4") },
                     singleLine = true,
                     isError = parsed == null,
@@ -148,8 +150,8 @@ private fun HexColorDialog(initial: Int, onConfirm: (Int) -> Unit, onDismiss: ()
                 )
             }
         },
-        confirmButton = { Button(onClick = { parsed?.let(onConfirm) }, enabled = parsed != null) { Text("Use") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        confirmButton = { Button(onClick = { parsed?.let(onConfirm) }, enabled = parsed != null) { Text(stringResource(R.string.settings_use)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_cancel)) } }
     )
 }
 

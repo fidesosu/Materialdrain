@@ -109,6 +109,8 @@ import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** The two ways of editing a config: field by field, or its text. */
 private enum class EditorMode(val label: String) { FORM("Form"), JSON("JSON") }
@@ -294,10 +296,10 @@ fun ConfigEditor(
         if (confirmDiscard) {
             AlertDialog(
                 onDismissRequest = { confirmDiscard = false },
-                title = { Text("Discard your changes?") },
-                text = { Text("What you changed in this config isn't saved yet.") },
-                confirmButton = { TextButton(onClick = { confirmDiscard = false; onDismiss() }) { Text("Discard") } },
-                dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Keep editing") } }
+                title = { Text(stringResource(R.string.settings_discard_your_changes)) },
+                text = { Text(stringResource(R.string.settings_what_you_changed_in_this)) },
+                confirmButton = { TextButton(onClick = { confirmDiscard = false; onDismiss() }) { Text(stringResource(R.string.settings_discard)) } },
+                dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text(stringResource(R.string.settings_keep_editing)) } }
             )
         }
     }
@@ -456,7 +458,7 @@ private fun FirstPage(sections: List<Section>, form: FormState, selected: Page?,
                     val obj = form.root.at(path)
                     NavRow(
                         title = section.title,
-                        summary = summaryOf(fields, obj).ifEmpty { "Nothing set yet" },
+                        summary = summaryOf(fields, obj).ifEmpty { stringResource(R.string.settings_nothing_set_yet) },
                         problem = hasProblem(fields, obj),
                         selected = selected == page,
                         onClick = { onOpen(page) }
@@ -501,7 +503,7 @@ private fun EndpointPage(page: Page.OfEndpoint, form: FormState) {
     val info = KnownEndpoints.firstOrNull { it.name == page.name }
     var confirmRemove by remember { mutableStateOf(false) }
     PageColumn {
-        Intro(info?.let { "${it.area}. ${it.help}" } ?: "Unknown name: kept, but unused.")
+        Intro(info?.let { "${it.area}. ${it.help}" } ?: stringResource(R.string.settings_unknown_name_kept_but_unused))
         FieldsEditor(info?.fields ?: endpointFields(), page.path, form)
         OutlinedButton(
             onClick = { confirmRemove = true },
@@ -510,22 +512,22 @@ private fun EndpointPage(page: Page.OfEndpoint, form: FormState) {
         ) {
             Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Remove endpoint")
+            Text(stringResource(R.string.settings_remove_endpoint))
         }
     }
     if (confirmRemove) {
         AlertDialog(
             onDismissRequest = { confirmRemove = false },
-            title = { Text("Remove ${page.name}?") },
-            text = { Text(info?.let { "The app stops using it for: ${it.help.removeSuffix(".").lowercase()}." } ?: "It isn't used by the app.") },
+            title = { Text(stringResource(R.string.settings_remove_2, page.name)) },
+            text = { Text(info?.let { stringResource(R.string.settings_the_app_stops_using_it, it.help.removeSuffix(".").lowercase()) } ?: stringResource(R.string.settings_it_isn_t_used_by)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmRemove = false
                     form.setAt(page.path, null)
                     form.back()
-                }) { Text("Remove") }
+                }) { Text(stringResource(R.string.settings_remove)) }
             },
-            dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text("Keep") } }
+            dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text(stringResource(R.string.settings_keep)) } }
         )
     }
 }
@@ -535,7 +537,7 @@ private fun EndpointPage(page: Page.OfEndpoint, form: FormState) {
 private fun OtherFieldsPage(sections: List<Section>, form: FormState) {
     val keys = form.root.keys - describedKeys(sections)
     PageColumn {
-        Intro("Fields this version doesn't use. They're kept.")
+        Intro(stringResource(R.string.settings_fields_this_version_doesn_t))
         keys.forEach { key ->
             RawJsonField(key, form.root.getValue(key), onValue = { form.setObject(emptyList(), form.root.with(key, it)) })
         }
@@ -573,8 +575,8 @@ private fun EditorTopBar(
         modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = 4.dp)
     ) {
         IconButton(onClick = onNavigate) {
-            if (back) Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-            else Icon(Icons.Filled.Close, contentDescription = "Close")
+            if (back) Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.files_back))
+            else Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.settings_close))
         }
         Column(modifier = Modifier.weight(1f).padding(start = 4.dp, end = 8.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -600,7 +602,7 @@ private fun PaneHeader(title: String, trail: String, canGoBack: Boolean, onBack:
         modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = if (canGoBack) 4.dp else 16.dp, end = 16.dp)
     ) {
         if (canGoBack) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.files_back)) }
             Spacer(Modifier.width(4.dp))
         }
         Column {
@@ -697,7 +699,7 @@ internal fun NavRow(
             )
             if (summary.isNotEmpty()) {
                 Text(
-                    if (problem) "Incomplete · $summary" else summary,
+                    if (problem) stringResource(R.string.settings_incomplete, summary) else summary,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (problem) colors.error else colors.onSurfaceVariant,
                     maxLines = 2,
@@ -789,8 +791,8 @@ private fun RawJsonField(key: String, value: JsonElement, onValue: (JsonElement?
         label = { Text(key) },
         textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
         isError = invalid,
-        supportingText = if (invalid) ({ Text("Invalid JSON: the last valid value is kept") }) else null,
-        trailingIcon = { IconButton(onClick = { onValue(null) }) { Icon(Icons.Filled.Delete, contentDescription = "Remove $key") } },
+        supportingText = if (invalid) ({ Text(stringResource(R.string.settings_invalid_json_the_last_valid)) }) else null,
+        trailingIcon = { IconButton(onClick = { onValue(null) }) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.settings_remove_3, key)) } },
         modifier = Modifier.fillMaxWidth()
     )
 }
@@ -828,7 +830,7 @@ private fun MoreOptions(fields: List<FieldSpec>, path: List<String>, obj: JsonOb
                 .padding(vertical = 12.dp)
         ) {
             Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                Text("More options", style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.common_more_options), style = MaterialTheme.typography.titleSmall)
                 if (!open) {
                     Text(
                         listOfNotNull("$setCount set".takeIf { setCount > 0 }, fields.joinToString(", ") { it.label }).joinToString(" · "),
@@ -839,7 +841,7 @@ private fun MoreOptions(fields: List<FieldSpec>, path: List<String>, obj: JsonOb
                     )
                 }
             }
-            Icon(if (open) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = if (open) "Fold" else "Unfold")
+            Icon(if (open) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = if (open) stringResource(R.string.settings_fold) else stringResource(R.string.settings_unfold))
         }
         if (open) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(top = 4.dp)) {

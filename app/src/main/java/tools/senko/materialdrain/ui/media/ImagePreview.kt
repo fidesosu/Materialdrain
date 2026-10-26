@@ -66,6 +66,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import tools.senko.materialdrain.ui.LocalBlurredBackdrop
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 internal const val TAG_COIL = "CoilImageLoaderShared"
 internal fun imageRequest(context: Context, data: Any, configure: ImageRequest.Builder.() -> Unit = {}): ImageRequest {
@@ -184,7 +186,7 @@ fun ClickablePreviewOverlay(onClick: () -> Unit) {
             .padding(8.dp),
         contentAlignment = Alignment.BottomEnd
     ) {
-        FullscreenBadge("View Fullscreen")
+        FullscreenBadge(stringResource(R.string.media_view_fullscreen))
     }
 }
 

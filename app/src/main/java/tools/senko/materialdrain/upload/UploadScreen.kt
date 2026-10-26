@@ -43,6 +43,8 @@ import tools.senko.materialdrain.util.formatSize
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import tools.senko.materialdrain.ui.preview.PreviewSamples
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 @Composable
 fun UploadScreenContent(
@@ -83,7 +85,7 @@ fun UploadScreenContent(
     initialTab: Int = 0
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(initialTab) }
-    val tabTitles = listOf("Upload File", "Upload Text")
+    val tabTitles = listOf(stringResource(R.string.upload_upload_file), stringResource(R.string.upload_upload_text))
 
 
     var fullScreenPreviewUri by remember { mutableStateOf<Uri?>(null) }
@@ -164,7 +166,7 @@ fun UploadScreenContent(
                             ) {
                                 Icon(Icons.Filled.AttachFile, contentDescription = null)
                                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                                Text(if (uiState.queuedItems.isNotEmpty()) "Choose different files" else "Choose a different file")
+                                Text(if (uiState.queuedItems.isNotEmpty()) stringResource(R.string.upload_choose_different_files) else stringResource(R.string.upload_choose_a_different_file))
                             }
                         }
                         if (uiState.queuedItems.isNotEmpty()) {
@@ -180,19 +182,19 @@ fun UploadScreenContent(
                             Spacer(modifier = Modifier.height(8.dp))
                             Card(modifier = Modifier.fillMaxWidth()){
                                 Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("Selected File:", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                                    InfoRow("Name", file.name ?: "N/A")
-                                    file.sizeBytes?.let { s -> InfoRow("Size", formatSize(s)) }
-                                    file.mimeType?.let { mt -> InfoRow("Type", mt) }
+                                    Text(stringResource(R.string.upload_selected_file), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+                                    InfoRow(stringResource(R.string.settings_name), file.name ?: "N/A")
+                                    file.sizeBytes?.let { s -> InfoRow(stringResource(R.string.files_size), formatSize(s)) }
+                                    file.mimeType?.let { mt -> InfoRow(stringResource(R.string.files_type), mt) }
                                     // Each of these is only filled for its own type
-                                    file.audioDurationMillis?.let { d -> InfoRow("Duration", formatDurationMillis(d)) }
-                                    file.audioBitrate?.let { b -> InfoRow("Bitrate", "${b / 1000} kbps") }
-                                    file.audioArtist?.let { a -> InfoRow("Artist", a) }
-                                    file.audioAlbum?.let { al -> InfoRow("Album", al) }
-                                    file.videoDurationMillis?.let { d -> InfoRow("Duration", formatDurationMillis(d)) }
-                                    file.pdfPageCount?.let { pc -> InfoRow("Pages", pc.toString()) }
-                                    file.apkPackageName?.let { pn -> InfoRow("Package", pn) }
-                                    file.apkVersionName?.let { vn -> InfoRow("Version", vn) }
+                                    file.audioDurationMillis?.let { d -> InfoRow(stringResource(R.string.upload_duration), formatDurationMillis(d)) }
+                                    file.audioBitrate?.let { b -> InfoRow(stringResource(R.string.upload_bitrate), "${b / 1000} kbps") }
+                                    file.audioArtist?.let { a -> InfoRow(stringResource(R.string.upload_artist), a) }
+                                    file.audioAlbum?.let { al -> InfoRow(stringResource(R.string.upload_album), al) }
+                                    file.videoDurationMillis?.let { d -> InfoRow(stringResource(R.string.upload_duration), formatDurationMillis(d)) }
+                                    file.pdfPageCount?.let { pc -> InfoRow(stringResource(R.string.upload_pages), pc.toString()) }
+                                    file.apkPackageName?.let { pn -> InfoRow(stringResource(R.string.settings_package), pn) }
+                                    file.apkVersionName?.let { vn -> InfoRow(stringResource(R.string.upload_version), vn) }
                                 }
                             }
                             Spacer(modifier = Modifier.height(8.dp))
@@ -200,7 +202,7 @@ fun UploadScreenContent(
                             if (file.mimeType?.startsWith("image/") == true) {
                                 InlineImagePreview(
                                     imageSource = file.uri,
-                                    contentDescription = "Selected image preview",
+                                    contentDescription = stringResource(R.string.upload_selected_image_preview),
                                     apiKey = null,
                                     onFullScreenClick = {
                                         fullScreenPreviewUri = file.uri
@@ -212,7 +214,7 @@ fun UploadScreenContent(
                             if (file.mimeType?.startsWith("video/") == true) {
                                 InlineVideoPreview(
                                     thumbnailSource = file.videoThumbnail, // Upload screen uses fetched byte array for thumbnail
-                                    contentDescription = "Selected video preview",
+                                    contentDescription = stringResource(R.string.upload_selected_video_preview),
                                     apiKey = null,
                                     onFullScreenClick = {
                                         fullScreenPreviewUri = file.uri
@@ -233,7 +235,7 @@ fun UploadScreenContent(
                                         modifier = Modifier.fillMaxSize(),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(Icons.Filled.PictureAsPdf, contentDescription = "PDF File", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+                                        Icon(Icons.Filled.PictureAsPdf, contentDescription = stringResource(R.string.upload_pdf_file), modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
@@ -253,11 +255,11 @@ fun UploadScreenContent(
                                         file.apkIcon?.let { rememberDecodedBitmap(it) }?.let { bitmap ->
                                             Image(
                                                 bitmap = bitmap,
-                                                contentDescription = "APK icon preview",
+                                                contentDescription = stringResource(R.string.upload_apk_icon_preview),
                                                 modifier = Modifier.size(64.dp),
                                                 contentScale = ContentScale.Fit
                                             )
-                                        } ?: Icon(Icons.Filled.Android, contentDescription = "APK File", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+                                        } ?: Icon(Icons.Filled.Android, contentDescription = stringResource(R.string.upload_apk_file), modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
@@ -285,7 +287,7 @@ fun UploadScreenContent(
                         OutlinedTextField(
                             value = uiState.textToUpload,
                             onValueChange = onTextChange,
-                            label = { Text("Paste text here") },
+                            label = { Text(stringResource(R.string.upload_paste_text_here)) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .defaultMinSize(minHeight = 240.dp),
@@ -294,7 +296,7 @@ fun UploadScreenContent(
                             supportingText = {
                                 val size = uiState.textToUpload.toByteArray().size.toLong()
                                 Text(
-                                    text = if (size > 0) "${uiState.textToUpload.length} characters · ${formatSize(size)}" else "Uploaded as a .txt file",
+                                    text = if (size > 0) "${uiState.textToUpload.length} characters · ${formatSize(size)}" else stringResource(R.string.upload_uploaded_as_a_txt_file),
                                     modifier = Modifier.fillMaxWidth(),
                                     textAlign = TextAlign.End
                                 )
@@ -308,7 +310,7 @@ fun UploadScreenContent(
                     OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Filled.Close, contentDescription = null)
                         Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                        Text("Cancel upload")
+                        Text(stringResource(R.string.upload_cancel_upload))
                     }
                 }
 
@@ -361,7 +363,7 @@ private fun UploadDropZone(enabled: Boolean, onClick: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                "Tap to choose files",
+                stringResource(R.string.upload_tap_to_choose_files),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = contentAlpha),
                 textAlign = TextAlign.Center
@@ -389,10 +391,10 @@ private fun UploadResultCard(fileId: String?) {
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Upload complete", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(stringResource(R.string.upload_upload_complete), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 if (fileId != null) {
                     Text(
-                        "pixeldrain.com/u/$fileId",
+                        stringResource(R.string.upload_pixeldrain_com_u, fileId),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         maxLines = 1,
@@ -402,7 +404,7 @@ private fun UploadResultCard(fileId: String?) {
             }
             if (fileId != null) {
                 IconButton(onClick = { copyToClipboard(context, pixeldrainLink(fileId), "Link copied to clipboard") }) {
-                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copy link", tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(R.string.upload_copy_link), tint = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
         }
@@ -438,7 +440,7 @@ private fun QueuedFilesCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (doneCount > 0) "$doneCount of ${items.size} uploaded" else "${items.size} files selected",
+                        text = if (doneCount > 0) "$doneCount of ${items.size} uploaded" else stringResource(R.string.upload_files_selected, items.size),
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
@@ -451,9 +453,9 @@ private fun QueuedFilesCard(
                     TextButton(onClick = {
                         val links = items.mapNotNull { it.fileId }.joinToString("\n") { pixeldrainLink(it) }
                         copyToClipboard(context, links, "Links copied to clipboard")
-                    }) { Text("Copy links") }
+                    }) { Text(stringResource(R.string.upload_copy_links)) }
                 }
-                TextButton(onClick = onClear, enabled = !isUploading) { Text("Clear") }
+                TextButton(onClick = onClear, enabled = !isUploading) { Text(stringResource(R.string.upload_clear)) }
             }
             items.forEach { item ->
                 key(item.id) {
@@ -472,12 +474,12 @@ private fun QueuedFileRow(item: UploadItem, isUploading: Boolean, onRemove: (Int
     val animatedFraction by animateFloatAsState(targetValue = fraction ?: 0f, label = "queuedItemProgress")
 
     val subtitle = when (item.status) {
-        UploadItemStatus.PENDING -> item.sizeBytes?.let { formatSize(it) } ?: "Unknown size"
+        UploadItemStatus.PENDING -> item.sizeBytes?.let { formatSize(it) } ?: stringResource(R.string.upload_unknown_size)
         UploadItemStatus.UPLOADING ->
             if (size != null) "${((fraction ?: 0f) * 100).toInt()}% · ${formatSize(item.uploadedBytes)} / ${formatSize(size)}"
             else formatSize(item.uploadedBytes)
-        UploadItemStatus.DONE -> "Uploaded" + (item.sizeBytes?.let { " · ${formatSize(it)}" } ?: "")
-        UploadItemStatus.FAILED -> item.errorMessage ?: "Upload failed"
+        UploadItemStatus.DONE -> stringResource(R.string.files_uploaded) + (item.sizeBytes?.let { " · ${formatSize(it)}" } ?: "")
+        UploadItemStatus.FAILED -> item.errorMessage ?: stringResource(R.string.upload_upload_failed)
     }
 
     Row(
@@ -488,12 +490,12 @@ private fun QueuedFileRow(item: UploadItem, isUploading: Boolean, onRemove: (Int
     ) {
         Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
             when (item.status) {
-                UploadItemStatus.PENDING -> Icon(Icons.Filled.Schedule, contentDescription = "Waiting", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                UploadItemStatus.PENDING -> Icon(Icons.Filled.Schedule, contentDescription = stringResource(R.string.upload_waiting), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 UploadItemStatus.UPLOADING ->
                     if (fraction != null) CircularProgressIndicator(progress = { animatedFraction }, modifier = Modifier.size(22.dp), strokeWidth = 3.dp)
                     else CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 3.dp)
-                UploadItemStatus.DONE -> Icon(Icons.Filled.CheckCircle, contentDescription = "Uploaded", tint = MaterialTheme.colorScheme.primary)
-                UploadItemStatus.FAILED -> Icon(Icons.Filled.Error, contentDescription = "Failed", tint = MaterialTheme.colorScheme.error)
+                UploadItemStatus.DONE -> Icon(Icons.Filled.CheckCircle, contentDescription = stringResource(R.string.files_uploaded), tint = MaterialTheme.colorScheme.primary)
+                UploadItemStatus.FAILED -> Icon(Icons.Filled.Error, contentDescription = stringResource(R.string.upload_failed), tint = MaterialTheme.colorScheme.error)
             }
         }
         Spacer(Modifier.width(12.dp))
@@ -510,11 +512,11 @@ private fun QueuedFileRow(item: UploadItem, isUploading: Boolean, onRemove: (Int
         val fileId = item.fileId
         if (item.status == UploadItemStatus.DONE && fileId != null) {
             IconButton(onClick = { copyToClipboard(context, pixeldrainLink(fileId), "Link copied to clipboard") }) {
-                Icon(Icons.Filled.ContentCopy, contentDescription = "Copy link")
+                Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(R.string.upload_copy_link))
             }
         } else if (!isUploading) {
             IconButton(onClick = { onRemove(item.id) }) {
-                Icon(Icons.Filled.Close, contentDescription = "Remove from list")
+                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.upload_remove_from_list))
             }
         } else {
             Spacer(Modifier.size(48.dp))

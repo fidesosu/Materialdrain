@@ -118,6 +118,7 @@ import tools.senko.materialdrain.update.WhatsNewSheet
 import tools.senko.materialdrain.upload.UploadItemStatus
 import tools.senko.materialdrain.upload.UploadScreenContent
 import tools.senko.materialdrain.upload.UploadViewModel
+import androidx.compose.ui.res.stringResource
 
 @androidx.annotation.OptIn(UnstableApi::class)
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalSharedTransitionApi::class)
@@ -636,7 +637,7 @@ fun MaterialdrainScreen() {
                         // A file's details have their own buttons for what's done with the file, and the settings
                         // are where the menu leads: neither has the menu
                         menu = if (currentScreen == Screen.FileDetail || currentScreen == Screen.Settings) null else { {
-                            OverflowMenuButton(contentDescription = "More options", buttonSize = 48.dp) { close ->
+                            OverflowMenuButton(contentDescription = stringResource(R.string.common_more_options), buttonSize = 48.dp) { close ->
                                 // Read only while the menu is open, so a change of the order doesn't redraw the bar
                                 val sortField by appContainer.appSettings.sortField.collectAsState()
                                 val sortAscending by appContainer.appSettings.sortAscending.collectAsState()
@@ -782,7 +783,7 @@ fun MaterialdrainScreen() {
                             bottom = if (underNavigationBar) 0.dp else bottomPadding - behindMiniPlayer
                         )
                 ) {
-                    val noScreensMessage = "${activeConfig?.name ?: "This host"} has no tabs to show. Check \"screens\" in its config under Settings → Hosts."
+                    val noScreensMessage = stringResource(R.string.app_has_no_tabs_to_show, activeConfig?.name ?: "This host")
                     when (targetScreen) {
                         in BROWSE_SCREENS if noScreensConfigured -> CenteredTextMessage(noScreensMessage)
                         Screen.Upload -> UploadScreenContent(
@@ -883,7 +884,7 @@ fun MaterialdrainScreen() {
                                         if (fileInfoUiState.isLoadingFileInfo) {
                                             CircularProgressIndicator()
                                         } else {
-                                            val errorMessage = fileInfoUiState.fileInfoErrorMessage ?: "File details not available."
+                                            val errorMessage = fileInfoUiState.fileInfoErrorMessage ?: stringResource(R.string.app_file_details_not_available)
                                             Text(
                                                 text = errorMessage,
                                                 modifier = Modifier.padding(16.dp),

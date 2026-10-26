@@ -61,6 +61,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /**
  * The darkenings over pictures, videos and their blurred backdrops, for what goes on them to read (white text, buttons).
@@ -126,7 +128,7 @@ fun MediaSkipButton(
     contentColor: Color = Color.White
 ) {
     val seconds = (stepMs / 1000).toInt()
-    val description = if (forward) "Forward $seconds seconds" else "Back $seconds seconds"
+    val description = if (forward) stringResource(R.string.media_forward_seconds, seconds) else stringResource(R.string.media_back_seconds, seconds)
     MediaButton(description, onClick, modifier, enabled = true, size = 44.dp, container = container) {
         Box(Modifier.semantics { contentDescription = description }) { SkipGlyph(forward, seconds, contentColor) }
     }

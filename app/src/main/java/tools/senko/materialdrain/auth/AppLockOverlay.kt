@@ -28,6 +28,8 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ScreenPreviews
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /**
  * Covers the app while it is locked, and asks for the fingerprint, face or screen lock straight away. The overlay
@@ -67,9 +69,9 @@ fun LockedScreen(onUnlock: () -> Unit) {
                 modifier = Modifier.size(64.dp)
             )
             Spacer(Modifier.height(16.dp))
-            Text("Materialdrain is locked", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.app_materialdrain_is_locked), style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(24.dp))
-            Button(onClick = onUnlock) { Text("Unlock") }
+            Button(onClick = onUnlock) { Text(stringResource(R.string.app_unlock)) }
         }
     }
 }

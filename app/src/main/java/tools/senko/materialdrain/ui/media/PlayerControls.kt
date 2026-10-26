@@ -43,6 +43,8 @@ import tools.senko.materialdrain.ui.icons.filled.Shuffle
 import tools.senko.materialdrain.ui.icons.filled.SkipNext
 import tools.senko.materialdrain.ui.icons.filled.SkipPrevious
 import tools.senko.materialdrain.util.formatDurationMillis
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 // ---- Shared by both ----
 
@@ -66,7 +68,7 @@ internal fun SongTitle(song: ShownSong, large: Boolean, modifier: Modifier = Mod
     // Wrapping while they fit; one that wouldn't, scrolling on one line instead (see ScrollingText)
     Column(modifier = modifier, horizontalAlignment = if (centered) Alignment.CenterHorizontally else Alignment.Start) {
         ScrollingText(
-            song.title ?: "Audio",
+            song.title ?: stringResource(R.string.media_audio),
             style = (if (large) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium).copy(textAlign = align),
             maxLines = 2
         )
@@ -151,7 +153,7 @@ internal fun SongControls(
     ) {
         if (withModes) RepeatButton(song)
         IconButton(onClick = { player.seekToPrevious() }, modifier = skipModifier) {
-            Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous song")
+            Icon(Icons.Filled.SkipPrevious, contentDescription = stringResource(R.string.media_previous_song))
         }
         PlayPauseButton(
             playing = state.playWhenReady && !state.isEnded,
@@ -162,7 +164,7 @@ internal fun SongControls(
             modifier = playModifier
         )
         IconButton(onClick = { song.skip(toNext = true) }, enabled = song.hasNext, modifier = skipModifier) {
-            Icon(Icons.Filled.SkipNext, contentDescription = "Next song")
+            Icon(Icons.Filled.SkipNext, contentDescription = stringResource(R.string.media_next_song))
         }
         if (withModes) ShuffleButton(song)
     }
@@ -177,9 +179,9 @@ private fun RepeatButton(song: BackgroundSong) {
         Icon(
             if (mode == Player.REPEAT_MODE_ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
             contentDescription = when (mode) {
-                Player.REPEAT_MODE_ALL -> "Repeating the queue"
-                Player.REPEAT_MODE_ONE -> "Repeating this song"
-                else -> "Repeat"
+                Player.REPEAT_MODE_ALL -> stringResource(R.string.media_repeating_the_queue)
+                Player.REPEAT_MODE_ONE -> stringResource(R.string.media_repeating_this_song)
+                else -> stringResource(R.string.media_repeat)
             },
             tint = if (mode == Player.REPEAT_MODE_OFF) colors.onSurfaceVariant.copy(alpha = 0.6f) else colors.primary
         )
@@ -193,7 +195,7 @@ private fun ShuffleButton(song: BackgroundSong) {
     IconButton(onClick = song::toggleShuffle) {
         Icon(
             Icons.Filled.Shuffle,
-            contentDescription = if (song.shuffle) "Shuffling" else "Shuffle",
+            contentDescription = if (song.shuffle) stringResource(R.string.media_shuffling) else stringResource(R.string.media_shuffle),
             tint = if (song.shuffle) colors.primary else colors.onSurfaceVariant.copy(alpha = 0.6f)
         )
     }
@@ -214,13 +216,13 @@ internal fun PlayPauseButton(playing: Boolean, buffering: Boolean, failed: Boole
     ) {
         val glyph = Modifier.size(size * 0.45f)
         when {
-            failed -> Icon(Icons.Filled.Refresh, contentDescription = "Try again", modifier = glyph)
+            failed -> Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.media_try_again), modifier = glyph)
             buffering -> CircularProgressIndicator(
                 modifier = glyph,
                 strokeWidth = 3.dp,
                 color = MaterialTheme.colorScheme.onPrimary
             )
-            else -> Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (playing) "Pause" else "Play", modifier = glyph)
+            else -> Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (playing) stringResource(R.string.media_pause) else stringResource(R.string.media_play), modifier = glyph)
         }
     }
 }
@@ -231,7 +233,7 @@ internal fun QueueButton(open: Boolean, count: Int, onClick: () -> Unit, modifie
     IconButton(onClick = onClick, modifier = modifier) {
         Icon(
             Icons.Filled.QueueMusic,
-            contentDescription = if (open) "Hide the queue" else "Queue, $count songs",
+            contentDescription = if (open) stringResource(R.string.media_hide_the_queue) else stringResource(R.string.media_queue_songs, count),
             tint = if (open) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

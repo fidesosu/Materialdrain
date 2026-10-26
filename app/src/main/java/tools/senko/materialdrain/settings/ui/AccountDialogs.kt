@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.util.formatSize
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** Like TextInputDialog, but an empty value can be saved too: it removes the setting. */
 @Composable
@@ -61,8 +63,8 @@ internal fun EditableTextDialog(
                 supportingText?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             }
         },
-        confirmButton = { Button(onClick = { onConfirm(value) }, enabled = value != initialValue) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        confirmButton = { Button(onClick = { onConfirm(value) }, enabled = value != initialValue) { Text(stringResource(R.string.settings_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_cancel)) } }
     )
 }
 
@@ -77,27 +79,27 @@ internal fun TransferCapDialog(currentBytes: Long, planCapBytes: Long, onConfirm
     val overPlan = bytes != null && planCapBytes > 0 && bytes > planCapBytes
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Monthly transfer cap") },
+        title = { Text(stringResource(R.string.settings_monthly_transfer_cap)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it.filter(Char::isDigit).take(7) },
-                    label = { Text("GB a month") },
+                    label = { Text(stringResource(R.string.settings_gb_a_month)) },
                     singleLine = true,
                     isError = overPlan,
-                    supportingText = if (overPlan) ({ Text("More than your plan allows (${formatSize(planCapBytes)})") }) else null,
+                    supportingText = if (overPlan) ({ Text(stringResource(R.string.settings_more_than_your_plan_allows, formatSize(planCapBytes))) }) else null,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
-                    "Caps premium transfer spending. Empty: your plan's cap.",
+                    stringResource(R.string.settings_caps_premium_transfer_spending_empty),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
         },
-        confirmButton = { Button(onClick = { onConfirm(bytes ?: 0L) }, enabled = bytes != null && !overPlan) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        confirmButton = { Button(onClick = { onConfirm(bytes ?: 0L) }, enabled = bytes != null && !overPlan) { Text(stringResource(R.string.settings_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_cancel)) } }
     )
 }
 
@@ -136,12 +138,12 @@ internal fun AddCreditDialog(
     val valid = amountOk && country.length == 3
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add credit") },
+        title = { Text(stringResource(R.string.settings_add_credit)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
                 if (hasOpenInvoice) {
                     Text(
-                        "Pay your open invoice first. It expires by itself.",
+                        stringResource(R.string.settings_pay_your_open_invoice_first),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -149,40 +151,40 @@ internal fun AddCreditDialog(
                 OutlinedTextField(
                     value = amount,
                     onValueChange = { amount = it.filter(Char::isDigit).take(7) },
-                    label = { Text("Amount in euros") },
+                    label = { Text(stringResource(R.string.settings_amount_in_euros)) },
                     prefix = { Text("€") },
                     singleLine = true,
                     isError = amount.isNotEmpty() && !amountOk,
-                    supportingText = { Text("At least €${CreditAmount.first}. VAT is added to it.") },
+                    supportingText = { Text(stringResource(R.string.settings_at_least_vat_is_added, CreditAmount.first)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
-                Text("Pay with", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.settings_pay_with), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PaymentMethods.forEach { (id, label) ->
                         FilterChip(selected = method == id, onClick = { method = id }, label = { Text(label) })
                     }
                 }
                 Text(
-                    "Paid in cryptocurrency, on a page in your browser.",
+                    stringResource(R.string.settings_paid_in_cryptocurrency_on_a),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 OutlinedTextField(
                     value = country,
                     onValueChange = { country = it.filter(Char::isLetter).take(3).uppercase() },
-                    label = { Text("Country code") },
+                    label = { Text(stringResource(R.string.settings_country_code)) },
                     placeholder = { Text("NLD") },
                     singleLine = true,
                     isError = country.isNotEmpty() && country.length != 3,
-                    supportingText = { Text("For VAT, like NLD or USA") },
+                    supportingText = { Text(stringResource(R.string.settings_for_vat_like_nld_or)) },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         },
-        confirmButton = { Button(onClick = { onConfirm(euros ?: 0L, method, country) }, enabled = valid) { Text("Continue to payment") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        confirmButton = { Button(onClick = { onConfirm(euros ?: 0L, method, country) }, enabled = valid) { Text(stringResource(R.string.settings_continue_to_payment)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_cancel)) } }
     )
 }
 
@@ -207,11 +209,11 @@ internal fun BrandingDialog(current: Map<String, String>, onConfirm: (Map<String
     val values = remember { mutableStateMapOf<String, String>().apply { BrandingFields.forEach { put(it.key, current[it.key].orEmpty()) } } }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("File viewer") },
+        title = { Text(stringResource(R.string.settings_file_viewer)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
                 Text(
-                    "Images are files on your account (JPEG, PNG, GIF, WebP, max 10 MB). Copy the ID from their details.",
+                    stringResource(R.string.settings_images_are_files_on_your),
                     style = MaterialTheme.typography.bodySmall
                 )
                 BrandingFields.forEach { field ->
@@ -238,9 +240,9 @@ internal fun BrandingDialog(current: Map<String, String>, onConfirm: (Map<String
                 onConfirm(BrandingFields.associate { field ->
                     field.key to if (field.isSwitch) (values[field.key] == "true").toString() else values[field.key].orEmpty().trim()
                 })
-            }) { Text("Save") }
+            }) { Text(stringResource(R.string.settings_save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_cancel)) } }
     )
 }
 

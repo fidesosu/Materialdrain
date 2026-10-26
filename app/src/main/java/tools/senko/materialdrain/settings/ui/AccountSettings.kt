@@ -99,6 +99,8 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Currency
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** Where pixeldrain lets the password, two-factor authentication, the e-mail addresses and deleting the account be changed. */
 internal const val WEBSITE_SETTINGS_URL = "https://pixeldrain.com/user/settings"
@@ -126,23 +128,23 @@ fun SettingsEnvironment.AccountPage() {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         if (!state.hasKey) {
             SignedOutHero()
-            AccountCard(title = "Log in") { Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { LoginSection() } }
-            AccountCard(title = "Or use an API key") { Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { ApiKeySection() } }
+            AccountCard(title = stringResource(R.string.settings_log_in)) { Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { LoginSection() } }
+            AccountCard(title = stringResource(R.string.settings_or_use_an_api_key)) { Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { ApiKeySection() } }
             return@Column
         }
 
         when (val user = state.user) {
             Loadable.Loading -> Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            is Loadable.Failed -> AccountCard(title = "Your account") {
+            is Loadable.Failed -> AccountCard(title = stringResource(R.string.settings_your_account)) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Text(user.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-                    OutlinedButton(onClick = { accountViewModel.refresh() }) { Text("Try again") }
+                    OutlinedButton(onClick = { accountViewModel.refresh() }) { Text(stringResource(R.string.media_try_again)) }
                 }
             }
             is Loadable.Loaded -> {
                 AccountHero(user.data, onRefresh = { accountViewModel.refresh() })
                 if (!user.data.canUpload) {
-                    WarningBanner("Verify an e-mail address to upload.")
+                    WarningBanner(stringResource(R.string.settings_verify_an_e_mail_address))
                 }
                 UsageCard(user.data)
                 StatisticsCard(state, accountViewModel)
@@ -154,7 +156,7 @@ fun SettingsEnvironment.AccountPage() {
                 ActivityCard(state, accountViewModel)
             }
         }
-        AccountCard(title = "This device") { Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { DeviceSection() } }
+        AccountCard(title = stringResource(R.string.settings_this_device)) { Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { DeviceSection() } }
         if (state.user is Loadable.Loaded) DangerCard()
     }
 }
@@ -167,10 +169,10 @@ private fun SignedOutHero() {
     HeroSurface {
         Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(64.dp))
         Spacer(Modifier.height(12.dp))
-        Text("Your pixeldrain account", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        Text(stringResource(R.string.settings_your_pixeldrain_account), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
         Spacer(Modifier.height(4.dp))
         Text(
-            "Log in to see storage, statistics and billing.",
+            stringResource(R.string.settings_log_in_to_see_storage),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
         )
@@ -198,14 +200,14 @@ private fun AccountHero(user: UserInfo, onRefresh: () -> Unit) {
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.onPrimaryContainer.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-            IconButton(onClick = onRefresh) { Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = colors.onPrimaryContainer) }
+            IconButton(onClick = onRefresh) { Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.settings_refresh), tint = colors.onPrimaryContainer) }
         }
         Spacer(Modifier.height(12.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            HeroTag(user.subscription.name.ifBlank { "Free" })
-            HeroTag(if (user.otpEnabled) "Two-factor on" else "Two-factor off")
-            if (user.emailAddressPending.isNotBlank()) HeroTag("E-mail waiting for verification")
-            if (user.isAdmin) HeroTag("Admin")
+            HeroTag(user.subscription.name.ifBlank { stringResource(R.string.settings_free) })
+            HeroTag(if (user.otpEnabled) stringResource(R.string.settings_two_factor_on) else stringResource(R.string.settings_two_factor_off))
+            if (user.emailAddressPending.isNotBlank()) HeroTag(stringResource(R.string.settings_e_mail_waiting_for_verification))
+            if (user.isAdmin) HeroTag(stringResource(R.string.settings_admin))
         }
     }
 }
@@ -231,11 +233,11 @@ private fun AvatarButton(user: UserInfo, avatar: AvatarState) {
                 .size(AvatarSize)
                 .clip(AvatarShape)
                 .background(colors.primary)
-                .clickable(onClickLabel = "Change picture") { menuOpen = true }
+                .clickable(onClickLabel = stringResource(R.string.settings_change_picture)) { menuOpen = true }
         ) {
             val picture = avatar.picture
             if (picture != null) {
-                AvatarPictureView(picture, contentDescription = "Your picture", modifier = Modifier.size(AvatarSize))
+                AvatarPictureView(picture, contentDescription = stringResource(R.string.settings_your_picture), modifier = Modifier.size(AvatarSize))
             } else {
                 Text(user.username.firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.headlineMedium, color = colors.onPrimary)
             }
@@ -256,13 +258,13 @@ private fun AvatarButton(user: UserInfo, avatar: AvatarState) {
         }
         AppMenu(expanded = menuOpen, onDismiss = { menuOpen = false }) {
             Text(
-                "Only kept on this device",
+                stringResource(R.string.settings_only_kept_on_this_device),
                 style = MaterialTheme.typography.labelMedium,
                 color = colors.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
             )
             AppMenuItem(
-                text = "Choose a picture",
+                text = stringResource(R.string.settings_choose_a_picture),
                 leadingIcon = Icons.Filled.Image,
                 onClick = {
                     menuOpen = false
@@ -270,9 +272,9 @@ private fun AvatarButton(user: UserInfo, avatar: AvatarState) {
                 }
             )
             if (avatar.picture != null) {
-                AppMenuItem(text = "Adjust crop", leadingIcon = Icons.Filled.Crop, onClick = { menuOpen = false; avatar.recrop() })
+                AppMenuItem(text = stringResource(R.string.settings_adjust_crop), leadingIcon = Icons.Filled.Crop, onClick = { menuOpen = false; avatar.recrop() })
                 AppMenuDivider()
-                AppMenuItem(text = "Remove picture", leadingIcon = Icons.Filled.Delete, destructive = true, onClick = { menuOpen = false; avatar.remove() })
+                AppMenuItem(text = stringResource(R.string.settings_remove_picture), leadingIcon = Icons.Filled.Delete, destructive = true, onClick = { menuOpen = false; avatar.remove() })
             }
         }
     }
@@ -323,7 +325,7 @@ internal fun SettingsEnvironment.AccountTile(onOpen: () -> Unit) {
             .fillMaxWidth()
             .clip(AccountCardShape)
             .background(colors.surfaceContainerLow)
-            .clickable(onClickLabel = "Open your account", onClick = onOpen)
+            .clickable(onClickLabel = stringResource(R.string.settings_open_your_account), onClick = onOpen)
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -342,21 +344,21 @@ internal fun SettingsEnvironment.AccountTile(onOpen: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 val title = when {
                     user != null -> user.username
-                    state.hasKey -> "Your account"
-                    else -> "Log in to pixeldrain"
+                    state.hasKey -> stringResource(R.string.settings_your_account)
+                    else -> stringResource(R.string.settings_log_in_to_pixeldrain)
                 }
                 Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val line = when {
-                    user != null -> user.emailAddresses.firstOrNull() ?: "No e-mail address"
-                    state.user is Loadable.Failed -> "Couldn't load the account"
-                    state.hasKey -> "Loading…"
-                    else -> "To see your storage, statistics and billing"
+                    user != null -> user.emailAddresses.firstOrNull() ?: stringResource(R.string.settings_no_e_mail_address)
+                    state.user is Loadable.Failed -> stringResource(R.string.settings_couldn_t_load_the_account)
+                    state.hasKey -> stringResource(R.string.settings_loading)
+                    else -> stringResource(R.string.settings_to_see_your_storage_statistics)
                 }
                 Text(line, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (user != null) {
                 Text(
-                    user.subscription.name.ifBlank { "Free" },
+                    user.subscription.name.ifBlank { stringResource(R.string.settings_free) },
                     style = MaterialTheme.typography.labelMedium,
                     color = colors.onSecondaryContainer,
                     maxLines = 1,
@@ -373,9 +375,9 @@ internal fun SettingsEnvironment.AccountTile(onOpen: () -> Unit) {
             val plan = user.subscription
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                TileMeter("Storage", user.storageSpaceUsed, plan.storageSpace, Modifier.weight(1f))
+                TileMeter(stringResource(R.string.browser_storage), user.storageSpaceUsed, plan.storageSpace, Modifier.weight(1f))
                 // The account's own cap when it set one, else the plan's (as on the account's page)
-                TileMeter("Transfer", user.monthlyTransferUsed, user.monthlyTransferCap.takeIf { it > 0 } ?: plan.monthlyTransferCap, Modifier.weight(1f))
+                TileMeter(stringResource(R.string.settings_transfer), user.monthlyTransferUsed, user.monthlyTransferCap.takeIf { it > 0 } ?: plan.monthlyTransferCap, Modifier.weight(1f))
             }
             Spacer(Modifier.height(8.dp))
             val numbers = NumberFormat.getIntegerInstance()
@@ -453,21 +455,21 @@ internal fun WarningBanner(message: String) {
 @Composable
 private fun UsageCard(user: UserInfo) {
     val plan = user.subscription
-    AccountCard(title = "Storage and transfer") {
+    AccountCard(title = stringResource(R.string.settings_storage_and_transfer)) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            UsageMeter("Files", user.storageSpaceUsed, plan.storageSpace)
+            UsageMeter(stringResource(R.string.settings_files), user.storageSpaceUsed, plan.storageSpace)
             if (plan.filesystemAccess || user.filesystemStorageUsed > 0) {
-                UsageMeter("Filesystem", user.filesystemStorageUsed, plan.filesystemStorageLimit)
+                UsageMeter(stringResource(R.string.files_filesystem), user.filesystemStorageUsed, plan.filesystemStorageLimit)
             }
             // The account's own cap when it set one, else the plan's
             val cap = user.monthlyTransferCap.takeIf { it > 0 } ?: plan.monthlyTransferCap
-            UsageMeter("Transfer this month", user.monthlyTransferUsed, cap)
+            UsageMeter(stringResource(R.string.settings_transfer_this_month), user.monthlyTransferUsed, cap)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp)) {
             val numbers = NumberFormat.getIntegerInstance()
-            CountTile(Icons.AutoMirrored.Filled.InsertDriveFile, numbers.format(user.fileCount), "Files")
-            CountTile(Icons.Filled.Folder, numbers.format(user.filesystemNodeCount), "In filesystem")
-            CountTile(Icons.Filled.AccountBalanceWallet, formatEuro(user.balanceMicroEur), "Credit")
+            CountTile(Icons.AutoMirrored.Filled.InsertDriveFile, numbers.format(user.fileCount), stringResource(R.string.settings_files))
+            CountTile(Icons.Filled.Folder, numbers.format(user.filesystemNodeCount), stringResource(R.string.settings_in_filesystem))
+            CountTile(Icons.Filled.AccountBalanceWallet, formatEuro(user.balanceMicroEur), stringResource(R.string.settings_credit))
         }
     }
 }
@@ -479,7 +481,7 @@ private fun UsageMeter(label: String, used: Long, limit: Long) {
         Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.fillMaxWidth()) {
             Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             Text(
-                if (limit > 0) "${formatSize(used)} of ${formatSize(limit)}" else "${formatSize(used)} · no limit",
+                if (limit > 0) "${formatSize(used)} of ${formatSize(limit)}" else stringResource(R.string.settings_no_limit_2, formatSize(used)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -524,22 +526,22 @@ private fun SettingsEnvironment.DeviceSection() {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         when (authState.activeSource) {
             ApiKeySource.LOGIN -> {
-                AccountRow(Icons.Filled.Smartphone, "Logged in as", authState.loggedInUser.orEmpty(), padded = false) {
+                AccountRow(Icons.Filled.Smartphone, stringResource(R.string.settings_logged_in_as), authState.loggedInUser.orEmpty(), padded = false) {
                     OutlinedButton(onClick = { authViewModel.logout() }, enabled = !authState.isBusy) {
-                        if (authState.isBusy) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) else Text("Log out")
+                        if (authState.isBusy) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) else Text(stringResource(R.string.settings_log_out))
                     }
                 }
                 ApiKeySection(showMessages = true)
             }
             ApiKeySource.MANUAL -> {
-                AccountRow(Icons.Filled.Key, "Signed in with", "An API key", padded = false)
+                AccountRow(Icons.Filled.Key, stringResource(R.string.settings_signed_in_with), stringResource(R.string.settings_an_api_key), padded = false)
                 // The login form under it shows the messages
                 ApiKeySection()
-                Text("Or log in", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
+                Text(stringResource(R.string.settings_or_log_in), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
                 LoginSection()
             }
             // Logged out, the login and the API key have cards of their own (see AccountPage)
-            ApiKeySource.NONE -> Text("Not signed in.", style = MaterialTheme.typography.bodyMedium)
+            ApiKeySource.NONE -> Text(stringResource(R.string.settings_not_signed_in), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -567,7 +569,7 @@ fun SettingsEnvironment.LoginSection() {
         OutlinedTextField(
             value = username,
             onValueChange = { username = it },
-            label = { Text("Username or e-mail address") },
+            label = { Text(stringResource(R.string.settings_username_or_e_mail_address)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
@@ -576,7 +578,7 @@ fun SettingsEnvironment.LoginSection() {
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Password") },
+            label = { Text(stringResource(R.string.settings_password)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
@@ -590,7 +592,7 @@ fun SettingsEnvironment.LoginSection() {
             OutlinedTextField(
                 value = totp,
                 onValueChange = { totp = it.filter { c -> c.isDigit() }.take(6) },
-                label = { Text("One-time password (2FA)") },
+                label = { Text(stringResource(R.string.settings_one_time_password_2fa)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
@@ -603,12 +605,12 @@ fun SettingsEnvironment.LoginSection() {
                 enabled = canSubmit && password.isNotEmpty(),
                 modifier = Modifier.weight(1f)
             ) {
-                if (authState.isBusy) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) else Text("Log in")
+                if (authState.isBusy) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) else Text(stringResource(R.string.settings_log_in))
             }
             TextButton(
                 onClick = { authViewModel.login(username, "", "") },
                 enabled = canSubmit
-            ) { Text("E-mail me a login link") }
+            ) { Text(stringResource(R.string.settings_e_mail_me_a_login)) }
         }
 
         if (authState.loginLinkSent) {
@@ -616,7 +618,7 @@ fun SettingsEnvironment.LoginSection() {
             OutlinedTextField(
                 value = pastedLink,
                 onValueChange = { pastedLink = it },
-                label = { Text("Login link from the e-mail") },
+                label = { Text(stringResource(R.string.settings_login_link_from_the_e)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -625,7 +627,7 @@ fun SettingsEnvironment.LoginSection() {
                 onClick = { authViewModel.completeLinkLogin(username, pastedLink, password, totp) },
                 enabled = canSubmit && pastedLink.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Finish login") }
+            ) { Text(stringResource(R.string.settings_finish_login)) }
         }
         AuthMessages()
     }
@@ -640,20 +642,20 @@ fun SettingsEnvironment.ApiKeySection(showMessages: Boolean = false) {
             OutlinedTextField(
                 value = apiKeyInput,
                 onValueChange = { onApiKeyInputChange(it) },
-                label = { Text("Pixeldrain API key") },
+                label = { Text(stringResource(R.string.settings_pixeldrain_api_key)) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace)
             )
-            OutlinedButton(onClick = { authViewModel.saveApiKey(apiKeyInput) }) { Text("Save") }
+            OutlinedButton(onClick = { authViewModel.saveApiKey(apiKeyInput) }) { Text(stringResource(R.string.settings_save)) }
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = when (authState.activeSource) {
-                ApiKeySource.LOGIN -> "Used after you log out."
-                ApiKeySource.MANUAL -> "Logging in overrides it."
-                ApiKeySource.NONE -> "Make one on pixeldrain.com under API keys."
+                ApiKeySource.LOGIN -> stringResource(R.string.settings_used_after_you_log_out)
+                ApiKeySource.MANUAL -> stringResource(R.string.settings_logging_in_overrides_it)
+                ApiKeySource.NONE -> stringResource(R.string.settings_make_one_on_pixeldrain_com)
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -815,7 +817,7 @@ internal fun <T> LoadableRows(loadable: Loadable<T>, content: @Composable (T) ->
                 color = if (loadable.websiteOnly) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                 modifier = Modifier.weight(1f)
             )
-            if (loadable.websiteOnly) WebsiteLink(WEBSITE_SETTINGS_URL, "This")
+            if (loadable.websiteOnly) WebsiteLink(WEBSITE_SETTINGS_URL, stringResource(R.string.settings_this))
         }
         is Loadable.Loaded -> content(loadable.data)
     }
@@ -830,16 +832,16 @@ internal fun WebsiteLink(url: String, what: String) {
     val context = LocalContext.current
     var asking by remember { mutableStateOf(false) }
     IconButton(onClick = { asking = true }) {
-        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "$what, on pixeldrain.com", tint = MaterialTheme.colorScheme.primary)
+        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = stringResource(R.string.settings_on_pixeldrain_com_2, what), tint = MaterialTheme.colorScheme.primary)
     }
     if (asking) {
         AlertDialog(
             onDismissRequest = { asking = false },
             icon = { Icon(Icons.Filled.Language, contentDescription = null) },
-            title = { Text("Open pixeldrain.com?") },
+            title = { Text(stringResource(R.string.settings_open_pixeldrain_com)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("$what can only be done on the website. Opens")
+                    Text(stringResource(R.string.settings_can_only_be_done_on, what))
                     Text(
                         url.removePrefix("https://"),
                         style = MaterialTheme.typography.bodyLarge,
@@ -848,8 +850,8 @@ internal fun WebsiteLink(url: String, what: String) {
                     )
                 }
             },
-            confirmButton = { Button(onClick = { asking = false; openLink(context, url) }) { Text("Open") } },
-            dismissButton = { TextButton(onClick = { asking = false }) { Text("Cancel") } }
+            confirmButton = { Button(onClick = { asking = false; openLink(context, url) }) { Text(stringResource(R.string.browser_open)) } },
+            dismissButton = { TextButton(onClick = { asking = false }) { Text(stringResource(R.string.browser_cancel)) } }
         )
     }
 }
@@ -860,11 +862,11 @@ internal fun MonthSwitcher(month: YearMonth, onChange: (YearMonth) -> Unit) {
     val isCurrent = !month.isBefore(YearMonth.now(ZoneOffset.UTC))
     Row(verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = { onChange(month.minusMonths(1)) }) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Month before")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.settings_month_before))
         }
         Text(month.format(MonthFormat), style = MaterialTheme.typography.labelLarge)
         IconButton(onClick = { onChange(month.plusMonths(1)) }, enabled = !isCurrent) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Month after")
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.settings_month_after))
         }
     }
 }
