@@ -73,10 +73,6 @@ class FakePixeldrain : Interceptor {
     /** The Range header of each request which had one, for tests of downloads going on (see DownloadRetryTest). */
     val ranges: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
 
-    /** How long the lists of files (the account's, a folder's) take to come, as on a slow connection (see PlaceholderTest). */
-    @Volatile
-    var listDelayMs = 0L
-
     /** Whether the host answers a range with the whole file, as some hosts do (see DocumentsProviderTest). */
     @Volatile
     var ignoreRanges = false
@@ -91,9 +87,6 @@ class FakePixeldrain : Interceptor {
         requests += url.encodedPath
         Log.v(TAG, "asked: ${request.method} $url ${request.header("Range").orEmpty()}")
         request.header("Range")?.let { ranges += it }
-        if (listDelayMs > 0 && (url.encodedPath == "/api/user/files" || (url.encodedPath.startsWith("/api/filesystem") && url.query == "stat"))) {
-            Thread.sleep(listDelayMs)
-        }
         val path = url.encodedPathSegments.map { java.net.URLDecoder.decode(it, "UTF-8") }
         val api = if (path.firstOrNull() == "api") path.drop(1) else null
         val answer: Answer? = when {
