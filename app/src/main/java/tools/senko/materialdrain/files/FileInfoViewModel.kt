@@ -2,7 +2,6 @@ package tools.senko.materialdrain.files
 
 import tools.senko.materialdrain.provider.api.ErrorCodes
 import android.app.Application
-import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -58,22 +57,6 @@ private const val MAX_TEXT_PREVIEW_DISPLAY_LENGTH = 8 * 1024 // 8KB
 internal const val MAX_TEXT_LOAD_ANYWAY_BYTES = 16 * 1024 * 1024
 private const val API_KEY_MISSING = "Log in or add an API key in Settings."
 
-
-/** Identifies a node in the app: its file id, or its path when it has no id (the filesystem). */
-val StorageNode.key: String get() = ref.id ?: ref.path
-
-/**
- * The type which decides how a file is previewed. Some hosts list files without a useful type (the filesystem can
- * give a blank or generic one), so a missing or generic type is worked out from the file extension instead.
- */
-fun StorageNode.previewMimeType(): String? {
-    val reported = mimeType?.takeIf { it.isNotBlank() && it != "application/octet-stream" }
-    if (reported != null) return reported
-    val extension = name.substringAfterLast('.', "").lowercase()
-    if (extension.isEmpty()) return mimeType
-    return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: mimeType
-}
-
 /** Passes at most [limit] bytes on to [target]: writing more stops the copy with an IOException, and sets [overflowed]. */
 private class LimitedOutputStream(target: OutputStream, private val limit: Long) : FilterOutputStream(target) {
     @Volatile
@@ -105,104 +88,11 @@ private class LimitedOutputStream(target: OutputStream, private val limit: Long)
 private const val PDF_CACHE_FOLDER = "pdf-preview"
 private const val PDF_CACHE_KEPT = 5
 
-/** The folder [inside] of the [archive], and its entries once they've loaded. */
-data class ArchiveView(val archive: StorageRef, val inside: String, val entries: List<StorageNode>?, val error: String?)
-
-/** Archives which can be looked inside from the file details (see ArchiveOps). */
-private val ARCHIVE_EXTENSIONS = setOf("zip", "7z", "rar", "tar", "tgz", "apk")
-
-/** Image formats whose thumbnails are made on the device rather than by the host (see FileInfoViewModel.thumbnailFor). */
-private val DEVICE_THUMBNAIL_EXTENSIONS = setOf("heic", "heif", "avif")
-
-fun isArchiveName(name: String): Boolean = name.substringAfterLast('.', "").lowercase() in ARCHIVE_EXTENSIONS
-
-/** Whether a file is a PDF, by its type or (when the host doesn't say) its name. */
-fun isPdf(name: String, mimeType: String?): Boolean =
-    mimeType == "application/pdf" || name.substringAfterLast('.', "").equals("pdf", ignoreCase = true)
-
-/**
- * The kinds of file the fullscreen view has, which a swipe there stays within (see FileInfoViewModel.openNeighbour), so
- * it goes from one to the next of what's viewed alike: pictures, videos and songs; texts and PDFs. Anything else has no
- * fullscreen view.
- */
-enum class FileGroup { MEDIA, DOCUMENT, OTHER }
-
-/** The [FileGroup] of a file, by its name and type (see previewMimeType). */
-fun fileGroup(name: String, mimeType: String?): FileGroup = when {
-    mimeType != null && listOf("image/", "video/", "audio/").any { mimeType.startsWith(it) } -> FileGroup.MEDIA
-    isPdf(name, mimeType) || isTextFile(name, mimeType) -> FileGroup.DOCUMENT
-    else -> FileGroup.OTHER
-}
-
 /** The most of a PDF that's loaded for its preview: Android draws the pages from a whole file on the device. */
 internal const val MAX_PDF_PREVIEW_BYTES = 64L * 1024 * 1024
 
 /** The most of a PDF that's loaded without being asked for: a bigger one waits for a tap (see PdfPreviewState.Large). */
 private const val MAX_PDF_AUTO_LOAD_BYTES = 16L * 1024 * 1024
-
-/**
- * A PDF's preview: too big to load without being asked for, loading into the app's cache, ready to be drawn from [file],
- * or why it can't be shown.
- */
-sealed interface PdfPreviewState {
-    data class Large(val totalBytes: Long) : PdfPreviewState
-    data class Loading(val loadedBytes: Long, val totalBytes: Long?) : PdfPreviewState
-    data class Ready(val file: File) : PdfPreviewState
-    data class Failed(val message: String) : PdfPreviewState
-}
-
-data class FileInfoUiState(
-    // For single file info
-    val isLoadingFileInfo: Boolean = false,
-    // Shown from a list's entry after a swipe, while the host's full details of it are on their way (see completeFileInfo):
-    // its counts (views, downloads) are the list's until then, which may be older
-    val fileInfoCompleting: Boolean = false,
-    val fileInfo: StorageNode? = null,
-    val fileInfoErrorMessage: String? = null,
-
-    // For text preview
-    val isLoadingTextPreview: Boolean = false,
-    val textPreviewContent: String? = null,
-    // The whole text the preview was made from (up to the fetch limit), for the fullscreen view
-    val textPreviewFullContent: String? = null,
-    val textPreviewErrorMessage: String? = null,
-    // The text is too big for the preview but can be loaded anyway, up to a bigger limit (see loadWholeText)
-    val textPreviewCanLoadAnyway: Boolean = false,
-
-    // For user's list of files
-    val userFilesList: List<StorageNode> = emptyList(),
-    val isLoadingUserFiles: Boolean = false,
-    val userFilesListErrorMessage: String? = null,
-
-    // For file deletion (its outcome goes to the snackbar, see UiMessages)
-    val isLoadingDeleteFile: Boolean = false,
-    val initiateDeleteFile: Boolean = false,
-    val fileIdToDelete: String? = null,
-    val nodeToDelete: StorageNode? = null,
-
-    val apiKeyMissingError: Boolean = false,
-    val apiKey: String = "", // Exposed API Key, only the built-in Pixeldrain uses it
-
-    // Filtering state
-    val filterQuery: String = "",
-    val showFilterInput: Boolean = false,
-
-    // The contents of an archive shown in the file details, see loadArchive
-    val archive: ArchiveView? = null,
-
-    // The data saver holds the preview back (see DataSaver): nothing of it is loaded until loadPreview
-    val previewHeld: Boolean = false,
-
-    // A PDF's preview, see fetchPdfPreview
-    val pdfPreview: PdfPreviewState? = null,
-
-    // Scroll state preservation
-    val shouldPreserveScrollPosition: Boolean = false,
-
-    // An action on several files at once (delete, add to filesystem, create list) is running; its outcome goes to the
-    // snackbar, as does the outcome of a download (see UiMessages)
-    val isBulkOperationRunning: Boolean = false
-)
 
 /**
  * The file details, the files of the account and the actions on them (download, delete, filesystem, lists),
