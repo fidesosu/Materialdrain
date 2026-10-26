@@ -211,6 +211,16 @@ class AppDriver {
     }
 
     /** The picture in a file's details (above its name [title]), fullscreen. */
+    /**
+     * Opens the song [name] (in the folder that's open) and plays it, or leaves it playing: the player goes on in the
+     * background from a test before.
+     */
+    fun playSong(name: String) {
+        openFile(name, By.desc(java.util.regex.Pattern.compile("Play|Pause")))
+        if (shows(By.desc("Play"), 500)) tapDesc("Play")
+        find(By.desc("Pause"), "playing")
+    }
+
     fun openFullscreenPicture(title: String) {
         val bounds = find(By.text(title), "name").visibleBounds
         device.click(device.displayWidth / 2, bounds.top - 250)

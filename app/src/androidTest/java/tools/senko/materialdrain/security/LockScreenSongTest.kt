@@ -41,10 +41,7 @@ class LockScreenSongTest {
     private fun playThenLockTheDevice(appLock: Boolean, picture: String) {
         app.start { setBackgroundAudio(true) }
         app.openFolder("Music")
-        // It may play on from the test before: the player goes on in the background
-        app.openFile("Night drive.mp3", By.desc(java.util.regex.Pattern.compile("Play|Pause")))
-        if (app.shows(By.desc("Play"), 500)) app.tapDesc("Play")
-        app.find(By.desc("Pause"), "playing")
+        app.playSong("Night drive.mp3")
         app.settings.setBiometricLock(appLock)
         app.device.pressHome()
         Screenshots.shell("input keyevent KEYCODE_SLEEP")

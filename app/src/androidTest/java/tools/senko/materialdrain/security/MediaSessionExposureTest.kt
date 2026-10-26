@@ -1,7 +1,6 @@
 package tools.senko.materialdrain.security
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.uiautomator.By
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assume.assumeTrue
@@ -34,9 +33,7 @@ class MediaSessionExposureTest {
         assumeTrue("The probe app isn't installed", Screenshots.shell("pm list packages probe.media").contains("probe.media"))
         app.start { setBackgroundAudio(true) }
         app.openFolder("Music")
-        app.openFile("Night drive.mp3", By.desc("Play"))
-        app.tapDesc("Play")
-        app.find(By.desc("Pause"), "playing")
+        app.playSong("Night drive.mp3")
 
         Screenshots.shell("logcat -c")
         Screenshots.shell("am start -W -n $PROBE")
