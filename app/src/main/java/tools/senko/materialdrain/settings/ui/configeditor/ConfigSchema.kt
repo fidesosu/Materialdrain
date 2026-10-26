@@ -9,7 +9,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import tools.senko.materialdrain.R
 
 /*
@@ -487,7 +487,7 @@ fun JsonElement.displayText(): String = when (this) {
 /** The config editor's schema in the app's language: made once, and again when the configuration changes. */
 @Composable
 fun configSchema(): ConfigSchema {
-    val resources = LocalContext.current.resources
+    val resources = LocalResources.current
     val configuration = LocalConfiguration.current
     return remember(configuration) { ConfigSchema(resources) }
 }

@@ -48,6 +48,7 @@ class AppContainer private constructor(application: Application) {
 
     /** Checks and applies updates of configs that have an update URL. */
     val providerUpdater = ProviderUpdater(
+        resources = application.resources,
         store = providerConfigStore,
         baseClient = okHttpClient,
         appVersion = application.packageManager.getPackageInfo(application.packageName, 0).longVersionCode.toInt()

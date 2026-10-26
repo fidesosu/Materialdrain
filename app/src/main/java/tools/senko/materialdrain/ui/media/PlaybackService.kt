@@ -63,6 +63,7 @@ import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import tools.senko.materialdrain.R
 
 /**
  * The player of songs which go on in the background (the Media setting "Play songs in the background"): it outlives the
@@ -142,7 +143,7 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         val exoPlayer = createPlayer(this, isVideo = false)
-        val player = LockScreenPrivatePlayer(ReshufflingPlayer(exoPlayer)).also { player = it }
+        val player = LockScreenPrivatePlayer(ReshufflingPlayer(exoPlayer), getString(R.string.app_name), getString(R.string.media_playing)).also { player = it }
         session = MediaSession.Builder(this, player)
             .setBitmapLoader(CoverBitmapLoader(this, scope))
             .setCallback(object : MediaSession.Callback {
@@ -226,7 +227,7 @@ class PlaybackService : MediaSessionService() {
  * that changes, as for a song's metadata changing.
  */
 @UnstableApi
-private class LockScreenPrivatePlayer(player: Player) : ForwardingPlayer(player) {
+private class LockScreenPrivatePlayer(player: Player, hiddenTitle: String, hiddenArtist: String) : ForwardingPlayer(player) {
     private val listeners = mutableListOf<Player.Listener>()
 
     var hidden = false
@@ -256,9 +257,8 @@ private class LockScreenPrivatePlayer(player: Player) : ForwardingPlayer(player)
     override fun getCurrentMediaItem(): MediaItem? =
         super.getCurrentMediaItem()?.let { if (hidden) it.buildUpon().setMediaMetadata(HIDDEN_METADATA).build() else it }
 
-    private companion object {
-        val HIDDEN_METADATA: MediaMetadata = MediaMetadata.Builder().setTitle("Materialdrain").setArtist("Playing").build()
-    }
+    /** What plays while it's hidden: the app's name, and that something plays */
+    private val HIDDEN_METADATA: MediaMetadata = MediaMetadata.Builder().setTitle(hiddenTitle).setArtist(hiddenArtist).build()
 }
 
 /**

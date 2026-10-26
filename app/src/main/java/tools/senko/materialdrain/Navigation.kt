@@ -63,19 +63,26 @@ import tools.senko.materialdrain.ui.HapticPlace
 import tools.senko.materialdrain.ui.LocalAppHaptics
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import tools.senko.materialdrain.R
 
 /** The screens of the app. [icon] is null for the one that isn't reached from the navigation, a file's details. */
-enum class Screen(val title: String, private val iconOf: (() -> ImageVector)?) {
-    Upload("Upload", { Symbols.Upload }),
-    Files("Files", { Symbols.Folder }),
-    Filesystem("Filesystem", { Symbols.HardDrive }),
-    FileDetail("File Details", null),
-    Lists("Lists", { Symbols.Lists }),
-    Settings("Settings", { Symbols.Settings });
+enum class Screen(@StringRes val titleRes: Int, private val iconOf: (() -> ImageVector)?) {
+    Upload(R.string.upload_upload, { Symbols.Upload }),
+    Files(R.string.settings_files, { Symbols.Folder }),
+    Filesystem(R.string.files_filesystem, { Symbols.HardDrive }),
+    FileDetail(R.string.screen_file_details, null),
+    Lists(R.string.screen_lists, { Symbols.Lists }),
+    Settings(R.string.browser_settings, { Symbols.Settings });
 
     // Looked up when asked for, so the enum doesn't build its icons when it's first touched
     val icon: ImageVector? get() = iconOf?.invoke()
 }
+
+/** The screen's name in the app's language. */
+val Screen.title: String
+    @Composable get() = stringResource(titleRes)
 
 /** [HostScreen] is provider-api's own (it can't reference [Screen], which lives in the app module); this is the
  * one place the two are matched up. */
@@ -95,7 +102,8 @@ data class Tab(val screen: Screen, val config: ScreenConfig? = null) {
     val id: String get() = config?.tabId ?: screen.name.lowercase()
 
     /** Its own name from the config, or the screen's. */
-    val title: String get() = config?.name?.takeIf { it.isNotBlank() } ?: screen.title
+    val title: String
+        @Composable get() = config?.name?.takeIf { it.isNotBlank() } ?: screen.title
 
     /** Its own icon from the config (see [TabIcons]), or the screen's. */
     val icon: ImageVector get() = config?.icon?.let { TabIcons[it.trim().lowercase()] } ?: requireNotNull(screen.icon)
@@ -307,6 +315,7 @@ private fun StripDot(tab: Tab, selected: Boolean, onClick: () -> Unit) {
         if (reduceMotion) snap() else tween(DOT_FADE_MILLIS),
         label = "stripDotColor"
     )
+    val title = tab.title
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
@@ -315,10 +324,10 @@ private fun StripDot(tab: Tab, selected: Boolean, onClick: () -> Unit) {
                 interactionSource = null,
                 indication = null,
                 role = Role.Tab,
-                onClickLabel = tab.title,
+                onClickLabel = title,
                 onClick = onClick
             )
-            .semantics { this.selected = selected; contentDescription = tab.title }
+            .semantics { this.selected = selected; contentDescription = title }
     ) {
         Box(
             modifier = Modifier

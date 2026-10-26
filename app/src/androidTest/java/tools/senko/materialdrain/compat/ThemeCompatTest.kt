@@ -15,6 +15,7 @@ import tools.senko.materialdrain.screenshots.AppDriver
 import tools.senko.materialdrain.screenshots.Screenshots
 import tools.senko.materialdrain.ui.theme.ThemeColorPresets
 import tools.senko.materialdrain.ui.theme.ThemeMode
+import tools.senko.materialdrain.R
 
 /**
  * The theme on this device's Android version (run on each, see app/build/compat/<api>): the main screens with the system
@@ -96,7 +97,7 @@ class ThemeCompatTest {
             setThemeMode(ThemeMode.DARK)
             setBlackBackground(true)
             setWallpaperColors(false)
-            setThemeColor(ThemeColorPresets.first { it.first == "Teal" }.second)
+            setThemeColor(ThemeColorPresets.first { it.first == R.string.theme_teal }.second)
         }
         tour("black-teal")
     }

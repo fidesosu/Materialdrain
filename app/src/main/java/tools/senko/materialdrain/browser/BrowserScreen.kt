@@ -44,6 +44,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.delay
 import tools.senko.materialdrain.files.FileActionDialogs
@@ -71,6 +72,7 @@ import tools.senko.materialdrain.filesystem.FilesystemUiState
 import tools.senko.materialdrain.ui.components.TextInputDialog
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import android.content.res.Resources
 
 private const val LOADING_INDICATOR_DELAY_MS = 400L
 private const val LOADING_START_GRACE_MS = 1500L
@@ -126,7 +128,7 @@ fun BrowserScreen(
     onBottomBarChange: (Boolean) -> Unit = {}
 ) {
     // The app's texts, for those its callbacks show
-    val res = LocalContext.current.resources
+    val res = LocalResources.current
     val fsState by filesystemViewModel.uiState.collectAsState()
     val fsDisplayedChildren by filesystemViewModel.displayedChildren.collectAsState()
     val fileState by fileInfoViewModel.uiState.collectAsState()
@@ -140,7 +142,7 @@ fun BrowserScreen(
     val downloads = fileInfoViewModel.downloads.collectAsState()
     val downloading by remember(fileInfoViewModel) { derivedStateOf { downloads.value.isDownloading } }
     val fsUploadProgress = filesystemViewModel.uploadProgress.collectAsState()
-    val fsUploadStatus by remember(filesystemViewModel) { derivedStateOf { fsUploadProgress.value?.statusLine() } }
+    val fsUploadStatus by remember(filesystemViewModel) { derivedStateOf { fsUploadProgress.value?.statusLine(res) } }
 
     // The sort order: shared by every sortable list in the app (see AppSettings.sortField)
     val sortField by appSettings.sortField.collectAsState()
@@ -356,7 +358,7 @@ fun BrowserScreen(
             title = stringResource(R.string.browser_delete_items, selectedEntries.size),
             text = (if (folderCount > 0) stringResource(R.string.browser_folders_are_deleted_with_everything) else "") +
                 stringResource(R.string.browser_this_can_t_be_undone) +
-                (if (selectedEntries.any { it.isSearchIndex() }) "\n\n$SEARCH_INDEX_DELETE_WARNING" else ""),
+                (if (selectedEntries.any { it.isSearchIndex() }) "\n\n" + res.getString(SEARCH_INDEX_DELETE_WARNING) else ""),
             confirmLabel = stringResource(R.string.browser_delete),
             isDestructive = true,
             onConfirm = {
@@ -371,7 +373,7 @@ fun BrowserScreen(
         ConfirmDialog(
             title = if (entry.isSearchIndex()) stringResource(R.string.browser_delete_the_search_index) else if (entry.isDirectory) stringResource(R.string.browser_delete_folder) else stringResource(R.string.browser_delete_file),
             text = if (entry.isSearchIndex()) {
-                SEARCH_INDEX_DELETE_WARNING
+                res.getString(SEARCH_INDEX_DELETE_WARNING)
             } else if (entry.isDirectory) {
                 stringResource(R.string.browser_and_everything_inside_it_will, entry.name)
             } else {
@@ -514,7 +516,7 @@ fun BrowserScreen(
             if (single != null && !single.isDirectory) {
                 add(SelectionAction(stringResource(R.string.browser_download), Icons.Filled.Download, { fileInfoViewModel.initiateDownloadFile(single); exitSelection() }))
             } else {
-                add(downloadChoices(enabled = selectedEntries.isNotEmpty()) { style ->
+                add(downloadChoices(res, enabled = selectedEntries.isNotEmpty()) { style ->
                     fileInfoViewModel.downloadItems(selectedEntries, style, single?.name ?: folderName)
                     exitSelection()
                 })
@@ -530,7 +532,7 @@ fun BrowserScreen(
             if (files.size <= 1) {
                 add(SelectionAction(stringResource(R.string.browser_download), Icons.Filled.Download, { fileInfoViewModel.downloadFilesSequentially(files); exitSelection() }, enabled = files.isNotEmpty()))
             } else {
-                add(downloadChoices(enabled = true) { style ->
+                add(downloadChoices(res, enabled = true) { style ->
                     if (style == DownloadStyle.ZIP) fileInfoViewModel.downloadFilesAsZip(files, openedList?.title ?: res.getString(R.string.browser_pixeldrain_files))
                     else fileInfoViewModel.downloadFilesSequentially(files)
                     exitSelection()
@@ -561,7 +563,7 @@ fun BrowserScreen(
                     enabled = listFiles.isNotEmpty(),
                     group = ScreenActionGroup.PAGE,
                     choices = if (listFiles.size > 1) {
-                        downloadScreenChoices { style ->
+                        downloadScreenChoices(res) { style ->
                             if (style == DownloadStyle.ZIP) fileInfoViewModel.downloadFilesAsZip(listFiles, openedList.title)
                             else fileInfoViewModel.downloadFilesSequentially(listFiles, title = openedList.title)
                         }
@@ -577,7 +579,7 @@ fun BrowserScreen(
                     Icons.Filled.Download,
                     stringResource(R.string.browser_download_this_folder),
                     group = ScreenActionGroup.PAGE,
-                    choices = downloadScreenChoices { style -> fileInfoViewModel.downloadItems(listOf(folder), style, folderName) }
+                    choices = downloadScreenChoices(res) { style -> fileInfoViewModel.downloadItems(listOf(folder), style, folderName) }
                 ) {}
             )
         }
@@ -859,22 +861,22 @@ private fun smartLayoutIsGrid(entries: List<StorageNode>): Boolean {
 }
 
 /** "Download" for the selection bar, as each file on its own or all in one zip, chosen in a menu of the two. */
-private fun downloadChoices(enabled: Boolean, onDownload: (DownloadStyle) -> Unit) = SelectionAction(
-    "Download",
+private fun downloadChoices(res: Resources, enabled: Boolean, onDownload: (DownloadStyle) -> Unit) = SelectionAction(
+    res.getString(R.string.browser_download),
     Icons.Filled.Download,
     {},
     enabled = enabled,
     choices = listOf(
-        SelectionAction("Separately", Icons.Filled.Download, { onDownload(DownloadStyle.SEPARATELY) }),
-        SelectionAction("As one ZIP", Icons.Filled.FolderZip, { onDownload(DownloadStyle.ZIP) })
+        SelectionAction(res.getString(R.string.files_separately), Icons.Filled.Download, { onDownload(DownloadStyle.SEPARATELY) }),
+        SelectionAction(res.getString(R.string.files_as_one_zip), Icons.Filled.FolderZip, { onDownload(DownloadStyle.ZIP) })
     )
 )
 
 /** The same two ways, for a Download of the ⋮ menu at the top of the screen (see ScreenAction.choices). */
-private fun downloadScreenChoices(onDownload: (DownloadStyle) -> Unit) = listOf(
-    ScreenAction(Icons.Filled.Download, "Separately") { onDownload(DownloadStyle.SEPARATELY) },
-    ScreenAction(Icons.Filled.FolderZip, "As one ZIP") { onDownload(DownloadStyle.ZIP) }
+private fun downloadScreenChoices(res: Resources, onDownload: (DownloadStyle) -> Unit) = listOf(
+    ScreenAction(Icons.Filled.Download, res.getString(R.string.files_separately)) { onDownload(DownloadStyle.SEPARATELY) },
+    ScreenAction(Icons.Filled.FolderZip, res.getString(R.string.files_as_one_zip)) { onDownload(DownloadStyle.ZIP) }
 )
 
 /** The line under the sort row while the filesystem uploads: which file it's on, of how many. */
-private fun FilesystemUploadProgress.statusLine(): String = "Uploading $currentFileName ($currentIndex/$totalFiles)"
+private fun FilesystemUploadProgress.statusLine(res: Resources): String = res.getString(R.string.browser_uploading, currentFileName, currentIndex, totalFiles)

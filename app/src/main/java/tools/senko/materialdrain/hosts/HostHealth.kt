@@ -26,6 +26,7 @@ import java.net.UnknownHostException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLException
+import tools.senko.materialdrain.R
 
 /**
  * Whether a host answers, as far as the last check knows. [UNKNOWN] until a host has been checked, or when there's no
@@ -87,6 +88,9 @@ class HostHealth(
     /** Whether the checks the app makes by itself wait for one that's asked for (the data saver, see DataSaver). */
     private val holdBackground: () -> Boolean = { false },
 ) {
+    /** The app's texts (what a check found) */
+    private val resources = context.resources
+
     private val _states = MutableStateFlow<Map<String, HostCheck>>(emptyMap())
     val states: StateFlow<Map<String, HostCheck>> = _states.asStateFlow()
 
@@ -157,7 +161,7 @@ class HostHealth(
     private fun markOffline() {
         _states.update { states ->
             hostIds().associateWith { id ->
-                (states[id] ?: HostCheck()).copy(reachability = Reachability.OFFLINE, checking = false, latencyMillis = null, message = "This device is offline")
+                (states[id] ?: HostCheck()).copy(reachability = Reachability.OFFLINE, checking = false, latencyMillis = null, message = resources.getString(R.string.app_this_device_is_offline))
             }
         }
     }
@@ -170,7 +174,7 @@ class HostHealth(
     }
 
     private fun probe(target: HealthTarget?): HostCheck {
-        target ?: return HostCheck(Reachability.UNKNOWN, message = "No address set in its config")
+        target ?: return HostCheck(Reachability.UNKNOWN, message = resources.getString(R.string.settings_no_address_set_in_its))
         val started = System.nanoTime()
         return try {
             when (target) {
@@ -179,16 +183,16 @@ class HostHealth(
             }
             HostCheck(Reachability.REACHABLE, latencyMillis = (System.nanoTime() - started) / 1_000_000)
         } catch (e: UnknownHostException) {
-            HostCheck(Reachability.UNREACHABLE, message = "Address not found")
+            HostCheck(Reachability.UNREACHABLE, message = resources.getString(R.string.settings_address_not_found))
         } catch (e: SocketTimeoutException) {
-            HostCheck(Reachability.UNREACHABLE, message = "Not answering")
+            HostCheck(Reachability.UNREACHABLE, message = resources.getString(R.string.settings_not_answering))
         } catch (e: ConnectException) {
-            HostCheck(Reachability.UNREACHABLE, message = "Refused the connection")
+            HostCheck(Reachability.UNREACHABLE, message = resources.getString(R.string.settings_refused_the_connection))
         } catch (e: SSLException) {
             // It answered, but not in a way the app can use
-            HostCheck(Reachability.UNREACHABLE, message = "Its certificate isn't trusted")
+            HostCheck(Reachability.UNREACHABLE, message = resources.getString(R.string.settings_its_certificate_isn_t_trusted))
         } catch (e: java.io.InterruptedIOException) {
-            HostCheck(Reachability.UNREACHABLE, message = "Not answering")
+            HostCheck(Reachability.UNREACHABLE, message = resources.getString(R.string.settings_not_answering))
         }
     }
 }

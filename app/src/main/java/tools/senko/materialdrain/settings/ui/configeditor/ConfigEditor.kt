@@ -109,11 +109,13 @@ import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.annotation.StringRes
 
 /** The two ways of editing a config: field by field, or its text. */
-private enum class EditorMode(val label: String) { FORM("Form"), JSON("JSON") }
+private enum class EditorMode(@StringRes val labelRes: Int) { FORM(R.string.settings_form), JSON(R.string.settings_json) }
 
 /** [this] with [key] set to [value], or left out when it's null; a key that's already there keeps its place. */
 internal fun JsonObject.with(key: String, value: JsonElement?): JsonObject =
@@ -168,7 +170,7 @@ fun ConfigEditor(
     onDismiss: () -> Unit
 ) {
     // The app's texts, for those its callbacks show
-    val res = LocalContext.current.resources
+    val res = LocalResources.current
     val schema = configSchema()
     val original = remember(initialText) { ProviderConfigCodec.parseObject(initialText) }
     var root by remember(initialText) { mutableStateOf(original ?: JsonObject(emptyMap())) }
@@ -312,35 +314,37 @@ fun ConfigEditor(
 
 /** A page of the form past the first: a section, an object inside the config, one endpoint, or the fields the app doesn't read. */
 internal sealed interface Page {
+    @get:Composable
     val title: String
     /** Tells pages apart, for what each one remembers: how far it's scrolled, what's unfolded. */
     val key: String
 
     data class OfSection(val section: Section) : Page {
-        override val title get() = section.title
+        override val title: String @Composable get() = section.title
         override val key get() = "section:${section.title}"
     }
 
     /** An object of its own, e.g. the sign-in request, at [path]. */
     data class OfGroup(val spec: FieldSpec, val fields: List<FieldSpec>, val path: List<String>) : Page {
-        override val title get() = spec.label
+        override val title: String @Composable get() = spec.label
         override val key get() = "group:${path.joinToString("/")}"
     }
 
     data class OfEndpoint(val name: String) : Page {
-        override val title get() = name
+        override val title: String @Composable get() = name
         override val key get() = "endpoint:$name"
         val path get() = listOf("endpoints", name)
     }
 
     data object OtherFields : Page {
-        override val title = "Other fields"
+        override val title: String @Composable get() = stringResource(R.string.settings_other_fields)
         override val key = "other"
     }
 }
 
 /** The pages under the one on top, as "Sign-in › Username and password". */
-private fun List<Page>.trail(): String = dropLast(1).joinToString(" › ") { it.title }
+@Composable
+private fun List<Page>.trail(): String = dropLast(1).map { it.title }.joinToString(" › ")
 
 /**
  * What every part of the form reaches: the config being edited, and the pages.
@@ -630,7 +634,7 @@ private fun ModeSwitch(mode: EditorMode, onSelect: (EditorMode) -> Unit) {
                     selected = mode == entry,
                     onClick = { if (entry != mode) onSelect(entry) },
                     shape = SegmentedButtonDefaults.itemShape(index, EditorMode.entries.size)
-                ) { Text(entry.label) }
+                ) { Text(stringResource(entry.labelRes)) }
             }
         }
     }
@@ -746,10 +750,11 @@ private fun MainSwitch(label: String, checked: Boolean, onChange: (Boolean) -> U
 }
 
 /** A short line for each set field of [obj], the first few, to show what a page holds without opening it. */
+@Composable
 internal fun summaryOf(fields: List<FieldSpec>, obj: JsonObject): String =
     fields.filter { it.shownWhen(obj) }.mapNotNull { spec ->
         val value = obj[spec.key]?.takeUnless { it is JsonNull }
-            ?: return@mapNotNull if (spec.kind == FieldKind.Screens) "Every tab the host can back" else null
+            ?: return@mapNotNull if (spec.kind == FieldKind.Screens) stringResource(R.string.settings_every_tab_the_host_can_back) else null
         when (val kind = spec.kind) {
             is FieldKind.Text -> (value as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() && !kind.multiline }
             FieldKind.Number -> "${spec.label} ${value.displayText()}"
@@ -868,8 +873,9 @@ internal fun initialValue(spec: FieldSpec): JsonElement = spec.default ?: when (
 }
 
 /** The help under a field, with its default when it has one. */
+@Composable
 internal fun helpText(spec: FieldSpec, defaultText: String? = spec.default?.displayText()): String =
-    listOfNotNull(spec.help.takeIf { it.isNotEmpty() }, defaultText?.let { "Default: $it." }).joinToString(" ")
+    listOfNotNull(spec.help.takeIf { it.isNotEmpty() }, defaultText?.let { stringResource(R.string.app_default, it) }).joinToString(" ")
 
 // ---- Previews ----
 

@@ -15,13 +15,20 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 import tools.senko.materialdrain.settings.AppSettings
 import kotlin.math.roundToInt
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** How strong the app's vibrations are (Feedback settings): how hard each one is played, of the device's strongest. */
-enum class VibrationStrength(val label: String, val scale: Float) {
-    LIGHT("Light", 0.3f),
-    MEDIUM("Medium", 0.6f),
-    STRONG("Strong", 1f)
+enum class VibrationStrength(@StringRes val labelRes: Int, val scale: Float) {
+    LIGHT(R.string.theme_light, 0.3f),
+    MEDIUM(R.string.feedback_medium, 0.6f),
+    STRONG(R.string.feedback_strong, 1f)
 }
+
+/** The strength's name in the app's language. */
+val VibrationStrength.label: String
+    @Composable get() = stringResource(labelRes)
 
 /** What a vibration says. */
 enum class HapticKind {

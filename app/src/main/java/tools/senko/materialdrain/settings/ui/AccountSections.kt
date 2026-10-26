@@ -51,6 +51,7 @@ import tools.senko.materialdrain.ui.components.TextInputDialog
 import tools.senko.materialdrain.util.formatSize
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.annotation.StringRes
 
 /** A small spinner in a button while what it started runs. */
 @Composable
@@ -210,7 +211,7 @@ internal fun SharingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
 private val UnpaidInvoiceStatuses = setOf("open")
 
 /** The prepaid plans which can be switched to from the app. */
-private val PrepaidPlans = listOf("prepaid" to "Prepaid", "prepaid_lite" to "Prepaid Lite")
+private val PrepaidPlans = listOf("prepaid" to R.string.settings_prepaid, "prepaid_lite" to R.string.settings_prepaid_lite)
 
 /** The plan and what it includes, the credit, the invoices and a month of transactions. */
 @Composable
@@ -251,7 +252,8 @@ internal fun BillingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
         if (otherPlans.isNotEmpty()) {
             CardButtons {
                 otherPlans.forEach { option ->
-                    OutlinedButton(onClick = { switchingTo = option }, enabled = !planBusy) { if (planBusy) ButtonSpinner() else Text(stringResource(R.string.settings_switch_to, option.second)) }
+                    val name = stringResource(option.second)
+                    OutlinedButton(onClick = { switchingTo = option.first to name }, enabled = !planBusy) { if (planBusy) ButtonSpinner() else Text(stringResource(R.string.settings_switch_to, name)) }
                 }
             }
         }
@@ -308,22 +310,24 @@ internal fun BillingCard(user: UserInfo, state: AccountUiState, viewModel: Accou
 }
 
 /** What an invoice's status means, in the words pixeldrain's website uses for it. */
+@Composable
 private fun invoiceStatusLabel(status: String): String = when (status.lowercase()) {
-    "open" -> "Waiting for payment"
-    "processing" -> "Payment received, waiting for confirmations"
-    "paid" -> "Paid"
-    "expired" -> "Expired"
-    "canceled" -> "Canceled"
+    "open" -> stringResource(R.string.settings_waiting_for_payment)
+    "processing" -> stringResource(R.string.settings_payment_received_waiting_for_confirmations)
+    "paid" -> stringResource(R.string.settings_paid)
+    "expired" -> stringResource(R.string.settings_expired)
+    "canceled" -> stringResource(R.string.settings_canceled)
     else -> status.replaceFirstChar { it.uppercase() }
 }
 
 /** "Deposit +€10.00 · Storage −€0.03 · …": the parts of a transaction which aren't zero. */
+@Composable
 private fun transactionParts(transaction: Transaction): String? = listOfNotNull(
-    transaction.depositAmount.takeIf { it != 0L }?.let { "Deposit ${formatEuroSigned(it)}" },
-    transaction.subscriptionCharge.takeIf { it != 0L }?.let { "Plan ${formatEuroSigned(it)}" },
-    transaction.storageCharge.takeIf { it != 0L }?.let { "Storage ${formatEuroSigned(it)} (${formatSize(transaction.storageUsed)})" },
-    transaction.bandwidthCharge.takeIf { it != 0L }?.let { "Transfer ${formatEuroSigned(it)} (${formatSize(transaction.bandwidthUsed)})" },
-    transaction.affiliateAmount.takeIf { it != 0L }?.let { "Affiliate ${formatEuroSigned(it)} (${transaction.affiliateCount})" }
+    transaction.depositAmount.takeIf { it != 0L }?.let { stringResource(R.string.settings_deposit, formatEuroSigned(it)) },
+    transaction.subscriptionCharge.takeIf { it != 0L }?.let { stringResource(R.string.settings_plan_2, formatEuroSigned(it)) },
+    transaction.storageCharge.takeIf { it != 0L }?.let { stringResource(R.string.settings_storage, formatEuroSigned(it), formatSize(transaction.storageUsed)) },
+    transaction.bandwidthCharge.takeIf { it != 0L }?.let { stringResource(R.string.settings_transfer_2, formatEuroSigned(it), formatSize(transaction.bandwidthUsed)) },
+    transaction.affiliateAmount.takeIf { it != 0L }?.let { stringResource(R.string.settings_affiliate_2, formatEuroSigned(it), transaction.affiliateCount) }
 ).joinToString(" · ").ifBlank { null }
 
 // ---- File viewer branding ----
@@ -392,12 +396,13 @@ internal fun ActivityCard(state: AccountUiState, viewModel: AccountViewModel) {
     }
 }
 
+@Composable
 private fun activityLabel(event: ActivityEvent): String = when (event.event) {
-    "file_instance_expired" -> "Expired"
-    "file_instance_blocked" -> "Blocked"
-    "file_instance_lost" -> "Lost"
-    "filesystem_node_blocked" -> "Blocked in the filesystem"
-    "filesystem_node_lost" -> "Lost from the filesystem"
+    "file_instance_expired" -> stringResource(R.string.settings_expired)
+    "file_instance_blocked" -> stringResource(R.string.settings_blocked)
+    "file_instance_lost" -> stringResource(R.string.settings_lost)
+    "filesystem_node_blocked" -> stringResource(R.string.settings_blocked_in_the_filesystem)
+    "filesystem_node_lost" -> stringResource(R.string.settings_lost_from_the_filesystem)
     else -> event.event.replace('_', ' ').replaceFirstChar { it.uppercase() }
 }
 

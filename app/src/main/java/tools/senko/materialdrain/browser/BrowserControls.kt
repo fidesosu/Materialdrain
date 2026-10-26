@@ -123,7 +123,7 @@ import tools.senko.materialdrain.ui.icons.filled.ViewList
 import tools.senko.materialdrain.settings.ListLayout
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 
 /** The path at the top of the filesystem: each folder is tappable, and the row scrolls to the end of it. */
 @Composable
@@ -434,7 +434,7 @@ fun ScreenMenuEntries(
                 AppMenuItem(
                     stringResource(R.string.browser_sort_by),
                     leadingIcon = Icons.Filled.Tune,
-                    trailingText = SortOptions.find { it.second == sort.field }?.first,
+                    trailingText = SortOptions.find { it.second == sort.field }?.first?.let { stringResource(it) },
                     trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     onClick = { open(ScreenMenuPage.Sort) }
                 )
@@ -541,7 +541,7 @@ private fun SortMenuEntries(
     SortOptions.forEach { (name, field) ->
         val selected = field == sortField
         AppMenuItem(
-            text = name,
+            text = stringResource(name),
             active = selected,
             trailingIcon = if (!selected) null else if (sortAscending) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
             trailingIconDescription = if (sortAscending) stringResource(R.string.browser_ascending) else stringResource(R.string.browser_descending),
@@ -560,7 +560,7 @@ private val SortRowGap = 8.dp
 @Composable
 private fun statusCardNeeds(): List<Dp> {
     // The app's texts, for those its callbacks show
-    val res = LocalContext.current.resources
+    val res = LocalResources.current
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val large = MaterialTheme.typography.labelLarge

@@ -28,6 +28,9 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import android.content.res.Resources
 import tools.senko.materialdrain.R
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 
 /** Something which is loaded from the account. */
 sealed interface Loadable<out T> {
@@ -40,19 +43,27 @@ sealed interface Loadable<out T> {
 val <T> Loadable<T>.dataOrNull: T? get() = (this as? Loadable.Loaded<T>)?.data
 
 /** The usage the statistics chart can show. */
-enum class UsageStatistic(val apiName: String, val label: String, val inBytes: Boolean) {
-    BANDWIDTH("bandwidth", "Transfer", true),
-    TRANSFER_PAID("transfer_paid", "Premium", true),
-    VIEWS("views", "Views", false),
-    DOWNLOADS("downloads", "Downloads", false)
+enum class UsageStatistic(val apiName: String, @StringRes val labelRes: Int, val inBytes: Boolean) {
+    BANDWIDTH("bandwidth", R.string.settings_transfer, true),
+    TRANSFER_PAID("transfer_paid", R.string.settings_premium, true),
+    VIEWS("views", R.string.files_views, false),
+    DOWNLOADS("downloads", R.string.files_downloads, false)
 }
 
+/** The statistic's name in the app's language. */
+val UsageStatistic.label: String
+    @Composable get() = stringResource(labelRes)
+
 /** How far back the statistics chart goes, and how long each of its bars is. */
-enum class StatsRange(val label: String, val days: Long, val intervalMinutes: Int) {
-    WEEK("7 days", 7, 360),
-    MONTH("30 days", 30, 1440),
-    QUARTER("90 days", 90, 1440)
+enum class StatsRange(@StringRes val labelRes: Int, val days: Long, val intervalMinutes: Int) {
+    WEEK(R.string.settings_7_days, 7, 360),
+    MONTH(R.string.settings_30_days, 30, 1440),
+    QUARTER(R.string.settings_90_days, 90, 1440)
 }
+
+/** The range's name in the app's language. */
+val StatsRange.label: String
+    @Composable get() = stringResource(labelRes)
 
 /** What on the account page is being changed, so its button can show it's busy. */
 enum class AccountTask { PROFILE, SHARING, CREDIT, PLAN, BRANDING }
@@ -275,7 +286,7 @@ class AccountViewModel(
                     loadInvoices()
                     loadUser(quietly = true)
                 }
-                is ApiResponse.Error -> uiMessages.show(describe(response.errorDetails), long = true)
+                is ApiResponse.Error -> uiMessages.show(describe(response.errorDetails, resources), long = true)
             }
             _uiState.update { it.copy(busy = it.busy - AccountTask.CREDIT) }
         }
@@ -285,7 +296,7 @@ class AccountViewModel(
         viewModelScope.launch {
             when (val response = userApi.getInvoiceCheckoutUrl(key, invoiceId)) {
                 is ApiResponse.Success -> links.send(response.data)
-                is ApiResponse.Error -> uiMessages.show(describe(response.errorDetails), long = true)
+                is ApiResponse.Error -> uiMessages.show(describe(response.errorDetails, resources), long = true)
             }
             // An invoice whose payment is gone is cancelled by asking for it
             loadInvoices()
@@ -324,7 +335,7 @@ class AccountViewModel(
         viewModelScope.launch {
             when (val response = request()) {
                 is ApiResponse.Success -> onSuccess()
-                is ApiResponse.Error -> uiMessages.show(describe(response.errorDetails), long = true)
+                is ApiResponse.Error -> uiMessages.show(describe(response.errorDetails, resources), long = true)
             }
             if (key.isNotBlank()) loadUser(quietly = true)
             _uiState.update { it.copy(busy = it.busy - task) }
@@ -333,7 +344,7 @@ class AccountViewModel(
 
     private fun <T> ApiResponse<T>.toLoadable(): Loadable<T> = when (this) {
         is ApiResponse.Success -> Loadable.Loaded(data)
-        is ApiResponse.Error -> Loadable.Failed(describe(errorDetails), websiteOnly = errorDetails.value == WEBSITE_LOGIN_REQUIRED)
+        is ApiResponse.Error -> Loadable.Failed(describe(errorDetails, resources), websiteOnly = errorDetails.value == WEBSITE_LOGIN_REQUIRED)
     }
 
     private fun <T, R> Loadable<T>.map(transform: (T) -> R): Loadable<R> = when (this) {
@@ -346,24 +357,24 @@ class AccountViewModel(
 const val WEBSITE_LOGIN_REQUIRED = "website_login_required"
 
 /** What an error of the user API means, in the words of the account page. */
-internal fun describe(error: FileUploadResponse): String = when (error.value) {
-    WEBSITE_LOGIN_REQUIRED -> "Only possible on pixeldrain.com."
-    "api_key_missing" -> "Log in or enter an API key first."
-    "authentication_failed", "unauthorized" -> "The API key isn't valid anymore. Log in again."
-    "username_already_registered" -> "That username is already taken."
-    "email_address_already_registered" -> "Another account already uses that e-mail address."
-    "invalid_email_address" -> "That e-mail address isn't valid."
-    "too_many_email_addresses" -> "An account can have at most 5 e-mail addresses. Remove one first."
-    "login_link_already_sent" -> "A link was already sent. Wait for it to expire."
-    "last_email_address" -> "An account needs at least one e-mail address."
-    "not_enough_credit_for_prepaid" -> "A prepaid plan needs at least €1 of credit. Add credit first."
-    "invalid_domain_name" -> "Each embed domain needs a period in it, like example.com."
-    "user_not_found" -> "No account has that username."
-    "otp_incorrect" -> "That code isn't correct. Check the time on your device and try a new code."
-    "app_name_reserved" -> "That name is reserved for the pixeldrain website. Pick another."
-    "branding_image_not_found", "not_found" -> "One of the images wasn't found on your account."
-    "invalid_file_type" -> "Images need to be JPEG, PNG, GIF or WebP."
-    "file_too_large" -> "Images can be at most 10 MB."
+internal fun describe(error: FileUploadResponse, resources: Resources): String = when (error.value) {
+    WEBSITE_LOGIN_REQUIRED -> resources.getString(R.string.settings_only_possible_on_pixeldrain_com)
+    "api_key_missing" -> resources.getString(R.string.settings_log_in_or_enter_an)
+    "authentication_failed", "unauthorized" -> resources.getString(R.string.settings_the_api_key_isn_t)
+    "username_already_registered" -> resources.getString(R.string.settings_that_username_is_already_taken)
+    "email_address_already_registered" -> resources.getString(R.string.settings_another_account_already_uses_that)
+    "invalid_email_address" -> resources.getString(R.string.settings_that_e_mail_address_isn)
+    "too_many_email_addresses" -> resources.getString(R.string.settings_an_account_can_have_at)
+    "login_link_already_sent" -> resources.getString(R.string.settings_a_link_was_already_sent)
+    "last_email_address" -> resources.getString(R.string.settings_an_account_needs_at_least)
+    "not_enough_credit_for_prepaid" -> resources.getString(R.string.settings_a_prepaid_plan_needs_at)
+    "invalid_domain_name" -> resources.getString(R.string.settings_each_embed_domain_needs_a)
+    "user_not_found" -> resources.getString(R.string.settings_no_account_has_that_username)
+    "otp_incorrect" -> resources.getString(R.string.settings_that_code_isn_t_correct)
+    "app_name_reserved" -> resources.getString(R.string.settings_that_name_is_reserved_for)
+    "branding_image_not_found", "not_found" -> resources.getString(R.string.settings_one_of_the_images_wasn)
+    "invalid_file_type" -> resources.getString(R.string.settings_images_need_to_be_jpeg)
+    "file_too_large" -> resources.getString(R.string.settings_images_can_be_at_most)
     "invalid_link" -> "Links need to start with https://."
-    else -> error.message?.takeIf { it.isNotBlank() } ?: error.value ?: "Something went wrong."
+    else -> error.message?.takeIf { it.isNotBlank() } ?: error.value ?: resources.getString(R.string.settings_something_went_wrong)
 }

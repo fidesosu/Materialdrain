@@ -298,12 +298,13 @@ private fun PullableFill(content: @Composable () -> Unit) {
     }
 }
 
+@Composable
 private fun emptyText(mode: BrowserMode, inList: Boolean, filter: String): String = when {
-    filter.isNotBlank() -> "No matches for '$filter'"
-    mode == BrowserMode.LISTS && !inList -> "No lists found."
-    mode == BrowserMode.LISTS -> "This list has no files."
-    mode == BrowserMode.FILES -> "No files."
-    else -> "This folder is empty."
+    filter.isNotBlank() -> stringResource(R.string.app_no_matches_for, filter)
+    mode == BrowserMode.LISTS && !inList -> stringResource(R.string.app_no_lists_found)
+    mode == BrowserMode.LISTS -> stringResource(R.string.app_this_list_has_no_files)
+    mode == BrowserMode.FILES -> stringResource(R.string.app_no_files)
+    else -> stringResource(R.string.app_this_folder_is_empty)
 }
 
 /** How wide a tile of the grid is about to be; the row gets as many as fit. */

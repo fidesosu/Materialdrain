@@ -93,7 +93,7 @@ fun installLauncherShortcuts(context: Context) {
     val shortcuts = listOf("upload" to Screen.Upload, "files" to Screen.Files, "filesystem" to Screen.Filesystem)
         .mapIndexed { rank, (id, screen) ->
             ShortcutInfoCompat.Builder(context, id)
-                .setShortLabel(screen.title)
+                .setShortLabel(context.getString(screen.titleRes))
                 .setIcon(IconCompat.createWithResource(context, R.mipmap.ic_launcher))
                 .setIntent(openScreenIntent(context, screen))
                 .setRank(rank)

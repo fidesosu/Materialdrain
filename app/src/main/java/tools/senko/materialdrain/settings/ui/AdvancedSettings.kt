@@ -61,6 +61,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
@@ -257,7 +258,7 @@ private fun HostCard(
     startExpanded: Boolean = false
 ) {
     // The app's texts, for those its callbacks show
-    val res = LocalContext.current.resources
+    val res = LocalResources.current
     var expanded by rememberSaveable(stored.id) { mutableStateOf(startExpanded) }
     // Asked for from the host switcher: opened, and scrolled to once the settings page has slid in and the card has grown
     val bringIntoView = remember { BringIntoViewRequester() }

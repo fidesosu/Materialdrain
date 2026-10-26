@@ -12,6 +12,7 @@ import tools.senko.materialdrain.util.VideoPositions
 import tools.senko.materialdrain.ui.icons.automirrored.filled.OpenInNew
 import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.res.Resources
 import android.content.Intent
 import android.media.AudioManager
 import android.provider.Settings
@@ -86,6 +87,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
@@ -211,7 +213,7 @@ private class TrackChoice(val group: Tracks.Group, val index: Int, val label: St
  * their own label, else their language, else their number.
  */
 @androidx.annotation.OptIn(UnstableApi::class)
-private fun Tracks.choicesOf(type: Int): List<TrackChoice> {
+private fun Tracks.choicesOf(type: Int, res: Resources): List<TrackChoice> {
     var number = 0
     return groups.filter { it.type == type }.flatMap { group ->
         (0 until group.length).filter { group.isTrackSupported(it) }.map { index ->
@@ -219,7 +221,7 @@ private fun Tracks.choicesOf(type: Int): List<TrackChoice> {
             val format = group.getTrackFormat(index)
             val language = format.language?.takeIf { it.isNotBlank() && it != C.LANGUAGE_UNDETERMINED }
                 ?.let { Locale.forLanguageTag(it).displayName }
-            TrackChoice(group, index, format.label ?: language ?: "Track $number", group.isTrackSelected(index))
+            TrackChoice(group, index, format.label ?: language ?: res.getString(R.string.media_track, number), group.isTrackSelected(index))
         }
     }
 }
@@ -369,9 +371,9 @@ private fun openVideoElsewhere(context: Context, uri: Uri) {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     try {
-        context.startActivity(Intent.createChooser(intent, "Open the video with"))
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.settings_open_the_video_with)))
     } catch (_: ActivityNotFoundException) {
-        Toast.makeText(context, "No other app on this device can play videos.", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, context.getString(R.string.settings_no_other_app_on_this), Toast.LENGTH_LONG).show()
     }
 }
 
@@ -519,8 +521,9 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
         player.addListener(listener)
         onDispose { player.removeListener(listener) }
     }
-    val subtitleChoices = remember(tracks) { tracks.choicesOf(C.TRACK_TYPE_TEXT) }
-    val audioChoices = remember(tracks) { tracks.choicesOf(C.TRACK_TYPE_AUDIO) }
+    val res = LocalResources.current
+    val subtitleChoices = remember(tracks) { tracks.choicesOf(C.TRACK_TYPE_TEXT, res) }
+    val audioChoices = remember(tracks) { tracks.choicesOf(C.TRACK_TYPE_AUDIO, res) }
 
     // The rotate button turns the screen the other way and keeps it there (either way up), until the player closes, when
     // the app has its own orientation again

@@ -93,7 +93,7 @@ fun showUnlockPrompt(activity: FragmentActivity, appLock: AppLock) {
     }
     BiometricPrompt(activity, ContextCompat.getMainExecutor(activity), callback).authenticate(
         BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Materialdrain")
+            .setTitle(activity.getString(R.string.app_unlock_materialdrain))
             .setAllowedAuthenticators(LOCK_AUTHENTICATORS)
             .build()
     )

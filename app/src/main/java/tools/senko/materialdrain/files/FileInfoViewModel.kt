@@ -700,7 +700,7 @@ class FileInfoViewModel(
                     _uiState.update { it.copy(isLoadingUserFiles = false, userFilesList = response.data.children) }
                 }
                 is ApiResponse.Error -> {
-                    val errorMsg = response.error.forDisplay().ifBlank { application.getString(R.string.files_unknown_error_fetching_user_files) }
+                    val errorMsg = response.error.forDisplay(application.resources).ifBlank { application.getString(R.string.files_unknown_error_fetching_user_files) }
                     ProviderLog.e("Files", "loading the file list failed (${response.error.code}): $errorMsg")
                     _uiState.update {
                         it.copy(

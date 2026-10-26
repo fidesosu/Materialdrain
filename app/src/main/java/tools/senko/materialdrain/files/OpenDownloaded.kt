@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import android.widget.Toast
+import tools.senko.materialdrain.R
 
 /** A finished download which the app can open: where it was saved, and what kind of file it is. */
 data class OpenableDownload(val uri: Uri, val mimeType: String)
@@ -30,6 +31,6 @@ fun openDownloadedFile(context: Context, download: OpenableDownload) {
     try {
         context.startActivity(intent)
     } catch (_: ActivityNotFoundException) {
-        Toast.makeText(context, "No app on this device can open this file.", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, context.getString(R.string.files_no_app_on_this_device_can), Toast.LENGTH_LONG).show()
     }
 }

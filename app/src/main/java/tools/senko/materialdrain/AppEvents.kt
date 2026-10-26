@@ -8,21 +8,23 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import tools.senko.materialdrain.files.OpenableDownload
+import androidx.annotation.StringRes
+import tools.senko.materialdrain.R
 
 /** What the button on a snackbar does. */
-sealed class UiMessageAction(val label: String) {
+sealed class UiMessageAction(@StringRes val labelRes: Int) {
     /** Opens a finished download. */
-    data class OpenDownload(val download: OpenableDownload) : UiMessageAction("Open")
+    data class OpenDownload(val download: OpenableDownload) : UiMessageAction(R.string.browser_open)
 
     /** Starts again what failed, e.g. a download. */
-    class Retry(val retry: () -> Unit) : UiMessageAction("Try again")
+    class Retry(val retry: () -> Unit) : UiMessageAction(R.string.media_try_again)
 
     /** Takes back what was just done, e.g. a song closed from the miniplayer. */
-    class Undo(val undo: () -> Unit) : UiMessageAction("Undo")
+    class Undo(val undo: () -> Unit) : UiMessageAction(R.string.app_undo)
 }
 
 /** A message for the snackbar: the outcome of something the user did. [long]: it stays a while longer (errors, summaries). */
-data class UiMessage(val text: String, val long: Boolean = false, val action: UiMessageAction? = null)
+data class UiMessage(val text: String, val long: Boolean = false, val action: UiMessageAction? = null, @StringRes val textRes: Int? = null)
 
 /**
  * The messages the ViewModels have for the snackbar, shown one after another by App.kt. Each is shown once. A message sent
@@ -35,6 +37,11 @@ class UiMessages {
 
     fun show(text: String, long: Boolean = false, action: UiMessageAction? = null) {
         channel.trySend(UiMessage(text, long, action))
+    }
+
+    /** A message of the app's texts ([textRes]), read in the app's language when it's shown. */
+    fun show(@StringRes textRes: Int, long: Boolean = false, action: UiMessageAction? = null) {
+        channel.trySend(UiMessage("", long, action, textRes))
     }
 }
 

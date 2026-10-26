@@ -122,12 +122,15 @@ fun SettingsScreenContent(
     // Each page keeps how far it was scrolled, for when it's come back to
     val pageStates = rememberSaveableStateHolder()
 
+    // By the category's id: the categories themselves are made again when the configuration changes (the language, light
+    // or dark), which isn't another page
     AnimatedContent(
-        targetState = settingsCategory(categoryId),
+        targetState = categoryId,
         transitionSpec = { pageTransition(forward = targetState != null, reduceMotion = reduceMotion) },
         label = "settingsCategory",
         modifier = Modifier.fillMaxSize()
-    ) { category ->
+    ) { shownId ->
+        val category = settingsCategory(shownId)
         // Room after the last row for the button over the bottom of the screen (the Save button, or the navigation
         // button of the prototype): its height, the margin it keeps from the edge, and a gap above it
         val bottomRoom = if (isFabVisible) fabHeight + 32.dp else 16.dp

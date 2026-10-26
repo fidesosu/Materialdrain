@@ -19,6 +19,7 @@ import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.ui.theme.DEFAULT_THEME_COLOR
 import tools.senko.materialdrain.ui.theme.ThemeMode
 import tools.senko.materialdrain.ui.theme.ThemeSettings
+import tools.senko.materialdrain.R
 
 private const val PREFS_NAME = "pixeldrain_prefs"
 private const val HIDE_SEARCH_INDEX_PREF = "hide_search_index"
@@ -111,8 +112,8 @@ val LOCK_TIMEOUTS = listOf(0, 30, 60, 300)
 /** Pixeldrain keeps the paths of the files of a filesystem in this file, it is re-created when removed. */
 const val SEARCH_INDEX_FILE_NAME = ".search_index.gz"
 
-const val SEARCH_INDEX_DELETE_WARNING =
-    "Pixeldrain uses this file for your file paths and recreates it anyway."
+/** Said when the search index is deleted (a string resource). */
+val SEARCH_INDEX_DELETE_WARNING = R.string.app_pixeldrain_uses_this_file_for_your
 
 fun StorageNode.isSearchIndex(): Boolean = !isDirectory && name == SEARCH_INDEX_FILE_NAME
 

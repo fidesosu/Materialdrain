@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -198,7 +199,7 @@ fun FileInfoDetailsCard(
     songQueue: SongQueue? = null
 ) {
     // The app's texts, for those its callbacks show
-    val res = LocalContext.current.resources
+    val res = LocalResources.current
     val localContext = LocalContext.current
     val inPreview = LocalInspectionMode.current
     val coroutineScope = rememberCoroutineScope()

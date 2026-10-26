@@ -34,6 +34,7 @@ import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.annotation.StringRes
 
 /** Like TextInputDialog, but an empty value can be saved too: it removes the setting. */
 @Composable
@@ -189,18 +190,26 @@ internal fun AddCreditDialog(
 }
 
 /** A setting of the file viewer, as PUT /user/file_customization names it. */
-internal class BrandingField(val key: String, val label: String, val isSwitch: Boolean = false, val hint: String? = null)
+internal class BrandingField(val key: String, @StringRes val labelRes: Int, val isSwitch: Boolean = false, @StringRes val hintRes: Int? = null, val hintText: String? = null)
+
+/** The field's name in the app's language. */
+internal val BrandingField.label: String
+    @Composable get() = stringResource(labelRes)
+
+/** What goes in the field, in the app's language. */
+internal val BrandingField.hint: String?
+    @Composable get() = hintRes?.let { stringResource(it) } ?: hintText
 
 internal val BrandingFields = listOf(
-    BrandingField("theme", "Theme", hint = "The name of one of pixeldrain's colour themes"),
-    BrandingField("header_image", "Header image", hint = "ID of an image file on your account"),
-    BrandingField("header_link", "Header link", hint = "https://…"),
-    BrandingField("background_image", "Background image", hint = "ID of an image file on your account"),
-    BrandingField("footer_image", "Footer image", hint = "ID of an image file on your account"),
-    BrandingField("footer_link", "Footer link", hint = "https://…"),
-    BrandingField("affiliate_prompt", "Affiliate message"),
-    BrandingField("disable_download_button", "Hide the download button", isSwitch = true),
-    BrandingField("disable_share_button", "Hide the share button", isSwitch = true)
+    BrandingField("theme", R.string.settings_theme, hintRes = R.string.settings_the_name_of_one_of_pixeldrain),
+    BrandingField("header_image", R.string.settings_header_image, hintRes = R.string.settings_id_of_an_image_file_on),
+    BrandingField("header_link", R.string.settings_header_link, hintText = "https://…"),
+    BrandingField("background_image", R.string.settings_background_image, hintRes = R.string.settings_id_of_an_image_file_on),
+    BrandingField("footer_image", R.string.settings_footer_image, hintRes = R.string.settings_id_of_an_image_file_on),
+    BrandingField("footer_link", R.string.settings_footer_link, hintText = "https://…"),
+    BrandingField("affiliate_prompt", R.string.settings_affiliate_message),
+    BrandingField("disable_download_button", R.string.settings_hide_the_download_button, isSwitch = true),
+    BrandingField("disable_share_button", R.string.settings_hide_the_share_button, isSwitch = true)
 )
 
 /** Every setting of the file viewer at once; empty ones are removed. */

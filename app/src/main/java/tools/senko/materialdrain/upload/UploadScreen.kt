@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -375,7 +376,7 @@ private fun UploadDropZone(enabled: Boolean, onClick: () -> Unit) {
 @Composable
 private fun UploadResultCard(fileId: String?) {
     // The app's texts, for those its callbacks show
-    val res = LocalContext.current.resources
+    val res = LocalResources.current
     val context = LocalContext.current
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -429,7 +430,7 @@ private fun QueuedFilesCard(
     onClear: () -> Unit
 ) {
     // The app's texts, for those its callbacks show
-    val res = LocalContext.current.resources
+    val res = LocalResources.current
     val context = LocalContext.current
     val doneCount = items.count { it.status == UploadItemStatus.DONE }
     val totalSize = items.sumOf { it.sizeBytes ?: 0L }
@@ -473,7 +474,7 @@ private fun QueuedFilesCard(
 @Composable
 private fun QueuedFileRow(item: UploadItem, isUploading: Boolean, onRemove: (Int) -> Unit) {
     // The app's texts, for those its callbacks show
-    val res = LocalContext.current.resources
+    val res = LocalResources.current
     val context = LocalContext.current
     val size = item.sizeBytes?.takeIf { it > 0 }
     val fraction = size?.let { (item.uploadedBytes.toFloat() / it).coerceIn(0f, 1f) }

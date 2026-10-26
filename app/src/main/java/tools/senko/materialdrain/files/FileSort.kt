@@ -10,6 +10,7 @@ import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.util.parseDateTime
 import java.util.Collections
 import java.util.IdentityHashMap
+import tools.senko.materialdrain.R
 
 /**
  * The date a file is listed and sorted by: when it was last modified where the host knows (SMB, WebDAV, S3, Pixeldrain's
@@ -24,11 +25,11 @@ enum class SortableField {
     UPLOAD_DATE
 }
 
-/** The labels and the order they're offered in, wherever a sort menu is shown. */
-val SortOptions: List<Pair<String, SortableField>> = listOf(
-    "Name" to SortableField.NAME,
-    "Size" to SortableField.SIZE,
-    "Date" to SortableField.UPLOAD_DATE
+/** The labels (string resources) and the order they're offered in, wherever a sort menu is shown. */
+val SortOptions: List<Pair<Int, SortableField>> = listOf(
+    R.string.settings_name to SortableField.NAME,
+    R.string.files_size to SortableField.SIZE,
+    R.string.files_date to SortableField.UPLOAD_DATE
 )
 
 private fun StorageNode.sortKey(field: SortableField): Comparable<*> = when (field) {

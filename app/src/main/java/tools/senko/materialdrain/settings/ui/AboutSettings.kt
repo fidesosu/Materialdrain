@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import java.time.Instant
@@ -68,10 +69,10 @@ internal fun readAbout(context: Context): AppAbout {
     val versionName = info?.versionName.orEmpty()
     val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
     val kind = when {
-        debuggable -> "Debug build"
+        debuggable -> context.getString(R.string.settings_debug_build)
         // "1.6.4-dev.5": a build of the dev branch (see app/build.gradle.kts)
-        "-dev." in versionName -> "Development build"
-        else -> "Stable release"
+        "-dev." in versionName -> context.getString(R.string.app_development_build)
+        else -> context.getString(R.string.app_stable_release)
     }
     val committed = Instant.ofEpochSecond(BuildConfig.COMMIT_TIME)
         .atZone(ZoneId.systemDefault())
@@ -83,7 +84,7 @@ internal fun readAbout(context: Context): AppAbout {
 @Composable
 fun SettingsEnvironment.AboutSection() {
     // The app's texts, for those its callbacks show
-    val res = LocalContext.current.resources
+    val res = LocalResources.current
     val context = LocalContext.current
     val about = remember { readAbout(context) }
     val icon = remember {

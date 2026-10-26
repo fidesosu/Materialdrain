@@ -68,6 +68,7 @@ import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.util.formatSize
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.annotation.StringRes
 
 /** How long a thumbnail fades in over its tile (Coil's own default). */
 private const val THUMBNAIL_CROSSFADE_MS = 100
@@ -240,7 +241,7 @@ fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp
     ) {
         Icon(
             imageVector = kind.icon,
-            contentDescription = kind.label,
+            contentDescription = stringResource(kind.labelRes),
             tint = content,
             modifier = Modifier.size(size * 0.46f).graphicsLayer { alpha = tileAlpha.value }
         )
@@ -273,20 +274,21 @@ fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp
 }
 
 /** What kind of file [name] is, in a word, e.g. "Video" or "Archive": the same kind its tile shows (see [FileIcon]). */
-fun fileKindLabel(name: String, isDirectory: Boolean): String = FileKind.of(name, isDirectory).label
+@Composable
+fun fileKindLabel(name: String, isDirectory: Boolean): String = stringResource(FileKind.of(name, isDirectory).labelRes)
 
 /** What kind of file a name is, for the colour and glyph of its tile (see [FileIcon]). */
-private enum class FileKind(val icon: ImageVector, val label: String) {
-    FOLDER(Icons.Filled.Folder, "Folder"),
-    IMAGE(Icons.Filled.Image, "Image"),
-    VIDEO(Icons.Filled.Movie, "Video"),
-    AUDIO(Icons.Filled.MusicNote, "Audio"),
-    ARCHIVE(Icons.Filled.FolderZip, "Archive"),
-    PDF(Icons.Filled.PictureAsPdf, "PDF"),
-    CODE(Icons.Filled.Code, "Code"),
-    TEXT(Icons.Filled.Description, "Document"),
-    APP(Icons.Filled.Android, "App"),
-    OTHER(Icons.AutoMirrored.Filled.InsertDriveFile, "File");
+private enum class FileKind(val icon: ImageVector, @StringRes val labelRes: Int) {
+    FOLDER(Icons.Filled.Folder, R.string.files_folder),
+    IMAGE(Icons.Filled.Image, R.string.common_image),
+    VIDEO(Icons.Filled.Movie, R.string.common_video),
+    AUDIO(Icons.Filled.MusicNote, R.string.media_audio),
+    ARCHIVE(Icons.Filled.FolderZip, R.string.common_archive),
+    PDF(Icons.Filled.PictureAsPdf, R.string.common_pdf),
+    CODE(Icons.Filled.Code, R.string.settings_code),
+    TEXT(Icons.Filled.Description, R.string.common_document),
+    APP(Icons.Filled.Android, R.string.common_app),
+    OTHER(Icons.AutoMirrored.Filled.InsertDriveFile, R.string.common_file);
 
     /** The tile's colour and the glyph's: from the theme, so they follow the app's colours (and dark mode). */
     @Composable
@@ -329,14 +331,17 @@ private enum class FileKind(val icon: ImageVector, val label: String) {
 }
 
 /** The details line of a file or folder: "Folder", or its size and extension; then [modified] when given. */
-fun fileDetails(name: String, isDirectory: Boolean, fileSize: Long?, modified: String? = null): String =
-    buildList {
-        if (isDirectory) add("Folder") else {
+@Composable
+fun fileDetails(name: String, isDirectory: Boolean, fileSize: Long?, modified: String? = null): String {
+    val folder = stringResource(R.string.files_folder)
+    return buildList {
+        if (isDirectory) add(folder) else {
             fileSize?.let { add(formatSize(it)) }
             extensionLabel(name)?.let { add(it) }
         }
         modified?.let { add(it) }
     }.joinToString(" • ")
+}
 
 /** The file extension in capitals ("PDF"), for the details line. Null when the name has none or it is not a short one. */
 private fun extensionLabel(name: String): String? =

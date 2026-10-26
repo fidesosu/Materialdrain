@@ -42,6 +42,8 @@ import androidx.media3.common.SimpleBasePlayer
 import android.os.Looper
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /**
  * The headers the active host needs for one of its URLs, installed by [AppContainer]. Images, thumbnails and media
@@ -270,15 +272,16 @@ fun rememberPlayerUiState(player: Player, polling: Boolean = true): PlayerUiStat
 }
 
 /** "the media can't be played" in words which mean something to the user. */
+@Composable
 fun PlaybackException.userMessage(): String = when (errorCode) {
     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "Couldn't reach the host. Check your connection."
-    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "The host refused the file (maybe rate limited)."
-    PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "The file was not found."
+    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> stringResource(R.string.app_couldn_t_reach_the_host)
+    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> stringResource(R.string.app_the_host_refused_the_file)
+    PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> stringResource(R.string.app_the_file_was_not_found)
     PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
     PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
-    PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED -> "This file can't be played on this device."
-    else -> "Playback failed."
+    PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED -> stringResource(R.string.app_this_file_can_t_be)
+    else -> stringResource(R.string.app_playback_failed)
 }
 
 // Shared by the controls of the video and audio players; how far they skip is a setting (PlayerSettings.seekStepMs)

@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.offset
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextAlign
@@ -126,7 +127,7 @@ import androidx.compose.ui.res.stringResource
 @Composable
 fun MaterialdrainScreen() {
     // The app's texts, for those its callbacks show
-    val res = LocalContext.current.resources
+    val res = LocalResources.current
     var previousScreen by rememberSaveable { mutableStateOf(Screen.Files) }
 
     // The problem shown in a dialog, if any (see AppDialog)
@@ -236,6 +237,7 @@ fun MaterialdrainScreen() {
     val noScreensConfigured = hostTabs.noScreensConfigured
     fun tabOf(screen: Screen): Tab? = hostTabs.tabOf(screen, currentTabId)
     val currentTab = if (currentScreen in BROWSE_SCREENS) tabOf(currentScreen) else null
+    @Composable
     fun screenTitle(screen: Screen): String = tabOf(screen)?.title ?: screen.title
     LaunchedEffect(navBarOrder, currentScreen) {
         // A tab the new host doesn't offer falls back to the first one it does (e.g. Upload isn't reachable on a
@@ -489,12 +491,14 @@ fun MaterialdrainScreen() {
         appContainer.appUpdates.checkOnOpening()
     }
 
-    // The ViewModels' messages for the snackbar, one after another (see UiMessages)
+    // The ViewModels' messages for the snackbar, one after another (see UiMessages), those of the app's texts read in
+    // its language when they're shown
+    val resources = LocalResources.current
     LaunchedEffect(Unit) {
         appContainer.uiMessages.messages.collect { message ->
             val result = snackbarHostState.showSnackbar(
-                message.text,
-                actionLabel = message.action?.label,
+                message.textRes?.let { resources.getString(it) } ?: message.text,
+                actionLabel = message.action?.let { resources.getString(it.labelRes) },
                 duration = if (message.long) SnackbarDuration.Long else SnackbarDuration.Short
             )
             if (result == SnackbarResult.ActionPerformed) {
@@ -544,6 +548,7 @@ fun MaterialdrainScreen() {
     val fabState by remember {
         derivedStateOf {
             screenFab(
+                resources = resources,
                 screen = currentScreen,
                 canUpload = uploadUiState.hasUploadable && !uploadUiState.isLoading,
                 onUpload = { if (uploadUiState.hasUploadable && !uploadUiState.isLoading) uploadViewModel.upload() },

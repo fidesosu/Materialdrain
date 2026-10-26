@@ -34,9 +34,8 @@ import tools.senko.materialdrain.ui.icons.symbols.SettingsFilled
 import tools.senko.materialdrain.ui.icons.symbols.Symbols
 import tools.senko.materialdrain.ui.icons.symbols.Upload
 import androidx.compose.ui.res.stringResource
+import android.content.res.Resources
 
-private const val SETTINGS_SAVE_TEXT = "Save Settings"
-private const val SETTINGS_SAVED_TEXT = "Settings saved"
 
 /** How far below its corner the button starts, enough to be off the screen; it slides up from there. */
 private val FabEntryOffset = 160.dp
@@ -61,6 +60,8 @@ data class FabDetails(
  * save by spinning its icon ([settingsSaveCount] counting up) and changing its text for a moment ([settingsJustSaved]).
  */
 internal fun screenFab(
+    /** The app's texts, for the button's */
+    resources: Resources,
     screen: Screen,
     canUpload: Boolean,
     onUpload: () -> Unit,
@@ -73,7 +74,7 @@ internal fun screenFab(
     Screen.Upload -> if (canUpload) FabDetails(
         screen = Screen.Upload,
         icon = Symbols.Upload,
-        text = "Upload",
+        text = resources.getString(R.string.upload_upload),
         onClick = onUpload,
         isExtended = true,
     ) else null
@@ -81,9 +82,9 @@ internal fun screenFab(
     Screen.Settings -> if (settingsHasSaveButton) FabDetails(
         screen = Screen.Settings,
         icon = Symbols.SettingsFilled, // The filled gear, as the save button
-        text = if (settingsJustSaved) SETTINGS_SAVED_TEXT else SETTINGS_SAVE_TEXT,
+        text = resources.getString(if (settingsJustSaved) R.string.app_settings_saved else R.string.app_save_settings),
         // Both texts take the same space, so the button doesn't change size when it confirms the save
-        reserveTextWidthFor = listOf(SETTINGS_SAVE_TEXT, SETTINGS_SAVED_TEXT),
+        reserveTextWidthFor = listOf(resources.getString(R.string.app_save_settings), resources.getString(R.string.app_settings_saved)),
         iconSpinTrigger = settingsSaveCount,
         onClick = onSaveSettings,
         isExtended = true

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import tools.senko.materialdrain.UiMessages
 import tools.senko.materialdrain.settings.AppSettings
+import tools.senko.materialdrain.R
 
 /**
  * A fingerprint or face, or the device's screen lock when there is no biometric. Used by the lock prompt. Android 10
@@ -72,7 +73,7 @@ class AppLock(private val settings: AppSettings, private val messages: UiMessage
     private fun turnedOffIfUnusable(): Boolean {
         if (settings.biometricLockStatus() !in NOTHING_TO_UNLOCK_WITH) return true
         settings.setBiometricLock(false)
-        messages.show("The app lock was turned off: this device has no screen lock any more.", long = true)
+        messages.show(R.string.app_the_app_lock_was_turned_off, long = true)
         return false
     }
 }

@@ -205,14 +205,15 @@ private fun UsageChart(series: TimeSeries?, statistic: UsageStatistic, range: St
         val dimColor = colors.primary.copy(alpha = 0.35f)
         val gridColor = colors.outlineVariant
         fun indexAt(x: Float, width: Float) = (x / width * amounts.size).toInt().coerceIn(0, amounts.lastIndex)
+        val statisticLabel = statistic.label
+        val rangeLabel = range.label
+        val description = if (series == null) "$statisticLabel in $rangeLabel" else
+            stringResource(R.string.settings_in_in_total_at_most, statisticLabel, rangeLabel, format(total), format(peak))
         Box(modifier = Modifier.fillMaxWidth().height(140.dp)) {
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .semantics {
-                        contentDescription = if (series == null) "${statistic.label} in ${range.label}" else
-                            "${statistic.label} in ${range.label}: ${format(total)} in total, at most ${format(peak)} at once"
-                    }
+                    .semantics { contentDescription = description }
                     .pointerInput(amounts) {
                         if (amounts.isEmpty()) return@pointerInput
                         detectTapGestures { offset ->

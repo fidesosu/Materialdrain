@@ -436,24 +436,26 @@ private fun KeyValueDialog(
 
 // ---- Screens ----
 
+@Composable
 private fun HostScreen.label(): String = when (this) {
-    HostScreen.UPLOAD -> "Upload"
-    HostScreen.FILES -> "Files"
-    HostScreen.LISTS -> "Lists"
-    HostScreen.FILESYSTEM -> "Filesystem"
+    HostScreen.UPLOAD -> stringResource(R.string.upload_upload)
+    HostScreen.FILES -> stringResource(R.string.settings_files)
+    HostScreen.LISTS -> stringResource(R.string.screen_lists)
+    HostScreen.FILESYSTEM -> stringResource(R.string.files_filesystem)
 }
 
+@Composable
 private fun HostScreen.help(): String = when (this) {
-    HostScreen.UPLOAD -> "Picking files to upload"
-    HostScreen.FILES -> "A flat list of every file on the account"
-    HostScreen.LISTS -> "Shareable lists of files"
-    HostScreen.FILESYSTEM -> "The folder browser"
+    HostScreen.UPLOAD -> stringResource(R.string.settings_picking_files_to_upload)
+    HostScreen.FILES -> stringResource(R.string.settings_a_flat_list_of_every)
+    HostScreen.LISTS -> stringResource(R.string.settings_shareable_lists_of_files)
+    HostScreen.FILESYSTEM -> stringResource(R.string.settings_the_folder_browser)
 }
 
 /** The actions a screen can leave out, by the names a config uses for them. */
 private val HideableActions = listOf(
-    "UPLOAD" to "Upload", "MKDIR" to "New folder", "RENAME" to "Rename and move", "DELETE" to "Delete",
-    "ARCHIVE_BROWSE" to "Look inside archives"
+    "UPLOAD" to R.string.upload_upload, "MKDIR" to R.string.browser_new_folder, "RENAME" to R.string.settings_rename_and_move, "DELETE" to R.string.browser_delete,
+    "ARCHIVE_BROWSE" to R.string.settings_look_inside_archives
 )
 
 /** One screen of the config, with what it may hold besides its name, which is kept as it is. */
@@ -478,6 +480,7 @@ internal data class ScreenEntry(
     }
 
     /** What the tab is called: its own name, or the screen's. */
+    @Composable
     fun title(): String = name?.takeIf { it.isNotBlank() } ?: HostScreen.entries.firstOrNull { it.name == screen }?.label() ?: screen
 
     /** The tab as the app reads it, for its id and checks (see screenProblems); null for a kind the app doesn't know. */
@@ -679,7 +682,7 @@ private fun ScreenRow(
                             FilterChip(
                                 selected = hidden,
                                 onClick = { onChange(entry.copy(disabled = if (hidden) entry.disabled - capability else entry.disabled + capability)) },
-                                label = { Text(label) }
+                                label = { Text(stringResource(label)) }
                             )
                         }
                     }

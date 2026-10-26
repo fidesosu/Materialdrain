@@ -79,7 +79,7 @@ fun ThemeColorPicker(selected: Int, enabled: Boolean, onSelect: (Int) -> Unit) {
             modifier = Modifier.horizontalScroll(rememberScrollState()).padding(bottom = 4.dp)
         ) {
             ThemeColorPresets.forEach { (name, color) ->
-                Swatch(color, name, chosen = color == selected, enabled = enabled, onClick = { onSelect(color) })
+                Swatch(color, stringResource(name), chosen = color == selected, enabled = enabled, onClick = { onSelect(color) })
             }
             Swatch(custom, stringResource(R.string.settings_custom), chosen = custom != null, enabled = enabled, onClick = { typing = true }, onType = true)
         }

@@ -31,9 +31,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** Whether the app is light or dark: as the system is, or always one of them. */
-enum class ThemeMode(val label: String) { SYSTEM("System"), LIGHT("Light"), DARK("Dark") }
+enum class ThemeMode(@StringRes val labelRes: Int) { SYSTEM(R.string.theme_system), LIGHT(R.string.theme_light), DARK(R.string.theme_dark) }
+
+/** The choice's name in the app's language. */
+val ThemeMode.label: String
+    @Composable get() = stringResource(labelRes)
 
 /**
  * How the app is coloured (Look and feel): light or dark ([mode]), from the wallpaper ([wallpaperColors]) or else from

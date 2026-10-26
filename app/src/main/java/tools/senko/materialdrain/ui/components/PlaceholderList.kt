@@ -44,6 +44,8 @@ import tools.senko.materialdrain.ui.LocalListLook
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** How long the shine takes to cross the placeholders. */
 private const val SHINE_MS = 1_300
@@ -61,10 +63,11 @@ private val DETAIL_WIDTHS = floatArrayOf(0.34f, 0.26f, 0.4f, 0.3f, 0.22f, 0.36f,
 fun PlaceholderList(modifier: Modifier = Modifier) {
     val look = LocalListLook.current
     val brush = placeholderBrush()
+    val loading = stringResource(R.string.common_loading)
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .semantics { contentDescription = "Loading" }
+            .semantics { contentDescription = loading }
     ) {
         if (look.grid) {
             // As many tiles to a row as the grid has (about 120dp each, two at the least)

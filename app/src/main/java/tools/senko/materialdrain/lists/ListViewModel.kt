@@ -147,7 +147,7 @@ class ListViewModel(
                 is ApiResponse.Error -> {
                     ProviderLog.e("Lists", "loading the lists failed (${response.error.code}): ${response.error.message}")
                     _uiState.update {
-                        it.copy(isLoading = false, errorMessage = response.error.forDisplay().ifBlank { resources.getString(R.string.lists_unknown_error_fetching_lists) })
+                        it.copy(isLoading = false, errorMessage = response.error.forDisplay(resources).ifBlank { resources.getString(R.string.lists_unknown_error_fetching_lists) })
                     }
                 }
             }
@@ -193,7 +193,7 @@ class ListViewModel(
                     if (it.openedList?.id != list.id) it
                     else it.copy(
                         isLoadingListFiles = false,
-                        listFilesErrorMessage = response.error.forDisplay().ifBlank { resources.getString(R.string.lists_unknown_error_fetching_list) }
+                        listFilesErrorMessage = response.error.forDisplay(resources).ifBlank { resources.getString(R.string.lists_unknown_error_fetching_list) }
                     )
                 }
             }

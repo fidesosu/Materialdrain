@@ -362,7 +362,7 @@ class FilesystemViewModel(
                         fetchPathContent(rootPath(provider))
                         return@launch
                     }
-                    _uiState.update { it.copy(isLoading = false, errorMessage = response.error.forDisplay()) }
+                    _uiState.update { it.copy(isLoading = false, errorMessage = response.error.forDisplay(application.resources)) }
                 }
             }
         }

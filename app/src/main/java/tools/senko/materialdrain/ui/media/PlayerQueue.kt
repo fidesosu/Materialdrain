@@ -270,6 +270,9 @@ private fun QueueRow(
     handle: Modifier,
     modifier: Modifier = Modifier
 ) {
+    // The names of the moves a screen reader offers
+    val moveUp = stringResource(R.string.media_move_up)
+    val moveDown = stringResource(R.string.media_move_down)
     val metadata = item.mediaMetadata
     val colors = MaterialTheme.colorScheme
     // Its title from its tags, read once the row is shown (see SongTags)
@@ -294,8 +297,8 @@ private fun QueueRow(
             .clickable(onClick = onPlay)
             .semantics {
                 customActions = buildList {
-                    if (canMove(-1)) add(CustomAccessibilityAction("Move up") { onMove(-1); true })
-                    if (canMove(1)) add(CustomAccessibilityAction("Move down") { onMove(1); true })
+                    if (canMove(-1)) add(CustomAccessibilityAction(moveUp) { onMove(-1); true })
+                    if (canMove(1)) add(CustomAccessibilityAction(moveDown) { onMove(1); true })
                 }
             }
             .padding(start = 8.dp, top = 6.dp, bottom = 6.dp)

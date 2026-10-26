@@ -31,6 +31,7 @@ import tools.senko.materialdrain.ui.icons.filled.Palette
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import tools.senko.materialdrain.ui.theme.ThemeMode
 import tools.senko.materialdrain.settings.SEARCH_INDEX_FILE_NAME
 import tools.senko.materialdrain.settings.SEARCH_RESULT_LIMITS
@@ -157,7 +158,7 @@ private fun buildSettingsCatalog(resources: Resources): List<SettingsCategory> =
             SettingsItem.Header(resources.getString(R.string.settings_theme)),
             SettingsItem.Choice(
                 title = resources.getString(R.string.settings_light_or_dark),
-                options = ThemeMode.entries.map { it.label to it },
+                options = ThemeMode.entries.map { resources.getString(it.labelRes) to it },
                 selected = { appSettings.theme.collectAsState().value.mode },
                 onSelect = { appSettings.setThemeMode(it) }
             ),
@@ -194,7 +195,7 @@ private fun buildSettingsCatalog(resources: Resources): List<SettingsCategory> =
             ),
             SettingsItem.Choice(
                 title = resources.getString(R.string.settings_open_on),
-                options = listOf<Pair<String, Screen?>>(resources.getString(R.string.settings_last) to null) + START_SCREENS.map { it.title to it },
+                options = listOf<Pair<String, Screen?>>(resources.getString(R.string.settings_last) to null) + START_SCREENS.map { resources.getString(it.titleRes) to it },
                 selected = { appSettings.startScreen.collectAsState().value },
                 onSelect = { appSettings.setStartScreen(it) }
             ),
@@ -334,7 +335,7 @@ private fun buildSettingsCatalog(resources: Resources): List<SettingsCategory> =
         tone = CategoryTone.SECONDARY,
         status = {
             if (!appSettings.vibration.collectAsState().value) resources.getString(R.string.media_off)
-            else appSettings.vibrationStrength.collectAsState().value.label
+            else resources.getString(appSettings.vibrationStrength.collectAsState().value.labelRes)
         },
         items = listOf(
             SettingsItem.Toggle(
@@ -347,7 +348,7 @@ private fun buildSettingsCatalog(resources: Resources): List<SettingsCategory> =
                     SettingsItem.Choice(
                         title = resources.getString(R.string.settings_strength),
                         info = resources.getString(R.string.settings_some_phones_only_tell_light),
-                        options = VibrationStrength.entries.map { it.label to it },
+                        options = VibrationStrength.entries.map { resources.getString(it.labelRes) to it },
                         selected = { appSettings.vibrationStrength.collectAsState().value },
                         onSelect = { appSettings.setVibrationStrength(it) }
                     ),
@@ -628,7 +629,7 @@ const val HOSTS_CATEGORY_ID = "advanced"
 /** The settings (see [buildSettingsCatalog]) in the app's language: made once, and again when the configuration changes. */
 @Composable
 fun settingsCatalog(): List<SettingsCategory> {
-    val resources = LocalContext.current.resources
+    val resources = LocalResources.current
     val configuration = LocalConfiguration.current
     return remember(configuration) { buildSettingsCatalog(resources) }
 }

@@ -1,6 +1,6 @@
 package tools.senko.materialdrain
 
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -17,25 +17,34 @@ import tools.senko.materialdrain.settings.SEARCH_INDEX_DELETE_WARNING
 import tools.senko.materialdrain.settings.isSearchIndex
 import tools.senko.materialdrain.upload.UploadViewModel
 import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
+import tools.senko.materialdrain.R
 
 /**
  * A problem the app shows in a dialog. Each kind decides its own title and text, and what closing it clears (see
  * [AppDialogs]), so neither depends on the wording of a message. [opensAccountSettings]: OK goes to the account,
  * where a missing API key is set.
  */
-internal sealed class AppDialog(val title: String, val text: String, val opensAccountSettings: Boolean = false) {
-    data class UploadFailed(val message: String) : AppDialog("Upload failed", "Error: $message")
-    data class UploadError(val message: String) : AppDialog("Upload error", message)
-    data object UploadApiKeyRequired : AppDialog(
-        "Not signed in",
-        "Log in or add an API key in Settings to upload.",
-        opensAccountSettings = true
-    )
+internal sealed class AppDialog(@StringRes val titleRes: Int, val opensAccountSettings: Boolean = false) {
+    /** What it says, in the app's language. */
+    @get:Composable
+    abstract val text: String
+
+    data class UploadFailed(val message: String) : AppDialog(R.string.upload_upload_failed) {
+        override val text: String @Composable get() = stringResource(R.string.app_error_1_s, message)
+    }
+    data class UploadError(val message: String) : AppDialog(R.string.app_upload_error) {
+        override val text: String @Composable get() = message
+    }
+    data object UploadApiKeyRequired : AppDialog(R.string.app_not_signed_in, opensAccountSettings = true) {
+        override val text: String @Composable get() = stringResource(R.string.app_log_in_or_add_an_api)
+    }
     data class FilesApiKeyRequired(val onDetails: Boolean, val message: String) : AppDialog(
-        "Not signed in",
-        message,
+        R.string.app_not_signed_in,
         opensAccountSettings = true
-    )
+    ) {
+        override val text: String @Composable get() = message
+    }
 }
 
 /**
@@ -53,7 +62,7 @@ internal fun AppDialogs(
     fileInfoViewModel: FileInfoViewModel
 ) {
     // The app's texts, for those its callbacks show
-    val res = LocalContext.current.resources
+    val res = LocalResources.current
     dialog?.let { shown ->
         fun close(confirmed: Boolean) {
             onClosed()
@@ -69,7 +78,7 @@ internal fun AppDialogs(
         }
         AlertDialog(
             onDismissRequest = { close(confirmed = false) },
-            title = { Text(shown.title) },
+            title = { Text(stringResource(shown.titleRes)) },
             text = { Text(shown.text) },
             confirmButton = { Button(onClick = { close(confirmed = true) }) { Text("OK") } }
         )
@@ -100,7 +109,7 @@ internal fun AppDialogs(
                 val fileInfoUiState by fileInfoViewModel.uiState.collectAsState()
                 val isSearchIndex = fileInfoUiState.nodeToDelete?.isSearchIndex() == true
                 Text(
-                    if (isSearchIndex) SEARCH_INDEX_DELETE_WARNING
+                    if (isSearchIndex) res.getString(SEARCH_INDEX_DELETE_WARNING)
                     else res.getString(R.string.app_delete_this_can_t_be, fileInfoUiState.nodeToDelete?.name ?: fileInfoUiState.fileIdToDelete)
                 )
             },

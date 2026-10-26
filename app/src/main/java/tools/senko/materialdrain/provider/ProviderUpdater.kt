@@ -10,6 +10,8 @@ import tools.senko.materialdrain.provider.api.ConfigUpdates
 import tools.senko.materialdrain.provider.api.SensitiveChange
 import tools.senko.materialdrain.provider.api.UpdateCheckResult
 import java.util.concurrent.TimeUnit
+import android.content.res.Resources
+import tools.senko.materialdrain.R
 
 private const val MAX_CONFIG_BYTES = 256L * 1024
 private const val AUTO_UPDATE_INTERVAL_MILLIS = 24L * 60 * 60 * 1000
@@ -30,6 +32,8 @@ sealed interface CheckOutcome {
  * Auto-update runs when the app starts, at most once a day per config — there is no background job.
  */
 class ProviderUpdater(
+    /** The app's texts (what a check found) */
+    private val resources: Resources,
     private val store: ProviderConfigStore,
     baseClient: OkHttpClient,
     private val appVersion: Int
@@ -37,14 +41,14 @@ class ProviderUpdater(
     private val client = baseClient.newBuilder().callTimeout(20, TimeUnit.SECONDS).build()
 
     suspend fun check(id: String): CheckOutcome = withContext(Dispatchers.IO) {
-        val stored = store.get(id) ?: return@withContext CheckOutcome.Failed("This host no longer exists.")
+        val stored = store.get(id) ?: return@withContext CheckOutcome.Failed(resources.getString(R.string.settings_this_host_no_longer_exists))
         val url = stored.updateUrl ?: return@withContext CheckOutcome.NoUpdateUrl
-        if (!ConfigUpdates.isHttps(url)) return@withContext CheckOutcome.Failed("The update URL has to use https.")
+        if (!ConfigUpdates.isHttps(url)) return@withContext CheckOutcome.Failed(resources.getString(R.string.settings_the_update_url_has_to))
         val now = System.currentTimeMillis()
 
         try {
             val request = Request.Builder().url(url.trim())
-                .apply { stored.etag?.let { header("If-None-Match", it) } }
+                .apply { stored.etag?.let { header(resources.getString(R.string.settings_if_none_match), it) } }
                 .build()
             client.newCall(request).execute().use { response ->
                 // Unchanged since the last fetch: whatever that fetch found still stands
@@ -54,10 +58,10 @@ class ProviderUpdater(
                         CheckOutcome.UpdateAvailable(pending.meta?.version ?: 0, ConfigUpdates.sensitiveChanges(stored.config, pending))
                     } ?: CheckOutcome.UpToDate
                 }
-                if (!response.isSuccessful) return@withContext CheckOutcome.Failed("The update URL answered HTTP ${response.code}.")
+                if (!response.isSuccessful) return@withContext CheckOutcome.Failed(resources.getString(R.string.settings_the_update_url_answered_http, response.code))
 
                 val text = readLimited(response.body)
-                    ?: return@withContext CheckOutcome.Failed("The file at the update URL is larger than 256 KB.")
+                    ?: return@withContext CheckOutcome.Failed(resources.getString(R.string.settings_the_file_at_the_update))
                 val etag = response.header("ETag")
 
                 when (val result = ConfigUpdates.evaluate(stored.config, text, appVersion)) {
@@ -84,7 +88,7 @@ class ProviderUpdater(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            CheckOutcome.Failed(e.message ?: "The update URL couldn't be reached.")
+            CheckOutcome.Failed(e.message ?: resources.getString(R.string.settings_the_update_url_couldn_t))
         }
     }
 

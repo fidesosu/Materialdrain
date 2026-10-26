@@ -55,7 +55,7 @@ internal fun rememberPreviewSettings(signedIn: Boolean = true): SettingsEnvironm
             accountViewModel = AccountViewModel(context.resources, PreviewUserApi, session, UiMessages()),
             apiKeyInput = "",
             onApiKeyInputChange = {},
-            providerSettingsViewModel = ProviderSettingsViewModel(context.resources, configStore, registry, ProviderUpdater(configStore, OkHttpClient(), appVersion = 0))
+            providerSettingsViewModel = ProviderSettingsViewModel(context.resources, configStore, registry, ProviderUpdater(context.resources, configStore, OkHttpClient(), appVersion = 0))
         )
     }
 }

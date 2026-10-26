@@ -227,7 +227,7 @@ internal fun closeSong(player: Player, song: BackgroundSong, messages: tools.sen
     player.stop()
     player.clearMediaItems()
     if (messages != null && items.isNotEmpty()) {
-        messages.show("Song closed", action = UiMessageAction.Undo {
+        messages.show(R.string.media_song_closed, action = UiMessageAction.Undo {
             player.setMediaItems(items, index.coerceIn(0, items.lastIndex), position)
             player.prepare()
             player.playWhenReady = wasPlaying
@@ -446,7 +446,7 @@ fun MiniPlayer(
         Column(
             modifier = Modifier
                 .background(Brush.horizontalGradient(listOf(tint, cardColor)))
-                .clickable(onClickLabel = "Open the player", onClick = sheet::open)
+                .clickable(onClickLabel = stringResource(R.string.media_open_the_player), onClick = sheet::open)
         ) {
             MiniPlayerRow(art, title, artist, controls, sheet = sheet)
             MiniProgressLine(progress, buffering, failed)

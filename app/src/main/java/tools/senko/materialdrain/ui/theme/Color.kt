@@ -9,21 +9,25 @@ import com.google.android.material.color.utilities.DynamicColor
 import com.google.android.material.color.utilities.Hct
 import com.google.android.material.color.utilities.MaterialDynamicColors
 import com.google.android.material.color.utilities.SchemeTonalSpot
+import tools.senko.materialdrain.R
 
 /** The app's own colour, which its colours are made from when they don't come from the wallpaper. */
 const val DEFAULT_THEME_COLOR: Int = 0xFF6750A4.toInt()
 
-/** The colours offered for the theme (Look and feel), with their names; any other can be typed in as well. */
-val ThemeColorPresets: List<Pair<String, Int>> = listOf(
-    "Purple" to DEFAULT_THEME_COLOR,
-    "Blue" to 0xFF2F6FDB.toInt(),
-    "Teal" to 0xFF00897B.toInt(),
-    "Green" to 0xFF43A047.toInt(),
-    "Yellow" to 0xFFF9A825.toInt(),
-    "Orange" to 0xFFF4511E.toInt(),
-    "Red" to 0xFFD32F2F.toInt(),
-    "Pink" to 0xFFD81B60.toInt(),
-    "Grey" to 0xFF607D8B.toInt()
+/**
+ * The colours offered for the theme (Look and feel), with their names (string resources); any other can be typed in as
+ * well.
+ */
+val ThemeColorPresets: List<Pair<Int, Int>> = listOf(
+    R.string.theme_purple to DEFAULT_THEME_COLOR,
+    R.string.theme_blue to 0xFF2F6FDB.toInt(),
+    R.string.theme_teal to 0xFF00897B.toInt(),
+    R.string.theme_green to 0xFF43A047.toInt(),
+    R.string.theme_yellow to 0xFFF9A825.toInt(),
+    R.string.theme_orange to 0xFFF4511E.toInt(),
+    R.string.theme_red to 0xFFD32F2F.toInt(),
+    R.string.theme_pink to 0xFFD81B60.toInt(),
+    R.string.theme_grey to 0xFF607D8B.toInt()
 )
 
 /**
