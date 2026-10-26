@@ -94,7 +94,7 @@ private const val DIMMED_ALPHA = 0.38f
  * The settings: a tile per category, its icon on a tile of one of the theme's colours so the categories are told apart
  * at a glance, and the account at the top with more in it. A tile opens the category's page with all of its settings,
  * the deepest the settings go: a setting's own settings are indented under it there, not a page further in. What the
- * categories and their settings are is defined in [SettingsCatalog].
+ * categories and their settings are is defined in [settingsCatalog].
  *
  * @param categoryId the opened page, null for the settings themselves
  */
@@ -156,7 +156,7 @@ private fun SettingsHome(environment: SettingsEnvironment, onOpen: (SettingsCate
                 .verticalScroll(scrollState)
                 .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = bottomRoom)
         ) {
-            SettingsCatalog.forEach { category ->
+            settingsCatalog().forEach { category ->
                 val tile = category.tile
                 if (tile != null) {
                     tile(environment) { onOpen(category) }

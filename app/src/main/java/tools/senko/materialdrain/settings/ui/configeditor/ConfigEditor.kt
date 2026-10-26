@@ -167,14 +167,15 @@ fun ConfigEditor(
     onSave: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val schema = configSchema()
     val original = remember(initialText) { ProviderConfigCodec.parseObject(initialText) }
     var root by remember(initialText) { mutableStateOf(original ?: JsonObject(emptyMap())) }
     var jsonText by rememberSaveable(initialText) { mutableStateOf(initialText) }
     var jsonError by remember { mutableStateOf<String?>(null) }
     val kind = root.textOf("kind")
-    val sections = sectionsFor(kind)
+    val sections = schema.sectionsFor(kind)
     // A config that isn't JSON yet, or of a kind the form doesn't know, opens as text
-    var mode by rememberSaveable(initialText) { mutableStateOf(if (original != null && sectionsFor(original.textOf("kind")) != null) EditorMode.FORM else EditorMode.JSON) }
+    var mode by rememberSaveable(initialText) { mutableStateOf(if (original != null && schema.sectionsFor(original.textOf("kind")) != null) EditorMode.FORM else EditorMode.JSON) }
     var confirmDiscard by remember { mutableStateOf(false) }
     // The pages opened from the first one, the one on top last
     val stack = remember(initialText) { mutableStateListOf<Page>() }
@@ -229,7 +230,7 @@ fun ConfigEditor(
                         back = fullPage != null,
                         title = fullPage?.title ?: title,
                         subtitle = if (fullPage != null) stack.trail().ifEmpty { configName.orEmpty() }
-                        else listOfNotNull(configName, kindLabel(kind)).joinToString(" · "),
+                        else listOfNotNull(configName, schema.kindLabel(kind)).joinToString(" · "),
                         onNavigate = goBack,
                         saveLabel = saveLabel,
                         onSave = { onSave(currentText()) }
@@ -251,7 +252,7 @@ fun ConfigEditor(
                                 val parsed = ProviderConfigCodec.parseObject(jsonText)
                                 when {
                                     parsed == null -> jsonError = "The JSON can't be read. Fix it here to use the form."
-                                    sectionsFor(parsed.textOf("kind")) == null ->
+                                    schema.sectionsFor(parsed.textOf("kind")) == null ->
                                         jsonError = "Set \"kind\" to generic_rest, webdav, s3 or smb to use the form."
                                     else -> {
                                         root = parsed
@@ -443,6 +444,7 @@ private fun PageColumn(maxWidth: Dp = ContentMaxWidth, content: @Composable Colu
  */
 @Composable
 private fun FirstPage(sections: List<Section>, form: FormState, selected: Page?, onOpen: (Page) -> Unit) {
+    val schema = configSchema()
     val others = form.root.keys - describedKeys(sections)
     PageColumn {
         sections.filter { it.startOpen }.forEach { section ->
@@ -459,7 +461,7 @@ private fun FirstPage(sections: List<Section>, form: FormState, selected: Page?,
                     NavRow(
                         title = section.title,
                         summary = summaryOf(fields, obj).ifEmpty { stringResource(R.string.settings_nothing_set_yet) },
-                        problem = hasProblem(fields, obj),
+                        problem = hasProblem(fields, obj, schema),
                         selected = selected == page,
                         onClick = { onOpen(page) }
                     )
@@ -500,11 +502,12 @@ private fun GroupPage(page: Page.OfGroup, form: FormState) {
 
 @Composable
 private fun EndpointPage(page: Page.OfEndpoint, form: FormState) {
-    val info = KnownEndpoints.firstOrNull { it.name == page.name }
+    val schema = configSchema()
+    val info = schema.KnownEndpoints.firstOrNull { it.name == page.name }
     var confirmRemove by remember { mutableStateOf(false) }
     PageColumn {
         Intro(info?.let { "${it.area}. ${it.help}" } ?: stringResource(R.string.settings_unknown_name_kept_but_unused))
-        FieldsEditor(info?.fields ?: endpointFields(), page.path, form)
+        FieldsEditor(info?.fields ?: schema.endpointFields(), page.path, form)
         OutlinedButton(
             onClick = { confirmRemove = true },
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
@@ -759,13 +762,13 @@ internal fun summaryOf(fields: List<FieldSpec>, obj: JsonObject): String =
     }.distinct().take(4).joinToString(" · ")
 
 /** Whether something [obj] can't do without is missing, in it or in an object inside it. */
-internal fun hasProblem(fields: List<FieldSpec>, obj: JsonObject): Boolean = fields.filter { it.shownWhen(obj) }.any { spec ->
+internal fun hasProblem(fields: List<FieldSpec>, obj: JsonObject, schema: ConfigSchema): Boolean = fields.filter { it.shownWhen(obj) }.any { spec ->
     val value = obj[spec.key]?.takeUnless { it is JsonNull }
     when (val kind = spec.kind) {
-        is FieldKind.Group -> (value != null || spec.required) && hasProblem(kind.fields, value as? JsonObject ?: JsonObject(emptyMap()))
+        is FieldKind.Group -> (value != null || spec.required) && hasProblem(kind.fields, value as? JsonObject ?: JsonObject(emptyMap()), schema)
         FieldKind.Endpoints -> {
             val endpoints = value as? JsonObject
-            endpoints.isNullOrEmpty() || endpoints.any { (name, endpoint) -> endpointHasProblem(name, endpoint) }
+            endpoints.isNullOrEmpty() || endpoints.any { (name, endpoint) -> endpointHasProblem(name, endpoint, schema) }
         }
         FieldKind.Screens -> screenEntryProblems(value).isNotEmpty()
         // A field with a default can be left out, the default stands in
@@ -773,8 +776,8 @@ internal fun hasProblem(fields: List<FieldSpec>, obj: JsonObject): Boolean = fie
     }
 }
 
-internal fun endpointHasProblem(name: String, endpoint: JsonElement): Boolean =
-    hasProblem(KnownEndpoints.firstOrNull { it.name == name }?.fields ?: endpointFields(), endpoint as? JsonObject ?: JsonObject(emptyMap()))
+internal fun endpointHasProblem(name: String, endpoint: JsonElement, schema: ConfigSchema): Boolean =
+    hasProblem(schema.KnownEndpoints.firstOrNull { it.name == name }?.fields ?: schema.endpointFields(), endpoint as? JsonObject ?: JsonObject(emptyMap()), schema)
 
 @Composable
 private fun RawJsonField(key: String, value: JsonElement, onValue: (JsonElement?) -> Unit) {
@@ -919,17 +922,27 @@ private fun ConfigEditorJsonPreview() {
     }
 }
 
+/**
+ * How many parts each kind's form has besides the one open at first (Sign-in, Endpoints, ...): the pages of the preview
+ * below, by their place, as their titles are in the app's language, which a parameter provider can't read.
+ */
+private val PreviewSectionCounts = mapOf("webdav" to 3, "s3" to 2, "smb" to 3, "generic_rest" to 4)
+
 /** Every page the form opens, for each example config: each part of it (Sign-in, Endpoints, ...), and an endpoint. */
 private class ConfigPageProvider : PreviewParameterProvider<Pair<String, String>> {
     override val values = ExampleConfigFiles.keys.asSequence().flatMap { kind ->
-        sectionsFor(kind).orEmpty().filterNot { it.startOpen }.map { kind to it.title }
-    } + sequenceOf("generic_rest" to "endpoint:upload", "generic_rest" to Page.OtherFields.title)
+        (0 until PreviewSectionCounts.getValue(kind)).map { kind to "section:$it" }
+    } + sequenceOf("generic_rest" to "endpoint:upload", "generic_rest" to "other")
 }
 
-/** One page of the form, [page] being a config's kind and the title of the page (or "endpoint:" and an endpoint's name). */
+/**
+ * One page of the form, [page] being a config's kind and the page: "section:" and its place among the parts folded at
+ * first, "endpoint:" and an endpoint's name, or "other" for the fields the form doesn't know.
+ */
 @ScreenPreviews
 @Composable
 private fun ConfigEditorPagePreview(@PreviewParameter(ConfigPageProvider::class) page: Pair<String, String>) {
+    val schema = configSchema()
     PreviewTheme {
         val (kind, title) = page
         val text = exampleConfigText(ExampleConfigFiles.getValue(kind))
@@ -937,12 +950,12 @@ private fun ConfigEditorPagePreview(@PreviewParameter(ConfigPageProvider::class)
         val root = remember(text) {
             (ProviderConfigCodec.parseObject(text) ?: JsonObject(emptyMap())).with("comment", JsonPrimitive("A field the form doesn't know"))
         }
-        val sections = sectionsFor(kind).orEmpty()
+        val sections = schema.sectionsFor(kind).orEmpty()
         val form = FormState(root = root, onChange = {}, open = {}, back = {}, stash = remember { mutableMapOf() })
         val shown: Page = when {
             title.startsWith("endpoint:") -> Page.OfEndpoint(title.removePrefix("endpoint:"))
-            title == Page.OtherFields.title -> Page.OtherFields
-            else -> Page.OfSection(sections.first { it.title == title })
+            title == "other" -> Page.OtherFields
+            else -> Page.OfSection(sections.filterNot { it.startOpen }[title.removePrefix("section:").toInt()])
         }
         Column {
             PaneHeader(shown.title, trail = root.textOf("name").orEmpty(), canGoBack = true, onBack = {})

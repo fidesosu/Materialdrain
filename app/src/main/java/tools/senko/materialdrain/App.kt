@@ -85,6 +85,7 @@ import tools.senko.materialdrain.settings.ui.AuthViewModel
 import tools.senko.materialdrain.settings.ui.ProviderSettingsViewModel
 import tools.senko.materialdrain.settings.ui.SettingsScreenContent
 import tools.senko.materialdrain.settings.ui.settingsCategory
+import tools.senko.materialdrain.settings.ui.settingsCatalog
 import tools.senko.materialdrain.files.key
 import tools.senko.materialdrain.ui.LocalBlurredBackdrop
 import tools.senko.materialdrain.ui.LocalBottomInset
@@ -537,13 +538,14 @@ fun MaterialdrainScreen() {
     }
 
     // The screen's own button in the corner: Upload, or Save in the settings
+    val catalog = settingsCatalog()
     val fabState by remember {
         derivedStateOf {
             screenFab(
                 screen = currentScreen,
                 canUpload = uploadUiState.hasUploadable && !uploadUiState.isLoading,
                 onUpload = { if (uploadUiState.hasUploadable && !uploadUiState.isLoading) uploadViewModel.upload() },
-                settingsHasSaveButton = settingsCategory(settingsCategoryId)?.hasSaveButton == true,
+                settingsHasSaveButton = catalog.firstOrNull { it.id == settingsCategoryId }?.hasSaveButton == true,
                 settingsJustSaved = settingsJustSaved,
                 settingsSaveCount = settingsSaveCount,
                 onSaveSettings = {

@@ -256,6 +256,7 @@ private fun ChoiceField(spec: FieldSpec, kind: FieldKind.Choice, value: JsonElem
 /** An object of its own: a row with what it holds, opening its page. */
 @Composable
 private fun GroupRow(spec: FieldSpec, kind: FieldKind.Group, value: JsonElement?, path: List<String>, form: FormState) {
+    val schema = configSchema()
     val obj = value as? JsonObject
     NavRow(
         title = spec.label,
@@ -263,7 +264,7 @@ private fun GroupRow(spec: FieldSpec, kind: FieldKind.Group, value: JsonElement?
             spec.canTurnOff && obj == null -> stringResource(R.string.media_off)
             else -> summaryOf(kind.fields, obj ?: JsonObject(emptyMap())).ifEmpty { stringResource(R.string.settings_nothing_set_yet) }
         },
-        problem = (obj != null || spec.required) && hasProblem(kind.fields, obj ?: JsonObject(emptyMap())),
+        problem = (obj != null || spec.required) && hasProblem(kind.fields, obj ?: JsonObject(emptyMap()), schema),
         onClick = { form.open(Page.OfGroup(spec, kind.fields, path)) }
     )
 }
@@ -694,10 +695,11 @@ private fun ScreenRow(
 /** A REST config's requests, by what they unlock, a row each that opens its page; the ones not set are offered in a list. */
 @Composable
 private fun EndpointsField(value: JsonElement?, form: FormState, onValue: (JsonElement?) -> Unit) {
+    val schema = configSchema()
     val endpoints = value as? JsonObject ?: JsonObject(emptyMap())
-    val known = KnownEndpoints.associateBy { it.name }
+    val known = schema.KnownEndpoints.associateBy { it.name }
     val byArea = endpoints.keys.groupBy { known[it]?.area ?: stringResource(R.string.settings_other) }
-    val areas = KnownEndpoints.map { it.area }.distinct() + stringResource(R.string.settings_other)
+    val areas = schema.KnownEndpoints.map { it.area }.distinct() + stringResource(R.string.settings_other)
     var adding by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -719,7 +721,7 @@ private fun EndpointsField(value: JsonElement?, form: FormState, onValue: (JsonE
                     NavRow(
                         title = name,
                         summary = listOfNotNull(endpoint.textOf("method"), endpoint.textOf("path")?.ifBlank { null }).joinToString(" ").ifEmpty { stringResource(R.string.settings_no_path_yet) },
-                        problem = endpointHasProblem(name, endpoint),
+                        problem = endpointHasProblem(name, endpoint, schema),
                         monospace = true,
                         onClick = { form.open(Page.OfEndpoint(name)) }
                     )
@@ -727,7 +729,7 @@ private fun EndpointsField(value: JsonElement?, form: FormState, onValue: (JsonE
             }
         }
 
-        val missing = KnownEndpoints.filter { it.name !in endpoints }
+        val missing = schema.KnownEndpoints.filter { it.name !in endpoints }
         if (missing.isNotEmpty()) {
             OutlinedButton(onClick = { adding = true }) {
                 Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -807,5 +809,6 @@ private fun KeyValueDialogPreview() {
 @ThemePreviews
 @Composable
 private fun AddEndpointDialogPreview() {
-    PreviewTheme { AddEndpointDialog(missing = KnownEndpoints.take(6), onPick = {}, onDismiss = {}) }
+    val schema = configSchema()
+    PreviewTheme { AddEndpointDialog(missing = schema.KnownEndpoints.take(6), onPick = {}, onDismiss = {}) }
 }
