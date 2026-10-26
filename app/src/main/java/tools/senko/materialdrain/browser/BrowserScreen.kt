@@ -36,7 +36,7 @@ import tools.senko.materialdrain.ui.icons.filled.Share
 import tools.senko.materialdrain.ui.icons.filled.Upload
 import tools.senko.materialdrain.ui.icons.automirrored.filled.ArrowBack
 import tools.senko.materialdrain.ui.icons.automirrored.filled.OpenInNew
-import androidx.compose.material3.CircularProgressIndicator
+import tools.senko.materialdrain.ui.components.PlaceholderList
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -721,7 +721,8 @@ fun BrowserScreen(
         mode = mode,
         entries = entries,
         isLoading = isLoading,
-        refreshing = userRefreshing || showLoadingIndicator,
+        // Not over the placeholders of a list still empty (see PlaceholderList), which say it already
+        refreshing = userRefreshing || (showLoadingIndicator && entries.isNotEmpty()),
         showLoadingIndicator = showLoadingIndicator,
         onRefresh = {
             userRefreshing = true
@@ -1007,8 +1008,9 @@ fun BrowserContent(
             // Body
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when {
+                // Rows of the shape of the files to come, until they're there (see PlaceholderList)
                 showLoadingIndicator && entries.isEmpty() && !keyMissing && errorMessage == null -> PullableFill {
-                    CircularProgressIndicator()
+                    PlaceholderList()
                 }
                 keyMissing -> PullableFill {
                     ErrorMessage(errorMessage ?: "Log in or add an API key in Settings.")
