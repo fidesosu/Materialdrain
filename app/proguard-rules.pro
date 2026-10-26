@@ -40,3 +40,7 @@
     public static int d(...);
     public static int v(...);
 }
+
+# WorkManager's database (the daily update check, see UpdateWorker) is Room's, which makes it by reflection, by its
+# constructor without arguments: R8 removed that, and the release build crashed as it started
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
