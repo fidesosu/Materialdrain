@@ -73,8 +73,6 @@ private fun UpdateSheetContent(
     onSkip: () -> Unit
 ) {
     val context = LocalContext.current
-    var showAll by rememberSaveable { mutableStateOf(false) }
-    val changes = if (showAll) update.changes else update.changes.take(CHANGES_SHOWN)
 
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -110,20 +108,7 @@ private fun UpdateSheetContent(
             "What's new since your version (${installed.versionName})",
             style = MaterialTheme.typography.titleMedium
         )
-        if (changes.isEmpty()) {
-            Text(
-                "This version came without a list of its changes.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                changes.forEach { ChangeRow(it) }
-            }
-            if (!showAll && update.changes.size > CHANGES_SHOWN) {
-                TextButton(onClick = { showAll = true }) { Text("Show all ${update.changes.size} changes") }
-            }
-        }
+        ChangeList(update.changes, empty = "This version came without a list of its changes.")
 
         when (download) {
             is UpdateDownload.Running -> {
@@ -161,6 +146,22 @@ private fun UpdateSheetContent(
                     }
                 )
             }
+        }
+    }
+}
+
+/** [changes], the first few until "Show all" is tapped, or [empty] when there are none. */
+@Composable
+internal fun ChangeList(changes: List<UpdateChange>, empty: String) {
+    var showAll by rememberSaveable { mutableStateOf(false) }
+    if (changes.isEmpty()) {
+        Text(empty, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        (if (showAll) changes else changes.take(CHANGES_SHOWN)).forEach { ChangeRow(it) }
+        if (!showAll && changes.size > CHANGES_SHOWN) {
+            TextButton(onClick = { showAll = true }) { Text("Show all ${changes.size} changes") }
         }
     }
 }

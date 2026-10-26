@@ -540,6 +540,12 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                 isChecked = { appSettings.includeDevUpdates.collectAsState().value },
                 onCheckedChange = { appSettings.setIncludeDevUpdates(it) }
             ),
+            SettingsItem.Toggle(
+                title = "Show what's new after an update",
+                summary = "Once, when the app first opens",
+                isChecked = { appSettings.showWhatsNew.collectAsState().value },
+                onCheckedChange = { appSettings.setShowWhatsNew(it) }
+            ),
             SettingsItem.Header("Links"),
             SettingsItem.Action(
                 title = "Website",

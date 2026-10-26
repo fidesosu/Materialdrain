@@ -1,3 +1,7 @@
+import java.io.ByteArrayOutputStream
+import javax.inject.Inject
+import org.gradle.process.ExecOperations
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -232,6 +236,67 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation(libs.androidx.core.splashscreen)
+}
+
+/*
+ * What changed in the app, for "What's new" after an update (see update/WhatsNew.kt) and the update check's description of
+ * a release (update.json, made from the APK by .github/scripts/update_json.py): the commits that change what users get (its
+ * code and resources, the hosts', the bundled configs; not tests, the workflows or docs), the last 150, newest first, each
+ * as the first paragraph of its message with its time. A commit with a "Changes: none" line is left out. The asset
+ * changes.json; empty without git.
+ */
+abstract class ChangesTask : DefaultTask() {
+    /** The commit it's made from: made again for each new one */
+    @get:Input
+    abstract val head: Property<String>
+
+    @get:Internal
+    abstract val repository: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @get:Inject
+    abstract val exec: ExecOperations
+
+    @TaskAction
+    fun write() {
+        val log = if (head.get() == NO_GIT) "" else {
+            val out = ByteArrayOutputStream()
+            exec.exec {
+                workingDir = repository.get().asFile
+                commandLine(
+                    "git", "log", "--no-merges", "-150", "--format=%ct%x1f%B%x1e", "HEAD", "--",
+                    ":(glob)app/src/main/**", ":(glob)provider-*/src/main/**", ":(glob)docs/provider-configs/**", ":(exclude,glob)**/*.md"
+                )
+                standardOutput = out
+            }
+            out.toString(Charsets.UTF_8)
+        }
+        val changes = log.split('\u001e').map { it.trim() }.filter { it.isNotEmpty() }.mapNotNull { entry ->
+            val time = entry.substringBefore('\u001f').trim().toLongOrNull() ?: return@mapNotNull null
+            val message = entry.substringAfter('\u001f')
+            if (message.lines().any { it.trim().equals("Changes: none", ignoreCase = true) }) return@mapNotNull null
+            val text = message.trim().split(Regex("\\r?\\n\\s*\\r?\\n"), limit = 2).first().split(Regex("\\s+")).joinToString(" ")
+            if (text.isEmpty()) null else mapOf("time" to time, "text" to text)
+        }
+        outputDir.get().file("changes.json").asFile.writeText(groovy.json.JsonOutput.toJson(mapOf("changes" to changes)))
+    }
+
+    companion object {
+        const val NO_GIT = "none"
+    }
+}
+
+val changesHead: String = runCatching { git("rev-parse", "HEAD") }.getOrNull()?.takeIf { it.isNotEmpty() } ?: ChangesTask.NO_GIT
+androidComponents {
+    onVariants { variant ->
+        val task = tasks.register<ChangesTask>("generate${variant.name.replaceFirstChar { it.uppercase() }}Changes") {
+            head.set(changesHead)
+            repository.set(rootDir)
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(task, ChangesTask::outputDir)
+    }
 }
 
 // The pictures of the app for the README and the docs (app/src/androidTest), taken on the emulator or phone that's

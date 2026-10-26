@@ -87,6 +87,8 @@ private const val CHECK_UPDATES_ON_OPENING_PREF = "check_updates_on_opening"
 private const val INCLUDE_DEV_UPDATES_PREF = "include_dev_updates"
 private const val SKIPPED_UPDATE_CODE_PREF = "skipped_update_code"
 private const val LAST_UPDATE_CHECK_PREF = "last_update_check"
+private const val SHOW_WHATS_NEW_PREF = "show_whats_new"
+private const val LAST_SEEN_COMMIT_TIME_PREF = "last_seen_commit_time"
 
 /** The choices for [AppSettings.searchResultLimit]; 0 is no limit. */
 val SEARCH_RESULT_LIMITS = listOf(0, 200, 50, 20)
@@ -624,6 +626,17 @@ class AppSettings(context: Context) {
     var skippedUpdateCode: Long
         get() = prefs.getLong(SKIPPED_UPDATE_CODE_PREF, 0L)
         set(value) = prefs.edit { putLong(SKIPPED_UPDATE_CODE_PREF, value) }
+
+    private val showWhatsNewPref = booleanSetting(SHOW_WHATS_NEW_PREF, true)
+    /** After an update, the app shows what it brought the first time it opens. On by default. */
+    val showWhatsNew: StateFlow<Boolean> = showWhatsNewPref.flow
+
+    fun setShowWhatsNew(enabled: Boolean) = showWhatsNewPref.set(enabled)
+
+    /** The commit time (BuildConfig.COMMIT_TIME) of the build which opened last: what an update's changes are newer than. */
+    var lastSeenCommitTime: Long
+        get() = prefs.getLong(LAST_SEEN_COMMIT_TIME_PREF, 0L)
+        set(value) = prefs.edit { putLong(LAST_SEEN_COMMIT_TIME_PREF, value) }
 
     /** When the app last looked for updates, in milliseconds since 1970. */
     var lastUpdateCheck: Long

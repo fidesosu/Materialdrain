@@ -35,11 +35,25 @@ const val RELEASES_URL = "https://github.com/fidesosu/Materialdrain/releases"
 private const val CHECK_INTERVAL_MILLIS = 6L * 60 * 60 * 1000
 
 private const val MAX_UPDATE_JSON_BYTES = 512L * 1024
+private const val CHANGES_ASSET = "changes.json"
 private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
 
 /** One change a release brings: the first paragraph of a commit's message, and the commit's time. */
 @Serializable
 data class UpdateChange(val time: Long, val text: String)
+
+/** The changes the app comes with (the asset changes.json, see ChangesTask in app/build.gradle.kts). */
+@Serializable
+private data class BundledChanges(val changes: List<UpdateChange> = emptyList())
+
+/**
+ * What's new in this build for whoever had the build of [lastSeen] (its commit time): the changes after it, up to this
+ * build's own, newest first. Nothing on a first start ([lastSeen] 0, nothing to compare with) or the same build again.
+ */
+fun whatsNewSince(lastSeen: Long, installed: InstalledBuild, changes: List<UpdateChange>): List<UpdateChange> {
+    if (lastSeen <= 0 || installed.commitTime <= lastSeen) return emptyList()
+    return changes.filter { it.time > lastSeen && it.time <= installed.commitTime }.sortedByDescending { it.time }
+}
 
 /** A release, as its update.json describes it (written by .github/scripts/update_json.py). */
 @Serializable
@@ -146,6 +160,31 @@ class AppUpdates(
     private val _offered = MutableStateFlow<AvailableUpdate?>(null)
     /** The update the sheet shows, until it's closed. */
     val offered: StateFlow<AvailableUpdate?> = _offered.asStateFlow()
+
+    private val _whatsNew = MutableStateFlow<List<UpdateChange>?>(null)
+    /** What this build brought since the one before, shown once after an update (WhatsNewSheet), until it's closed. */
+    val whatsNew: StateFlow<List<UpdateChange>?> = _whatsNew.asStateFlow()
+
+    /**
+     * After an update, the first time the app opens: what came since the build it had, when the setting is on. Each build
+     * is shown once; the first start only notes which build it is.
+     */
+    suspend fun checkWhatsNew() {
+        val lastSeen = settings.lastSeenCommitTime
+        if (lastSeen == installed.commitTime) return
+        settings.lastSeenCommitTime = installed.commitTime
+        if (!settings.showWhatsNew.value) return
+        val changes = withContext(Dispatchers.IO) {
+            runCatching {
+                appContext.assets.open(CHANGES_ASSET).use { json.decodeFromString<BundledChanges>(it.readBytes().decodeToString()).changes }
+            }.getOrDefault(emptyList())
+        }
+        whatsNewSince(lastSeen, installed, changes).takeIf { it.isNotEmpty() }?.let { _whatsNew.value = it }
+    }
+
+    fun dismissWhatsNew() {
+        _whatsNew.value = null
+    }
 
     private val _checking = MutableStateFlow(false)
     val checking: StateFlow<Boolean> = _checking.asStateFlow()
