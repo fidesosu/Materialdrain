@@ -5,6 +5,8 @@ local.properties
 .DS_Store
 build/
 release/
+# ...but not the release build's own sources: its baseline profile (see baselineprofile/)
+!app/src/release/
 captures/
 .externalNativeBuild
 .cxx

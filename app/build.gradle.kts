@@ -7,6 +7,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.roborazzi)
+    // The baseline profile, made by :baselineprofile (see BaselineProfileGenerator)
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 // Every @Preview of the app drawn to a picture on the computer, without a device: ./gradlew :app:recordRoborazziDebug
@@ -240,6 +242,9 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation(libs.androidx.core.splashscreen)
+    // Installs the baseline profile on devices whose app store doesn't (an APK from GitHub)
+    implementation(libs.androidx.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
 }
 
 /*

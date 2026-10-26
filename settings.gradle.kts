@@ -29,4 +29,5 @@ include(":provider-generic-rest")
 include(":provider-webdav")
 include(":provider-s3")
 include(":provider-smb")
+include(":baselineprofile")
  
