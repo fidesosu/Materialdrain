@@ -73,6 +73,8 @@ import tools.senko.materialdrain.ui.preview.PreviewSamples
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.ui.theme.AppShapes
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** Whether [language] is Markdown, which the previews show as it's meant to look rather than as its source. */
 fun isMarkdown(language: SourceLanguage?): Boolean = language?.family == SyntaxFamily.MARKDOWN
@@ -254,7 +256,7 @@ private fun TaskBox(checked: Boolean, scale: Float) {
                 else Modifier.border(1.5.dp, scheme.onSurfaceVariant, AppShapes.ExtraSmall)
             )
     ) {
-        if (checked) Icon(Icons.Filled.Check, contentDescription = "Done", tint = scheme.onPrimary, modifier = Modifier.size(size * 0.8f))
+        if (checked) Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.common_done), tint = scheme.onPrimary, modifier = Modifier.size(size * 0.8f))
     }
 }
 

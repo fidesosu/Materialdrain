@@ -128,6 +128,8 @@ import tools.senko.materialdrain.ui.icons.filled.ExpandMore
 import tools.senko.materialdrain.ui.icons.filled.Numbers
 import tools.senko.materialdrain.ui.icons.filled.Remove
 import tools.senko.materialdrain.ui.icons.filled.Search
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** Tabs as spaces, so columns line up in the monospaced text whatever the tab width would have been. */
 private fun expandTabs(text: String) = text.replace("\t", "    ")
@@ -333,9 +335,9 @@ internal fun BoxScope.TextPreviewLabels(label: String, onOpen: () -> Unit) {
         modifier = Modifier
             .align(Alignment.BottomEnd)
             .size(44.dp)
-            .clickable(onClickLabel = "Open the text fullscreen", onClick = onOpen)
+            .clickable(onClickLabel = stringResource(R.string.common_open_the_text_fullscreen), onClick = onOpen)
     ) {
-        FullscreenBadge("Open the text fullscreen")
+        FullscreenBadge(stringResource(R.string.common_open_the_text_fullscreen))
     }
 }
 
@@ -521,12 +523,12 @@ fun CodeFullscreenContent(
         Column(modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 4.dp)) {
                 // Back, as on the other fullscreen views (a picture's, a PDF's, a video's)
-                IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.files_back)) }
                 Column(modifier = Modifier.weight(1f).padding(start = 4.dp)) {
                     Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val count = lines?.size ?: text?.let(::lineCount)
                     Text(
-                        listOfNotNull(language?.name ?: "Text", count?.let { "${NumberFormat.getIntegerInstance().format(it)} lines" }).joinToString(" · "),
+                        listOfNotNull(language?.name ?: stringResource(R.string.common_text), count?.let { "${NumberFormat.getIntegerInstance().format(it)} lines" }).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onSurfaceVariant
                     )
@@ -540,19 +542,19 @@ fun CodeFullscreenContent(
                         }) {
                             Icon(
                                 if (rendered) Icons.Filled.Code else Icons.Filled.Description,
-                                contentDescription = if (rendered) "Show the source" else "Show it as it looks"
+                                contentDescription = if (rendered) stringResource(R.string.common_show_the_source) else stringResource(R.string.common_show_it_as_it_looks)
                             )
                         }
                     }
                     // Finding is in the source, which it switches to
                     IconToggleButton(checked = searching, onCheckedChange = { searching = it; if (it) rendered = false else query = "" }) {
-                        Icon(Icons.Filled.Search, contentDescription = if (searching) "Stop finding" else "Find in the text")
+                        Icon(Icons.Filled.Search, contentDescription = if (searching) stringResource(R.string.common_stop_finding) else stringResource(R.string.common_find_in_the_text))
                     }
-                    OverflowMenuButton(contentDescription = "More options", buttonSize = 48.dp) { close ->
+                    OverflowMenuButton(contentDescription = stringResource(R.string.common_more_options), buttonSize = 48.dp) { close ->
                         if (!rendered) {
-                            AppMenuItem("Wrap long lines", leadingIcon = Icons.AutoMirrored.Filled.WrapText, active = wrap, onClick = { wrap = !wrap })
+                            AppMenuItem(stringResource(R.string.common_wrap_long_lines), leadingIcon = Icons.AutoMirrored.Filled.WrapText, active = wrap, onClick = { wrap = !wrap })
                             AppMenuItem(
-                                "Line numbers",
+                                stringResource(R.string.common_line_numbers),
                                 leadingIcon = Icons.Filled.Numbers,
                                 active = CodeViewLook.lineNumbers,
                                 onClick = { CodeViewLook.lineNumbers = !CodeViewLook.lineNumbers }
@@ -560,20 +562,20 @@ fun CodeFullscreenContent(
                         }
                         val sizeAt = CodeTextScales.indexOfFirst { it >= scale - 0.01f }.coerceAtLeast(0)
                         AppMenuItem(
-                            "Bigger text",
+                            stringResource(R.string.common_bigger_text),
                             leadingIcon = Icons.Filled.Add,
                             trailingText = "${(scale * 100).roundToInt()}%",
                             enabled = sizeAt < CodeTextScales.lastIndex,
                             onClick = { CodeViewLook.textScale = CodeTextScales[(sizeAt + 1).coerceAtMost(CodeTextScales.lastIndex)] }
                         )
                         AppMenuItem(
-                            "Smaller text",
+                            stringResource(R.string.common_smaller_text),
                             leadingIcon = Icons.Filled.Remove,
                             enabled = sizeAt > 0,
                             onClick = { CodeViewLook.textScale = CodeTextScales[(sizeAt - 1).coerceAtLeast(0)] }
                         )
                         AppMenuDivider()
-                        AppMenuItem("Copy all of it", leadingIcon = Icons.Filled.ContentCopy, onClick = {
+                        AppMenuItem(stringResource(R.string.common_copy_all_of_it), leadingIcon = Icons.Filled.ContentCopy, onClick = {
                             close()
                             content?.let { copy(title, it) }
                         })
@@ -631,7 +633,7 @@ fun CodeFullscreenContent(
                         modifier = Modifier.align(Alignment.Center).padding(32.dp)
                     ) {
                         Text(message, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
-                        onLoadAnyway?.let { TextButton(onClick = it, modifier = Modifier.padding(top = 8.dp)) { Text("Load anyway") } }
+                        onLoadAnyway?.let { TextButton(onClick = it, modifier = Modifier.padding(top = 8.dp)) { Text(stringResource(R.string.files_load_anyway)) } }
                     }
                     // Loading, or being coloured
                     else -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -651,7 +653,7 @@ fun CodeFullscreenContent(
                             val first = range.first + 1
                             val last = range.last + 1
                             Text(
-                                if (first == last) "Line $first" else "Lines $first–$last",
+                                if (first == last) stringResource(R.string.common_line, first) else stringResource(R.string.common_lines, first, last),
                                 style = MaterialTheme.typography.labelLarge
                             )
                             Spacer(Modifier.width(8.dp))
@@ -660,9 +662,9 @@ fun CodeFullscreenContent(
                                 copy(if (first == last) "Line $first" else "Lines $first–$last", picked.joinToString("\n"))
                                 rangeStart = null
                                 rangeEnd = null
-                            }) { Text("Copy") }
+                            }) { Text(stringResource(R.string.common_copy)) }
                             IconButton(onClick = { rangeStart = null; rangeEnd = null }) {
-                                Icon(Icons.Filled.Close, contentDescription = "Stop picking lines")
+                                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.common_stop_picking_lines))
                             }
                         }
                     }
@@ -706,7 +708,7 @@ private fun FindBar(
                 modifier = Modifier.weight(1f).focusRequester(focus),
                 decorationBox = { field ->
                     Box(contentAlignment = Alignment.CenterStart) {
-                        if (query.isEmpty()) Text("Find in the text", style = MaterialTheme.typography.bodyLarge, color = scheme.onSurfaceVariant)
+                        if (query.isEmpty()) Text(stringResource(R.string.common_find_in_the_text), style = MaterialTheme.typography.bodyLarge, color = scheme.onSurfaceVariant)
                         field()
                     }
                 }
@@ -715,7 +717,7 @@ private fun FindBar(
                 val count = NumberFormat.getIntegerInstance()
                 Text(
                     when {
-                        found == 0 -> "None"
+                        found == 0 -> stringResource(R.string.common_none)
                         found >= MAX_MATCHES -> "${count.format(current + 1)} of ${count.format(found)}+"
                         else -> "${count.format(current + 1)} of ${count.format(found)}"
                     },
@@ -724,9 +726,9 @@ private fun FindBar(
                     modifier = Modifier.padding(horizontal = 4.dp)
                 )
             }
-            IconButton(onClick = { onStep(false) }, enabled = found > 0) { Icon(Icons.Filled.ExpandLess, contentDescription = "Match before") }
-            IconButton(onClick = { onStep(true) }, enabled = found > 0) { Icon(Icons.Filled.ExpandMore, contentDescription = "Next match") }
-            IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Stop finding") }
+            IconButton(onClick = { onStep(false) }, enabled = found > 0) { Icon(Icons.Filled.ExpandLess, contentDescription = stringResource(R.string.common_match_before)) }
+            IconButton(onClick = { onStep(true) }, enabled = found > 0) { Icon(Icons.Filled.ExpandMore, contentDescription = stringResource(R.string.common_next_match)) }
+            IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.common_stop_finding)) }
         }
     }
 }
@@ -834,8 +836,8 @@ private fun CodeLines(
                                         .fillMaxHeight()
                                         .background(gutterColor)
                                         .combinedClickable(
-                                            onClickLabel = "Pick the lines up to this one",
-                                            onLongClickLabel = "Start picking lines from this one",
+                                            onClickLabel = stringResource(R.string.common_pick_the_lines_up_to),
+                                            onLongClickLabel = stringResource(R.string.common_start_picking_lines_from_this),
                                             onLongClick = { onNumberLongPress(index) },
                                             onClick = { onNumberTap(index) }
                                         )

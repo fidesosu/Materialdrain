@@ -61,6 +61,8 @@ import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import tools.senko.materialdrain.ui.preview.PreviewSamples
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /**
  * The browser as it's drawn: the header of [mode] (the sorting, the path or the open list), then [entries] or why there
@@ -138,7 +140,7 @@ fun BrowserContent(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             IconButton(onClick = onCloseList) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to the lists")
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.browser_back_to_the_lists))
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(openedList.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -179,7 +181,7 @@ fun BrowserContent(
                     PlaceholderList()
                 }
                 keyMissing -> PullableFill {
-                    ErrorMessage(errorMessage ?: "Log in or add an API key in Settings.")
+                    ErrorMessage(errorMessage ?: stringResource(R.string.browser_log_in_or_add_an))
                 }
                 errorMessage != null && entries.isEmpty() -> PullableFill {
                     Column(
@@ -188,7 +190,7 @@ fun BrowserContent(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Text(errorMessage, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge)
-                        TextButton(onClick = onRetry) { Text("Retry") }
+                        TextButton(onClick = onRetry) { Text(stringResource(R.string.browser_retry)) }
                     }
                 }
                 entries.isEmpty() && !isLoading -> PullableFill {
@@ -365,10 +367,10 @@ internal fun SampleBrowserContent(
         selectedKeys = selectedKeys.orEmpty(),
         selectedCount = selectedKeys?.size ?: 0,
         selectionActions = listOf(
-            SelectionAction("Download", Icons.Filled.Download, {}),
-            SelectionAction("Move", Icons.AutoMirrored.Filled.DriveFileMove, {}),
-            SelectionAction("Delete", Icons.Filled.Delete, {}, destructive = true),
-            SelectionAction("Select all", Icons.Filled.SelectAll, {})
+            SelectionAction(stringResource(R.string.browser_download), Icons.Filled.Download, {}),
+            SelectionAction(stringResource(R.string.browser_move), Icons.AutoMirrored.Filled.DriveFileMove, {}),
+            SelectionAction(stringResource(R.string.browser_delete), Icons.Filled.Delete, {}, destructive = true),
+            SelectionAction(stringResource(R.string.browser_select_all), Icons.Filled.SelectAll, {})
         ),
         onExitSelection = {},
         canWriteFs = true,
@@ -409,7 +411,7 @@ private fun BrowserListsPreview() = BrowserPreview(
 private fun BrowserOpenedListPreview() = BrowserPreview(
     BrowserMode.LISTS,
     PreviewSamples.files.filter { !it.isDirectory }.take(5),
-    openedList = FileList("a", "Holiday 2026", fileCount = 5, canEdit = true)
+    openedList = FileList("a", stringResource(R.string.browser_holiday_2026), fileCount = 5, canEdit = true)
 )
 
 /** Selecting: the checkboxes, and the selection's bar at the bottom. */

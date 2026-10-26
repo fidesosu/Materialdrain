@@ -66,6 +66,8 @@ import tools.senko.materialdrain.ui.preview.PreviewSamples
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.util.formatSize
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** How long a thumbnail fades in over its tile (Coil's own default). */
 private const val THUMBNAIL_CROSSFADE_MS = 100
@@ -231,7 +233,7 @@ fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp
             // Read while drawing, so the fade only draws again rather than recomposing the list
             .drawBehind { drawRect(container, alpha = tileAlpha.value) }
             .then(
-                if (held && loadOnTap) Modifier.clickable(onClickLabel = "Load the thumbnail") { dataSaver.loadThumbnail(thumbnailUrl!!) }
+                if (held && loadOnTap) Modifier.clickable(onClickLabel = stringResource(R.string.common_load_the_thumbnail)) { dataSaver.loadThumbnail(thumbnailUrl!!) }
                 else Modifier
             ),
         contentAlignment = Alignment.Center

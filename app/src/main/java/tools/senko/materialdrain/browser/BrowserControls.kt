@@ -121,6 +121,8 @@ import tools.senko.materialdrain.ui.icons.filled.AutoAwesome
 import tools.senko.materialdrain.ui.icons.filled.Refresh
 import tools.senko.materialdrain.ui.icons.filled.ViewList
 import tools.senko.materialdrain.settings.ListLayout
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** The path at the top of the filesystem: each folder is tappable, and the row scrolls to the end of it. */
 @Composable
@@ -139,7 +141,7 @@ fun PathBreadcrumb(
 
     if (pathSegments.isEmpty()) {
         Text(
-            text = "Storage",
+            text = stringResource(R.string.browser_storage),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
             modifier = modifier
@@ -172,7 +174,7 @@ fun PathBreadcrumb(
             if (index < pathSegments.lastIndex) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                    contentDescription = "Path separator",
+                    contentDescription = stringResource(R.string.browser_path_separator),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )
@@ -240,7 +242,7 @@ fun StatusCards(
                             Icon(Icons.Filled.Close, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                "Cancel",
+                                stringResource(R.string.browser_cancel),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.error,
                                 maxLines = 1,
@@ -256,7 +258,7 @@ fun StatusCards(
                         FloatingCardButton(onClick = { lastLoadThumbnails?.invoke() }, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Outlined.Image, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Thumbnails", style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(stringResource(R.string.browser_thumbnails), style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -357,7 +359,7 @@ fun ScreenMenuEntries(
     }
     val newPage: @Composable ColumnScope.() -> Unit = {
         if (newActions.isNotEmpty()) {
-            AppMenuItem("New", onClick = { page = null }, leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
+            AppMenuItem(stringResource(R.string.browser_new), onClick = { page = null }, leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
             AppMenuDivider()
             newActions.forEach { action ->
                 AppMenuItem(
@@ -418,7 +420,7 @@ fun ScreenMenuEntries(
             }
             if (newActions.isNotEmpty()) {
                 AppMenuItem(
-                    "New",
+                    stringResource(R.string.browser_new),
                     leadingIcon = Icons.Filled.Add,
                     trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     enabled = newActions.any { it.enabled },
@@ -429,7 +431,7 @@ fun ScreenMenuEntries(
             if ((pageActions.isNotEmpty() || newActions.isNotEmpty()) && (sort != null || view != null)) AppMenuDivider()
             if (sort != null) {
                 AppMenuItem(
-                    "Sort by",
+                    stringResource(R.string.browser_sort_by),
                     leadingIcon = Icons.Filled.Tune,
                     trailingText = SortOptions.find { it.second == sort.field }?.first,
                     trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -438,15 +440,15 @@ fun ScreenMenuEntries(
             }
             if (view != null) {
                 AppMenuItem(
-                    "View",
+                    stringResource(R.string.browser_view),
                     leadingIcon = if (view.grid) Icons.Filled.GridView else Icons.Filled.ViewList,
-                    trailingText = if (view.smart) "Smart" else if (view.grid) "Grid" else if (view.compact) "Compact" else "List",
+                    trailingText = if (view.smart) stringResource(R.string.browser_smart) else if (view.grid) stringResource(R.string.browser_grid) else if (view.compact) stringResource(R.string.browser_compact) else stringResource(R.string.browser_list),
                     trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     onClick = { open(ScreenMenuPage.View) }
                 )
             }
             if (pageActions.isNotEmpty() || newActions.isNotEmpty() || sort != null || view != null) AppMenuDivider()
-            AppMenuItem("Settings", leadingIcon = Icons.Filled.Settings, onClick = { close(); onOpenSettings() })
+            AppMenuItem(stringResource(R.string.browser_settings), leadingIcon = Icons.Filled.Settings, onClick = { close(); onOpenSettings() })
         },
         secondary = { pages.getValue(secondPage)() },
         otherPages = { pages.filterKeys { it != secondPage }.values.forEach { it() } }
@@ -461,19 +463,19 @@ fun ScreenMenuEntries(
  */
 @Composable
 private fun ViewMenuEntries(view: ViewChoice, onBack: () -> Unit) {
-    AppMenuItem("View", onClick = onBack, leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
+    AppMenuItem(stringResource(R.string.browser_view), onClick = onBack, leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
     AppMenuDivider()
     val list = !view.smart && !view.grid
     val grid = !view.smart && view.grid
     AppMenuItem(
-        "List",
+        stringResource(R.string.browser_list),
         leadingIcon = Icons.Filled.ViewList,
         active = list,
         trailingIcon = if (list) Icons.Filled.Check else null,
         onClick = { view.onLayout(ListLayout.LIST) }
     )
     AppMenuItem(
-        "Grid",
+        stringResource(R.string.browser_grid),
         leadingIcon = Icons.Filled.GridView,
         active = grid,
         trailingIcon = if (grid) Icons.Filled.Check else null,
@@ -481,9 +483,9 @@ private fun ViewMenuEntries(view: ViewChoice, onBack: () -> Unit) {
     )
     // Which of the two it picked, while it's chosen
     AppMenuItem(
-        "Smart",
+        stringResource(R.string.browser_smart),
         leadingIcon = Icons.Filled.AutoAwesome,
-        supportingText = if (view.smart) "Here: ${if (view.grid) "Grid" else "List"}" else "A grid for pictures and videos",
+        supportingText = if (view.smart) stringResource(R.string.browser_here, if (view.grid) "Grid" else "List") else stringResource(R.string.browser_a_grid_for_pictures_and),
         active = view.smart,
         trailingIcon = if (view.smart) Icons.Filled.Check else null,
         onClick = { view.onLayout(ListLayout.SMART) }
@@ -492,7 +494,7 @@ private fun ViewMenuEntries(view: ViewChoice, onBack: () -> Unit) {
     // Only rows have a height to lower; Smart may pick them, so it's chosen for them there too, whichever it picked
     val compactShown = view.compact && (!view.grid || view.smart)
     AppMenuItem(
-        "Compact rows",
+        stringResource(R.string.browser_compact_rows),
         active = compactShown,
         trailingIcon = if (compactShown) Icons.Filled.Check else null,
         enabled = !view.grid || view.smart,
@@ -502,19 +504,19 @@ private fun ViewMenuEntries(view: ViewChoice, onBack: () -> Unit) {
     // What this look is set for: a folder's can be for the ones inside it too, except those with a look of their own
     if (view.subfolders != null) {
         AppMenuItem(
-            "Subfolders too",
+            stringResource(R.string.browser_subfolders_too),
             active = view.subfolders,
             trailingIcon = if (view.subfolders) Icons.Filled.Check else null,
             onClick = { view.onSubfolders(!view.subfolders) }
         )
     }
     AppMenuItem(
-        "Use the default",
+        stringResource(R.string.browser_use_the_default),
         leadingIcon = Icons.Filled.Refresh,
         supportingText = when {
             view.custom -> "${view.inheritedFrom?.let { "From $it" } ?: "Look and feel's"}: ${view.defaultLabel}"
-            view.inheritedFrom != null -> "Same as ${view.inheritedFrom}"
-            else -> "Already the default"
+            view.inheritedFrom != null -> stringResource(R.string.browser_same_as, view.inheritedFrom)
+            else -> stringResource(R.string.browser_already_the_default)
         },
         enabled = view.custom,
         onClick = view.onReset
@@ -533,7 +535,7 @@ private fun SortMenuEntries(
     onSortFieldSelected: (SortableField) -> Unit,
     onBack: () -> Unit
 ) {
-    AppMenuItem("Sort by", onClick = onBack, leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
+    AppMenuItem(stringResource(R.string.browser_sort_by), onClick = onBack, leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft)
     AppMenuDivider()
     SortOptions.forEach { (name, field) ->
         val selected = field == sortField
@@ -541,7 +543,7 @@ private fun SortMenuEntries(
             text = name,
             active = selected,
             trailingIcon = if (!selected) null else if (sortAscending) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
-            trailingIconDescription = if (sortAscending) "Ascending" else "Descending",
+            trailingIconDescription = if (sortAscending) stringResource(R.string.browser_ascending) else stringResource(R.string.browser_descending),
             onClick = { onSortFieldSelected(field) }
         )
     }

@@ -30,6 +30,8 @@ import tools.senko.materialdrain.ui.components.AppMenuItem
 import tools.senko.materialdrain.ui.components.FileListItem
 import tools.senko.materialdrain.ui.components.OverflowMenuButton
 import tools.senko.materialdrain.util.formatRelativeDateTime
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** One row (or, [asTile], one tile of the grid) of the browser, with the menu and the actions its mode offers. */
 @Composable
@@ -142,17 +144,17 @@ private fun ListFolderMenu(
     onDownload: (DownloadStyle) -> Unit,
     downloadHasChoices: Boolean
 ) {
-    OverflowMenuButton(contentDescription = "More options for $title") { close ->
+    OverflowMenuButton(contentDescription = stringResource(R.string.browser_more_options_for, title)) { close ->
         // Remembered in the menu's popup, so each opening starts on the first page
         var downloadPage by remember { mutableStateOf(false) }
         AppMenuPages(
             showSecondary = downloadPage,
             primary = {
-                AppMenuItem("Open", leadingIcon = Icons.AutoMirrored.Filled.OpenInNew, onClick = { close(); onOpen() })
+                AppMenuItem(stringResource(R.string.browser_open), leadingIcon = Icons.AutoMirrored.Filled.OpenInNew, onClick = { close(); onOpen() })
                 if (downloadHasChoices) DownloadMenuItem { downloadPage = true }
-                else AppMenuItem("Download", leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload(DownloadStyle.SEPARATELY) })
+                else AppMenuItem(stringResource(R.string.browser_download), leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload(DownloadStyle.SEPARATELY) })
                 if (link != null) {
-                    AppMenuItem("Share link", leadingIcon = Icons.Filled.Share, onClick = { close(); onShareLink(link) })
+                    AppMenuItem(stringResource(R.string.browser_share_link), leadingIcon = Icons.Filled.Share, onClick = { close(); onShareLink(link) })
                 }
             },
             secondary = {
@@ -181,7 +183,7 @@ private fun FilesystemMenu(
     /** Shares the file itself, where it has no link ([shareUrl] null). */
     onShareFile: (() -> Unit)? = null
 ) {
-    OverflowMenuButton(contentDescription = "More options for ${node.name}") { close ->
+    OverflowMenuButton(contentDescription = stringResource(R.string.browser_more_options_for, node.name)) { close ->
         // A folder's Download is a page of its own: each file on its own, or all in one zip. Remembered in the menu's
         // popup, so each opening starts on the first page
         var downloadPage by remember { mutableStateOf(false) }
@@ -191,21 +193,21 @@ private fun FilesystemMenu(
                 if (node.isDirectory) {
                     DownloadMenuItem { downloadPage = true }
                 } else {
-                    AppMenuItem("Download", leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload(DownloadStyle.SEPARATELY) })
+                    AppMenuItem(stringResource(R.string.browser_download), leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload(DownloadStyle.SEPARATELY) })
                     if (shareUrl == null && onShareFile != null) {
-                        AppMenuItem("Share file", leadingIcon = Icons.Filled.Share, onClick = { close(); onShareFile() })
+                        AppMenuItem(stringResource(R.string.browser_share_file), leadingIcon = Icons.Filled.Share, onClick = { close(); onShareFile() })
                     }
                 }
                 if (onAddToQueue != null) {
-                    AppMenuItem("Add to queue", leadingIcon = Icons.Filled.QueueMusic, onClick = { close(); onAddToQueue() })
+                    AppMenuItem(stringResource(R.string.browser_add_to_queue), leadingIcon = Icons.Filled.QueueMusic, onClick = { close(); onAddToQueue() })
                 }
                 if (canWrite) {
-                    AppMenuItem("Rename", leadingIcon = Icons.Filled.Edit, onClick = { close(); onRename() })
-                    AppMenuItem("Move", leadingIcon = Icons.AutoMirrored.Filled.DriveFileMove, supportingText = "To another folder", onClick = { close(); onMove() })
+                    AppMenuItem(stringResource(R.string.browser_rename), leadingIcon = Icons.Filled.Edit, onClick = { close(); onRename() })
+                    AppMenuItem(stringResource(R.string.browser_move), leadingIcon = Icons.AutoMirrored.Filled.DriveFileMove, supportingText = stringResource(R.string.browser_to_another_folder), onClick = { close(); onMove() })
                 }
                 if (canDelete) {
                     AppMenuDivider()
-                    AppMenuItem("Delete", leadingIcon = Icons.Filled.Delete, destructive = true, onClick = { close(); onDelete() })
+                    AppMenuItem(stringResource(R.string.browser_delete), leadingIcon = Icons.Filled.Delete, destructive = true, onClick = { close(); onDelete() })
                 }
             },
             secondary = {

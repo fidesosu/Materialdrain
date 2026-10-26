@@ -22,6 +22,8 @@ import tools.senko.materialdrain.files.FloatingBottomBar
 import tools.senko.materialdrain.ui.icons.filled.Close
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /**
  * Files shared from another app (or picked with the Upload shortcut), waiting for the screen they go into, whichever
@@ -67,7 +69,7 @@ fun DestinationBar(request: DestinationRequest?) {
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = shown.destination?.let { "Into $it" } ?: shown.unavailable,
+                text = shown.destination?.let { stringResource(R.string.browser_into, it) } ?: shown.unavailable,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

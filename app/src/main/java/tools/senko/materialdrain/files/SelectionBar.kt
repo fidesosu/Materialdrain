@@ -50,6 +50,8 @@ import tools.senko.materialdrain.ui.icons.filled.Share
 import tools.senko.materialdrain.ui.icons.filled.Delete
 import tools.senko.materialdrain.ui.icons.filled.SelectAll
 import tools.senko.materialdrain.ui.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /**
  * One action on the selected items. [destructive] actions are tinted red. With [choices] (Download: each file on its
@@ -146,9 +148,9 @@ fun SelectionActionBar(
     actions: List<SelectionAction>,
 ) {
     FloatingBottomBar(visible = visible) {
-        IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Stop selecting") }
+        IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.files_stop_selecting)) }
         Text(
-            text = if (selectedCount == 0) "Select items" else "$selectedCount selected",
+            text = if (selectedCount == 0) stringResource(R.string.files_select_items) else "$selectedCount selected",
             style = MaterialTheme.typography.labelLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -211,7 +213,7 @@ private fun OverflowMenu(actions: List<SelectionAction>) {
     // The menu is anchored to its own box, so it opens from the button and not from the edge of the bar
     Box {
         IconButton(onClick = { expanded = true }) {
-            Icon(Icons.Filled.MoreVert, contentDescription = "More actions for the selection")
+            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.files_more_actions_for_the_selection))
         }
         AppMenu(expanded = expanded, onDismiss = close) {
             // The action whose choices are shown, on the second page; remembered in the menu's popup, so each opening

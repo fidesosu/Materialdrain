@@ -34,6 +34,8 @@ import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.ui.preview.PreviewSamples
 import tools.senko.materialdrain.provider.api.StorageRef
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /**
  * What's inside an archive, shown where the file's preview would be: folders to open, files to save, and a Back button
@@ -57,9 +59,9 @@ fun ArchiveContents(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Contents", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.files_contents), style = MaterialTheme.typography.titleSmall)
                     Text(
-                        text = if (archive.inside.isEmpty()) "Top of the archive" else archive.inside,
+                        text = if (archive.inside.isEmpty()) stringResource(R.string.files_top_of_the_archive) else archive.inside,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -71,7 +73,7 @@ fun ArchiveContents(
                     TextButton(onClick = { onOpenFolder(archive.inside.substringBeforeLast('/', "")) }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Back")
+                        Text(stringResource(R.string.files_back))
                     }
                 }
             }
@@ -91,7 +93,7 @@ fun ArchiveContents(
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 }
                 archive.entries.isEmpty() -> Text(
-                    text = "This folder is empty",
+                    text = stringResource(R.string.files_this_folder_is_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp)
@@ -146,7 +148,7 @@ private fun ArchiveRow(
         if (!entry.isDirectory) {
             Icon(
                 Icons.Filled.Download,
-                contentDescription = "Save ${entry.name}",
+                contentDescription = stringResource(R.string.files_save, entry.name),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)
             )

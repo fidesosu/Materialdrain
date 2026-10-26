@@ -107,6 +107,8 @@ import androidx.compose.foundation.layout.Arrangement
 import tools.senko.materialdrain.provider.api.StorageRef
 import androidx.compose.ui.platform.LocalInspectionMode
 import tools.senko.materialdrain.ui.preview.LongScreenPreviews
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /** The corners of the cards on this page, the same as the app's other floating cards. */
 private val DetailCardShape = AppShapes.Card
@@ -236,7 +238,7 @@ fun FileInfoDetailsCard(
             previewType?.startsWith("image/") == true || previewType?.startsWith("video/") == true -> FullScreenContent.Media
             previewType?.startsWith("audio/") == true -> FullScreenContent.Song(songQueue, songApiKey)
             uiState.previewHeld && (textFile || isPdf(fileInfo.name, previewType)) ->
-                FullScreenContent.Held(if (textFile) "the text" else "the PDF")
+                FullScreenContent.Held(if (textFile) stringResource(R.string.files_the_text) else stringResource(R.string.files_the_pdf))
             isPdf(fileInfo.name, previewType) -> FullScreenContent.Pdf(uiState.pdfPreview)
             textFile -> FullScreenContent.Text(
                 text = wholeText.takeIf { !uiState.isLoadingTextPreview },
@@ -318,7 +320,7 @@ fun FileInfoDetailsCard(
                     InlineImagePreview(
                         imageSource = rawFileApiUrl,
                         thumbnailSource = actualThumbnailUrl,
-                        contentDescription = "Image preview for ${fileInfo.name}",
+                        contentDescription = stringResource(R.string.files_image_preview_for, fileInfo.name),
                         apiKey = previewApiKey,
                         // This disables smooth filtering (nearest neighbor scaling), which removes the blur when scaling images.
                         filterQuality = FilterQuality.None,
@@ -328,7 +330,7 @@ fun FileInfoDetailsCard(
                 } else if (previewType?.startsWith("video/") == true) {
                     InlineVideoPreview(
                         thumbnailSource = actualThumbnailUrl,
-                        contentDescription = "Video thumbnail for ${fileInfo.name}",
+                        contentDescription = stringResource(R.string.files_video_thumbnail_for, fileInfo.name),
                         apiKey = previewApiKey,
                         outerPadding = mediaPadding,
                         onFullScreenClick = { fullScreenOpen = true }
@@ -381,14 +383,14 @@ fun FileInfoDetailsCard(
                 } else if (uiState.textPreviewErrorMessage != null) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
                         Text(
-                            uiState.textPreviewErrorMessage ?: "Error loading text preview.",
+                            uiState.textPreviewErrorMessage ?: stringResource(R.string.files_error_loading_text_preview),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.weight(1f)
                         )
                         // Too big for the preview, but not for the fullscreen view
                         if (uiState.textPreviewCanLoadAnyway) {
-                            TextButton(onClick = actions.loadWholeText) { Text("Load anyway") }
+                            TextButton(onClick = actions.loadWholeText) { Text(stringResource(R.string.files_load_anyway)) }
                         }
                     }
                 } else if (actualThumbnailUrl != null) {
@@ -403,7 +405,7 @@ fun FileInfoDetailsCard(
                     ) {
                         AsyncImage(
                             model = request,
-                            contentDescription = "File thumbnail for ${fileInfo.name}",
+                            contentDescription = stringResource(R.string.files_file_thumbnail_for, fileInfo.name),
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
                             error = rememberVectorPainter(Icons.Filled.ImageNotSupported)
@@ -455,39 +457,39 @@ fun FileInfoDetailsCard(
             }
 
             Spacer(Modifier.height(16.dp))
-            DetailsCard(title = "Details") {
+            DetailsCard(title = stringResource(R.string.files_details)) {
                 val rows = buildList<@Composable () -> Unit> {
                     add {
                         DetailRow(
                             icon = Icons.Filled.Category,
-                            label = "Type",
-                            value = fileInfo.mimeType?.takeIf { it.isNotBlank() } ?: previewType ?: "Unknown"
+                            label = stringResource(R.string.files_type),
+                            value = fileInfo.mimeType?.takeIf { it.isNotBlank() } ?: previewType ?: stringResource(R.string.files_unknown)
                         )
                     }
                     fileInfo.size?.let { size ->
                         add {
                             DetailRow(
                                 icon = Icons.Filled.Straighten,
-                                label = "Size",
+                                label = stringResource(R.string.files_size),
                                 value = formatSize(size),
                                 supporting = "${NumberFormat.getIntegerInstance().format(size)} bytes".takeIf { size >= 1024 }
                             )
                         }
                     }
                     fileInfo.createdAt?.let { date ->
-                        add { DetailRow(Icons.Filled.CalendarToday, if (isFilesystemFile) "Created" else "Uploaded", formatApiDateTimeString(date), relativeTime(date)) }
+                        add { DetailRow(Icons.Filled.CalendarToday, if (isFilesystemFile) stringResource(R.string.files_created) else stringResource(R.string.files_uploaded), formatApiDateTimeString(date), relativeTime(date)) }
                     }
                     fileInfo.modifiedAt?.takeIf { it != fileInfo.createdAt }?.let { date ->
-                        add { DetailRow(Icons.Filled.Edit, "Modified", formatApiDateTimeString(date), relativeTime(date)) }
+                        add { DetailRow(Icons.Filled.Edit, stringResource(R.string.files_modified), formatApiDateTimeString(date), relativeTime(date)) }
                     }
                     rich?.dateLastView?.let { date ->
-                        add { DetailRow(Icons.Filled.Visibility, "Last viewed", formatApiDateTimeString(date), relativeTime(date)) }
+                        add { DetailRow(Icons.Filled.Visibility, stringResource(R.string.files_last_viewed), formatApiDateTimeString(date), relativeTime(date)) }
                     }
                     folderOf(fileInfo)?.let { folder ->
                         add { DetailRow(Icons.Filled.Folder, "Folder", folder, collapsedLines = 2, onCopy = { copy("Folder", folder) }) }
                     }
                     rich?.let { autoDeleteText(it) }?.let { text ->
-                        add { DetailRow(Icons.Filled.AutoDelete, "Deletes itself", text) }
+                        add { DetailRow(Icons.Filled.AutoDelete, stringResource(R.string.files_deletes_itself), text) }
                     }
                 }
                 rows.forEachIndexed { index, row ->
@@ -499,13 +501,13 @@ fun FileInfoDetailsCard(
             val hasIdentifiers = shareUrl != null || fileInfo.ref.id != null || rich?.sha256 != null
             if (hasIdentifiers) {
                 Spacer(Modifier.height(12.dp))
-                DetailsCard(title = "Links and identifiers") {
+                DetailsCard(title = stringResource(R.string.files_links_and_identifiers)) {
                     val rows = buildList<@Composable () -> Unit> {
                         shareUrl?.let { link ->
                             add {
                                 DetailRow(
                                     icon = Icons.Filled.Link,
-                                    label = "Link",
+                                    label = stringResource(R.string.files_link),
                                     value = link.removePrefix("https://"),
                                     collapsedLines = 1,
                                     cutInMiddle = false,
@@ -724,12 +726,12 @@ private fun ActionRow(
             modifier = Modifier.weight(1f)
         )
         if (shareUrl != null) {
-            IconAction(Icons.Filled.Share, "Share the link", onClick = { onShare(shareUrl) })
+            IconAction(Icons.Filled.Share, stringResource(R.string.files_share_the_link), onClick = { onShare(shareUrl) })
         } else if (onShareFile != null) {
             // No link to share: the file itself
-            IconAction(Icons.Filled.Share, "Share the file", onClick = onShareFile)
+            IconAction(Icons.Filled.Share, stringResource(R.string.files_share_the_file), onClick = onShareFile)
         }
-        if (canDelete) IconAction(Icons.Filled.Delete, "Delete", onClick = onDelete, destructive = true)
+        if (canDelete) IconAction(Icons.Filled.Delete, stringResource(R.string.browser_delete), onClick = onDelete, destructive = true)
     }
 }
 
@@ -823,12 +825,12 @@ private fun DownloadButton(
                     val label = when (shown) {
                         DownloadButtonState.RUNNING -> {
                             val percent = download?.progressFraction?.takeIf { it > 0f }?.let { " · ${(it * 100).toInt()}%" }.orEmpty()
-                            "Cancel$percent"
+                            stringResource(R.string.files_cancel, percent)
                         }
-                        DownloadButtonState.SAVED -> "Open"
-                        DownloadButtonState.ARMED -> "Tap again"
-                        DownloadButtonState.FAILED -> "Retry download"
-                        DownloadButtonState.IDLE -> "Download"
+                        DownloadButtonState.SAVED -> stringResource(R.string.browser_open)
+                        DownloadButtonState.ARMED -> stringResource(R.string.files_tap_again)
+                        DownloadButtonState.FAILED -> stringResource(R.string.files_retry_download)
+                        DownloadButtonState.IDLE -> stringResource(R.string.browser_download)
                     }
                     val style = MaterialTheme.typography.labelLarge
                     BasicText(
@@ -875,9 +877,9 @@ private fun IconAction(icon: ImageVector, description: String, onClick: () -> Un
 private fun StatsRow(rich: PixeldrainRichDetails) {
     val numbers = NumberFormat.getIntegerInstance()
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        rich.views?.let { StatTile(Icons.Filled.Visibility, numbers.format(it), "Views") }
-        rich.downloads?.let { StatTile(Icons.Filled.Download, numbers.format(it), "Downloads") }
-        rich.bandwidthUsed?.let { StatTile(Icons.Filled.DataUsage, formatSize(it), "Bandwidth") }
+        rich.views?.let { StatTile(Icons.Filled.Visibility, numbers.format(it), stringResource(R.string.files_views)) }
+        rich.downloads?.let { StatTile(Icons.Filled.Download, numbers.format(it), stringResource(R.string.files_downloads)) }
+        rich.bandwidthUsed?.let { StatTile(Icons.Filled.DataUsage, formatSize(it), stringResource(R.string.files_bandwidth)) }
     }
 }
 
@@ -975,10 +977,10 @@ private fun DetailRow(
             }
         }
         onOpen?.let {
-            IconButton(onClick = it) { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Open $label", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            IconButton(onClick = it) { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = stringResource(R.string.files_open, label), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         if (onCopy != null) {
-            IconButton(onClick = onCopy) { Icon(Icons.Filled.ContentCopy, contentDescription = "Copy $label", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            IconButton(onClick = onCopy) { Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(R.string.files_copy, label), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
         } else if (onOpen == null) {
             Spacer(Modifier.width(12.dp))
         }

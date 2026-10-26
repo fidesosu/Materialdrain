@@ -58,6 +58,8 @@ import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.ui.preview.PreviewSamples
 import tools.senko.materialdrain.provider.api.StorageRef
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 @Composable
 fun TextInputDialog(
@@ -91,7 +93,7 @@ fun TextInputDialog(
         confirmButton = {
             Button(onClick = { onConfirm(value) }, enabled = value.isNotBlank()) { Text(confirmLabel) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_cancel)) } }
     )
 }
 
@@ -114,7 +116,7 @@ fun ConfirmDialog(
                 colors = if (isDestructive) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error) else ButtonDefaults.buttonColors()
             ) { Text(confirmLabel) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_cancel)) } }
     )
 }
 /**
@@ -208,7 +210,7 @@ fun FolderPickerDialog(
                                 )
                                 is FolderListing.Loaded -> if (listing.folders.isEmpty()) {
                                     Text(
-                                        "No folders in here",
+                                        stringResource(R.string.common_no_folders_in_here),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.align(Alignment.Center)
@@ -231,7 +233,7 @@ fun FolderPickerDialog(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_cancel)) }
                     Spacer(Modifier.width(8.dp))
                     Button(onClick = { onConfirm(path) }, enabled = listings[path] !is FolderListing.Failed) { Text(confirmLabel) }
                 }
@@ -302,7 +304,7 @@ private fun PickerFolderRow(name: String, onClick: () -> Unit) {
         Text(name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         Icon(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = "Open",
+            contentDescription = stringResource(R.string.browser_open),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

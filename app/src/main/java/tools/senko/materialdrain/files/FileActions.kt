@@ -60,6 +60,8 @@ import tools.senko.materialdrain.ui.components.AppMenuPreview
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import tools.senko.materialdrain.provider.api.StorageRef
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 fun shareLink(context: Context, url: String) {
     val sendIntent = Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_TEXT, url).setType("text/plain")
@@ -69,7 +71,7 @@ fun shareLink(context: Context, url: String) {
 /** "Download" in a ⋮ menu where it can be either (a folder, a list): opens the page of [DownloadChoiceEntries]. */
 @Composable
 fun DownloadMenuItem(onClick: () -> Unit) {
-    AppMenuItem("Download", leadingIcon = Icons.Filled.Download, trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight, onClick = onClick)
+    AppMenuItem(stringResource(R.string.browser_download), leadingIcon = Icons.Filled.Download, trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight, onClick = onClick)
 }
 
 /**
@@ -79,15 +81,15 @@ fun DownloadMenuItem(onClick: () -> Unit) {
  */
 @Composable
 fun DownloadChoiceEntries(onBack: () -> Unit, onSeparately: () -> Unit, onZip: () -> Unit, folders: Boolean) {
-    AppMenuItem("Download", leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft, onClick = onBack)
+    AppMenuItem(stringResource(R.string.browser_download), leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft, onClick = onBack)
     AppMenuDivider()
     AppMenuItem(
-        "Separately",
+        stringResource(R.string.files_separately),
         leadingIcon = Icons.Filled.Download,
-        supportingText = if (folders) "Each file, in its folders" else "Each file on its own",
+        supportingText = if (folders) stringResource(R.string.files_each_file_in_its_folders) else stringResource(R.string.files_each_file_on_its_own),
         onClick = onSeparately
     )
-    AppMenuItem("As one ZIP", leadingIcon = Icons.Filled.FolderZip, onClick = onZip)
+    AppMenuItem(stringResource(R.string.files_as_one_zip), leadingIcon = Icons.Filled.FolderZip, onClick = onZip)
 }
 
 /** The 3 dot menu of a file of the Files page or of a list. */
@@ -107,7 +109,7 @@ fun FileItemMenu(
     /** Shares the file itself, for a host whose files have no link ([shareUrl] null). */
     onShareFile: (() -> Unit)? = null
 ) {
-    OverflowMenuButton(contentDescription = "More options for ${file.name}") { close ->
+    OverflowMenuButton(contentDescription = stringResource(R.string.browser_more_options_for, file.name)) { close ->
         FileItemMenuEntries(close, shareUrl, canDelete, onDownload, onAddToFilesystem, onAddToList, onDelete, onRemoveFromList, onAddToQueue, onShareFile)
     }
 }
@@ -137,34 +139,34 @@ private fun FileItemMenuEntries(
     AppMenuPages(
         showSecondary = addToPageOpen,
         primary = {
-            AppMenuItem("Download", leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload() })
+            AppMenuItem(stringResource(R.string.browser_download), leadingIcon = Icons.Filled.Download, onClick = { close(); onDownload() })
             if (url != null) {
-                AppMenuItem("Share link", leadingIcon = Icons.Filled.Share, onClick = { close(); shareLink(context, url) })
+                AppMenuItem(stringResource(R.string.browser_share_link), leadingIcon = Icons.Filled.Share, onClick = { close(); shareLink(context, url) })
             } else if (onShareFile != null) {
-                AppMenuItem("Share file", leadingIcon = Icons.Filled.Share, onClick = { close(); onShareFile() })
+                AppMenuItem(stringResource(R.string.browser_share_file), leadingIcon = Icons.Filled.Share, onClick = { close(); onShareFile() })
             }
             if (onAddToQueue != null) {
-                AppMenuItem("Add to queue", leadingIcon = Icons.Filled.QueueMusic, onClick = { close(); onAddToQueue() })
+                AppMenuItem(stringResource(R.string.browser_add_to_queue), leadingIcon = Icons.Filled.QueueMusic, onClick = { close(); onAddToQueue() })
             }
             AppMenuItem(
-                "Add to…",
+                stringResource(R.string.files_add_to),
                 leadingIcon = Icons.Filled.Add,
                 trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 onClick = { addToPageOpen = true }
             )
             if (onRemoveFromList != null) {
-                AppMenuItem("Remove from this list", leadingIcon = Icons.Filled.Remove, onClick = { close(); onRemoveFromList() })
+                AppMenuItem(stringResource(R.string.files_remove_from_this_list), leadingIcon = Icons.Filled.Remove, onClick = { close(); onRemoveFromList() })
             }
             if (canDelete) {
                 AppMenuDivider()
-                AppMenuItem("Delete", leadingIcon = Icons.Filled.Delete, destructive = true, onClick = { close(); onDelete() })
+                AppMenuItem(stringResource(R.string.browser_delete), leadingIcon = Icons.Filled.Delete, destructive = true, onClick = { close(); onDelete() })
             }
         },
         secondary = {
-            AppMenuItem("Add to", leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft, onClick = { addToPageOpen = false })
+            AppMenuItem(stringResource(R.string.files_add_to_2), leadingIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft, onClick = { addToPageOpen = false })
             AppMenuDivider()
-            AppMenuItem("Filesystem", leadingIcon = Icons.Filled.FolderCopy, onClick = { close(); onAddToFilesystem() })
-            AppMenuItem("List", leadingIcon = Icons.AutoMirrored.Filled.PlaylistAdd, onClick = { close(); onAddToList() })
+            AppMenuItem(stringResource(R.string.files_filesystem), leadingIcon = Icons.Filled.FolderCopy, onClick = { close(); onAddToFilesystem() })
+            AppMenuItem(stringResource(R.string.browser_list), leadingIcon = Icons.AutoMirrored.Filled.PlaylistAdd, onClick = { close(); onAddToList() })
         }
     )
 }
@@ -337,7 +339,7 @@ private fun ListPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add to list") },
+        title = { Text(stringResource(R.string.files_add_to_list)) },
         text = {
             Box(modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 360.dp)) {
                 val shownLists = lists
@@ -347,7 +349,7 @@ private fun ListPickerDialog(
                     else -> LazyColumn {
                         item {
                             ListItem(
-                                headlineContent = { Text("New list…") },
+                                headlineContent = { Text(stringResource(R.string.files_new_list)) },
                                 leadingContent = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null) },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                 modifier = Modifier.clickable { onNewList() }
@@ -367,7 +369,7 @@ private fun ListPickerDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_cancel)) } }
     )
 }
 

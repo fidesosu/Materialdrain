@@ -69,6 +69,8 @@ import tools.senko.materialdrain.settings.isSearchIndex
 import tools.senko.materialdrain.ui.components.ConfirmDialog
 import tools.senko.materialdrain.filesystem.FilesystemUiState
 import tools.senko.materialdrain.ui.components.TextInputDialog
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 private const val LOADING_INDICATOR_DELAY_MS = 400L
 private const val LOADING_START_GRACE_MS = 1500L
@@ -779,15 +781,15 @@ private fun rememberDestinationBar(
         val alreadyHere = pendingMove.all { it.ref.path.trim('/').substringBeforeLast('/', "") == here }
         val canMoveHere = fsState.canWrite && !fsState.isModifying && !insideMoved && !alreadyHere
         return DestinationRequest(
-            title = if (pendingMove.size == 1) "Moving \"${pendingMove.first().name}\"" else "Moving ${pendingMove.size} items",
+            title = if (pendingMove.size == 1) stringResource(R.string.browser_moving, pendingMove.first().name) else stringResource(R.string.browser_moving_items, pendingMove.size),
             destination = folderName.takeIf { canMoveHere },
             unavailable = when {
-                insideMoved -> "Not into a folder that's being moved"
-                alreadyHere -> "Already in this folder: open another"
-                else -> "Open a folder that can be written to"
+                insideMoved -> stringResource(R.string.browser_not_into_a_folder_that)
+                alreadyHere -> stringResource(R.string.browser_already_in_this_folder_open)
+                else -> stringResource(R.string.browser_open_a_folder_that_can)
             },
-            confirmLabel = "Move here",
-            cancelDescription = "Leave them where they are",
+            confirmLabel = stringResource(R.string.browser_move_here),
+            cancelDescription = stringResource(R.string.browser_leave_them_where_they_are),
             onConfirm = { filesystemViewModel.moveHere() },
             onCancel = { filesystemViewModel.cancelMove() }
         )
@@ -796,19 +798,19 @@ private fun rememberDestinationBar(
     // Where this screen puts them: the folder that's open, the host's own files; a list takes no files of its own
     val destination = when (mode) {
         BrowserMode.FILESYSTEM -> folderName.takeIf { fsState.canWrite && canUploadFs && !fsState.isModifying && !fsUploadBusy }
-        BrowserMode.FILES -> "your files".takeIf { onUploadFiles != null }
+        BrowserMode.FILES -> stringResource(R.string.browser_your_files).takeIf { onUploadFiles != null }
         BrowserMode.LISTS -> null
     }
     return DestinationRequest(
-        title = if (shared.count == 1) "1 shared file" else "${shared.count} shared files",
+        title = if (shared.count == 1) stringResource(R.string.browser_1_shared_file) else stringResource(R.string.browser_shared_files, shared.count),
         destination = destination,
         unavailable = when (mode) {
-            BrowserMode.FILESYSTEM -> "Open a folder that can be written to"
-            BrowserMode.FILES -> "This host takes no uploads here"
-            BrowserMode.LISTS -> "Go to Files or a folder to upload them"
+            BrowserMode.FILESYSTEM -> stringResource(R.string.browser_open_a_folder_that_can)
+            BrowserMode.FILES -> stringResource(R.string.browser_this_host_takes_no_uploads)
+            BrowserMode.LISTS -> stringResource(R.string.browser_go_to_files_or_a)
         },
-        confirmLabel = "Upload here",
-        cancelDescription = "Don't upload the shared files",
+        confirmLabel = stringResource(R.string.browser_upload_here),
+        cancelDescription = stringResource(R.string.browser_don_t_upload_the_shared),
         // Only where there's a destination: the button is off elsewhere
         onConfirm = {
             when (mode) {
