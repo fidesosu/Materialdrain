@@ -29,6 +29,7 @@ import android.graphics.drawable.ColorDrawable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.toArgb
 import tools.senko.materialdrain.ui.theme.ThemeMode
+import tools.senko.materialdrain.update.EXTRA_OFFER_UPDATE
 import tools.senko.materialdrain.ui.theme.MaterialdrainTheme
 import tools.senko.materialdrain.ui.theme.isDarkTheme
 
@@ -120,6 +121,8 @@ class MainActivity : FragmentActivity() {
     private fun handleIntent(intent: Intent?) {
         val container = AppContainer.get(application)
         pendingOpenOf(intent)?.let { container.pendingOpen.value = it }
+        // The notification of a new version: offered in the app (after its lock, which the update sheet waits for)
+        if (intent?.getBooleanExtra(EXTRA_OFFER_UPDATE, false) == true) container.appUpdates.checkNow()
         val uris: List<Uri> = when (intent?.action) {
             Intent.ACTION_SEND -> listOfNotNull(sharedStream(intent))
             Intent.ACTION_SEND_MULTIPLE -> sharedStreams(intent)

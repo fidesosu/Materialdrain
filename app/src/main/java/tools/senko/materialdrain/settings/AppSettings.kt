@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.settings
 
+import tools.senko.materialdrain.update.UpdateWorker
 import tools.senko.materialdrain.ui.VibrationStrength
 import android.content.Context
 import android.content.SharedPreferences
@@ -88,6 +89,8 @@ private const val INCLUDE_DEV_UPDATES_PREF = "include_dev_updates"
 private const val SKIPPED_UPDATE_CODE_PREF = "skipped_update_code"
 private const val LAST_UPDATE_CHECK_PREF = "last_update_check"
 private const val SHOW_WHATS_NEW_PREF = "show_whats_new"
+private const val CHECK_UPDATES_IN_BACKGROUND_PREF = "check_updates_in_background"
+private const val NOTIFIED_UPDATE_CODE_PREF = "notified_update_code"
 private const val LAST_SEEN_COMMIT_TIME_PREF = "last_seen_commit_time"
 
 /** The choices for [AppSettings.searchResultLimit]; 0 is no limit. */
@@ -626,6 +629,20 @@ class AppSettings(context: Context) {
     var skippedUpdateCode: Long
         get() = prefs.getLong(SKIPPED_UPDATE_CODE_PREF, 0L)
         set(value) = prefs.edit { putLong(SKIPPED_UPDATE_CODE_PREF, value) }
+
+    private val checkUpdatesInBackgroundPref = booleanSetting(CHECK_UPDATES_IN_BACKGROUND_PREF, false)
+    /** Looks for a newer version once a day in the background too, with a notification when one is out. Off by default. */
+    val checkUpdatesInBackground: StateFlow<Boolean> = checkUpdatesInBackgroundPref.flow
+
+    fun setCheckUpdatesInBackground(enabled: Boolean) {
+        checkUpdatesInBackgroundPref.set(enabled)
+        UpdateWorker.schedule(appContext, enabled)
+    }
+
+    /** The versionCode of the update the background check last told about: each version gets one notification. */
+    var notifiedUpdateCode: Long
+        get() = prefs.getLong(NOTIFIED_UPDATE_CODE_PREF, 0L)
+        set(value) = prefs.edit { putLong(NOTIFIED_UPDATE_CODE_PREF, value) }
 
     private val showWhatsNewPref = booleanSetting(SHOW_WHATS_NEW_PREF, true)
     /** After an update, the app shows what it brought the first time it opens. On by default. */

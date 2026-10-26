@@ -215,6 +215,9 @@ dependencies {
     implementation(libs.androidx.media3.datasource.okhttp) // Streams media over the same OkHttp client as the API
     // Songs which go on in the background, with their controls in the notification (see PlaybackService)
     implementation(libs.androidx.media3.session)
+    // The daily check for a new version in the background, when it's turned on (see UpdateWorker)
+    implementation(libs.androidx.work.runtime.ktx)
+    testImplementation(libs.androidx.work.testing)
 
     testImplementation(libs.junit)
     // Serves GitHub's releases to the update check (see UpdateCheckTest)

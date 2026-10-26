@@ -29,6 +29,7 @@ okhttp = "5.5.0"
 # The SMB client (provider-smb), LGPL-3.0
 jcifs = "2.1.10"
 profileinstaller = "1.4.1"
+work = "2.10.1"
 # Renders the @Preview functions to images on the computer (see app/build.gradle.kts, roborazzi)
 roborazzi = "1.76.0"
 robolectric = "4.17"
@@ -45,6 +46,8 @@ androidx-media3-ui = { module = "androidx.media3:media3-ui", version.ref = "medi
 androidx-media3-datasource-okhttp = { module = "androidx.media3:media3-datasource-okhttp", version.ref = "media3Exoplayer" }
 androidx-media3-session = { module = "androidx.media3:media3-session", version.ref = "media3Exoplayer" }
 androidx-profileinstaller = { module = "androidx.profileinstaller:profileinstaller", version.ref = "profileinstaller" }
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
+androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "work" }
 coil-gif = { module = "io.coil-kt:coil-gif", version.ref = "coil" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }

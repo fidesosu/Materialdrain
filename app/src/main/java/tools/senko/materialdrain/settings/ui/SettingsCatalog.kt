@@ -22,6 +22,8 @@ import tools.senko.materialdrain.ui.icons.filled.Language
 import tools.senko.materialdrain.ui.icons.filled.Lock
 import tools.senko.materialdrain.ui.icons.filled.Refresh
 import tools.senko.materialdrain.AppContainer
+import tools.senko.materialdrain.update.CHANNEL_APP_UPDATES
+import tools.senko.materialdrain.update.UpdateWorker
 import android.app.Application
 import tools.senko.materialdrain.ui.icons.filled.NewReleases
 import tools.senko.materialdrain.ui.icons.filled.Notifications
@@ -456,6 +458,15 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                         onClick = { context -> openNotificationSettings(context, CHANNEL_TRANSFER_COMPLETE) }
                     ),
                     SettingsItem.Action(
+                        title = "App updates",
+                        summary = "From the daily check",
+                        external = true,
+                        onClick = { context ->
+                            UpdateWorker.ensureChannel(context)
+                            openNotificationSettings(context, CHANNEL_APP_UPDATES)
+                        }
+                    ),
+                    SettingsItem.Action(
                         title = "Failed transfers",
                         summary = "Failed in the background",
                         external = true,
@@ -531,6 +542,13 @@ val SettingsCatalog: List<SettingsCategory> = listOf(
                 info = "Looks on GitHub, where the app is released, at most every 6 hours. Not while the data saver holds what the app loads by itself.",
                 isChecked = { appSettings.checkUpdatesOnOpening.collectAsState().value },
                 onCheckedChange = { appSettings.setCheckUpdatesOnOpening(it) }
+            ),
+            SettingsItem.Toggle(
+                title = "Also check daily in the background",
+                summary = "A notification when a new version is out",
+                info = "Once a day, with any network but not on mobile data while the data saver is on. It needs notifications to be allowed, and names only the version.",
+                isChecked = { appSettings.checkUpdatesInBackground.collectAsState().value },
+                onCheckedChange = { appSettings.setCheckUpdatesInBackground(it) }
             ),
             // Not under the switch above: "Check for updates" follows it too
             SettingsItem.Toggle(
