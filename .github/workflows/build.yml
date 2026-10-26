@@ -12,7 +12,7 @@
 # app for it (screenshots.yml).
 #
 # Only a change to what goes into the APK builds it: the app, the provider modules it's made of, the example configs
-# it bundles, and the build's own settings. Anything else (the README, this workflow) doesn't, nor do Markdown files
+# it bundles, and the build's own settings and plugins (build-logic). Anything else (the README, this workflow) doesn't, nor do Markdown files
 # anywhere. "Run workflow" on the Actions tab builds anyway. app/build.gradle.kts has the same list (appPaths), for
 # the number of a dev build: keep the two in step.
 name: Android build
@@ -25,6 +25,7 @@ on:
       - "provider-*/**"
       - "docs/provider-configs/**"
       - "gradle/**"
+      - "build-logic/**"
       - "*.gradle.kts"
       - "gradle.properties"
       - "gradlew"
@@ -38,6 +39,7 @@ on:
       - "provider-*/**"
       - "docs/provider-configs/**"
       - "gradle/**"
+      - "build-logic/**"
       - "*.gradle.kts"
       - "gradle.properties"
       - "gradlew"

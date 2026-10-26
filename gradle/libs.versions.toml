@@ -1,10 +1,13 @@
 [versions]
+# The Android versions the app and its modules are built for (read by app/build.gradle.kts and build-logic)
+compileSdk = "37"
+minSdk = "29"
+targetSdk = "36"
 agp = "9.4.1"
 coil = "2.7.0"
 coreSplashscreen = "1.2.0"
-# The Kotlin compiler plugins, of the Kotlin version Android's Gradle plugin builds with
-kotlinComposeCompiler = "2.4.20"
-kotlinSerialization = "2.4.20"
+# The Kotlin of the build: its compiler plugins, and its Gradle plugin, which build-logic compiles against
+kotlin = "2.4.20"
 coreKtx = "1.19.1"
 coroutines = "1.11.0"
 junit = "4.13.2"
@@ -84,9 +87,15 @@ roborazzi-compose-preview-scanner-support = { group = "io.github.takahirom.robor
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 composable-preview-scanner = { group = "io.github.sergio-sastre.ComposablePreviewScanner", name = "android", version.ref = "composablePreviewScanner" }
 
+# Only for build-logic to compile against
+android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
+kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+
 [plugins]
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
-kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlinComposeCompiler" }
-kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlinSerialization" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+# The modules of the hosts (build-logic)
+materialdrain-android-library = { id = "materialdrain.android.library" }

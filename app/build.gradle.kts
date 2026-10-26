@@ -45,6 +45,7 @@ val appPaths = arrayOf(
     ":(glob)provider-*/**",
     ":(glob)docs/provider-configs/**",
     ":(glob)gradle/**",
+    ":(glob)build-logic/**",
     ":(glob)*.gradle.kts",
     "gradle.properties",
     "gradlew",
@@ -88,13 +89,13 @@ val computedVersionCode: Int = ((commitEpochSeconds - 1_735_689_600L) / 60).toIn
 
 android {
     namespace = "tools.senko.materialdrain"
-    compileSdk = 37
+    compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
         applicationId = "tools.senko.materialdrain"
-        minSdk = 29
+        minSdk = libs.versions.minSdk.get().toInt()
         //noinspection OldTargetApi
-        targetSdk = 36
+        targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = computedVersionCode
         versionName = computedVersionName
         buildConfigField("long", "COMMIT_TIME", "${commitEpochSeconds}L")
