@@ -154,4 +154,18 @@ class ThemeCompatTest {
         if (api >= 31) assertTrue("The activity's configuration is still night while the app is light", !night)
         capture("light-app-configuration")
     }
+
+    /** Light or dark changed (Look and feel): the app follows it as it is, what's open staying open. */
+    @Test
+    fun aThemeChangeKeepsWhatsOpen() {
+        app.start()
+        app.openFolder("Music")
+        app.waitText("Ocean waves")
+        app.settings.setThemeMode(ThemeMode.DARK)
+        Thread.sleep(1_000)
+        assertTrue("The folder closed when the theme changed", app.shows(By.text("Ocean waves.flac"), 3_000))
+        app.settings.setThemeMode(ThemeMode.LIGHT)
+        Thread.sleep(1_000)
+        assertTrue("The folder closed when the theme changed back", app.shows(By.text("Ocean waves.flac"), 3_000))
+    }
 }

@@ -30,12 +30,14 @@
         <!-- singleTask: one copy of the app, in its own task. A share from another app comes to it (onNewIntent) and waits
              for the screen it goes into, instead of a second copy on top of the sharing app, which the share could miss.
              Turning the screen doesn't make it again (configChanges): the screens follow the new size as they are, so a
-             video playing fullscreen goes on when it's turned, and the player's rotate button can turn it -->
+             video playing fullscreen goes on when it's turned, and the player's rotate button can turn it. Nor does light or
+             dark changing (uiMode): the app's theme follows it as it is, with what's open staying open (see
+             MainActivity.applyNightMode, which sets it when Look and feel changes) -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
             android:theme="@style/Theme.App.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

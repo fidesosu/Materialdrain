@@ -151,7 +151,8 @@ class MainActivity : FragmentActivity() {
     /**
      * Tells Android whether the app is light or dark (Look and feel), from Android 12 on: its splash screen and the system's
      * popups over it (the text selection toolbar) then match the app instead of the system, from the next start on too.
-     * Before 12 they follow the system. Android makes the activity again when this changes what it is.
+     * Before 12 they follow the system. The activity isn't made again for it (uiMode in its configChanges): the app's
+     * theme follows the new configuration as it is.
      */
     private fun applyNightMode(mode: ThemeMode) {
         if (Build.VERSION.SDK_INT < 31) return
