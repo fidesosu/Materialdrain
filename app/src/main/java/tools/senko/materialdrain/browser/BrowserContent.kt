@@ -76,6 +76,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Immutable
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import androidx.compose.animation.Crossfade
+import tools.senko.materialdrain.ui.components.RefreshIndicator
+import androidx.compose.ui.graphics.graphicsLayer
 
 /**
  * The browser as it's drawn: the header of [mode] (the sorting, the path or the open list), then [entries] or why there
@@ -126,15 +128,22 @@ fun BrowserContent(
 ) {
     val context = LocalContext.current
     val pullRefreshState = rememberPullToRefreshState()
+    val reduceMotionAll = LocalReduceMotion.current
     PullToRefreshBox(
         isRefreshing = refreshing,
         onRefresh = onRefresh,
         state = pullRefreshState,
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
+        indicator = { RefreshIndicator(pullRefreshState, refreshing, Modifier.align(Alignment.TopCenter)) }
     ) {
         // The thumbnails the data saver holds back, all at once (see DataSaver); null while none are held back
         val loadThumbnails = LocalDataSaver.current.let { if (it.holdThumbnails) it.loadAllThumbnails else null }
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                // The list comes down a little with the pull, under the indicator (read while drawing)
+                .graphicsLayer { if (!reduceMotionAll) translationY = pullRefreshState.distanceFraction.coerceIn(0f, 1f) * PULL_SHIFT.toPx() }
+        ) {
             // Header: the sorting and filter of whichever mode's list is sortable (every mode except the lists overview,
             // which is just titles), then right above the content the path (filesystem) or the list being shown (lists)
             when (mode) {
@@ -379,6 +388,9 @@ private class BrowserPage(
     val errorMessage: String?,
     val keyMissing: Boolean
 )
+
+/** How far the list comes down with a full pull to refresh. */
+private val PULL_SHIFT = 24.dp
 
 /** What the body of a page is: rows to come, why there's nothing, or the files. */
 private enum class PageBody { PLACEHOLDERS, KEY_MISSING, ERROR, EMPTY, LIST }
