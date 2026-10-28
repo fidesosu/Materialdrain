@@ -1,8 +1,6 @@
 package tools.senko.materialdrain.ui.components
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.LocalContentColor
@@ -43,6 +41,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 
 private const val BLANK = -1
 private const val LETTERS = 26
@@ -84,6 +91,9 @@ private const val GHOST_REACH = 1.25f
  * ghost, see [NumberOdometer]
  * @param alignChanges lines the old and the new text up so that as many characters as possible stay where they are
  * ("9.1 GB" to "10.1 GB" only changes the 9 and adds a 1 in front), instead of comparing them from the left
+ * @param settleOvershoot how far a wheel goes past its new character before it settles on it, like a spring (0 for none;
+ * about 1 is a tenth of a character); instead of [accelerationFraction] and [decelerationFraction]
+ * @param speedStretch how much taller the characters are drawn at a wheel's top speed, as if blurred by the motion
  */
 data class OdometerSpec(
     val durationMillis: Int = 450,
@@ -97,11 +107,13 @@ data class OdometerSpec(
     val maxStepsPerChar: Int = 26,
     val reelSpacing: Float = 1.15f,
     val push: Boolean = false,
-    val alignChanges: Boolean = false
+    val alignChanges: Boolean = false,
+    val settleOvershoot: Float = 0f,
+    val speedStretch: Float = 0.12f
 )
 
 /** For numbers, amounts and sizes: each changed digit is pushed out by the new one, and what stays the same doesn't move. */
-val NumberOdometer = OdometerSpec(push = true, alignChanges = true)
+val NumberOdometer = OdometerSpec(push = true, alignChanges = true, settleOvershoot = 0.8f, speedStretch = 0f)
 
 // --- The route of a single character ---
 
@@ -227,7 +239,9 @@ internal class OdometerColumn(
     /** How far the wheel has come, 0 at the start and 1 at the target. */
     val progress: Float,
     /** 0 when the ghost characters are invisible, 1 when they are fully faded in. */
-    val ghostVisibility: Float
+    val ghostVisibility: Float,
+    /** How fast the wheel turns, from 0 (still) to 1 (its top speed). */
+    val speed: Float = 0f
 )
 
 internal class OdometerPlan(
@@ -245,11 +259,11 @@ internal class OdometerPlan(
             when {
                 slot.durationMillis <= 0f || t >= slot.durationMillis -> slot.target
                 t <= 0f -> slot.start
-                else -> slot.strip[position(slot, t).first.roundToInt().coerceIn(0, slot.strip.lastIndex)]
+                else -> slot.strip[position(slot, t).index.roundToInt().coerceIn(0, slot.strip.lastIndex)]
             }
         }
         // A blank is no character: the texts can be lined up with blanks before them as well as after them
-        return codes.filter { it != BLANK }.joinToString("") { it.toChar().toString() }
+        return codes.filter { it != BLANK }.joinToString("") { codeText(it) }
     }
 
     private fun columnAt(slot: OdometerSlot, elapsedMillis: Float): OdometerColumn {
@@ -264,15 +278,18 @@ internal class OdometerPlan(
             val waiting = if (slot.start == BLANK) emptyList() else listOf(OdometerGlyph(slot.start, 0f))
             return OdometerColumn(waiting, slot.start, slot.target, 0f, 0f)
         }
-        val (pos, progress, visibility) = position(slot, t)
+        val at = position(slot, t)
         val glyphs = slot.strip.indices.mapNotNull { k ->
-            val offset = k - pos
+            val offset = k - at.index
             if (abs(offset) < GHOST_REACH && slot.strip[k] != BLANK) OdometerGlyph(slot.strip[k], offset) else null
         }
-        return OdometerColumn(glyphs, slot.start, slot.target, progress, visibility)
+        return OdometerColumn(glyphs, slot.start, slot.target, at.progress.coerceIn(0f, 1f), at.visibility, at.speed)
     }
 
-    private fun position(slot: OdometerSlot, elapsedMillis: Float): Triple<Float, Float, Float> {
+    /** Where a wheel is: [index] into its strip, how far it has come (past 1 while it overshoots), its ghosts and speed. */
+    private class WheelAt(val index: Float, val progress: Float, val visibility: Float, val speed: Float)
+
+    private fun position(slot: OdometerSlot, elapsedMillis: Float): WheelAt {
         val duration = slot.durationMillis
         val fade = slot.fadeMillis
         val visibility = when {
@@ -282,8 +299,15 @@ internal class OdometerPlan(
         }.coerceIn(0f, 1f)
         val rollTime = duration - 2 * fade
         val u = if (rollTime <= 0f) 1f else ((elapsedMillis - fade) / rollTime).coerceIn(0f, 1f)
-        val progress = rollProfile(u, spec.accelerationFraction, spec.decelerationFraction)
-        return Triple(slot.startIndex + (slot.targetIndex - slot.startIndex) * progress, progress, visibility)
+        fun profile(at: Float) = if (spec.settleOvershoot > 0f) overshootProfile(at, spec.settleOvershoot)
+            else rollProfile(at, spec.accelerationFraction, spec.decelerationFraction)
+        val progress = profile(u)
+        // The slope of the profile, against that at the top speed of a roll with its ramps
+        val step = 0.02f
+        val slope = (profile((u + step).coerceAtMost(1f)) - profile((u - step).coerceAtLeast(0f))) / (2 * step)
+        val topSlope = 1f / (1f - min(spec.accelerationFraction + spec.decelerationFraction, 1f) / 2f)
+        val speed = if (rollTime <= 0f || u <= 0f || u >= 1f) 0f else (slope / topSlope).coerceIn(0f, 1f)
+        return WheelAt(slot.startIndex + (slot.targetIndex - slot.startIndex) * progress, progress, visibility, speed)
     }
 }
 
@@ -303,16 +327,33 @@ internal fun rollProfile(u: Float, acceleration: Float, deceleration: Float): Fl
     }.coerceIn(0f, 1f)
 }
 
+/**
+ * How far a wheel which overshoots has rolled after the share [u] of its roll time: it goes past its target (about a
+ * tenth of a character for an [overshoot] of 1) and comes back to it, as a spring settles (an ease out "back" curve).
+ */
+internal fun overshootProfile(u: Float, overshoot: Float): Float {
+    val t = u.coerceIn(0f, 1f) - 1f
+    return 1f + (overshoot + 1f) * t * t * t + overshoot * t * t
+}
+
+/** The characters of [this] as code points: an emoji or another character outside the 16 bits of a Char stays whole. */
+private fun String.codes(): IntArray = codePoints().toArray()
+
+/** The character [code] as text. */
+private fun codeText(code: Int): String = String(Character.toChars(code))
+
 private fun staticSlot(code: Int) = OdometerSlot(code, code, intArrayOf(code), 0, 0, 0f, 0f)
 
 internal fun staticOdometerPlan(text: String, spec: OdometerSpec) =
-    OdometerPlan(text.map { staticSlot(it.code) }, 0f, spec)
+    OdometerPlan(text.codes().map { staticSlot(it) }, 0f, spec)
 
 /** Works out how every character position gets from [from] to [to], see [OdometerSpec] for the timing. */
 internal fun planOdometer(from: String, to: String, spec: OdometerSpec): OdometerPlan {
     val (starts, targets) = if (spec.alignChanges) alignTexts(from, to) else {
-        val count = max(from.length, to.length)
-        IntArray(count) { from.getOrNull(it)?.code ?: BLANK } to IntArray(count) { to.getOrNull(it)?.code ?: BLANK }
+        val a = from.codes()
+        val b = to.codes()
+        val count = max(a.size, b.size)
+        IntArray(count) { a.getOrNull(it) ?: BLANK } to IntArray(count) { b.getOrNull(it) ?: BLANK }
     }
     val positions = starts.size
     // Pushed: the whole text goes one way, the way its value goes
@@ -414,12 +455,14 @@ internal fun valueDirection(from: String, to: String): Int? {
  * The two texts lined up, with blanks where one has no character: shifted against each other so that the most
  * characters are the same in both. Of equally good ways, the one with their ends together, as numbers grow at the front.
  */
-internal fun alignTexts(from: String, to: String): Pair<IntArray, IntArray> {
-    val endsTogether = to.length - from.length
+internal fun alignTexts(fromText: String, toText: String): Pair<IntArray, IntArray> {
+    val from = fromText.codes()
+    val to = toText.codes()
+    val endsTogether = to.size - from.size
     var bestShift = endsTogether
     var bestScore = -1
     // from[i] goes in the column of to[i + shift]
-    for (shift in -from.length..to.length) {
+    for (shift in -from.size..to.size) {
         var score = 0
         for (i in from.indices) {
             val j = i + shift
@@ -431,9 +474,9 @@ internal fun alignTexts(from: String, to: String): Pair<IntArray, IntArray> {
         }
     }
     val first = min(0, bestShift)
-    val count = max(to.length, from.length + bestShift) - first
-    val starts = IntArray(count) { c -> from.getOrNull(c + first - bestShift)?.code ?: BLANK }
-    val targets = IntArray(count) { c -> to.getOrNull(c + first)?.code ?: BLANK }
+    val count = max(to.size, from.size + bestShift) - first
+    val starts = IntArray(count) { c -> from.getOrNull(c + first - bestShift) ?: BLANK }
+    val targets = IntArray(count) { c -> to.getOrNull(c + first) ?: BLANK }
     return starts to targets
 }
 
@@ -465,30 +508,36 @@ fun OdometerText(
     widthReferenceTexts: List<String> = emptyList()
 ) {
     var plan by remember { mutableStateOf(staticOdometerPlan(text, spec)) }
-    var elapsedMillis by remember { mutableFloatStateOf(0f) }
+    // Read while laying out and drawing only: each frame of a roll is laid out and drawn again, without composing again
+    val elapsedMillis = remember { mutableFloatStateOf(0f) }
+    var rolling by remember { mutableStateOf(false) }
 
     LaunchedEffect(text) {
         // Continues from what is currently in the middle of the wheels, so an interrupted roll doesn't jump
-        val from = plan.centerTextAt(elapsedMillis)
+        val from = plan.centerTextAt(elapsedMillis.floatValue)
         val next = if (animate) planOdometer(from, text, spec) else staticOdometerPlan(text, spec)
         if (next.totalMillis > 0f) {
             plan = next
-            elapsedMillis = 0f
+            elapsedMillis.floatValue = 0f
+            rolling = true
             val startNanos = withFrameNanos { it }
             while (true) {
                 val elapsed = (withFrameNanos { it } - startNanos) / 1_000_000f
                 if (elapsed >= next.totalMillis) break
-                elapsedMillis = elapsed
+                elapsedMillis.floatValue = elapsed
             }
         }
         plan = staticOdometerPlan(text, spec)
-        elapsedMillis = 0f
+        elapsedMillis.floatValue = 0f
+        rolling = false
     }
 
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val resolvedColor = color.takeOrElse { style.color.takeOrElse { LocalContentColor.current } }
     val glyphs = remember(style, textMeasurer) { GlyphCache(textMeasurer, style) }
+    // At rest the text is drawn as a Text draws it, its kerning and all; only while it rolls, character by character
+    val wholeText = remember(text, style, textMeasurer) { textMeasurer.measure(text, style) }
 
     val reservedWidth = if (fixedWidth) {
         remember(text, widthReferenceTexts, style, density) {
@@ -496,15 +545,19 @@ fun OdometerText(
         }
     } else null
 
-    val columns = plan.columnsAt(elapsedMillis)
-    val columnWidths = columns.map { column ->
-        val startWidth = glyphs.width(column.startCode)
-        val targetWidth = glyphs.width(column.targetCode)
-        startWidth + (targetWidth - startWidth) * column.progress
-    }
-    val contentWidth = columnWidths.sum()
     val lineHeight = glyphs.lineHeight
     val spacing = with(density) { (if (style.fontSize.isSp) style.fontSize.toPx() else 16.sp.toPx()) } * spec.reelSpacing
+    // Room above and below the line for the characters rolling in and out, which fade out towards its edges
+    val margin = spacing * GHOST_REACH
+    val edgeFade = remember(lineHeight, margin) {
+        val total = lineHeight + 2 * margin
+        Brush.verticalGradient(
+            0f to Color.Transparent,
+            (margin / total) to Color.Black,
+            ((margin + lineHeight) / total) to Color.Black,
+            1f to Color.Transparent
+        )
+    }
 
     Box(
         modifier = modifier
@@ -513,33 +566,53 @@ fun OdometerText(
             .clearAndSetSemantics { contentDescription = text },
         contentAlignment = Alignment.Center
     ) {
-        Canvas(
+        Spacer(
             modifier = Modifier
                 .then(if (reservedWidth != null) Modifier.wrapContentWidth(unbounded = true) else Modifier)
-                .size(with(density) { contentWidth.toDp() }, with(density) { lineHeight.toDp() })
-        ) {
-            var x = 0f
-            columns.forEachIndexed { index, column ->
-                val columnWidth = columnWidths[index]
-                column.glyphs.forEach { glyph ->
-                    val layout = glyphs.layout(glyph.code) ?: return@forEach
-                    val alpha = glyphAlpha(abs(glyph.offset), spec.ghostAlpha * column.ghostVisibility)
-                    if (alpha > 0f) {
-                        drawText(
-                            textLayoutResult = layout,
-                            color = resolvedColor,
-                            alpha = alpha,
-                            topLeft = Offset(
-                                x + (columnWidth - layout.size.width) / 2f,
-                                (size.height - layout.size.height) / 2f + glyph.offset * spacing
-                            )
-                        )
-                    }
+                // As wide as the wheels are (they change their width as they roll), as high as the line; what's drawn
+                // above and below it is the margin, outside of what the text takes
+                .layout { measurable, _ ->
+                    val width = if (rolling) plan.columnsAt(elapsedMillis.floatValue).sumOf { columnWidth(it, glyphs).toDouble() }.toFloat()
+                        else wholeText.size.width.toFloat()
+                    val w = width.roundToInt()
+                    val placeable = measurable.measure(Constraints.fixed(w, (lineHeight + 2 * margin).roundToInt()))
+                    layout(w, lineHeight.roundToInt()) { placeable.place(0, -margin.roundToInt()) }
                 }
-                x += columnWidth
-            }
-        }
+                // Its own layer while rolling, for the fade at the edges
+                .graphicsLayer { compositingStrategy = if (rolling) CompositingStrategy.Offscreen else CompositingStrategy.Auto }
+                .drawBehind {
+                    if (!rolling) {
+                        drawText(wholeText, color = resolvedColor, topLeft = Offset(0f, margin))
+                        return@drawBehind
+                    }
+                    var x = 0f
+                    plan.columnsAt(elapsedMillis.floatValue).forEach { column ->
+                        val width = columnWidth(column, glyphs)
+                        // Taller at speed, as if blurred by the motion
+                        val stretch = 1f + spec.speedStretch * column.speed
+                        column.glyphs.forEach { glyph ->
+                            val layout = glyphs.layout(glyph.code) ?: return@forEach
+                            val alpha = glyphAlpha(abs(glyph.offset), spec.ghostAlpha * column.ghostVisibility)
+                            if (alpha > 0f) {
+                                val top = margin + (lineHeight - layout.size.height) / 2f + glyph.offset * spacing
+                                withTransform({ scale(1f, stretch, Offset(x + width / 2f, top + layout.size.height / 2f)) }) {
+                                    drawText(layout, color = resolvedColor, alpha = alpha, topLeft = Offset(x + (width - layout.size.width) / 2f, top))
+                                }
+                            }
+                        }
+                        x += width
+                    }
+                    drawRect(edgeFade, blendMode = BlendMode.DstIn)
+                }
+        )
     }
+}
+
+/** How wide a wheel is: from its start character's width to its target's, as far as it has rolled. */
+private fun columnWidth(column: OdometerColumn, glyphs: GlyphCache): Float {
+    val startWidth = glyphs.width(column.startCode)
+    val targetWidth = glyphs.width(column.targetCode)
+    return startWidth + (targetWidth - startWidth) * column.progress
 }
 
 /** The character in the middle is fully visible, the ghost characters next to it have [ghostAlpha]. */
@@ -555,7 +628,7 @@ private class GlyphCache(private val measurer: TextMeasurer, private val style: 
 
     fun layout(code: Int): TextLayoutResult? {
         if (code == BLANK) return null
-        return layouts.getOrPut(code) { measurer.measure(code.toChar().toString(), style) }
+        return layouts.getOrPut(code) { measurer.measure(codeText(code), style) }
     }
 
     fun width(code: Int): Float = layout(code)?.size?.width?.toFloat() ?: 0f

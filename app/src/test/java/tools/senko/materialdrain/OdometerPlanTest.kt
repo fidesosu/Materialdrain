@@ -11,6 +11,7 @@ import tools.senko.materialdrain.ui.components.buildPath
 import tools.senko.materialdrain.ui.components.buildRoute
 import tools.senko.materialdrain.ui.components.glyphAlpha
 import tools.senko.materialdrain.ui.components.neighbour
+import tools.senko.materialdrain.ui.components.overshootProfile
 import tools.senko.materialdrain.ui.components.planOdometer
 import tools.senko.materialdrain.ui.components.rollProfile
 
@@ -327,5 +328,33 @@ class OdometerPlanTest {
         assertEquals(0f, glyphAlpha(1.25f, 0.35f), 0.0001f)
         // With invisible ghosts only the middle is drawn
         assertEquals(0f, glyphAlpha(1f, 0f), 0f)
+    }
+
+    // --- Settling, and characters beyond a Char ---
+
+    @Test
+    fun aNumberGoesALittlePastAndSettles() {
+        assertEquals(0f, overshootProfile(0f, 0.8f), 0.0001f)
+        assertEquals(1f, overshootProfile(1f, 0.8f), 0.0001f)
+        val most = (0..100).maxOf { overshootProfile(it / 100f, 0.8f) }
+        assertTrue("it should overshoot a little, not $most", most > 1.02f && most < 1.15f)
+        // Pushed numbers do: the new digit passes the middle before it comes to rest in it
+        val plan = planOdometer("3", "7", numbers)
+        val passed = (0..plan.totalMillis.toInt()).any { t ->
+            plan.columnsAt(t.toFloat()).single().glyphs.any { it.code == '7'.code && it.offset < -0.01f }
+        }
+        assertTrue(passed)
+        assertEquals("7", plan.centerTextAt(plan.totalMillis))
+    }
+
+    @Test
+    fun anEmojiStaysOneCharacter() {
+        val plan = planOdometer("1 \uD83D\uDE00", "2 \uD83D\uDE00", numbers)
+        // "1", " " and the emoji: three wheels, not four
+        assertEquals(3, plan.columnsAt(0f).size)
+        assertEquals("2 \uD83D\uDE00", plan.centerTextAt(plan.totalMillis))
+        val letters = planOdometer("a\uD83D\uDE00", "b\uD83D\uDE00", spec)
+        assertEquals(2, letters.columnsAt(0f).size)
+        assertEquals("b\uD83D\uDE00", letters.centerTextAt(letters.totalMillis))
     }
 }
