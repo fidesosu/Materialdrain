@@ -318,6 +318,11 @@ class DownloadManager(
         _confirmation.value = null
     }
 
+    private fun resumeTexts() = ResumeTexts(
+        httpStatus = { application.getString(R.string.files_resume_http_status, it) },
+        wrongPart = application.getString(R.string.files_resume_wrong_part)
+    )
+
     /** A download that failed on its own (not one of a batch), which "Try again" starts again, from [partial] when it can. */
     private class FailedDownload(val node: StorageNode, val folder: String?, val partial: PartialDownload?)
 
@@ -580,7 +585,7 @@ class DownloadManager(
                 val response = if (resumeFrom != null) {
                     val (resumed, offset) = resumeFrom
                     val client = HostRequestAuth.client ?: throw IOException(application.getString(R.string.files_the_download_can_t_go))
-                    downloadRest(client, resumed.url, provider.requestHeaders(resumed.url), offset, { append ->
+                    downloadRest(client, resumeTexts(), resumed.url, provider.requestHeaders(resumed.url), offset, { append ->
                         val stream = application.contentResolver.openOutputStream(resumed.uri, if (append) "wa" else "wt")
                             ?: throw IOException(application.getString(R.string.files_failed_to_re_open_the))
                         BufferedOutputStream(stream, DOWNLOAD_WRITE_BUFFER_BYTES)
@@ -620,7 +625,7 @@ class DownloadManager(
                     application.getString(R.string.files_download_for_was_cancelled, node.name)
                 } else {
                     Log.e(TAG, "Error during file download process for $key: ${e.message}", e)
-                    application.getString(R.string.files_download_error_for, node.name, e.localizedMessage ?: "Unexpected error")
+                    application.getString(R.string.files_download_error_for, node.name, e.localizedMessage ?: application.getString(R.string.files_unexpected_error))
                 }
                 outcomeMessage = errorMsg
                 if (e !is CancellationException && batchId == null) {
@@ -753,7 +758,7 @@ class DownloadManager(
             }
         }
         transfers.start(
-            TransferInfo(batchId, TransferKind.DOWNLOAD, title ?: "${files.size} files", totalBytes = totalBytes),
+            TransferInfo(batchId, TransferKind.DOWNLOAD, title ?: application.resources.getQuantityString(R.plurals.common_files, files.size, files.size), totalBytes = totalBytes),
             onCancel = { batchJob.cancel() }
         )
         batchJob.start()
@@ -970,7 +975,7 @@ class DownloadManager(
                     outcome = TransferOutcome.CANCELLED
                 } else {
                     Log.e(TAG, "Sharing ${node.name} failed: ${e.message}", e)
-                    val failure = application.getString(R.string.files_couldn_t_share, node.name, e.localizedMessage ?: "Unexpected error")
+                    val failure = application.getString(R.string.files_couldn_t_share, node.name, e.localizedMessage ?: application.getString(R.string.files_unexpected_error))
                     message = failure
                     messages.show(failure, long = true)
                 }

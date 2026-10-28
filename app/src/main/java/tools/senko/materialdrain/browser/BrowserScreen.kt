@@ -499,7 +499,7 @@ fun BrowserScreen(
             songs.forEach { player.addToQueue(it, placeholderArt) }
             messages.show(
                 when {
-                    wasEmpty -> res.getString(R.string.browser_playing, songs.first().title) + if (songs.size > 1) " and ${songs.size - 1} more" else ""
+                    wasEmpty -> res.getString(R.string.browser_playing, songs.first().title) + if (songs.size > 1) res.getQuantityString(R.plurals.common_and_more, songs.size - 1, songs.size - 1) else ""
                     songs.size == 1 -> res.getString(R.string.browser_added_to_the_queue)
                     else -> res.getString(R.string.browser_added_songs_to_the_queue, songs.size)
                 }
@@ -653,7 +653,7 @@ fun BrowserScreen(
                 else ownLook?.copy(subfolders = false)
             )
         },
-        inheritedFrom = inheritedPath?.let { path -> if (path.isEmpty()) "the top folder" else path.substringAfterLast('/') },
+        inheritedFrom = inheritedPath?.let { path -> if (path.isEmpty()) res.getString(R.string.browser_the_top_folder) else path.substringAfterLast('/') },
         smart = listLayout == ListLayout.SMART
     )
     val currentOnViewChange by rememberUpdatedState(onViewChange)

@@ -12,6 +12,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import android.content.res.Resources
+import tools.senko.materialdrain.R
 
 // Helper function to format size in bytes to a human-readable string
 fun formatSize(bytes: Long): String {
@@ -30,11 +32,11 @@ fun formatSize(bytes: Long): String {
 
 fun formatSpeed(bytesPerSecond: Long): String = formatSize(bytesPerSecond) + "/s"
 
-fun formatEta(seconds: Long): String = when {
-    seconds < 1 -> "<1s"
-    seconds < 60 -> "${seconds}s"
-    seconds < 3600 -> String.format(Locale.US, "%dm %02ds", seconds / 60, seconds % 60)
-    else -> String.format(Locale.US, "%dh %02dm", seconds / 3600, (seconds % 3600) / 60)
+fun formatEta(seconds: Long, res: Resources): String = when {
+    seconds < 1 -> res.getString(R.string.common_eta_under_a_second)
+    seconds < 60 -> res.getString(R.string.common_eta_seconds, seconds)
+    seconds < 3600 -> res.getString(R.string.common_eta_minutes, seconds / 60, seconds % 60)
+    else -> res.getString(R.string.common_eta_hours, seconds / 3600, (seconds % 3600) / 60)
 }
 
 // Helper function to format duration in milliseconds to MM:SS or HH:MM:SS
@@ -65,16 +67,16 @@ internal fun formatApiDateTimeString(dateTimeString: String?): String {
  * How long ago an API date-time was ("3 days ago"), for the lists of files. From a week on it is the date itself.
  * Null when the date is missing or can't be read.
  */
-internal fun formatRelativeDateTime(dateTimeString: String?, now: Instant = Instant.now()): String? {
+internal fun formatRelativeDateTime(dateTimeString: String?, res: Resources, now: Instant = Instant.now()): String? {
     if (dateTimeString.isNullOrBlank()) return null
     val then = parseDateTime(dateTimeString) ?: return null
     val seconds = Duration.between(then, now).seconds
-    fun ago(amount: Long, unit: String) = "$amount $unit${if (amount == 1L) "" else "s"} ago"
+    fun ago(id: Int, amount: Long) = amount.toInt().let { res.getQuantityString(id, it, it) }
     return when {
-        seconds < 60 -> "just now"
-        seconds < 3600 -> ago(seconds / 60, "min")
-        seconds < 86_400 -> ago(seconds / 3600, "hour")
-        seconds < 7 * 86_400 -> ago(seconds / 86_400, "day")
+        seconds < 60 -> res.getString(R.string.common_just_now)
+        seconds < 3600 -> ago(R.plurals.common_minutes_ago, seconds / 60)
+        seconds < 86_400 -> ago(R.plurals.common_hours_ago, seconds / 3600)
+        seconds < 7 * 86_400 -> ago(R.plurals.common_days_ago, seconds / 86_400)
         else -> DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withZone(ZoneId.systemDefault()).format(then)
     }
 }

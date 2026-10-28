@@ -172,7 +172,7 @@ fun InlineVideoPreview(
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        Icon(Icons.Filled.BrokenImage, contentDescription = "Error displaying video thumbnail", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
+                        Icon(Icons.Filled.BrokenImage, contentDescription = stringResource(R.string.media_video_thumbnail_error), modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
                     }
                 }
                 is String, is Uri -> LayeredPreviewImage(
@@ -183,9 +183,9 @@ fun InlineVideoPreview(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
-                null -> Icon(Icons.Filled.Videocam, contentDescription = "Video thumbnail unavailable", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                null -> Icon(Icons.Filled.Videocam, contentDescription = stringResource(R.string.media_video_thumbnail_unavailable), modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 else -> {
-                    Icon(Icons.Filled.BrokenImage, contentDescription = "Unsupported thumbnail type", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Filled.BrokenImage, contentDescription = stringResource(R.string.media_video_thumbnail_unsupported), modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.error)
                     Log.w(TAG_COIL, "Unsupported thumbnailSource type: ${thumbnailSource::class.java.name}")
                 }
             }
@@ -196,7 +196,7 @@ fun InlineVideoPreview(
                     color = MediaScrim.Play,
                     modifier = Modifier.size(56.dp)
                 ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = "Play video", tint = Color.White, modifier = Modifier.padding(12.dp))
+                    Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.media_play_video), tint = Color.White, modifier = Modifier.padding(12.dp))
                 }
             }
         }
@@ -761,7 +761,7 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                     SkipGlyph(feedbackForward, (stepMs / 1000).toInt(), colors.onSurface, size = 32.dp)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "${if (feedbackForward) "+" else "−"} ${feedback.seconds} s",
+                        stringResource(if (feedbackForward) R.string.media_skipped_forward else R.string.media_skipped_back, feedback.seconds),
                         color = colors.onSurface,
                         style = MaterialTheme.typography.titleMedium
                     )
@@ -770,12 +770,12 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
         }
 
         // What a gesture is doing, near the top: the brightness or volume, the faster speed, where a swipe seeks to
-        val status = gestureLevel?.let { "${if (it.brightness) "Brightness" else "Volume"} ${(it.level * 100).roundToInt()}%" }
+        val status = gestureLevel?.let { stringResource(if (it.brightness) R.string.media_brightness_level else R.string.media_volume_level, (it.level * 100).roundToInt()) }
             ?: swipeSeek?.let { (from, to) ->
                 val seconds = (to - from) / 1000
-                "${formatDurationMillis(to)}  (${if (seconds >= 0) "+" else "−"}${abs(seconds)} s)"
+                stringResource(if (seconds >= 0) R.string.media_seek_to_forward else R.string.media_seek_to_back, formatDurationMillis(to), abs(seconds))
             }
-            ?: if (holding) "${speedLabel(HOLD_SPEED)} speed" else null
+            ?: if (holding) stringResource(R.string.media_hold_speed, speedLabel(HOLD_SPEED)) else null
         status?.let { text ->
             Surface(
                 shape = AppShapes.Large,

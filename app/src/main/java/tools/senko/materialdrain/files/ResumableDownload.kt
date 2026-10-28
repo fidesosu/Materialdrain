@@ -15,8 +15,12 @@ private const val COPY_BUFFER_BYTES = 64 * 1024
  * the whole file again (200) has it written from the start (false: what's there is replaced). [onProgress] counts the
  * whole file, the bytes there before included. The result is the size of the whole file.
  */
+/** What [downloadRest] says when the host gets it wrong: an answer which is neither the part nor the file, or another part. */
+internal class ResumeTexts(val httpStatus: (code: Int) -> String, val wrongPart: String)
+
 internal fun downloadRest(
     client: OkHttpClient,
+    texts: ResumeTexts,
     url: String,
     headers: Map<String, String>,
     offset: Long,
@@ -30,12 +34,12 @@ internal fun downloadRest(
     client.newCall(request).execute().use { response ->
         val partial = response.code == 206
         if (!partial && !response.isSuccessful) {
-            return ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, "The host answered HTTP ${response.code}."))
+            return ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, texts.httpStatus(response.code)))
         }
         // A part which doesn't start where the file stopped would leave a gap: start over instead
         val start = if (partial) contentRangeStart(response.header("Content-Range")) else 0L
         if (partial && start != offset) {
-            return ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, "The host sent another part of the file than asked for."))
+            return ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, texts.wrongPart))
         }
         val before = if (partial) offset else 0L
         val total = response.body.contentLength().takeIf { it >= 0 }?.plus(before)

@@ -52,6 +52,7 @@ import tools.senko.materialdrain.transfer.TransferSpeedTracker
 import tools.senko.materialdrain.transfer.estimateEtaSeconds
 import tools.senko.materialdrain.util.readContentUriInfo
 import tools.senko.materialdrain.R
+import androidx.annotation.PluralsRes
 
 private const val TAG_FS_VM = "FilesystemViewModel"
 /** How many folders are listed at once while indexing the folder tree: quick, without flooding the host. */
@@ -145,6 +146,9 @@ class FilesystemViewModel(
     private val messages: UiMessages,
     contentChanges: ContentChanges
 ) : ViewModel() {
+
+    /** Said when Pixeldrain needs a login or an API key and has neither. */
+    private val apiKeyMissing: String get() = application.getString(R.string.browser_log_in_or_add_an)
 
     private val _uiState = MutableStateFlow(FilesystemUiState())
     val uiState: StateFlow<FilesystemUiState> = _uiState.asStateFlow()
@@ -281,7 +285,7 @@ class FilesystemViewModel(
                 hostName = provider.displayName,
                 apiKey = apiKey,
                 apiKeyMissingError = provider.kind == ProviderKind.PIXELDRAIN && apiKey.isBlank(),
-                errorMessage = if (provider.kind == ProviderKind.PIXELDRAIN && apiKey.isBlank()) API_KEY_MISSING else null,
+                errorMessage = if (provider.kind == ProviderKind.PIXELDRAIN && apiKey.isBlank()) apiKeyMissing else null,
                 canWrite = false,
                 canDelete = false
             )
@@ -299,7 +303,7 @@ class FilesystemViewModel(
         forgetFolderTree()
         val provider = provider()
         if (provider.kind == ProviderKind.PIXELDRAIN && sessionManager.currentApiKey().isBlank()) {
-            _uiState.update { it.copy(apiKeyMissingError = true, errorMessage = API_KEY_MISSING, isLoading = false, children = emptyList()) }
+            _uiState.update { it.copy(apiKeyMissingError = true, errorMessage = apiKeyMissing, isLoading = false, children = emptyList()) }
             return
         }
         fetchPathContent(uiState.value.currentPath)
@@ -522,7 +526,7 @@ class FilesystemViewModel(
 
     /** There is no endpoint to delete several nodes everywhere, so this deletes them one by one. */
     fun deleteEntries(entries: List<StorageNode>) {
-        runBulkModification(entries, "deleted") { browse, entry -> browse.delete(entry.ref.path, recursive = entry.isDirectory) }
+        runBulkModification(entries, R.plurals.filesystem_items_deleted) { browse, entry -> browse.delete(entry.ref.path, recursive = entry.isDirectory) }
     }
 
     private val _pendingMove = MutableStateFlow<List<StorageNode>>(emptyList())
@@ -553,7 +557,7 @@ class FilesystemViewModel(
 
     fun moveEntries(entries: List<StorageNode>, destinationDirectory: String) {
         val destination = normalizePath(destinationDirectory, rootPath(provider()))
-        runBulkModification(entries, "moved") { browse, entry ->
+        runBulkModification(entries, R.plurals.filesystem_items_moved) { browse, entry ->
             val source = entry.ref.path.trim('/')
             when {
                 destination == source || destination.startsWith("$source/") ->
@@ -567,7 +571,8 @@ class FilesystemViewModel(
 
     private fun runBulkModification(
         entries: List<StorageNode>,
-        pastTense: String,
+        /** "N items deleted." and the like, said of the ones which worked */
+        @PluralsRes doneMessage: Int,
         operation: suspend (browse: BrowseOps, entry: StorageNode) -> ApiResponse<Unit>
     ) {
         if (entries.isEmpty()) return
@@ -585,7 +590,7 @@ class FilesystemViewModel(
                 }
             }
             _uiState.update { it.copy(isModifying = false) }
-            if (succeeded > 0) messages.show(if (succeeded == 1) "1 item $pastTense." else "$succeeded items $pastTense.")
+            if (succeeded > 0) messages.show(application.resources.getQuantityString(doneMessage, succeeded, succeeded))
             if (failures.isNotEmpty()) {
                 messages.show(failures.take(3).joinToString("\n") + if (failures.size > 3) application.getString(R.string.filesystem_and_more_failed, failures.size - 3) else "", long = true)
             }
@@ -818,7 +823,6 @@ class FilesystemViewModel(
         }
 
     companion object {
-        private const val API_KEY_MISSING = "Log in or add an API key in Settings."
         /** The id of a host's Filesystem tab when its config gives it none (see ScreenConfig.tabId). */
         const val DEFAULT_TAB_ID = "filesystem"
     }

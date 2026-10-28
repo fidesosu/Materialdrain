@@ -60,6 +60,7 @@ import tools.senko.materialdrain.ui.preview.PreviewSamples
 import tools.senko.materialdrain.provider.api.StorageRef
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.compose.ui.platform.LocalResources
 
 @Composable
 fun TextInputDialog(
@@ -144,12 +145,13 @@ fun FolderPickerDialog(
     var path by remember { mutableStateOf(initialPath.trim('/').ifEmpty { root }) }
     // Each folder's listing, kept while the dialog is open: going back shows it at once
     val listings = remember { mutableStateMapOf<String, FolderListing>() }
+    val res = LocalResources.current
     LaunchedEffect(path) {
         if (listings[path] is FolderListing.Loaded) return@LaunchedEffect
         listings[path] = FolderListing.Loading
         listings[path] = when (val response = loadFolders(path)) {
             is ApiResponse.Success -> FolderListing.Loaded(response.data.filter { it.ref.path.trim('/') !in excludedPaths })
-            is ApiResponse.Error -> FolderListing.Failed(response.error.message.ifBlank { "Could not load this folder." })
+            is ApiResponse.Error -> FolderListing.Failed(response.error.message.ifBlank { res.getString(R.string.common_folder_not_loaded) })
         }
     }
 

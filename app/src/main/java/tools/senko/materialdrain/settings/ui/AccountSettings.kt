@@ -101,6 +101,7 @@ import java.util.Currency
 import java.util.Locale
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.compose.ui.res.pluralStringResource
 
 /** Where pixeldrain lets the password, two-factor authentication, the e-mail addresses and deleting the account be changed. */
 internal const val WEBSITE_SETTINGS_URL = "https://pixeldrain.com/user/settings"
@@ -382,7 +383,7 @@ internal fun SettingsEnvironment.AccountTile(onOpen: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             val numbers = NumberFormat.getIntegerInstance()
             Text(
-                "${numbers.format(user.fileCount)} files · ${formatEuro(user.balanceMicroEur)} credit",
+                pluralStringResource(R.plurals.settings_files_and_credit, user.fileCount.toInt(), numbers.format(user.fileCount), formatEuro(user.balanceMicroEur)),
                 style = MaterialTheme.typography.labelMedium,
                 color = colors.onSurfaceVariant,
                 maxLines = 1,

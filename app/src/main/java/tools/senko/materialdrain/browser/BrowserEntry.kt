@@ -32,6 +32,7 @@ import tools.senko.materialdrain.ui.components.OverflowMenuButton
 import tools.senko.materialdrain.util.formatRelativeDateTime
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.compose.ui.platform.LocalResources
 
 /** One row (or, [asTile], one tile of the grid) of the browser, with the menu and the actions its mode offers. */
 @Composable
@@ -68,8 +69,9 @@ internal fun BrowserEntry(
     val folderLink = if (node.isDirectory && mode == BrowserMode.LISTS) shareUrl else null
     // How long ago, or the date and time itself (Look and feel, Relative dates)
     val relative = LocalListLook.current.relativeDates
-    val modified = remember(node.listDate, relative) {
-        if (relative) formatRelativeDateTime(node.listDate) else node.listDate?.let { formatApiDateTimeString(it) }
+    val res = LocalResources.current
+    val modified = remember(node.listDate, relative, res) {
+        if (relative) formatRelativeDateTime(node.listDate, res) else node.listDate?.let { formatApiDateTimeString(it) }
     }
     val trailingContent: @Composable () -> Unit = {
         when {

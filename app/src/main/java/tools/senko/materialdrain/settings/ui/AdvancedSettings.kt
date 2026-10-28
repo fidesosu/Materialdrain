@@ -312,7 +312,7 @@ private fun HostCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(stored.config.name, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        listOfNotNull(hostType.label,meta?.let { "v${it.version}" }, meta?.author?.let { "by $it" }).joinToString(" · "),
+                        listOfNotNull(stringResource(hostType.label), meta?.let { stringResource(R.string.settings_config_version, it.version) }, meta?.author?.let { stringResource(R.string.settings_config_by, it) }).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.onSurfaceVariant
                     )
@@ -366,12 +366,12 @@ private fun HostCard(
                     if (keyPairLabels != null) {
                         Text(stringResource(R.string.settings_credentials), style = MaterialTheme.typography.labelLarge, color = colors.primary)
                         if (!hostType.needsSignIn) {
-                            Text(hostType.noSignInNote ?: stringResource(R.string.settings_there_s_nothing_to_sign), style = MaterialTheme.typography.bodyMedium)
+                            Text(hostType.noSignInNote?.let { stringResource(it) } ?: stringResource(R.string.settings_there_s_nothing_to_sign), style = MaterialTheme.typography.bodyMedium)
                         } else {
                             CredentialFields(
                                 username, { username = it }, password, { password = it },
-                                usernameLabel = keyPairLabels.username,
-                                passwordLabel = keyPairLabels.password
+                                usernameLabel = stringResource(keyPairLabels.username),
+                                passwordLabel = stringResource(keyPairLabels.password)
                             )
                         }
                     } else {
@@ -543,7 +543,7 @@ private fun UpdateApprovalDialog(approval: UpdateApproval, viewModel: ProviderSe
         title = { Text(stringResource(R.string.settings_review_update)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("${approval.hostName}: version ${approval.fromVersion} → ${approval.toVersion}")
+                Text(stringResource(R.string.settings_update_versions, approval.hostName, approval.fromVersion, approval.toVersion))
                 if (approval.sensitiveChanges.isNotEmpty()) {
                     Text(stringResource(R.string.settings_this_update_changes_how_your))
                     approval.sensitiveChanges.forEach { change ->

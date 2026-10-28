@@ -144,7 +144,7 @@ private fun StoredProvider.toHostOption(configStore: ProviderConfigStore): HostO
     return HostOption(
         id = id,
         name = config.name,
-        kindLabel = type.shortLabel,
+        kindLabel = stringResource(type.shortLabel),
         icon = type.icon,
         status = status,
         detail = when {

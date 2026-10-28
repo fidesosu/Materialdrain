@@ -110,6 +110,7 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import tools.senko.materialdrain.ui.preview.LongScreenPreviews
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import android.content.res.Resources
 
 /** The corners of the cards on this page, the same as the app's other floating cards. */
 private val DetailCardShape = AppShapes.Card
@@ -226,7 +227,7 @@ fun FileInfoDetailsCard(
     /** Copies [text] and says so, naming [what] was copied. */
     fun copy(what: String, text: String) {
         clipboardManager.setPrimaryClip(ClipData.newPlainText(what, text))
-        coroutineScope.launch { snackbarHostState.showSnackbar("$what copied") }
+        coroutineScope.launch { snackbarHostState.showSnackbar(res.getString(R.string.files_what_copied, what)) }
     }
 
     if (fullScreenOpen) {
@@ -475,7 +476,7 @@ fun FileInfoDetailsCard(
                                 icon = Icons.Filled.Straighten,
                                 label = stringResource(R.string.files_size),
                                 value = formatSize(size),
-                                supporting = "${NumberFormat.getIntegerInstance().format(size)} bytes".takeIf { size >= 1024 }
+                                supporting = stringResource(R.string.files_bytes, NumberFormat.getIntegerInstance().format(size)).takeIf { size >= 1024 }
                             )
                         }
                     }
@@ -491,7 +492,7 @@ fun FileInfoDetailsCard(
                     folderOf(fileInfo)?.let { folder ->
                         add { DetailRow(Icons.Filled.Folder, res.getString(R.string.files_folder), folder, collapsedLines = 2, onCopy = { copy(res.getString(R.string.files_folder), folder) }) }
                     }
-                    rich?.let { autoDeleteText(it) }?.let { text ->
+                    rich?.let { autoDeleteText(it, res) }?.let { text ->
                         add { DetailRow(Icons.Filled.AutoDelete, stringResource(R.string.files_deletes_itself), text) }
                     }
                 }
@@ -553,7 +554,7 @@ private fun FileHeader(file: StorageNode) {
     val summary = listOfNotNull(
         fileKindLabel(file.name, file.isDirectory),
         file.size?.let { formatSize(it) },
-        file.createdAt?.let { relativeTime(it) }?.let { "uploaded $it" }
+        file.createdAt?.let { relativeTime(it) }?.let { stringResource(R.string.files_uploaded_when, it) }
     ).joinToString(" · ")
     Row(verticalAlignment = Alignment.CenterVertically) {
         FileIcon(name = file.name, isDirectory = file.isDirectory, thumbnailUrl = null, size = 44.dp)
@@ -593,27 +594,27 @@ private fun HeldPreview(
     // What it would show, what that loads, and the preview's own frame: its size, shape and colour
     class Held(val what: String, val cost: String?, val frame: Modifier, val shape: Shape, val color: Color)
     val held = when {
-        withArchive -> Held("what's inside", null, Modifier.height(HeldPreviewHeight), AppShapes.Medium, scheme.surfaceContainerHighest)
+        withArchive -> Held(stringResource(R.string.files_held_contents), null, Modifier.height(HeldPreviewHeight), AppShapes.Medium, scheme.surfaceContainerHighest)
         isPdf(file.name, previewType) -> Held(
-            "the PDF",
-            size?.let { if (it > MAX_PDF_PREVIEW_BYTES) "Too big to preview" else "About ${formatSize(it)}" },
+            stringResource(R.string.files_held_pdf),
+            size?.let { if (it > MAX_PDF_PREVIEW_BYTES) stringResource(R.string.files_held_too_big) else stringResource(R.string.files_held_about, formatSize(it)) },
             Modifier.aspectRatio(16f / 9f).padding(mediaPadding),
             media,
             scheme.surfaceContainerHigh
         )
         isTextFile(file.name, previewType) && previewType?.startsWith("image/") != true -> Held(
-            "the text",
-            size?.let { "Up to ${formatSize(minOf(it, MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES.toLong()))}" },
+            stringResource(R.string.files_held_text),
+            size?.let { stringResource(R.string.files_held_up_to, formatSize(minOf(it, MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES.toLong()))) },
             // The text's own card (see CodePreview)
             Modifier.aspectRatio(16f / 9f).padding(mediaPadding),
             media,
             scheme.surfaceContainerHighest
         )
         previewType?.startsWith("image/") == true ->
-            Held("the picture", size?.let { "About ${formatSize(it)}" }, Modifier.aspectRatio(16f / 9f).padding(mediaPadding), media, scheme.surfaceContainerHigh)
+            Held(stringResource(R.string.files_held_picture), size?.let { stringResource(R.string.files_held_about, formatSize(it)) }, Modifier.aspectRatio(16f / 9f).padding(mediaPadding), media, scheme.surfaceContainerHigh)
         previewType?.startsWith("video/") == true ->
-            Held("the video", "Streams once it's played", Modifier.aspectRatio(16f / 9f).padding(mediaPadding), media, scheme.surfaceContainerHigh)
-        else -> Held("the thumbnail", null, Modifier.aspectRatio(16f / 9f).padding(vertical = 8.dp), AppShapes.Medium, scheme.surfaceContainerHigh)
+            Held(stringResource(R.string.files_held_video), stringResource(R.string.files_held_streams), Modifier.aspectRatio(16f / 9f).padding(mediaPadding), media, scheme.surfaceContainerHigh)
+        else -> Held(stringResource(R.string.files_held_thumbnail), null, Modifier.aspectRatio(16f / 9f).padding(vertical = 8.dp), AppShapes.Medium, scheme.surfaceContainerHigh)
     }
     Box(
         contentAlignment = Alignment.Center,
@@ -623,7 +624,7 @@ private fun HeldPreview(
             .clip(held.shape)
             // Black under the thumbnail, as around a fullscreen picture: before Android 12 it's only made faint, not blurred
             .background(if (backdrop != null) Color.Black else held.color)
-            .clickable(onClickLabel = "Load the preview", onClick = onLoad)
+            .clickable(onClickLabel = stringResource(R.string.files_load_the_preview), onClick = onLoad)
     ) {
         if (backdrop != null) {
             BlurredBackdrop(backdrop, apiKey, LocalContext.current.imageLoader, Modifier.matchParentSize())
@@ -635,9 +636,9 @@ private fun HeldPreview(
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
             Icon(Icons.Filled.DataSaverOn, contentDescription = null, tint = subtext, modifier = Modifier.size(28.dp))
             Spacer(Modifier.height(8.dp))
-            Text("Tap to load ${held.what}", style = MaterialTheme.typography.labelLarge, color = text)
+            Text(stringResource(R.string.files_tap_to_load, held.what), style = MaterialTheme.typography.labelLarge, color = text)
             Text(
-                listOfNotNull("Data saver", held.cost).joinToString(" · "),
+                listOfNotNull(stringResource(R.string.settings_data_saver), held.cost).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = subtext
             )
@@ -1004,12 +1005,15 @@ private fun folderOf(file: StorageNode): String? {
 }
 
 /** When Pixeldrain deletes the file by itself, e.g. "after 10 downloads"; null when it doesn't. */
-private fun autoDeleteText(rich: PixeldrainRichDetails): String? {
-    val parts = listOfNotNull(
-        rich.deleteAfterDate?.takeIf { it.isNotBlank() && !it.startsWith("0001") }?.let { "on ${formatApiDateTimeString(it)}" },
-        rich.deleteAfterDownloads?.takeIf { it > 0 }?.let { "after $it downloads" }
-    )
-    return parts.takeIf { it.isNotEmpty() }?.joinToString(", or ")?.replaceFirstChar { it.uppercase() }
+private fun autoDeleteText(rich: PixeldrainRichDetails, res: Resources): String? {
+    val date = rich.deleteAfterDate?.takeIf { it.isNotBlank() && !it.startsWith("0001") }?.let { formatApiDateTimeString(it) }
+    val downloads = rich.deleteAfterDownloads?.takeIf { it > 0 }
+    return when {
+        date != null && downloads != null -> res.getQuantityString(R.plurals.files_deletes_on_or_after, downloads, date, downloads)
+        date != null -> res.getString(R.string.files_deletes_on, date)
+        downloads != null -> res.getQuantityString(R.plurals.files_deletes_after, downloads, downloads)
+        else -> null
+    }
 }
 
 // ---- Previews ----

@@ -261,7 +261,7 @@ fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp
             // No placeholder or error picture: the tile underneath is both
             AsyncImage(
                 model = request,
-                contentDescription = "$name thumbnail",
+                contentDescription = stringResource(R.string.files_thumbnail_of, name),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.size(size),
                 onSuccess = { success ->

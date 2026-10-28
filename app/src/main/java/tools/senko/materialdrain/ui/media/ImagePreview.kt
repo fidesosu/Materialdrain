@@ -168,7 +168,7 @@ fun LayeredPreviewImage(
             is AsyncImagePainter.State.Error ->
                 Icon(
                     Icons.Filled.BrokenImage,
-                    contentDescription = "Error loading image",
+                    contentDescription = stringResource(R.string.media_image_error),
                     modifier = Modifier.align(Alignment.Center).size(48.dp),
                     tint = MaterialTheme.colorScheme.error
                 )

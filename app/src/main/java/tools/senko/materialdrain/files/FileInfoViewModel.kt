@@ -56,7 +56,6 @@ private const val MAX_TEXT_PREVIEW_DISPLAY_LENGTH = 8 * 1024 // 8KB
 
 /** The most of a text that's loaded when it's asked for anyway, past [MAX_TEXT_PREVIEW_FETCH_SIZE_BYTES] (see loadWholeText). */
 internal const val MAX_TEXT_LOAD_ANYWAY_BYTES = 16 * 1024 * 1024
-private const val API_KEY_MISSING = "Log in or add an API key in Settings."
 
 /** Passes at most [limit] bytes on to [target]: writing more stops the copy with an IOException, and sets [overflowed]. */
 private class LimitedOutputStream(target: OutputStream, private val limit: Long) : FilterOutputStream(target) {
@@ -111,6 +110,9 @@ class FileInfoViewModel(
     private val contentChanges: ContentChanges,
     private val dataSaver: DataSaver
 ) : ViewModel() {
+
+    /** Said when Pixeldrain needs a login or an API key and has neither. */
+    private val apiKeyMissing: String get() = application.getString(R.string.browser_log_in_or_add_an)
 
     private val _uiState = MutableStateFlow(FileInfoUiState())
     val uiState: StateFlow<FileInfoUiState> = _uiState.asStateFlow()
@@ -226,7 +228,7 @@ class FileInfoViewModel(
         val key = apiKeyForUi()
         _uiState.update { it.copy(apiKey = key) }
         if (needsKeyButMissing()) {
-            _uiState.update { it.copy(apiKeyMissingError = true, userFilesListErrorMessage = API_KEY_MISSING) }
+            _uiState.update { it.copy(apiKeyMissingError = true, userFilesListErrorMessage = apiKeyMissing) }
             return
         }
         _uiState.update { it.copy(apiKeyMissingError = false, userFilesListErrorMessage = null) }
@@ -262,7 +264,7 @@ class FileInfoViewModel(
         }
         val size = node.size
         val tooBig = PdfPreviewState.Failed(
-            "Too big to preview (max ${formatSize(MAX_PDF_PREVIEW_BYTES)})."
+            application.getString(R.string.files_pdf_too_big, formatSize(MAX_PDF_PREVIEW_BYTES))
         )
         if (size != null && size > MAX_PDF_PREVIEW_BYTES) {
             _uiState.update { it.copy(pdfPreview = tooBig) }
@@ -308,16 +310,16 @@ class FileInfoViewModel(
                     }
                     when {
                         out.overflowed -> tooBig
-                        response is ApiResponse.Error -> PdfPreviewState.Failed(response.error.message.ifBlank { "The PDF couldn't be loaded." })
+                        response is ApiResponse.Error -> PdfPreviewState.Failed(response.error.message.ifBlank { application.getString(R.string.files_pdf_not_loaded) })
                         partial.renameTo(file) -> {
                             trimPdfCache(folder, keep = file)
                             PdfPreviewState.Ready(file)
                         }
-                        else -> PdfPreviewState.Failed("The PDF couldn't be saved for preview.")
+                        else -> PdfPreviewState.Failed(application.getString(R.string.files_pdf_not_saved))
                     }
                 } catch (e: IOException) {
                     // The cache can't be written to, e.g. the device is full
-                    PdfPreviewState.Failed("The PDF couldn't be saved for preview.")
+                    PdfPreviewState.Failed(application.getString(R.string.files_pdf_not_saved))
                 } finally {
                     // Gone already once it's renamed; otherwise what was loaded is of no use, cancelled or not
                     partial.delete()
@@ -688,7 +690,7 @@ class FileInfoViewModel(
             return
         }
         if (needsKeyButMissing()) {
-            _uiState.update { it.copy(userFilesListErrorMessage = API_KEY_MISSING, isLoadingUserFiles = false, userFilesList = emptyList(), apiKeyMissingError = true) }
+            _uiState.update { it.copy(userFilesListErrorMessage = apiKeyMissing, isLoadingUserFiles = false, userFilesList = emptyList(), apiKeyMissingError = true) }
             return
         }
         _uiState.update { it.copy(isLoadingUserFiles = true, userFilesListErrorMessage = null, apiKeyMissingError = false) }
@@ -764,7 +766,7 @@ class FileInfoViewModel(
                             nodeToDelete = null
                         )
                     }
-                    messages.show(application.getString(R.string.files_delete_failed, response.error.message.ifBlank { "Unknown error deleting file." }), long = true)
+                    messages.show(application.getString(R.string.files_delete_failed, response.error.message.ifBlank { application.getString(R.string.files_unknown_delete_error) }), long = true)
                 }
             }
         }
@@ -800,7 +802,7 @@ class FileInfoViewModel(
         _uiState.update {
             it.copy(
                 apiKeyMissingError = false,
-                userFilesListErrorMessage = if (it.userFilesListErrorMessage == API_KEY_MISSING) null else it.userFilesListErrorMessage
+                userFilesListErrorMessage = if (it.userFilesListErrorMessage == apiKeyMissing) null else it.userFilesListErrorMessage
             )
         }
     }
@@ -863,7 +865,7 @@ class FileInfoViewModel(
     /** Checks the preconditions of an action on several files and marks it as running. */
     private fun beginBulkOperation(): Boolean {
         if (needsKeyButMissing()) {
-            messages.show(API_KEY_MISSING, long = true)
+            messages.show(apiKeyMissing, long = true)
             return false
         }
         if (_uiState.value.isBulkOperationRunning) return false
@@ -883,7 +885,7 @@ class FileInfoViewModel(
     }
 
     private fun failureSummary(failures: List<String>): String =
-        failures.take(3).joinToString("; ") + if (failures.size > 3) " and ${failures.size - 3} more" else ""
+        failures.take(3).joinToString("; ") + if (failures.size > 3) application.resources.getQuantityString(R.plurals.common_and_more, failures.size - 3, failures.size - 3) else ""
 
     /** There is no endpoint to delete several files everywhere, so this deletes them one by one. */
     fun deleteFiles(files: List<StorageNode>) {
@@ -895,7 +897,7 @@ class FileInfoViewModel(
             for (file in targets) {
                 when (val response = deleteNode(file)) {
                     is ApiResponse.Success -> deletedKeys.add(file.key)
-                    is ApiResponse.Error -> failures.add("${file.name} (${response.error.message.ifBlank { "unknown error" }})")
+                    is ApiResponse.Error -> failures.add("${file.name} (${response.error.message.ifBlank { application.getString(R.string.common_unknown_error_lower) }})")
                 }
             }
             downloadManager.forget(deletedKeys)
@@ -927,7 +929,7 @@ class FileInfoViewModel(
                     (if (ids.size == 1) application.getString(R.string.files_file_added_to) else application.getString(R.string.files_files_added_to, ids.size)) + directoryPath.trim('/')
                 )
                 is ApiResponse.Error -> finishBulkOperation(
-                    null, application.getString(R.string.files_could_not_add_the_files, response.error.message.ifBlank { "unknown error" })
+                    null, application.getString(R.string.files_could_not_add_the_files, response.error.message.ifBlank { application.getString(R.string.common_unknown_error_lower) })
                 )
             }
         }
@@ -943,7 +945,7 @@ class FileInfoViewModel(
             when (response) {
                 is ApiResponse.Success -> finishBulkOperation(application.getString(R.string.files_list_created) + linkSuffix(response.data))
                 is ApiResponse.Error -> finishBulkOperation(
-                    null, application.getString(R.string.files_could_not_create_the_list, response.error.message.ifBlank { "unknown error" })
+                    null, application.getString(R.string.files_could_not_create_the_list, response.error.message.ifBlank { application.getString(R.string.common_unknown_error_lower) })
                 )
             }
         }
@@ -955,7 +957,7 @@ class FileInfoViewModel(
 
     /** The lists of the user which can be changed, for choosing the list to add files to. */
     suspend fun loadEditableLists(): ApiResponse<List<FileList>> {
-        if (needsKeyButMissing()) return ApiResponse.Error(ProviderError(ErrorCodes.API_KEY_MISSING, API_KEY_MISSING))
+        if (needsKeyButMissing()) return ApiResponse.Error(ProviderError(ErrorCodes.API_KEY_MISSING, apiKeyMissing))
         val lists = provider().lists ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, application.getString(R.string.files_this_host_has_no_lists)))
         return when (val response = lists.lists()) {
             is ApiResponse.Success -> ApiResponse.Success(response.data.filter { it.canEdit })

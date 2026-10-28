@@ -130,6 +130,8 @@ import tools.senko.materialdrain.ui.icons.filled.Remove
 import tools.senko.materialdrain.ui.icons.filled.Search
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import android.content.res.Resources
+import androidx.compose.ui.platform.LocalResources
 
 /** Tabs as spaces, so columns line up in the monospaced text whatever the tab width would have been. */
 private fun expandTabs(text: String) = text.replace("\t", "    ")
@@ -294,7 +296,7 @@ fun CodePreview(
         }
         // A file cut short says how much of it is here; the rest is in the fullscreen view
         TextPreviewLabels(
-            label = textPreviewLabel(language?.name ?: "Text", shownLines, totalLines, cut),
+            label = textPreviewLabel(LocalResources.current, language?.name ?: "Text", shownLines, totalLines, cut),
             onOpen = { onFullScreen?.invoke() ?: run { fullscreen = true } }
         )
     }
@@ -303,11 +305,12 @@ fun CodePreview(
 }
 
 /** What a text's preview says it is: its [kind] and how long it is, or how much of it is shown when it's [cut] short. */
-internal fun textPreviewLabel(kind: String, shownLines: Int, totalLines: Int, cut: Boolean): String {
+internal fun textPreviewLabel(res: Resources, kind: String, shownLines: Int, totalLines: Int, cut: Boolean): String {
     val count = NumberFormat.getIntegerInstance()
     return listOf(
         kind,
-        if (cut) "first ${count.format(shownLines)} of ${count.format(totalLines)} lines" else "${count.format(totalLines)} lines"
+        if (cut) res.getQuantityString(R.plurals.files_first_lines_of, totalLines, count.format(shownLines), count.format(totalLines))
+        else res.getQuantityString(R.plurals.files_lines, totalLines, count.format(totalLines))
     ).joinToString(" · ")
 }
 
@@ -430,6 +433,7 @@ fun CodeFullscreenContent(
     onLoadAnyway: (() -> Unit)? = null
 ) {
     val colors = codeColors()
+    val res = LocalResources.current
     val scheme = MaterialTheme.colorScheme
     val context = LocalContext.current
     val wrapSetting = LocalTextWrap.current
@@ -659,7 +663,7 @@ fun CodeFullscreenContent(
                             Spacer(Modifier.width(8.dp))
                             TextButton(onClick = {
                                 val picked = fileLines.subList(range.first, (range.last + 1).coerceAtMost(fileLines.size))
-                                copy(if (first == last) "Line $first" else "Lines $first–$last", picked.joinToString("\n"))
+                                copy(if (first == last) res.getString(R.string.files_line, first) else res.getString(R.string.files_lines_range, first, last), picked.joinToString("\n"))
                                 rangeStart = null
                                 rangeEnd = null
                             }) { Text(stringResource(R.string.common_copy)) }

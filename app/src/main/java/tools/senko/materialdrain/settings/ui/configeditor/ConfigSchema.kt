@@ -169,7 +169,7 @@ class ConfigSchema(private val resources: Resources) {
         FieldSpec("method", resources.getString(R.string.settings_method), resources.getString(R.string.settings_the_http_method_of_the), kind = methodChoice, required = true, default = str("GET")),
         FieldSpec(
             "path", resources.getString(R.string.settings_path),
-            "Added to the base address, or a full https:// address." + (placeholders?.let { resources.getString(R.string.settings_can_use, it) } ?: ""),
+            resources.getString(R.string.settings_path_added_to_base) + (placeholders?.let { resources.getString(R.string.settings_can_use, it) } ?: ""),
             required = true, placeholder = "/files/{id}"
         ),
         FieldSpec("body", resources.getString(R.string.settings_body), resources.getString(R.string.settings_what_s_sent_with_the), kind = bodyChoice, default = str("RAW")),

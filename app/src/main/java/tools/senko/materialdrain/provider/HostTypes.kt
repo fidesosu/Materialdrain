@@ -22,9 +22,11 @@ import tools.senko.materialdrain.provider.genericrest.GenericRestStorageProvider
 import tools.senko.materialdrain.provider.s3.S3StorageProvider
 import tools.senko.materialdrain.provider.smb.SmbStorageProvider
 import tools.senko.materialdrain.provider.webdav.WebDavStorageProvider
+import androidx.annotation.StringRes
+import tools.senko.materialdrain.R
 
 /** The two halves of a sign-in, as a kind of host calls them: "Access Key ID" and "Secret Access Key" for S3. */
-data class KeyPairLabels(val username: String, val password: String)
+data class KeyPairLabels(@param:StringRes val username: Int, @param:StringRes val password: Int)
 
 /**
  * What the app knows of one kind of configured host, in one place: its names and icon, where it is, what the health
@@ -35,9 +37,9 @@ data class KeyPairLabels(val username: String, val password: String)
  */
 sealed class HostType {
     /** Short, in the host switcher: "S3" */
-    abstract val shortLabel: String
+    @get:StringRes abstract val shortLabel: Int
     /** In the host settings: "S3-compatible" */
-    abstract val label: String
+    @get:StringRes abstract val label: Int
     abstract val icon: ImageVector
     /** Where the host is, as the switcher shows it, e.g. "nas.local/Documents"; null when its config has none yet */
     abstract val address: String?
@@ -51,7 +53,7 @@ sealed class HostType {
      */
     open val keyPairLabels: KeyPairLabels? get() = null
     /** Shown in the host settings instead of the sign-in fields, when [needsSignIn] is false */
-    open val noSignInNote: String? get() = null
+    @get:StringRes open val noSignInNote: Int? get() = null
 
     /**
      * Builds the host's provider. [accountCredentials] is the account's own login (Settings → Account), for the hosts
@@ -69,8 +71,8 @@ fun hostTypeOf(config: ProviderConfig): HostType = when (config) {
 }
 
 private class GenericRestHost(private val config: GenericRestConfig) : HostType() {
-    override val shortLabel = "REST API"
-    override val label = "Generic REST"
+    override val shortLabel = R.string.hosts_kind_rest_short
+    override val label = R.string.hosts_kind_rest
     override val icon = Icons.Filled.Dns
     override val address get() = ConfigUpdates.hostOf(config.baseUrl)
     override val healthTarget get() = HealthTarget.originOf(config.baseUrl)
@@ -92,8 +94,8 @@ private class GenericRestHost(private val config: GenericRestConfig) : HostType(
 }
 
 private class WebDavHost(private val config: WebDavConfig) : HostType() {
-    override val shortLabel = "WebDAV"
-    override val label = "WebDAV"
+    override val shortLabel = R.string.hosts_kind_webdav
+    override val label = R.string.hosts_kind_webdav
     override val icon = Icons.Filled.FolderShared
     override val address get() = ConfigUpdates.hostOf(config.baseUrl)
     override val healthTarget get() = HealthTarget.originOf(config.baseUrl)
@@ -103,29 +105,29 @@ private class WebDavHost(private val config: WebDavConfig) : HostType() {
 }
 
 private class S3Host(private val config: S3Config) : HostType() {
-    override val shortLabel = "S3"
-    override val label = "S3-compatible"
+    override val shortLabel = R.string.hosts_kind_s3_short
+    override val label = R.string.hosts_kind_s3
     override val icon = Icons.Filled.Storage
     override val address get() = ConfigUpdates.hostOf(config.endpoint)?.let { host -> config.bucket.takeIf { it.isNotBlank() }?.let { "$host/$it" } ?: host }
     override val healthTarget get() = HealthTarget.originOf(config.endpoint)
     // Both halves of a key pair, always: S3 has no single API key
-    override val keyPairLabels = KeyPairLabels("Access Key ID", "Secret Access Key")
+    override val keyPairLabels = KeyPairLabels(R.string.hosts_access_key_id, R.string.hosts_secret_access_key)
 
     override fun build(id: String, configStore: ProviderConfigStore, accountCredentials: () -> Credentials) =
         S3StorageProvider(id, config, credentials = { configStore.credentials(id) })
 }
 
 private class SmbHost(private val config: SmbConfig) : HostType() {
-    override val shortLabel = "SMB"
-    override val label = "SMB share"
+    override val shortLabel = R.string.hosts_kind_smb_short
+    override val label = R.string.hosts_kind_smb
     override val icon = Icons.Filled.Share
     override val address get() = config.host.trim().takeIf { it.isNotEmpty() }?.let { host -> "$host/${config.share.trim('/', '\\')}" }
     // SMB isn't HTTP: the check connects to its port
     override val healthTarget get() = config.host.trim().takeIf { it.isNotEmpty() }?.let { HealthTarget.Tcp(it, config.port) }
     // A share can be open to guests or anonymous: then there's nothing to sign in to
     override val needsSignIn get() = config.auth == SmbAuthMode.CREDENTIALS
-    override val keyPairLabels = KeyPairLabels("Username", "Password")
-    override val noSignInNote get() = "Guest share: no sign-in needed."
+    override val keyPairLabels = KeyPairLabels(R.string.settings_username, R.string.settings_password)
+    override val noSignInNote get() = R.string.hosts_guest_share
 
     override fun build(id: String, configStore: ProviderConfigStore, accountCredentials: () -> Credentials) =
         SmbStorageProvider(id, config, credentials = { configStore.credentials(id) })

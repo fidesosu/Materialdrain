@@ -375,6 +375,6 @@ internal fun describe(error: FileUploadResponse, resources: Resources): String =
     "branding_image_not_found", "not_found" -> resources.getString(R.string.settings_one_of_the_images_wasn)
     "invalid_file_type" -> resources.getString(R.string.settings_images_need_to_be_jpeg)
     "file_too_large" -> resources.getString(R.string.settings_images_can_be_at_most)
-    "invalid_link" -> "Links need to start with https://."
+    "invalid_link" -> resources.getString(R.string.settings_links_need_https)
     else -> error.message?.takeIf { it.isNotBlank() } ?: error.value ?: resources.getString(R.string.settings_something_went_wrong)
 }

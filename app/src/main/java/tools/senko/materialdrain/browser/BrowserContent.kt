@@ -63,6 +63,7 @@ import tools.senko.materialdrain.ui.preview.PreviewSamples
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.compose.ui.res.pluralStringResource
 
 /**
  * The browser as it's drawn: the header of [mode] (the sorting, the path or the open list), then [entries] or why there
@@ -145,7 +146,7 @@ fun BrowserContent(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(openedList.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 Text(
-                                    if (openedList.fileCount == 1) "1 file" else "${openedList.fileCount} files",
+                                    pluralStringResource(R.plurals.common_files, openedList.fileCount, openedList.fileCount),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

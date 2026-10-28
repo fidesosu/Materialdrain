@@ -1226,4 +1226,129 @@
     <string name="upload_was_uploaded">%1$s was uploaded.</string>
     <string name="upload_when_a_transfer_fails_in">When a transfer fails in the background</string>
     <string name="upload_when_a_transfer_finishes_in">When a transfer finishes in the background</string>
+    <string name="app_files_done_of">%1$d / %2$d files</string>
+    <string name="app_press_back_again">Press back again to exit</string>
+    <string name="browser_from_folder_default">From %1$s: %2$s</string>
+    <string name="browser_look_and_feel_default">Look and feel\'s: %1$s</string>
+    <string name="browser_the_top_folder">the top folder</string>
+    <string name="common_eta_hours">%1$dh %2$02dm</string>
+    <string name="common_eta_minutes">%1$dm %2$02ds</string>
+    <string name="common_eta_seconds">%1$ds</string>
+    <string name="common_eta_under_a_second">&lt;1s</string>
+    <string name="common_folder_not_loaded">Could not load this folder.</string>
+    <string name="common_just_now">just now</string>
+    <string name="common_ok">OK</string>
+    <string name="common_time_left">%1$s left</string>
+    <string name="common_unknown_error_lower">unknown error</string>
+    <string name="documents_download_stopped">The download stopped</string>
+    <string name="documents_no_folders">No folders on this host</string>
+    <string name="files_bytes">%1$s bytes</string>
+    <string name="files_deletes_on">On %1$s</string>
+    <string name="files_held_about">About %1$s</string>
+    <string name="files_held_contents">what\'s inside</string>
+    <string name="files_held_pdf">the PDF</string>
+    <string name="files_held_picture">the picture</string>
+    <string name="files_held_streams">Streams once it\'s played</string>
+    <string name="files_held_text">the text</string>
+    <string name="files_held_thumbnail">the thumbnail</string>
+    <string name="files_held_too_big">Too big to preview</string>
+    <string name="files_held_up_to">Up to %1$s</string>
+    <string name="files_held_video">the video</string>
+    <string name="files_line">Line %1$d</string>
+    <string name="files_lines_range">Lines %1$d–%2$d</string>
+    <string name="files_load_the_preview">Load the preview</string>
+    <string name="files_pdf_not_loaded">The PDF couldn\'t be loaded.</string>
+    <string name="files_pdf_not_saved">The PDF couldn\'t be saved for preview.</string>
+    <string name="files_pdf_too_big">Too big to preview (max %1$s).</string>
+    <string name="files_resume_http_status">The host answered HTTP %1$d.</string>
+    <string name="files_resume_wrong_part">The host sent another part of the file than asked for.</string>
+    <string name="files_tap_to_load">Tap to load %1$s</string>
+    <string name="files_thumbnail_of">%1$s thumbnail</string>
+    <string name="files_unexpected_error">Unexpected error</string>
+    <string name="files_unknown_delete_error">Unknown error deleting file.</string>
+    <string name="files_uploaded_when">uploaded %1$s</string>
+    <string name="files_what_copied">%1$s copied</string>
+    <string name="hosts_access_key_id">Access Key ID</string>
+    <string name="hosts_guest_share">Guest share: no sign-in needed.</string>
+    <string name="hosts_kind_rest">Generic REST</string>
+    <string name="hosts_kind_rest_short">REST API</string>
+    <string name="hosts_kind_s3">S3-compatible</string>
+    <string name="hosts_kind_s3_short">S3</string>
+    <string name="hosts_kind_smb">SMB share</string>
+    <string name="hosts_kind_smb_short">SMB</string>
+    <string name="hosts_kind_webdav">WebDAV</string>
+    <string name="hosts_secret_access_key">Secret Access Key</string>
+    <string name="media_brightness_level">Brightness %1$d%%</string>
+    <string name="media_hold_speed">%1$s speed</string>
+    <string name="media_image_error">The picture couldn\'t be loaded</string>
+    <string name="media_play_video">Play video</string>
+    <string name="media_seek_to_back">"%1$s  (−%2$d s)"</string>
+    <string name="media_seek_to_forward">"%1$s  (+%2$d s)"</string>
+    <string name="media_skipped_back">− %1$d s</string>
+    <string name="media_skipped_forward">+ %1$d s</string>
+    <string name="media_video_thumbnail_error">The video thumbnail can\'t be shown</string>
+    <string name="media_video_thumbnail_unavailable">No video thumbnail</string>
+    <string name="media_video_thumbnail_unsupported">This thumbnail can\'t be shown</string>
+    <string name="media_volume_level">Volume %1$d%%</string>
+    <string name="settings_config_by">by %1$s</string>
+    <string name="settings_config_version">v%1$s</string>
+    <string name="settings_links_need_https">Links need to start with https://.</string>
+    <string name="settings_path_added_to_base">Added to the base address, or a full https:// address.</string>
+    <string name="settings_update_versions">%1$s: version %2$s → %3$s</string>
+    <string name="upload_clip_label">Pixeldrain URL</string>
+    <string name="upload_done_of">%1$d of %2$d uploaded</string>
+    <string name="upload_download_complete">Download complete</string>
+    <string name="upload_download_failed">Download failed</string>
+    <plurals name="common_and_more">
+        <item quantity="one">" and %d more"</item>
+        <item quantity="other">" and %d more"</item>
+    </plurals>
+    <plurals name="common_days_ago">
+        <item quantity="one">%d day ago</item>
+        <item quantity="other">%d days ago</item>
+    </plurals>
+    <plurals name="common_files">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
+    <plurals name="common_hours_ago">
+        <item quantity="one">%d hour ago</item>
+        <item quantity="other">%d hours ago</item>
+    </plurals>
+    <plurals name="common_minutes_ago">
+        <item quantity="one">%d min ago</item>
+        <item quantity="other">%d mins ago</item>
+    </plurals>
+    <plurals name="files_deletes_after">
+        <item quantity="one">After %d download</item>
+        <item quantity="other">After %d downloads</item>
+    </plurals>
+    <plurals name="files_deletes_on_or_after">
+        <item quantity="one">On %1$s, or after %2$d download</item>
+        <item quantity="other">On %1$s, or after %2$d downloads</item>
+    </plurals>
+    <plurals name="files_first_lines_of">
+        <item quantity="one">first %1$s of %2$s line</item>
+        <item quantity="other">first %1$s of %2$s lines</item>
+    </plurals>
+    <plurals name="files_lines">
+        <item quantity="one">%1$s line</item>
+        <item quantity="other">%1$s lines</item>
+    </plurals>
+    <plurals name="files_selected">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <plurals name="filesystem_items_deleted">
+        <item quantity="one">%d item deleted.</item>
+        <item quantity="other">%d items deleted.</item>
+    </plurals>
+    <plurals name="filesystem_items_moved">
+        <item quantity="one">%d item moved.</item>
+        <item quantity="other">%d items moved.</item>
+    </plurals>
+    <plurals name="settings_files_and_credit">
+        <item quantity="one">%1$s file · %2$s credit</item>
+        <item quantity="other">%1$s files · %2$s credit</item>
+    </plurals>
 </resources>

@@ -515,7 +515,8 @@ private fun ViewMenuEntries(view: ViewChoice, onBack: () -> Unit) {
         stringResource(R.string.browser_use_the_default),
         leadingIcon = Icons.Filled.Refresh,
         supportingText = when {
-            view.custom -> "${view.inheritedFrom?.let { "From $it" } ?: "Look and feel's"}: ${view.defaultLabel}"
+            view.custom -> view.inheritedFrom?.let { stringResource(R.string.browser_from_folder_default, it, view.defaultLabel) }
+                ?: stringResource(R.string.browser_look_and_feel_default, view.defaultLabel)
             view.inheritedFrom != null -> stringResource(R.string.browser_same_as, view.inheritedFrom)
             else -> stringResource(R.string.browser_already_the_default)
         },

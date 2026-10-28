@@ -19,6 +19,7 @@ import tools.senko.materialdrain.upload.UploadViewModel
 import androidx.compose.ui.res.stringResource
 import androidx.annotation.StringRes
 import tools.senko.materialdrain.R
+import androidx.compose.ui.res.pluralStringResource
 
 /**
  * A problem the app shows in a dialog. Each kind decides its own title and text, and what closing it clears (see
@@ -80,7 +81,7 @@ internal fun AppDialogs(
             onDismissRequest = { close(confirmed = false) },
             title = { Text(stringResource(shown.titleRes)) },
             text = { Text(shown.text) },
-            confirmButton = { Button(onClick = { close(confirmed = true) }) { Text("OK") } }
+            confirmButton = { Button(onClick = { close(confirmed = true) }) { Text(stringResource(R.string.common_ok)) } }
         )
     }
 
@@ -90,7 +91,7 @@ internal fun AppDialogs(
         val size = download.totalBytes?.let { ", ${formatSize(it)}" }.orEmpty()
         ConfirmDialog(
             title = stringResource(R.string.app_download_files, download.fileCount),
-            text = "${download.fileCount} files$size. " + when (download.style) {
+            text = pluralStringResource(R.plurals.common_files, download.fileCount, download.fileCount) + "$size. " + when (download.style) {
                 DownloadStyle.SEPARATELY -> stringResource(R.string.app_saved_to_download_in_their)
                 DownloadStyle.ZIP -> stringResource(R.string.app_saved_as_one_zip)
             },

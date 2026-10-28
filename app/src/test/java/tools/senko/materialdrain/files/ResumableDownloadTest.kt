@@ -54,7 +54,7 @@ class ResumableDownloadTest {
     }
 
     private fun resume(saved: Saved, offset: Long, progress: MutableList<Pair<Long, Long?>> = mutableListOf()) =
-        downloadRest(OkHttpClient(), server.url("/file").toString(), mapOf("Authorization" to "Basic x"), offset, saved::open) { read, total ->
+        downloadRest(OkHttpClient(), ResumeTexts({ "HTTP $it" }, "another part"), server.url("/file").toString(), mapOf("Authorization" to "Basic x"), offset, saved::open) { read, total ->
             progress += read to total
         }
 

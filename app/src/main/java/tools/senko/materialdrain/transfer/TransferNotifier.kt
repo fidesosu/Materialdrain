@@ -109,7 +109,7 @@ class TransferNotifier(private val context: Context) {
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setContentIntent(openAppIntent())
-            .addAction(0, "Cancel", cancelAllIntent())
+            .addAction(0, context.getString(R.string.browser_cancel), cancelAllIntent())
 
         if (transfers.isEmpty()) {
             return builder
@@ -143,7 +143,7 @@ class TransferNotifier(private val context: Context) {
             if (total != null) add("${(transferred * 100 / total).coerceIn(0L, 100L)}% · ${formatSize(transferred)} / ${formatSize(total)}")
             else if (transferred > 0) add(formatSize(transferred))
             if (speed > 0) add(formatSpeed(speed))
-            if (eta != null) add("${formatEta(eta)} left")
+            if (eta != null) add(context.getString(R.string.common_time_left, formatEta(eta, context.resources)))
         }.joinToString(" · ")
 
         val icon = if (onlyDownloads) R.drawable.icon_download else R.drawable.icon_upload
@@ -167,7 +167,15 @@ class TransferNotifier(private val context: Context) {
     /** The notification of a finished transfer, with "Try again" when it failed and [canRetry]; returns its id. */
     fun notifyResult(info: TransferInfo, outcome: TransferOutcome, message: String?, openUri: Uri?, mimeType: String?, canRetry: Boolean = false): Int {
         val failed = outcome == TransferOutcome.FAILED
-        val verb = if (info.kind == TransferKind.UPLOAD) context.getString(R.string.upload_upload) else context.getString(R.string.browser_download)
+        val upload = info.kind == TransferKind.UPLOAD
+        val title = context.getString(
+            when {
+                failed && upload -> R.string.upload_upload_failed
+                failed -> R.string.upload_download_failed
+                upload -> R.string.upload_upload_complete
+                else -> R.string.upload_download_complete
+            }
+        )
 
         val contentIntent = if (!failed && openUri != null) {
             val viewIntent = Intent(Intent.ACTION_VIEW)
@@ -184,14 +192,14 @@ class TransferNotifier(private val context: Context) {
         val notification = NotificationCompat.Builder(context, channel)
             .setColor(iconColor())
             .setSmallIcon(icon)
-            .setContentTitle(if (failed) "$verb failed" else "$verb complete")
+            .setContentTitle(title)
             .setContentText(message ?: info.title)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message ?: info.title))
             .setContentIntent(contentIntent)
             .setAutoCancel(true)
             .setCategory(if (failed) NotificationCompat.CATEGORY_ERROR else NotificationCompat.CATEGORY_STATUS)
-            .apply { if (failed && canRetry) addAction(0, "Try again", retryIntent(id)) }
-            .let { privateOnLockScreen(it, channel, icon, if (failed) "$verb failed" else "$verb complete") }
+            .apply { if (failed && canRetry) addAction(0, context.getString(R.string.media_try_again), retryIntent(id)) }
+            .let { privateOnLockScreen(it, channel, icon, title) }
             .build()
         notify(id, notification)
         return id

@@ -52,6 +52,7 @@ import tools.senko.materialdrain.ui.icons.filled.SelectAll
 import tools.senko.materialdrain.ui.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.compose.ui.res.pluralStringResource
 
 /**
  * One action on the selected items. [destructive] actions are tinted red. With [choices] (Download: each file on its
@@ -150,7 +151,7 @@ fun SelectionActionBar(
     FloatingBottomBar(visible = visible) {
         IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.files_stop_selecting)) }
         Text(
-            text = if (selectedCount == 0) stringResource(R.string.files_select_items) else "$selectedCount selected",
+            text = if (selectedCount == 0) stringResource(R.string.files_select_items) else pluralStringResource(R.plurals.files_selected, selectedCount, selectedCount),
             style = MaterialTheme.typography.labelLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

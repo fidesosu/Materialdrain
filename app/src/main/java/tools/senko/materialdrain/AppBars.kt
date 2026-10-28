@@ -51,6 +51,7 @@ import tools.senko.materialdrain.ui.icons.filled.Cloud
 import tools.senko.materialdrain.upload.UploadUiState
 import tools.senko.materialdrain.settings.ui.rememberPreviewSettings
 import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /**
  * The bar at the top of the app: the screen's title (or, on the browse screens, the host switcher over the middle of the
@@ -161,7 +162,7 @@ internal fun ColumnScope.TransferBarSlot(
             bytesPerSecond = uploadUiState.uploadSpeedBytesPerSec,
             etaSeconds = uploadUiState.uploadEtaSeconds,
             label = uploadUiState.queuedItems.takeIf { it.isNotEmpty() }?.let { items ->
-                "${items.count { it.status == UploadItemStatus.DONE }} / ${items.size} files"
+                stringResource(R.string.app_files_done_of, items.count { it.status == UploadItemStatus.DONE }, items.size)
             }
         )
     } else null
@@ -172,7 +173,7 @@ internal fun ColumnScope.TransferBarSlot(
                 totalBytes = it.totalBytes,
                 bytesPerSecond = it.bytesPerSecond,
                 etaSeconds = it.etaSeconds,
-                label = "${it.currentIndex} / ${it.totalFiles} files"
+                label = stringResource(R.string.app_files_done_of, it.currentIndex, it.totalFiles)
             )
         }
         else -> downloads.batch?.takeIf {

@@ -418,7 +418,7 @@ private fun pixeldrainLink(fileId: String) = "https://pixeldrain.com/u/$fileId"
 
 private fun copyToClipboard(context: Context, text: String, toastMessage: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText("Pixeldrain URL", text))
+    clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.upload_clip_label), text))
     Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
 }
 
@@ -445,7 +445,7 @@ private fun QueuedFilesCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (doneCount > 0) "$doneCount of ${items.size} uploaded" else stringResource(R.string.upload_files_selected, items.size),
+                        text = if (doneCount > 0) stringResource(R.string.upload_done_of, doneCount, items.size) else stringResource(R.string.upload_files_selected, items.size),
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(

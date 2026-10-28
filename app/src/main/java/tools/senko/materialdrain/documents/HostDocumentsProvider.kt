@@ -133,7 +133,7 @@ class HostDocumentsProvider : DocumentsProvider() {
 
     /** The folder [path] of [provider], also kept in [known]. The search index stays out, as in the app when it's hidden. */
     private fun listChildren(hostId: String, provider: StorageProvider, path: String): List<StorageNode> {
-        val browse = provider.browse ?: throw FileNotFoundException("No folders on this host")
+        val browse = provider.browse ?: throw FileNotFoundException(context?.getString(R.string.documents_no_folders))
         val hideIndex = container.appSettings.hideSearchIndex.value
         return when (val listing = runBlocking(Dispatchers.IO) { browse.list(path) }) {
             is ApiResponse.Success -> listing.data.children
@@ -173,7 +173,7 @@ class HostDocumentsProvider : DocumentsProvider() {
     override fun openDocument(documentId: String, mode: String, signal: CancellationSignal?): ParcelFileDescriptor {
         if (mode != "r") throw UnsupportedOperationException("The hosts can only be read from here")
         val (provider, path) = hostOf(documentId)
-        val browse = provider.browse ?: throw FileNotFoundException("No folders on this host")
+        val browse = provider.browse ?: throw FileNotFoundException(context?.getString(R.string.documents_no_folders))
         signal?.throwIfCanceled()
         rangedReader(documentId, provider, path)?.let { reader ->
             val thread = HandlerThread("document-$documentId").apply { start() }
@@ -188,7 +188,7 @@ class HostDocumentsProvider : DocumentsProvider() {
                     runBlocking(Dispatchers.IO) { browse.download(path, out) { _, _ -> signal?.throwIfCanceled() } }
                 }
             } catch (e: Exception) {
-                ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: "The download stopped"))
+                ApiResponse.Error(ProviderError(ErrorCodes.NETWORK_ERROR, e.message ?: context?.getString(R.string.documents_download_stopped).orEmpty()))
             }
             if (result is ApiResponse.Error) runCatching { write.closeWithError(result.error.message) }
         }

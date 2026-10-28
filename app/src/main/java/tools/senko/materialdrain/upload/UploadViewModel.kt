@@ -817,7 +817,7 @@ class UploadViewModel(
             } catch (e: Exception) {
                 Log.e(TAG, "Upload failed for $operationType. Exception: ${e.message}", e)
                 _uiState.update {
-                    it.copy(isLoading = false, errorMessage = application.getString(R.string.upload_upload_failed_3, e.message ?: "Unknown error"))
+                    it.copy(isLoading = false, errorMessage = application.getString(R.string.upload_upload_failed_3, e.message ?: application.getString(R.string.app_unknown_error)))
                 }
                 null
             }

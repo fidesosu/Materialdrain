@@ -62,6 +62,7 @@ import androidx.compose.foundation.layout.padding
 import tools.senko.materialdrain.provider.api.StorageRef
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.compose.ui.res.pluralStringResource
 
 fun shareLink(context: Context, url: String) {
     val sendIntent = Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_TEXT, url).setType("text/plain")
@@ -359,7 +360,7 @@ private fun ListPickerDialog(
                         items(shownLists, key = { it.id }) { list ->
                             ListItem(
                                 headlineContent = { Text(list.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                supportingContent = { Text(if (list.fileCount == 1) "1 file" else "${list.fileCount} files") },
+                                supportingContent = { Text(pluralStringResource(R.plurals.common_files, list.fileCount, list.fileCount)) },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                 modifier = Modifier.clickable { onPick(list) }
                             )

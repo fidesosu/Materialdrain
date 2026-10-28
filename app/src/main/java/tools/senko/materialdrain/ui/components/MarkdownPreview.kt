@@ -75,6 +75,7 @@ import tools.senko.materialdrain.ui.preview.ThemePreviews
 import tools.senko.materialdrain.ui.theme.AppShapes
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.compose.ui.platform.LocalResources
 
 /** Whether [language] is Markdown, which the previews show as it's meant to look rather than as its source. */
 fun isMarkdown(language: SourceLanguage?): Boolean = language?.family == SyntaxFamily.MARKDOWN
@@ -127,7 +128,7 @@ fun MarkdownPreview(
             }
         }
         TextPreviewLabels(
-            label = textPreviewLabel(language?.name ?: "Markdown", shownLines, totalLines, cut),
+            label = textPreviewLabel(LocalResources.current, language?.name ?: "Markdown", shownLines, totalLines, cut),
             onOpen = { onFullScreen?.invoke() ?: run { fullscreen = true } }
         )
     }

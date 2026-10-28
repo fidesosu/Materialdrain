@@ -27,6 +27,7 @@ import tools.senko.materialdrain.ui.preview.ThemePreviews
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.compose.ui.platform.LocalResources
 
 data class TransferProgress(
     val transferredBytes: Long,
@@ -66,7 +67,7 @@ fun TransferStatusBar(progress: TransferProgress, modifier: Modifier = Modifier)
         fraction != null && fraction >= 1f -> stringResource(R.string.common_finalizing)
         progress.bytesPerSecond > 0 -> buildString {
             append(formatSpeed(progress.bytesPerSecond))
-            progress.etaSeconds?.let { append(" · ${formatEta(it)} left") }
+            progress.etaSeconds?.let { append(" · " + stringResource(R.string.common_time_left, formatEta(it, LocalResources.current))) }
         }
         else -> null
     }
