@@ -124,6 +124,13 @@ import tools.senko.materialdrain.settings.ListLayout
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.runtime.key
+import kotlinx.coroutines.delay
+import androidx.compose.animation.core.Animatable
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.draw.clipToBounds
+import kotlin.math.roundToInt
 
 /** The path at the top of the filesystem: each folder is tappable, and the row scrolls to the end of it. */
 @Composable
@@ -152,6 +159,19 @@ fun PathBreadcrumb(
         return
     }
 
+    // Going up, the folders left shrink away rather than vanishing: they stay in the row until they're gone. Going into a
+    // folder, it grows in at the end. The row's first look (the screen opening) has nothing growing in
+    val reduceMotion = LocalReduceMotion.current
+    var trail by remember { mutableStateOf(pathSegments) }
+    val leaving = trail.size > pathSegments.size && trail.subList(0, pathSegments.size) == pathSegments
+    val shown = if (leaving) trail else pathSegments
+    LaunchedEffect(pathSegments) {
+        if (leaving && !reduceMotion) delay(SEGMENT_ANIMATION_MS.toLong())
+        trail = pathSegments
+    }
+    val firstLook = remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) { firstLook.value = false }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -160,29 +180,58 @@ fun PathBreadcrumb(
             .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        pathSegments.forEachIndexed { index, segment ->
-            Text(
-                text = segment.name,
-                style = MaterialTheme.typography.titleSmall.copy(
-                    color = if (index == pathSegments.lastIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                ),
-                fontWeight = if (index == pathSegments.lastIndex) FontWeight.Bold else FontWeight.Normal,
-                modifier = Modifier
-                    .clip(AppShapes.ExtraSmall)
-                    .clickable { onPathSegmentClick(segment) }
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
-            )
-            if (index < pathSegments.lastIndex) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                    contentDescription = stringResource(R.string.browser_path_separator),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp)
+        shown.forEachIndexed { index, segment ->
+            key(segment.fullPath) {
+                // How much of the folder is there: growing to 1 as it comes, shrinking to 0 as it leaves
+                val presence = remember { Animatable(if (firstLook.value || reduceMotion) 1f else 0f) }
+                val there = index < pathSegments.size
+                LaunchedEffect(there) {
+                    if (reduceMotion) presence.snapTo(if (there) 1f else 0f)
+                    else presence.animateTo(if (there) 1f else 0f, tween(SEGMENT_ANIMATION_MS))
+                }
+                val current = index == pathSegments.lastIndex
+                val color by animateColorAsState(
+                    if (current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tween(if (reduceMotion) 0 else SEGMENT_ANIMATION_MS),
+                    label = "pathSegmentColor"
                 )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        // As wide as it's there, from the start side, and as faded
+                        .layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints)
+                            layout((placeable.width * presence.value).roundToInt(), placeable.height) { placeable.place(0, 0) }
+                        }
+                        .clipToBounds()
+                        .graphicsLayer { alpha = presence.value }
+                ) {
+                    if (index > 0) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                            contentDescription = stringResource(R.string.browser_path_separator),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Text(
+                        text = segment.name,
+                        style = MaterialTheme.typography.titleSmall.copy(color = color),
+                        fontWeight = if (current) FontWeight.Bold else FontWeight.Normal,
+                        softWrap = false,
+                        modifier = Modifier
+                            .clip(AppShapes.ExtraSmall)
+                            .clickable(enabled = there) { onPathSegmentClick(segment) }
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
             }
         }
     }
 }
+
+/** How long a folder of the path takes to grow in or shrink away, and its colour to change. */
+private const val SEGMENT_ANIMATION_MS = 250
 
 /**
  * The cards above the list for what's going on: Cancel, which stops the transfer the bar above shows, and Thumbnails,
