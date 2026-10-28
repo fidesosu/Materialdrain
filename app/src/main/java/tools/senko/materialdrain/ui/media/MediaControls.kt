@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
+import tools.senko.materialdrain.ui.theme.AppShapes
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -44,9 +44,46 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.ui.LocalReduceMotion
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import tools.senko.materialdrain.ui.icons.filled.Replay10
+import tools.senko.materialdrain.ui.icons.filled.PlayArrow
+import tools.senko.materialdrain.ui.icons.filled.Forward10
+import tools.senko.materialdrain.ui.icons.filled.Fullscreen
+import tools.senko.materialdrain.ui.icons.filled.Replay
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
+
+/**
+ * The darkenings over pictures, videos and their blurred backdrops, for what goes on them to read (white text, buttons).
+ * One place for all of them, so they stay alike.
+ */
+internal object MediaScrim {
+    /** Over a blurred backdrop, so the picture and the buttons stand out from it */
+    val Backdrop = Color.Black.copy(alpha = 0.35f)
+
+    /** Behind a small button or label over a picture: the back button, a page number */
+    val Button = Color.Black.copy(alpha = 0.5f)
+
+    /** Behind the play button over a video's thumbnail, and the like */
+    val Play = Color.Black.copy(alpha = 0.55f)
+
+    /** The top of a video, where the shade behind its name starts */
+    val Top = Color.Black.copy(alpha = 0.6f)
+}
 
 /** Buttons of the media players are rectangles with slightly rounded corners, no pills and no circles. */
-internal val MediaControlShape = RoundedCornerShape(6.dp)
+internal val MediaControlShape = AppShapes.Small
 
 private val ControlContainer = Color.White.copy(alpha = 0.14f)
 
@@ -75,6 +112,67 @@ fun MediaIconButton(
     container: Color = ControlContainer,
     contentColor: Color = Color.White
 ) {
+    MediaButton(contentDescription, onClick, modifier, enabled, size, container) {
+        Icon(icon, contentDescription = contentDescription, tint = if (enabled) contentColor else contentColor.copy(alpha = 0.5f))
+    }
+}
+
+/** The square button of skipping back or [forward] by [stepMs], with the step on it (see [SkipGlyph]). */
+@Composable
+fun MediaSkipButton(
+    forward: Boolean,
+    stepMs: Long,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    container: Color = ControlContainer,
+    contentColor: Color = Color.White
+) {
+    val seconds = (stepMs / 1000).toInt()
+    val description = if (forward) stringResource(R.string.media_forward_seconds, seconds) else stringResource(R.string.media_back_seconds, seconds)
+    MediaButton(description, onClick, modifier, enabled = true, size = 44.dp, container = container) {
+        Box(Modifier.semantics { contentDescription = description }) { SkipGlyph(forward, seconds, contentColor) }
+    }
+}
+
+/**
+ * The sign of skipping back or [forward] by [seconds]: Material's own for 10 seconds, and for any other step the circling
+ * arrow (turned around to go forward) with the number in it, as Material draws its 10.
+ */
+@Composable
+fun SkipGlyph(forward: Boolean, seconds: Int, tint: Color, size: Dp = 24.dp) {
+    if (seconds == 10) {
+        Icon(if (forward) Icons.Filled.Forward10 else Icons.Filled.Replay10, contentDescription = null, tint = tint, modifier = Modifier.size(size))
+        return
+    }
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(size)) {
+        Icon(
+            Icons.Filled.Replay,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.matchParentSize().graphicsLayer { if (forward) scaleX = -1f }
+        )
+        // In the middle of the circle, which is a little below the middle of the icon
+        Text(
+            "$seconds",
+            color = tint,
+            fontSize = (size.value * 0.3f).sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.offset(y = size * 0.06f)
+        )
+    }
+}
+
+/** A square button of the players, with [content] on it. */
+@Composable
+private fun MediaButton(
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    enabled: Boolean,
+    size: Dp,
+    container: Color,
+    content: @Composable () -> Unit
+) {
     val interaction = remember { MutableInteractionSource() }
     val background = rememberControlColor(container, interaction, enabled)
     Box(
@@ -92,7 +190,7 @@ fun MediaIconButton(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = contentDescription, tint = if (enabled) contentColor else contentColor.copy(alpha = 0.5f))
+        content()
     }
 }
 
@@ -215,5 +313,37 @@ fun MediaSeekBar(
     }
 }
 
-/** Media cards and buttons are rectangles with slightly rounded corners. */
-internal val MediaCardShape = RoundedCornerShape(8.dp)
+/** The previews of a file (picture, video, song, text, PDF, archive) are cards with these corners. */
+internal val MediaCardShape = AppShapes.Medium
+
+// ---- Previews ----
+
+/** The players' buttons and seek bar, over the dark of a video. */
+@ThemePreviews
+@Composable
+private fun MediaControlsPreview() {
+    PreviewTheme {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.background(Color.Black).padding(16.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                MediaSkipButton(forward = false, stepMs = 10_000, onClick = {})
+                MediaIconButton(Icons.Filled.PlayArrow, "Play", onClick = {}, size = 56.dp)
+                MediaSkipButton(forward = true, stepMs = 10_000, onClick = {})
+                MediaSkipButton(forward = false, stepMs = 5_000, onClick = {})
+                MediaSkipButton(forward = true, stepMs = 30_000, onClick = {})
+                MediaIconButton(Icons.Filled.Fullscreen, "Fullscreen", onClick = {}, enabled = false)
+                MediaTextButton("1.5×", onClick = {})
+            }
+            MediaSeekBar(
+                positionMs = 74_000,
+                durationMs = 213_000,
+                bufferedMs = 120_000,
+                onSeekStarted = {},
+                onSeekPreview = {},
+                onSeekFinished = {}
+            )
+        }
+    }
+}

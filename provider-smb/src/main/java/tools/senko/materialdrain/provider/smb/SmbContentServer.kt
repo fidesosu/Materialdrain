@@ -27,17 +27,22 @@ import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.Semaphore
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 /**
  * A tiny HTTP server on this device only (127.0.0.1), which hands out the files of SMB shares by URL. Everything in the
  * app that shows a file works from a URL (the image loader, the video and audio player), and a share has none of its
  * own; this gives each file one, so they all work for SMB unchanged:
  *
- * - `/<token>/raw/<host>/<path>`: the file itself, with ranges, so a video can be seeked without reading what's before
- * - `/<token>/thumb/<host>/<path>`: a small picture of it (an image scaled down, a frame of a video, the cover of a
+ * - `/<key>/raw/<host>/<path>`: the file itself, with ranges, so a video can be seeked without reading what's before
+ * - `/<key>/thumb/<host>/<path>`: a small picture of it (an image scaled down, a frame of a video, the cover of a
  *   song), made once and kept in [cacheDir]
  *
- * Only reachable from this device, and only with [token], a random secret made fresh every time the app starts, so
+ * The key is the file's own (see [keyOf]): a URL opens that one file and no other, so one handed to another app (a video
+ * opened elsewhere) or read from the song queue doesn't open the rest of the shares.
+ *
+ * Only reachable from this device, and only with a file's key, made with a secret new every time the app starts, so
  * other apps can't read the shares through it. Started on first use.
  */
 object SmbContentServer {
@@ -59,7 +64,8 @@ object SmbContentServer {
 
     private const val COPY_BUFFER_BYTES = 256 * 1024
 
-    private val token: String = ByteArray(16).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
+    /** The secret the files' keys are made with, made fresh every time the app starts. */
+    private val secret: ByteArray = ByteArray(32).also { SecureRandom().nextBytes(it) }
 
     /** The share clients of the hosts in use, by host id; a host built again (its config changed) replaces its old one. */
     private val clients = ConcurrentHashMap<String, SmbClient>()
@@ -89,9 +95,16 @@ object SmbContentServer {
         if (ThumbnailKind.of(path) == null) null else url("thumb", hostId, path, version)
 
     private fun url(kind: String, hostId: String, path: String, version: String?): String {
-        val encodedPath = SmbPaths.normalize(path).split('/').joinToString("/") { encode(it) }
+        val segments = SmbPaths.normalize(path).split('/').filter { it.isNotEmpty() }
+        val encodedPath = segments.joinToString("/") { encode(it) }
         val query = version?.takeIf { it.isNotBlank() }?.let { "?v=${encode(it)}" }.orEmpty()
-        return "http://127.0.0.1:${ensureStarted()}/$token/$kind/${encode(hostId)}/$encodedPath$query"
+        return "http://127.0.0.1:${ensureStarted()}/${keyOf(hostId, segments.joinToString("/"))}/$kind/${encode(hostId)}/$encodedPath$query"
+    }
+
+    /** The key of the file at [path] of [hostId]: a MAC of both with [secret], which only this run of the app can make. */
+    private fun keyOf(hostId: String, path: String): String {
+        val mac = Mac.getInstance("HmacSHA256").apply { init(SecretKeySpec(secret, "HmacSHA256")) }
+        return mac.doFinal("$hostId\n$path".toByteArray()).take(16).joinToString("") { "%02x".format(it) }
     }
 
     @Synchronized
@@ -168,10 +181,14 @@ object SmbContentServer {
     private fun respond(request: Request, output: OutputStream) {
         if (request.method != "GET" && request.method != "HEAD") return status(output, 405, "Method Not Allowed")
         val segments = request.segments
-        // token / kind / host / path...
-        if (segments.size < 4 || segments[0] != token) return status(output, 403, "Forbidden")
-        val client = clients[segments[2]] ?: return status(output, 404, "Not Found")
+        // key / kind / host / path...
+        if (segments.size < 4) return status(output, 403, "Forbidden")
         val path = segments.drop(3).joinToString("/")
+        // The key of this very file, compared in constant time
+        if (!MessageDigest.isEqual(segments[0].toByteArray(), keyOf(segments[2], path).toByteArray())) {
+            return status(output, 403, "Forbidden")
+        }
+        val client = clients[segments[2]] ?: return status(output, 404, "Not Found")
         when (segments[1]) {
             "raw" -> serveRaw(client, path, request, output)
             "thumb" -> serveThumbnail(segments[2], client, path, request, output)

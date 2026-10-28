@@ -42,6 +42,14 @@ import tools.senko.materialdrain.ui.LocalBottomInset
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 
 /** How tall the whole content is, how far down it is scrolled (in pixels), and whether it is taller than the view at all. */
 private class ScrollMetrics(val contentPx: Float, val offsetPx: Float, val scrollable: Boolean)
@@ -50,6 +58,9 @@ private class ScrollMetrics(val contentPx: Float, val offsetPx: Float, val scrol
 private class DotGeometry(val top: Float, val length: Float, val stretchedLength: Float)
 
 private val StripWidth = 24.dp
+
+/** How far the dot is from the edge of the screen; it's drawn no further in than this and its width (see GRID_SCROLLBAR_ROOM). */
+private val DotEdgeMargin = 6.dp
 
 /** The shortest and longest the stretched line gets, whatever the length of the content. */
 private val MinLineLength = 24.dp
@@ -84,7 +95,14 @@ fun BoxScope.DotScrollbar(state: ScrollState, modifier: Modifier = Modifier) {
     }
 }
 
-/** A lazy list's content is estimated from its visible items, as the items out of view are not measured. */
+/**
+ * A lazy list's content is estimated from its visible items, as the items out of view are not measured. The room the list
+ * leaves before its first item and after its last (its content padding: after the last, the room for the upload button,
+ * the miniplayer and the system's navigation bar) is part of what scrolls, so it's counted too: without it, the dot
+ * reached the bottom while the list could still be scrolled that much further, and dragging the dot couldn't get there.
+ * The lists leave only the room for what covers their end (see BrowserContent), so one that fits has nothing to scroll,
+ * and no dot.
+ */
 private fun lazyMetrics(state: LazyListState): ScrollMetrics {
     val info = state.layoutInfo
     val visible = info.visibleItemsInfo
@@ -92,15 +110,15 @@ private fun lazyMetrics(state: LazyListState): ScrollMetrics {
     val first = visible.first()
     val last = visible.last()
     val allShown = first.index == 0 && first.offset >= 0 && last.index == info.totalItemsCount - 1 &&
-        last.offset + last.size <= info.viewportEndOffset
-    if (allShown) return ScrollMetrics(0f, 0f, scrollable = false)
+        last.offset + last.size + info.afterContentPadding <= info.viewportEndOffset
+    if (allShown || !(state.canScrollForward || state.canScrollBackward)) return ScrollMetrics(0f, 0f, scrollable = false)
     val step = if (last.index > first.index) {
         (last.offset - first.offset).toFloat() / (last.index - first.index)
     } else {
         first.size.toFloat()
     }
     return ScrollMetrics(
-        contentPx = info.totalItemsCount * step,
+        contentPx = info.beforeContentPadding + info.totalItemsCount * step + info.afterContentPadding,
         offsetPx = state.firstVisibleItemIndex * step + state.firstVisibleItemScrollOffset,
         scrollable = true
     )
@@ -114,6 +132,7 @@ private fun BoxScope.DotScrollbarStrip(
 ) {
     val density = LocalDensity.current
     val dotWidthPx = with(density) { 6.dp.toPx() }
+    val edgeMarginPx = with(density) { DotEdgeMargin.toPx() }
     val marginPx = with(density) { 6.dp.toPx() }
     val grabPx = with(density) { 12.dp.toPx() }
     val minLinePx = with(density) { MinLineLength.toPx() }
@@ -182,7 +201,8 @@ private fun BoxScope.DotScrollbarStrip(
                     if (length <= 0f) return@drawBehind
                     drawRoundRect(
                         color = color,
-                        topLeft = Offset((size.width - dotWidthPx) / 2f, grabPx),
+                        // Near the edge of the screen, so it keeps off what the list shows at its end
+                        topLeft = Offset(size.width - edgeMarginPx - dotWidthPx, grabPx),
                         size = Size(dotWidthPx, length),
                         cornerRadius = CornerRadius(dotWidthPx / 2f)
                     )
@@ -222,5 +242,22 @@ private fun BoxScope.DotScrollbarStrip(
                     }
                 }
         )
+    }
+}
+
+// ---- Previews ----
+
+/** A long list with its dot at the right edge, scrolled a little way down; it can be dragged in the interactive preview. */
+@ThemePreviews
+@Composable
+private fun DotScrollbarPreview() {
+    PreviewTheme {
+        val state = rememberLazyListState(initialFirstVisibleItemIndex = 12)
+        Box(Modifier.height(320.dp)) {
+            LazyColumn(state = state) {
+                items(60) { Text("Item ${it + 1}", modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) }
+            }
+            DotScrollbar(state)
+        }
     }
 }

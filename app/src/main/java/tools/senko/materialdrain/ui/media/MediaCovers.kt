@@ -45,6 +45,9 @@ object MediaCovers {
     /** The longest side of a thumbnail, in pixels. */
     private const val COVER_PX = 320
 
+    /** The longest side of a song's cover in the players (see [large]), in pixels: sharp on the whole screen. */
+    private const val LARGE_COVER_PX = 1440
+
     /** How far into a video its frame is taken: past a fade in or a title card, which the first frame often is. */
     private const val FRAME_AT_FRACTION = 0.1
 
@@ -62,6 +65,21 @@ object MediaCovers {
 
     /** The thumbnail URL of a video streamed from [rawUrl]: a frame of it, or [fallback] when none can be read. See [audioCoverUrl]. */
     fun videoFrameUrl(rawUrl: String, fallback: String?, version: String?): String = url(FRAME, rawUrl, fallback, version)
+
+    /**
+     * [art] as big as the players show it, when it's a song's cover read out of its file ([audioCoverUrl]): the cover
+     * at up to [LARGE_COVER_PX] rather than the thumbnail's [COVER_PX], which shows its pixels on a cover the width of
+     * the screen. Anything else is given back as it is.
+     */
+    fun large(art: Any?): Any? {
+        val uri = when (art) {
+            is Uri -> art
+            is String -> if (art.startsWith("$SCHEME://$COVER")) Uri.parse(art) else return art
+            else -> return art
+        }
+        if (uri.scheme != SCHEME || uri.authority != COVER || uri.getQueryParameter("px") != null) return art
+        return uri.buildUpon().appendQueryParameter("px", LARGE_COVER_PX.toString()).build().toString()
+    }
 
     private fun url(kind: String, rawUrl: String, fallback: String?, version: String?): String =
         Uri.Builder().scheme(SCHEME).authority(kind)
@@ -88,7 +106,9 @@ object MediaCovers {
 
         override suspend fun fetch(): FetchResult? {
             val src = data.getQueryParameter("src") ?: return null
-            val cover = coverOf(src, data.getQueryParameter("v").orEmpty())
+            // A cover for the players (see large) is read at its own size; a video's frame always as the thumbnail's
+            val px = data.getQueryParameter("px")?.toIntOrNull()?.takeIf { !video }?.coerceIn(COVER_PX, LARGE_COVER_PX) ?: COVER_PX
+            val cover = coverOf(src, data.getQueryParameter("v").orEmpty(), px)
             if (cover != null) {
                 return SourceResult(ImageSource(Buffer().write(cover), context), mimeType = null, dataSource = DataSource.DISK)
             }
@@ -100,23 +120,26 @@ object MediaCovers {
             return fetcher.fetch()
         }
 
-        /** The thumbnail of the file at [src], from the disk when it was read before; null when it has none. */
-        private suspend fun coverOf(src: String, version: String): ByteArray? {
+        /**
+         * The thumbnail of the file at [src] at up to [px], from the disk when it was read before; null when it has none.
+         * One that has none is remembered as such for every size.
+         */
+        private suspend fun coverOf(src: String, version: String, px: Int): ByteArray? {
             // Songs keep the folder they always had, so the covers read before stay. Videos start a new one: the first
             // version also kept "no frame" for videos which merely failed to load once, and so never tried them again
             val dir = File(context.cacheDir, if (video) "video-frames-2" else "audio-covers")
             val key = sha1("$src\n$version")
-            val cached = File(dir, "$key.jpg")
+            val cached = File(dir, if (px == COVER_PX) "$key.jpg" else "$key-$px.jpg")
             val none = File(dir, "$key.none")
             if (cached.isFile) return cached.readBytes()
             if (none.isFile) return null
-            val result = permits.withPermit { if (video) readFrame(src) else readCover(src) }
+            val result = permits.withPermit { if (video) readFrame(src) else readCover(src, px) }
             runCatching {
                 dir.mkdirs()
                 when (result) {
                     is Read.Found -> {
                         // Written whole, then moved in place: a thumbnail cut short by a crash is never read back
-                        val partial = File(dir, "$key.part")
+                        val partial = File(dir, "${cached.nameWithoutExtension}.part")
                         partial.writeBytes(result.bytes)
                         partial.renameTo(cached)
                     }
@@ -129,9 +152,12 @@ object MediaCovers {
             return (result as? Read.Found)?.bytes
         }
 
-        /** Reads the embedded picture of [src] over the network: the media framework fetches only the ranges it needs. */
-        private fun readCover(src: String): Read = withRetriever(src) { retriever ->
-            retriever.embeddedPicture?.let { scaled(it) }
+        /**
+         * Reads the embedded picture of [src] over the network (the media framework fetches only the ranges it needs),
+         * scaled down to [px].
+         */
+        private fun readCover(src: String, px: Int): Read = withRetriever(src) { retriever ->
+            retriever.embeddedPicture?.let { scaled(it, px) }
         }
 
         /**
@@ -153,7 +179,7 @@ object MediaCovers {
         private fun withRetriever(src: String, read: (MediaMetadataRetriever) -> ByteArray?): Read {
             val retriever = MediaMetadataRetriever()
             return try {
-                retriever.setDataSource(src, HostRequestAuth.headersFor(src))
+                retriever.setHostDataSource(src)
                 read(retriever)?.let { Read.Found(it) } ?: Read.Nothing
             } catch (e: Exception) {
                 Log.w(TAG, "nothing read from $src: ${e.message}")
@@ -171,12 +197,12 @@ object MediaCovers {
         data object Failed : Read
     }
 
-    /** [bytes] scaled down to [COVER_PX] and encoded as a JPEG. */
-    private fun scaled(bytes: ByteArray): ByteArray {
+    /** [bytes] scaled down to [px] and encoded as a JPEG. */
+    private fun scaled(bytes: ByteArray, px: Int = COVER_PX): ByteArray {
         val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, info, _ ->
             val longest = maxOf(info.size.width, info.size.height)
-            if (longest > COVER_PX) {
-                val scale = COVER_PX.toFloat() / longest
+            if (longest > px) {
+                val scale = px.toFloat() / longest
                 decoder.setTargetSize((info.size.width * scale).toInt().coerceAtLeast(1), (info.size.height * scale).toInt().coerceAtLeast(1))
             }
             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE

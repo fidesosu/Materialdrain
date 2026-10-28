@@ -8,7 +8,11 @@
     <!-- Transfers keep running in the background as a foreground service with a progress notification -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Songs going on in the background (the Media setting), see PlaybackService -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- The app's own vibrations, with the strength chosen in the Feedback settings (see AppHaptics) -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Opening a downloaded APK hands it to the system installer, which quietly closes for an app without this -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
@@ -22,32 +26,101 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Materialdrain"
         android:enableOnBackInvokedCallback="true"
-        android:networkSecurityConfig="@xml/network_security_config">
-        <!-- singleTask: one copy of the app, in its own task. A share from another app comes to it (onNewIntent) and opens
-             its Upload screen, instead of a second copy on top of the sharing app, which the share could miss -->
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:localeConfig="@xml/locales_config">
+        <!-- singleTask: one copy of the app, in its own task. A share from another app comes to it (onNewIntent) and waits
+             for the screen it goes into, instead of a second copy on top of the sharing app, which the share could miss.
+             Turning the screen doesn't make it again (configChanges): the screens follow the new size as they are, so a
+             video playing fullscreen goes on when it's turned, and the player's rotate button can turn it. Nor does light or
+             dark changing (uiMode): the app's theme follows it as it is, with what's open staying open (see
+             MainActivity.applyNightMode, which sets it when Look and feel changes) -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
             android:theme="@style/Theme.App.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- "Share" from another app: the shared files are uploaded to Pixeldrain -->
+            <!-- "Share" from another app: the shared files wait for the screen they're uploaded into; shared text with a
+                 Pixeldrain link opens it, other text is uploaded as a text file (see PendingOpen) -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <action android:name="android.intent.action.SEND_MULTIPLE" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="*/*" />
             </intent-filter>
+            <!-- Pixeldrain's links of a file (/u/…) and of a list (/l/…) can open in the app. Not verified as the app's own
+                 (that's for the site to declare), so Android asks, or the user turns them on in the app's settings under
+                 "Open by default" -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:scheme="http" />
+                <data android:host="pixeldrain.com" />
+                <data android:host="www.pixeldrain.com" />
+                <data android:host="pixeldrain.net" />
+                <data android:pathPrefix="/u/" />
+                <data android:pathPrefix="/l/" />
+            </intent-filter>
         </activity>
+
+        <!-- The hosts in the system's file picker, read only, when the setting is on (see HostDocumentsProvider). Only the
+             system can reach it (MANAGE_DOCUMENTS), for the app the user picks a file in -->
+        <provider
+            android:name=".documents.HostDocumentsProvider"
+            android:authorities="${applicationId}.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+
+        <!-- The files shared with another app, from a host whose files have no link (see DownloadManager.shareFile) -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/shared_files" />
+        </provider>
+
+        <!-- The Quick Settings tile which opens the upload screen -->
+        <service
+            android:name=".UploadTileService"
+            android:exported="true"
+            android:icon="@drawable/icon_upload"
+            android:label="@string/upload_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <service
             android:name=".transfer.TransferService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- The player of songs going on in the background, with their controls in the notification and on the lock screen.
+             Exported as Media3 needs it to be, for the system's media controls to reach it -->
+        <service
+            android:name=".ui.media.PlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

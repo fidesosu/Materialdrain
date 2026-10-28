@@ -125,7 +125,7 @@ private class SmbHost(private val config: SmbConfig) : HostType() {
     // A share can be open to guests or anonymous: then there's nothing to sign in to
     override val needsSignIn get() = config.auth == SmbAuthMode.CREDENTIALS
     override val keyPairLabels = KeyPairLabels("Username", "Password")
-    override val noSignInNote get() = "This share is opened as ${config.auth.name.lowercase()}, so there's nothing to sign in to."
+    override val noSignInNote get() = "Guest share: no sign-in needed."
 
     override fun build(id: String, configStore: ProviderConfigStore, accountCredentials: () -> Credentials) =
         SmbStorageProvider(id, config, credentials = { configStore.credentials(id) })

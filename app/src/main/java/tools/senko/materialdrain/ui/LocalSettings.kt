@@ -37,3 +37,34 @@ val LocalBottomInset = compositionLocalOf { 0.dp }
 class VideoLoopSetting(val enabled: Boolean, val onChange: (Boolean) -> Unit)
 
 val LocalVideoLoop = compositionLocalOf { VideoLoopSetting(enabled = false, onChange = {}) }
+
+/** How the media players behave (see the Media settings). One for every video and song. */
+@Immutable
+data class PlayerSettings(
+    /** A video plays as soon as its player opens */
+    val autoplay: Boolean = true,
+    /** A video goes on from where it was left (see VideoPositions) */
+    val resume: Boolean = true,
+    /** How far the skip buttons and a double tap go */
+    val seekStepMs: Long = 10_000L,
+    /** The speed media starts at */
+    val defaultSpeed: Float = 1f,
+    /** Swipes up and down on the video change the brightness (left) and the volume (right) */
+    val gestures: Boolean = false,
+    /** Songs play in the background, through PlaybackService */
+    val backgroundAudio: Boolean = false,
+    /** The miniplayer takes the colour of the song's cover (see MiniPlayer) */
+    val tintPlayer: Boolean = false,
+    /** The song player is a card a third of the screen high, which the miniplayer grows into, not the whole screen */
+    val compactPlayer: Boolean = false,
+    /** Closing a song from the miniplayer offers an Undo on the snackbar */
+    val undoCloseSong: Boolean = false
+)
+
+val LocalPlayerSettings = compositionLocalOf { PlayerSettings() }
+
+/** How the file lists look (see Look and feel): rows or a grid, lower rows, and how dates are written. */
+@Immutable
+data class ListLook(val compact: Boolean = false, val grid: Boolean = false, val relativeDates: Boolean = true)
+
+val LocalListLook = compositionLocalOf { ListLook() }

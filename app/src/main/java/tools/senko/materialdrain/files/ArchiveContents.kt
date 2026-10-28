@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.files
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.automirrored.filled.ArrowBack
 import tools.senko.materialdrain.ui.icons.automirrored.filled.InsertDriveFile
@@ -30,6 +30,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.util.formatSize
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import tools.senko.materialdrain.provider.api.StorageRef
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /**
  * What's inside an archive, shown where the file's preview would be: folders to open, files to save, and a Back button
@@ -43,7 +49,7 @@ fun ArchiveContents(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        shape = RoundedCornerShape(12.dp),
+        shape = AppShapes.Medium,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column {
@@ -53,9 +59,9 @@ fun ArchiveContents(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Contents", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.files_contents), style = MaterialTheme.typography.titleSmall)
                     Text(
-                        text = if (archive.inside.isEmpty()) "Top of the archive" else archive.inside,
+                        text = if (archive.inside.isEmpty()) stringResource(R.string.files_top_of_the_archive) else archive.inside,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -67,7 +73,7 @@ fun ArchiveContents(
                     TextButton(onClick = { onOpenFolder(archive.inside.substringBeforeLast('/', "")) }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Back")
+                        Text(stringResource(R.string.files_back))
                     }
                 }
             }
@@ -87,7 +93,7 @@ fun ArchiveContents(
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 }
                 archive.entries.isEmpty() -> Text(
-                    text = "This folder is empty",
+                    text = stringResource(R.string.files_this_folder_is_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp)
@@ -142,10 +148,31 @@ private fun ArchiveRow(
         if (!entry.isDirectory) {
             Icon(
                 Icons.Filled.Download,
-                contentDescription = "Save ${entry.name}",
+                contentDescription = stringResource(R.string.files_save, entry.name),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)
             )
+        }
+    }
+}
+
+// ---- Previews ----
+
+/** Inside a folder of the archive (with Back), its folders and files; then loading, empty and failed. */
+@ThemePreviews
+@Composable
+private fun ArchiveContentsPreview() {
+    PreviewTheme(padding = 16.dp) {
+        val ref = PreviewSamples.archive.ref
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            ArchiveContents(
+                ArchiveView(ref, inside = "backup/2026", entries = PreviewSamples.files.take(5).map { it.copy(ref = StorageRef(path = "backup/2026/${it.name}")) }, error = null),
+                onOpenFolder = {},
+                onDownload = {}
+            )
+            ArchiveContents(ArchiveView(ref, inside = "", entries = null, error = null), onOpenFolder = {}, onDownload = {})
+            ArchiveContents(ArchiveView(ref, inside = "empty", entries = emptyList(), error = null), onOpenFolder = {}, onDownload = {})
+            ArchiveContents(ArchiveView(ref, inside = "", entries = null, error = "This archive is either not valid or has a password."), onOpenFolder = {}, onDownload = {})
         }
     }
 }

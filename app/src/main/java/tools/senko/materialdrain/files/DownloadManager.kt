@@ -1,9 +1,17 @@
 package tools.senko.materialdrain.files
 
+import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.provider.api.ErrorCodes
 import android.app.Application
+import android.content.ContentResolver
 import android.content.ContentValues
+import android.content.Context
+import android.content.res.Resources
+import java.util.concurrent.ConcurrentHashMap
+import tools.senko.materialdrain.ui.media.HostRequestAuth
 import android.net.Uri
+import android.os.Build
+import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
@@ -21,8 +29,17 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedOutputStream
+import java.io.File
+import java.io.FilterOutputStream
 import java.io.IOException
 import java.io.OutputStream
+import java.util.zip.Deflater
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+import android.content.ClipData
+import android.content.Intent
+import androidx.core.content.FileProvider
+import tools.senko.materialdrain.provider.api.BrowseOps
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
 import tools.senko.materialdrain.UiMessageAction
@@ -36,6 +53,8 @@ import tools.senko.materialdrain.provider.api.ProviderError
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.provider.api.StorageProvider
 import tools.senko.materialdrain.provider.api.StorageRef
+import tools.senko.materialdrain.provider.api.ZipDownloadDetails
+import tools.senko.materialdrain.provider.api.ZipDownloadEntry
 import tools.senko.materialdrain.transfer.TransferInfo
 import tools.senko.materialdrain.transfer.TransferKind
 import tools.senko.materialdrain.transfer.TransferOutcome
@@ -43,10 +62,68 @@ import tools.senko.materialdrain.transfer.TransferRegistry
 import tools.senko.materialdrain.transfer.TransferSpeedTracker
 import tools.senko.materialdrain.transfer.estimateEtaSeconds
 import tools.senko.materialdrain.util.formatSize
+import tools.senko.materialdrain.R
 
 private const val TAG = "DownloadManager"
 private const val DOWNLOAD_WRITE_BUFFER_BYTES = 256 * 1024
 private const val MAX_FILES_PER_ZIP = 100
+
+/** From how many files, or how many bytes, a download of folders asks first (see DownloadManager.downloadItems). */
+private const val LARGE_DOWNLOAD_FILES = 100
+private const val LARGE_DOWNLOAD_BYTES = 1024L * 1024 * 1024
+
+/** The folder in the app's cache that files shared with another app are saved into (see DownloadManager.shareFile). */
+private const val SHARED_FOLDER = "shared"
+
+/** How long a file shared with another app is kept, for that app to read it, before the next share clears it. */
+private const val SHARED_KEEP_MS = 24L * 60 * 60 * 1000
+
+/** Where the entries of unfinished downloads kept for a retry are listed (see DownloadManager.PartialDownload). */
+private const val PARTIAL_DOWNLOADS_PREFS = "partial_downloads"
+private const val PARTIAL_DOWNLOADS_KEY = "entries"
+
+/** The authority of the app's FileProvider for those files (see AndroidManifest.xml). */
+internal const val FILE_PROVIDER_SUFFIX = ".files"
+
+/**
+ * The extensions of files which are compressed already (pictures, videos, songs, archives): zipped on the device, they
+ * are only stored, as compressing them again would take time and save next to nothing.
+ */
+private val STORED_EXTENSIONS = setOf(
+    "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif",
+    "mp4", "mkv", "webm", "mov", "avi", "m4v",
+    "mp3", "m4a", "aac", "ogg", "opus", "flac",
+    "zip", "7z", "rar", "gz", "xz", "bz2", "zst", "apk", "jar"
+)
+/** The folder of the app's own in Download, when downloads go there (AppSettings.downloadSubfolder). */
+const val DOWNLOAD_SUBFOLDER = "Materialdrain"
+
+/** How many names a download tries when its own is taken, before MediaStore names it (see insertDownloadEntry). */
+private const val MAX_NAME_TRIES = 100
+
+/**
+ * The name a download tries next when [name] is taken in Downloads: the number in brackets at the end of the part before
+ * the first dot one up, or " (1)" put there when it has none. "senko.jpg" becomes "senko (1).jpg", "senko (2).jpg"
+ * "senko (3).jpg", "archive.tar.gz" "archive (1).tar.gz". Brackets anywhere else ("a (2) b.jpg") are left alone, and a
+ * dot the name starts with (".bashrc") isn't the first.
+ */
+internal fun nextDuplicateName(name: String): String {
+    val dot = name.indexOf('.', startIndex = 1).let { if (it < 0) name.length else it }
+    val base = name.substring(0, dot)
+    val extensions = name.substring(dot)
+    val number = DUPLICATE_NUMBER.find(base)
+    val next = number?.groupValues?.get(1)?.toLongOrNull()?.takeIf { it < Long.MAX_VALUE }?.plus(1)
+    return if (number != null && next != null) base.substring(0, number.range.first) + "($next)" + extensions else "$base (1)$extensions"
+}
+
+private val DUPLICATE_NUMBER = Regex("""\((\d+)\)$""")
+
+/**
+ * [name] with the characters MediaStore doesn't allow in a file name (those FAT doesn't) replaced by "_", as MediaStore
+ * would: the name tried is then the name saved, unless it's taken.
+ */
+private fun validFileName(name: String): String =
+    name.map { if (it.code < 0x20 || it.code == 0x7F || it in "\"*/:<>?\\|") '_' else it }.joinToString("")
 
 enum class DownloadStatus {
     PENDING,
@@ -99,18 +176,26 @@ internal suspend fun downloadNode(
     provider: StorageProvider,
     node: StorageNode,
     outputStream: OutputStream,
+    resources: Resources,
     onProgress: (Long, Long?) -> Unit
 ): ApiResponse<Long> {
+    // A zip of several things of the host: made by the host, or here as they're downloaded
+    (node.richDetails as? ZipDownloadDetails)?.let { zip ->
+        if (!zip.hostMade) return zipOnDevice(provider, zip.entries, outputStream, resources, onProgress)
+        val browse = provider.browse
+            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, resources.getString(R.string.files_this_host_can_t_download)))
+        return browse.downloadFolderArchive(zip.folderPath.orEmpty(), outputStream, onProgress)
+    }
     // A file inside an archive is read from the archive
     (node.richDetails as? ArchiveEntryDetails)?.let { entry ->
-        val archives = provider.archives
-            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't look inside archives."))
+        val archives = archivesOf(provider, resources)
+            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, resources.getString(R.string.files_this_host_can_t_look)))
         return archives.read(entry.archive, entry.entryPath, outputStream, onProgress)
     }
     val id = node.ref.id
     return if (id != null) {
         val store = provider.fileStore
-            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't download files by id."))
+            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, resources.getString(R.string.files_this_host_can_t_download_2)))
         // Several ids joined by commas (see DownloadManager.downloadAsZip) are one archive; file ids never contain commas
         if (',' in id) {
             store.downloadArchive(id.split(',').map { StorageRef(id = it) }, outputStream, onProgress)
@@ -119,10 +204,90 @@ internal suspend fun downloadNode(
         }
     } else {
         val browse = provider.browse
-            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't download this file."))
+            ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, resources.getString(R.string.files_this_host_can_t_download_3)))
         browse.download(node.ref.path, outputStream, onProgress)
     }
 }
+
+/**
+ * Downloads [entries] one after another into one zip archive written to [outputStream], each at its path in it (an
+ * entry without a file is an empty folder). Nothing is kept on the device meanwhile: each file goes straight into the
+ * archive. The progress is the bytes of all the files so far, against all of theirs when every size is known.
+ */
+private suspend fun zipOnDevice(
+    provider: StorageProvider,
+    entries: List<ZipDownloadEntry>,
+    outputStream: OutputStream,
+    resources: Resources,
+    onProgress: (Long, Long?) -> Unit
+): ApiResponse<Long> {
+    val files = entries.mapNotNull { it.node }
+    val total = files.takeIf { list -> list.all { it.size != null } }?.sumOf { it.size ?: 0L }
+    // The archive writes into the download's stream, which its caller closes; and a host closing the stream it's given
+    // mustn't close the archive
+    val zip = ZipOutputStream(KeptOpen(outputStream))
+    var done = 0L
+    // Closed however it ends, for the compressor it holds; a failed zip's file is deleted by the download anyway
+    try {
+        for (entry in entries) {
+            val node = entry.node
+            if (node == null) {
+                zip.putNextEntry(ZipEntry(entry.path.trimEnd('/') + "/"))
+                zip.closeEntry()
+                continue
+            }
+            val extension = node.name.substringAfterLast('.', "").lowercase()
+            zip.setLevel(if (extension in STORED_EXTENSIONS) Deflater.NO_COMPRESSION else Deflater.BEST_SPEED)
+            zip.putNextEntry(ZipEntry(entry.path))
+            val before = done
+            when (val response = downloadNode(provider, node, KeptOpen(zip), resources) { read, _ -> onProgress(before + read, total) }) {
+                is ApiResponse.Success -> done += response.data
+                is ApiResponse.Error -> return ApiResponse.Error(response.error.copy(message = "${node.name}: ${response.error.message}"))
+            }
+            zip.closeEntry()
+        }
+    } finally {
+        // Writes what's left of the archive, then only flushes the stream under it (see KeptOpen)
+        runCatching { zip.close() }
+    }
+    return ApiResponse.Success(done)
+}
+
+/** Writes through to [out], but leaves it open when it's closed itself. */
+private class KeptOpen(out: OutputStream) : FilterOutputStream(out) {
+    override fun write(b: ByteArray, off: Int, len: Int) = out.write(b, off, len)
+    override fun close() = flush()
+}
+
+/**
+ * [entries] at paths of their own in a zip: a second file of the same name in one folder gets the next free name, as a
+ * download does in Downloads (see nextDuplicateName); a zip can't hold two entries at one path.
+ */
+private fun withFreePaths(entries: List<ZipDownloadEntry>): List<ZipDownloadEntry> {
+    val taken = HashSet<String>()
+    return entries.map { entry ->
+        val folder = entry.path.substringBeforeLast('/', "")
+        var name = entry.path.substringAfterLast('/')
+        fun path() = if (folder.isEmpty()) name else "$folder/$name"
+        while (!taken.add(path().lowercase())) name = nextDuplicateName(name)
+        entry.copy(path = path())
+    }
+}
+
+/** How several things are downloaded: each file on its own (folders made again in Download), or all in one zip. */
+enum class DownloadStyle { SEPARATELY, ZIP }
+
+/**
+ * A download of folders big enough to be asked about first (see DownloadManager.downloadItems): [title] is what's
+ * downloaded, with its [fileCount] files of [totalBytes] (null when a size isn't known).
+ */
+data class DownloadConfirmation(
+    val title: String,
+    val fileCount: Int,
+    val totalBytes: Long?,
+    val style: DownloadStyle,
+    internal val start: () -> Unit
+)
 
 /**
  * Downloads files of the active host into the device's Downloads folder: single files, batches one after another, and
@@ -135,12 +300,72 @@ class DownloadManager(
     private val registry: ProviderRegistry,
     private val configStore: ProviderConfigStore,
     private val transfers: TransferRegistry,
-    private val messages: UiMessages
+    private val messages: UiMessages,
+    private val appSettings: AppSettings
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private val _downloads = MutableStateFlow(DownloadsState())
     val downloads: StateFlow<DownloadsState> = _downloads.asStateFlow()
+
+    /** A download of folders waiting to be confirmed, for being big (see [downloadItems]); null while none is. */
+    private val _confirmation = MutableStateFlow<DownloadConfirmation?>(null)
+    val confirmation: StateFlow<DownloadConfirmation?> = _confirmation.asStateFlow()
+
+    /** Starts the download waiting in [confirmation]. */
+    fun confirmDownload() {
+        _confirmation.value?.start?.invoke()
+        _confirmation.value = null
+    }
+
+    /** A download that failed on its own (not one of a batch), which "Try again" starts again, from [partial] when it can. */
+    private class FailedDownload(val node: StorageNode, val folder: String?, val partial: PartialDownload?)
+
+    /**
+     * What a failed download left in Downloads: its entry, still pending (other apps don't see it), with what came before
+     * it stopped, and the file's address on the host, which the rest is asked from.
+     */
+    private class PartialDownload(val uri: Uri, val url: String)
+
+    private val failed = ConcurrentHashMap<String, FailedDownload>()
+
+    /** The entries of [PartialDownload]s, kept until they're finished or deleted: a run that ends first leaves them behind */
+    private val partialPrefs = application.getSharedPreferences(PARTIAL_DOWNLOADS_PREFS, Context.MODE_PRIVATE)
+
+    init {
+        // Left by a run before this one: nothing goes on from them any more
+        val left = partialPrefs.getStringSet(PARTIAL_DOWNLOADS_KEY, emptySet()).orEmpty()
+        if (left.isNotEmpty()) scope.launch(Dispatchers.IO) { left.forEach { forgetPartial(Uri.parse(it), delete = true) } }
+    }
+
+    private fun rememberPartial(uri: Uri) = synchronized(partialPrefs) {
+        val now = partialPrefs.getStringSet(PARTIAL_DOWNLOADS_KEY, emptySet()).orEmpty()
+        partialPrefs.edit().putStringSet(PARTIAL_DOWNLOADS_KEY, now + uri.toString()).apply()
+    }
+
+    /** No longer kept for a retry: finished, or (with [delete]) given up, its unfinished file deleted. */
+    private fun forgetPartial(uri: Uri, delete: Boolean) {
+        synchronized(partialPrefs) {
+            val now = partialPrefs.getStringSet(PARTIAL_DOWNLOADS_KEY, emptySet()).orEmpty()
+            if (uri.toString() in now) partialPrefs.edit().putStringSet(PARTIAL_DOWNLOADS_KEY, now - uri.toString()).apply()
+        }
+        if (delete) runCatching { application.contentResolver.delete(uri, null, null) }
+    }
+
+    /** How much of a [PartialDownload] is there, or null when its entry is gone. */
+    private fun partialSize(uri: Uri): Long? =
+        runCatching { application.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } }.getOrNull()
+
+    /** Starts the download that failed with [key] again: from where it stopped, when the host can send the rest. */
+    fun retry(key: String) {
+        val download = failed.remove(key) ?: return
+        start(download.node, queue = null, batchId = null, folder = download.folder, partial = download.partial)
+    }
+
+    /** Drops the download waiting in [confirmation]; nothing is downloaded. */
+    fun dismissConfirmation() {
+        _confirmation.value = null
+    }
 
     private fun provider(): StorageProvider = registry.resolve(configStore.activeProviderId.value)
 
@@ -157,21 +382,14 @@ class DownloadManager(
         _downloads.update { it.copy(active = it.active - keys.toSet()) }
     }
 
-    private suspend fun prepareDownloadTargetUriAndStream(fileName: String, mimeType: String?): Pair<Uri?, OutputStream?> {
+    private suspend fun prepareDownloadTargetUriAndStream(fileName: String, folder: String?): Pair<Uri?, OutputStream?> {
         return withContext(Dispatchers.IO) {
             val context = application.applicationContext
             val contentResolver = context.contentResolver
-            val contentValues = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                put(MediaStore.MediaColumns.MIME_TYPE, mimeType ?: "application/octet-stream")
-                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                put(MediaStore.MediaColumns.IS_PENDING, 1)
-            }
-
             var outputStream: OutputStream? = null
             var uri: Uri? = null
             try {
-                uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                uri = insertDownloadEntry(contentResolver, fileName, folder)
                 uri?.let {
                     val rawOutputStream = contentResolver.openOutputStream(it)
                     if (rawOutputStream != null) {
@@ -183,7 +401,7 @@ class DownloadManager(
                 if (outputStream == null && uri != null) {
                     contentResolver.delete(uri, null, null)
                     uri = null
-                    throw IOException("Failed to open output stream for $uri")
+                    throw IOException(application.getString(R.string.files_failed_to_open_output_stream, uri))
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to prepare download target for '$fileName': ${e.message}", e)
@@ -192,6 +410,55 @@ class DownloadManager(
             }
             uri to outputStream
         }
+    }
+
+    /**
+     * Makes the entry in Downloads that a download is written to, named [fileName], or when that's taken the next name of
+     * [nextDuplicateName]. MediaStore would pick its own for a name that's taken, but puts the number after the last dot
+     * ("archive.tar (1).gz") and adds one to a name with a number already ("senko (2) (1).jpg"). Whether a name is taken
+     * can't be asked beforehand, as the app doesn't see the files other apps put in Downloads; so each name is tried, and
+     * an entry MediaStore renamed is deleted for the next name. After [MAX_NAME_TRIES] MediaStore's own name is kept.
+     */
+    private fun insertDownloadEntry(contentResolver: ContentResolver, fileName: String, folder: String?): Uri? {
+        var candidate = validFileName(fileName)
+        repeat(MAX_NAME_TRIES) {
+            val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, downloadEntryValues(candidate, folder)) ?: return null
+            val savedName = displayNameOf(contentResolver, uri)
+            // Renamed for a name that's taken: MediaStore added " (n)" to it. Kept when it changed it otherwise, e.g. cut
+            // off a name too long, which another try wouldn't change
+            if (savedName == null || savedName == candidate || savedName.length <= candidate.length) return uri
+            contentResolver.delete(uri, null, null)
+            candidate = nextDuplicateName(candidate)
+        }
+        return contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, downloadEntryValues(validFileName(fileName), folder))
+    }
+
+    /**
+     * What the entry in Downloads is made with: its name, its type, and where it goes, which is under the app's own
+     * folder there when that's chosen, and in [folder] under that (the folders of a downloaded folder, "Photos/2026").
+     */
+    private fun downloadEntryValues(fileName: String, folder: String?) = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+        // The type of the name's extension, never the host's: when the extension doesn't match the type MediaStore adds
+        // the type's own (a .rmbak the host calls a zip became .rmbak.zip). An unknown extension gets the generic type
+        put(MediaStore.MediaColumns.MIME_TYPE, downloadedFileMimeType(fileName).takeIf { it != "*/*" } ?: "application/octet-stream")
+        // Download itself, or its folder of the app's own (Files and transfers, Download folder)
+        val base = if (appSettings.downloadSubfolder.value) "${Environment.DIRECTORY_DOWNLOADS}/$DOWNLOAD_SUBFOLDER" else Environment.DIRECTORY_DOWNLOADS
+        val inside = folder?.split('/')?.filter { it.isNotBlank() }?.joinToString("/") { validFileName(it) }.orEmpty()
+        put(MediaStore.MediaColumns.RELATIVE_PATH, if (inside.isEmpty()) base else "$base/$inside")
+        put(MediaStore.MediaColumns.IS_PENDING, 1)
+    }
+
+    /** The name MediaStore gave the entry at [uri], which is still pending (only its owner sees it, and only when asked). */
+    private fun displayNameOf(contentResolver: ContentResolver, uri: Uri): String? {
+        val projection = arrayOf(MediaStore.MediaColumns.DISPLAY_NAME)
+        val cursor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            contentResolver.query(uri, projection, Bundle().apply { putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_INCLUDE) }, null)
+        } else {
+            @Suppress("DEPRECATION")
+            contentResolver.query(MediaStore.setIncludePending(uri), projection, null, null, null)
+        }
+        return cursor?.use { if (it.moveToFirst()) it.getString(0) else null }
     }
 
     private suspend fun finalizeMediaStoreEntry(uri: Uri, success: Boolean) {
@@ -217,9 +484,17 @@ class DownloadManager(
         }
     }
 
-    /** Starts the download and returns its job. When [queue] is given, cancelling this download cancels the queue too. */
-    fun download(node: StorageNode, queue: Job? = null, batchId: String? = null): Job {
+    /**
+     * Starts the download and returns its job. When [queue] is given, cancelling this download cancels the queue too.
+     * [folder] is where in Download it goes, below where downloads go (see downloadEntryValues).
+     */
+    fun download(node: StorageNode, queue: Job? = null, batchId: String? = null, folder: String? = null): Job =
+        start(node, queue, batchId, folder, partial = null)
+
+    private fun start(node: StorageNode, queue: Job?, batchId: String?, folder: String?, partial: PartialDownload?): Job {
         val key = node.key
+        // A new download of a file that failed before starts over: what that one left is deleted
+        if (partial == null) failed.remove(key)?.partial?.let { old -> scope.launch(Dispatchers.IO) { forgetPartial(old.uri, delete = true) } }
         val size = node.size ?: 0L
 
         _downloads.update { state ->
@@ -242,23 +517,32 @@ class DownloadManager(
             var downloadSuccessful = false
             var outcome = TransferOutcome.FAILED
             var outcomeMessage: String? = null
+            // Failed, with what came kept for a retry to go on from (see PartialDownload)
+            var keepPartial = false
 
             try {
-                _downloads.value.active[key]?.let {
-                    targetUri = it.targetUri
-                }
-                if (targetUri == null) {
-                    val (uri, stream) = prepareDownloadTargetUriAndStream(node.name, node.mimeType)
-                    targetUri = uri
-                    outputStream = stream
+                // Going on from where a failed try stopped: its entry in Downloads, and how much of the file is there
+                val resumeFrom = partial?.let { p -> partialSize(p.uri)?.let { size -> p to size } }
+                if (partial != null && resumeFrom == null) forgetPartial(partial.uri, delete = true)
+                if (resumeFrom != null) {
+                    targetUri = resumeFrom.first.uri
                 } else {
-                    application.contentResolver.openOutputStream(targetUri)?.let {
-                        outputStream = BufferedOutputStream(it, DOWNLOAD_WRITE_BUFFER_BYTES)
+                    _downloads.value.active[key]?.let {
+                        targetUri = it.targetUri
+                    }
+                    if (targetUri == null) {
+                        val (uri, stream) = prepareDownloadTargetUriAndStream(node.name, folder)
+                        targetUri = uri
+                        outputStream = stream
+                    } else {
+                        application.contentResolver.openOutputStream(targetUri)?.let {
+                            outputStream = BufferedOutputStream(it, DOWNLOAD_WRITE_BUFFER_BYTES)
+                        }
                     }
                 }
 
-                if (targetUri == null || outputStream == null) {
-                    throw IOException("Failed to prepare or re-open download target in MediaStore.")
+                if (targetUri == null || (outputStream == null && resumeFrom == null)) {
+                    throw IOException(application.getString(R.string.files_failed_to_prepare_or_re))
                 }
 
                 updateDownload(key) { it.copy(status = DownloadStatus.DOWNLOADING, targetUri = targetUri) }
@@ -268,7 +552,7 @@ class DownloadManager(
                 val onProgress: (Long, Long?) -> Unit = { bytesRead, totalBytes ->
                     // Called from inside the host's copy loop, which keeps reading until the file ends unless it's
                     // stopped: a cancelled download stops here, whatever the host's own code does with cancelling
-                    if (job?.isActive == false) throw CancellationException("The download was cancelled")
+                    if (job?.isActive == false) throw CancellationException(application.getString(R.string.files_the_download_was_cancelled))
                     val progress = if (totalBytes != null && totalBytes > 0) {
                         (bytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
                     } else 0f
@@ -293,14 +577,24 @@ class DownloadManager(
                     }
                 }
 
-                val response = downloadNode(provider, node, outputStream!!, onProgress)
+                val response = if (resumeFrom != null) {
+                    val (resumed, offset) = resumeFrom
+                    val client = HostRequestAuth.client ?: throw IOException(application.getString(R.string.files_the_download_can_t_go))
+                    downloadRest(client, resumed.url, provider.requestHeaders(resumed.url), offset, { append ->
+                        val stream = application.contentResolver.openOutputStream(resumed.uri, if (append) "wa" else "wt")
+                            ?: throw IOException(application.getString(R.string.files_failed_to_re_open_the))
+                        BufferedOutputStream(stream, DOWNLOAD_WRITE_BUFFER_BYTES)
+                    }, onProgress)
+                } else {
+                    downloadNode(provider, node, outputStream!!, application.resources, onProgress)
+                }
                 // A host which turns the stopped copy into an error of its own: it was still a cancel
                 ensureActive()
                 when (response) {
                     is ApiResponse.Success -> {
                         downloadSuccessful = true
                         val bytesCopied = response.data
-                        val message = "File '${node.name}' downloaded (${formatSize(bytesCopied)})."
+                        val message = application.getString(R.string.files_downloaded, node.name)
                         outcome = TransferOutcome.COMPLETED
                         outcomeMessage = message
                         updateDownload(key) {
@@ -315,7 +609,7 @@ class DownloadManager(
                         }
                     }
                     is ApiResponse.Error -> {
-                        throw IOException(response.error.message.ifBlank { "Download failed due to API error." })
+                        throw IOException(response.error.message.ifBlank { application.getString(R.string.files_download_failed) })
                     }
                 }
             } catch (e: Exception) {
@@ -323,12 +617,19 @@ class DownloadManager(
                 outcome = if (e is CancellationException) TransferOutcome.CANCELLED else TransferOutcome.FAILED
                 val errorMsg = if (e is CancellationException) {
                     Log.i(TAG, "Download for $key was cancelled by scope.")
-                    "Download for '${node.name}' was cancelled."
+                    application.getString(R.string.files_download_for_was_cancelled, node.name)
                 } else {
                     Log.e(TAG, "Error during file download process for $key: ${e.message}", e)
-                    "Download error for '${node.name}': ${e.localizedMessage ?: "Unexpected error"}"
+                    application.getString(R.string.files_download_error_for, node.name, e.localizedMessage ?: "Unexpected error")
                 }
                 outcomeMessage = errorMsg
+                if (e !is CancellationException && batchId == null) {
+                    // What came is kept when the host can send the rest of the file (a plain file, at an address of its own)
+                    val url = targetUri?.takeIf { node.richDetails !is ZipDownloadDetails && node.richDetails !is ArchiveEntryDetails }
+                        ?.let { runCatching { provider.rawContentUrl(node) }.getOrNull() }
+                    keepPartial = url != null
+                    failed[key] = FailedDownload(node, folder, url?.let { PartialDownload(targetUri!!, it) })
+                }
                 val hadDownload = _downloads.value.active.containsKey(key)
                 updateDownload(key) {
                     it.copy(
@@ -342,7 +643,9 @@ class DownloadManager(
                         downloadedBytes = if (e is CancellationException) 0L else it.downloadedBytes
                     )
                 }
-                if (hadDownload && e !is CancellationException) messages.show("Download failed: $errorMsg", long = true)
+                if (hadDownload && e !is CancellationException) {
+                    messages.show(application.getString(R.string.files_download_failed_2, errorMsg), long = true, action = if (batchId == null) UiMessageAction.Retry { retry(key) } else null)
+                }
             } finally {
                 try {
                     outputStream?.close()
@@ -350,17 +653,33 @@ class DownloadManager(
                     Log.e(TAG, "Error closing output stream for ${node.name}: ${e.message}", e)
                 }
                 targetUri?.let {
-                    // NonCancellable: a cancelled coroutine could otherwise not clean up the partial file
-                    withContext(NonCancellable) { finalizeMediaStoreEntry(it, downloadSuccessful) }
+                    if (keepPartial) {
+                        rememberPartial(it)
+                    } else {
+                        forgetPartial(it, delete = false)
+                        // NonCancellable: a cancelled coroutine could otherwise not clean up the partial file
+                        withContext(NonCancellable) { finalizeMediaStoreEntry(it, downloadSuccessful) }
+                    }
                 }
                 // Reported after the file was finalized, so the notification (and the snackbar's Open) can open it
-                if (batchId == null) transfers.finish(transferId, outcome, outcomeMessage, if (downloadSuccessful) targetUri else null, node.mimeType)
+                val openMimeType = downloadedFileMimeType(node.name)
+                if (batchId == null) transfers.finish(
+                    transferId, outcome, outcomeMessage, if (downloadSuccessful) targetUri else null, openMimeType,
+                    retry = if (outcome == TransferOutcome.FAILED) ({ retry(key) }) else null
+                )
                 if (downloadSuccessful) {
                     messages.show(
                         outcomeMessage.orEmpty(),
                         long = true,
-                        action = targetUri?.let { UiMessageAction.OpenDownload(OpenableDownload(it, node.previewMimeType() ?: "*/*")) }
+                        action = targetUri?.let { UiMessageAction.OpenDownload(OpenableDownload(it, openMimeType)) }
                     )
+                    // A file on its own, not one of several, opens when it's done (Files and transfers, Open when done)
+                    val saved = targetUri
+                    if (batchId == null && saved != null && appSettings.openAfterDownload.value) {
+                        withContext(Dispatchers.Main + NonCancellable) {
+                            openDownloadedFile(application, OpenableDownload(saved, openMimeType))
+                        }
+                    }
                 }
             }
         }
@@ -381,11 +700,14 @@ class DownloadManager(
     /** Stops every download, single files and batches alike. */
     fun cancelAll() = transfers.cancelAll(TransferKind.DOWNLOAD)
 
-    /** Downloads the files one after another, several simultaneous downloads can run into the download limits. */
-    fun downloadSequentially(files: List<StorageNode>) {
+    /**
+     * Downloads the files one after another, several simultaneous downloads can run into the download limits. [folders]
+     * says where in Download a file goes, by its key (the folders of a downloaded folder); [title] names the batch.
+     */
+    fun downloadSequentially(files: List<StorageNode>, folders: Map<String, String> = emptyMap(), title: String? = null) {
         if (files.isEmpty()) return
         if (files.size == 1) {
-            download(files.first())
+            download(files.first(), folder = folders[files.first().key])
             return
         }
         // The total is only known when every file has a size
@@ -400,7 +722,7 @@ class DownloadManager(
                 for (file in files) {
                     ensureActive()
                     // Its own job, not a child of the batch's: cancelling the batch has to stop it too
-                    val download = download(file, queue, batchId)
+                    val download = download(file, queue, batchId, folders[file.key])
                     try {
                         download.join()
                     } catch (e: CancellationException) {
@@ -423,23 +745,23 @@ class DownloadManager(
                     else -> TransferOutcome.FAILED
                 }
                 val message = when (outcome) {
-                    TransferOutcome.COMPLETED -> "${files.size} files downloaded."
-                    TransferOutcome.FAILED -> "$savedFiles of ${files.size} files downloaded."
+                    TransferOutcome.COMPLETED -> application.getString(R.string.files_files_downloaded, files.size)
+                    TransferOutcome.FAILED -> application.getString(R.string.files_of_files_downloaded, savedFiles, files.size)
                     TransferOutcome.CANCELLED -> null
                 }
                 transfers.finish(batchId, outcome, message)
             }
         }
         transfers.start(
-            TransferInfo(batchId, TransferKind.DOWNLOAD, "${files.size} files", totalBytes = totalBytes),
+            TransferInfo(batchId, TransferKind.DOWNLOAD, title ?: "${files.size} files", totalBytes = totalBytes),
             onCancel = { batchJob.cancel() }
         )
         batchJob.start()
     }
 
     /**
-     * Downloads the files as zip archive(s) when the provider serves several ids as one archive (Pixeldrain does,
-     * with comma separated ids). Otherwise the files are downloaded one after another.
+     * Downloads the files as zip archive(s): made by the host where it serves several ids as one archive (Pixeldrain
+     * does, with comma separated ids), otherwise made here as the files are downloaded (see zipOnDevice).
      */
     fun downloadAsZip(files: List<StorageNode>, archiveName: String) {
         if (files.isEmpty()) return
@@ -448,7 +770,7 @@ class DownloadManager(
             return
         }
         if (files.any { it.ref.id == null || it.isDirectory } || ProviderCapability.ARCHIVE_DOWNLOAD !in provider().capabilities) {
-            downloadSequentially(files)
+            downloadZipMadeHere(files.map { ZipDownloadEntry(it.name, it) }, archiveName)
             return
         }
         val baseName = archiveName.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "files" }
@@ -464,5 +786,199 @@ class DownloadManager(
             )
         }
         downloadSequentially(archives)
+    }
+
+    /** Downloads [entries] as one zip made on the device as they're downloaded (see zipOnDevice), named [archiveName]. */
+    private fun downloadZipMadeHere(entries: List<ZipDownloadEntry>, archiveName: String) {
+        val files = entries.mapNotNull { it.node }
+        download(
+            StorageNode(
+                // A key of its own, which no file of the host has
+                ref = StorageRef(path = "zip-download:${System.nanoTime()}"),
+                name = zipName(archiveName),
+                isDirectory = false,
+                size = files.takeIf { list -> list.all { it.size != null } }?.sumOf { it.size ?: 0L },
+                mimeType = "application/zip",
+                richDetails = ZipDownloadDetails(entries = withFreePaths(entries))
+            )
+        )
+    }
+
+    /** [name] as the name of a zip in Downloads: what it can't hold replaced, ".zip" at its end. */
+    private fun zipName(name: String): String =
+        validFileName(name).ifBlank { "files" }.let { if (it.endsWith(".zip", ignoreCase = true)) it else "$it.zip" }
+
+    /**
+     * Downloads [items] of a folder browser, files and folders alike, as [style] says: each file on its own, with the
+     * folders made again in Download around theirs, or all of it in one zip named [archiveName]. A single folder is zipped
+     * by the host where it can (FOLDER_ARCHIVE_DOWNLOAD); otherwise the zip is made here, as the files are downloaded.
+     *
+     * The folders are looked through first, for their files. When that finds more than [LARGE_DOWNLOAD_FILES] files or
+     * [LARGE_DOWNLOAD_BYTES], the download waits in [confirmation] to be confirmed: a folder can hold far more than it looks.
+     */
+    fun downloadItems(items: List<StorageNode>, style: DownloadStyle, archiveName: String) {
+        if (items.isEmpty()) return
+        val folders = items.filter { it.isDirectory }
+        if (folders.isEmpty()) {
+            when (style) {
+                DownloadStyle.SEPARATELY -> downloadSequentially(items)
+                DownloadStyle.ZIP -> downloadAsZip(items, archiveName)
+            }
+            return
+        }
+        val provider = provider()
+        val browse = provider.browse
+        if (browse == null) {
+            messages.show(application.getString(R.string.files_this_host_can_t_download))
+            return
+        }
+        if (style == DownloadStyle.ZIP && items.size == 1 && ProviderCapability.FOLDER_ARCHIVE_DOWNLOAD in provider.capabilities) {
+            // Its size isn't known before the host has made it, so there's nothing to look through or ask about
+            val folder = items.single()
+            download(
+                StorageNode(
+                    ref = StorageRef(path = "zip-download:${folder.ref.path}"),
+                    name = zipName(folder.name),
+                    isDirectory = false,
+                    mimeType = "application/zip",
+                    richDetails = ZipDownloadDetails(folderPath = folder.ref.path, hostMade = true)
+                )
+            )
+            return
+        }
+        scope.launch {
+            messages.show(if (folders.size == 1) application.getString(R.string.files_looking_through, folders.single().name) else application.getString(R.string.files_looking_through_folders, folders.size))
+            val tree = withContext(Dispatchers.IO) { walk(browse, items) }
+            if (tree.failedFolders > 0) {
+                messages.show(
+                    if (tree.failedFolders == 1) application.getString(R.string.files_a_folder_couldn_t_be) else application.getString(R.string.files_folders_couldn_t_be_opened, tree.failedFolders),
+                    long = true
+                )
+            }
+            if (tree.files.isEmpty() && (style == DownloadStyle.SEPARATELY || tree.emptyFolders.isEmpty())) {
+                messages.show(application.getString(R.string.files_there_are_no_files_in))
+                return@launch
+            }
+            val start = {
+                when (style) {
+                    DownloadStyle.SEPARATELY -> downloadSequentially(
+                        tree.files.map { it.node },
+                        folders = tree.files.associate { it.node.key to it.folder },
+                        title = archiveName
+                    )
+                    DownloadStyle.ZIP -> downloadZipMadeHere(
+                        tree.files.map { ZipDownloadEntry(it.path, it.node) } + tree.emptyFolders.map { ZipDownloadEntry(it) },
+                        archiveName
+                    )
+                }
+            }
+            val bytes = tree.files.takeIf { files -> files.all { it.node.size != null } }?.sumOf { it.node.size ?: 0L }
+            if (tree.files.size > LARGE_DOWNLOAD_FILES || (bytes ?: 0L) > LARGE_DOWNLOAD_BYTES) {
+                _confirmation.value = DownloadConfirmation(archiveName, tree.files.size, bytes, style, start)
+            } else {
+                start()
+            }
+        }
+    }
+
+    /** A file found in a downloaded folder, and the folder it goes into, from the downloaded one down ("Photos/2026"). */
+    private class TreeFile(val node: StorageNode, val folder: String) {
+        val path: String get() = if (folder.isEmpty()) node.name else "$folder/${node.name}"
+    }
+
+    /** What looking through downloaded folders found: their files, their empty folders, and how many couldn't be listed. */
+    private class FolderTree(val files: List<TreeFile>, val emptyFolders: List<String>, val failedFolders: Int)
+
+    /**
+     * Lists the folders among [items] and every folder in them, one after another. A file of [items] goes at the top; a
+     * folder's files go under its name, and under their own folders' names below it.
+     */
+    private suspend fun walk(browse: BrowseOps, items: List<StorageNode>): FolderTree {
+        val files = ArrayList<TreeFile>()
+        val emptyFolders = ArrayList<String>()
+        var failed = 0
+        // A folder reachable twice (a link back up the tree) is only listed once
+        val visited = HashSet<String>()
+        // Each folder still to be listed, with where it goes
+        val pending = ArrayDeque<Pair<StorageNode, String>>()
+        items.forEach { if (it.isDirectory) pending += it to it.name else files += TreeFile(it, "") }
+        while (pending.isNotEmpty()) {
+            coroutineContext.ensureActive()
+            val (folder, at) = pending.removeFirst()
+            if (!visited.add(folder.ref.path)) continue
+            when (val response = browse.list(folder.ref.path)) {
+                is ApiResponse.Success -> {
+                    val children = response.data.children
+                    if (children.isEmpty()) emptyFolders += at
+                    children.forEach { child ->
+                        if (child.isDirectory) pending += child to "$at/${child.name}" else files += TreeFile(child, at)
+                    }
+                }
+                is ApiResponse.Error -> failed++
+            }
+        }
+        return FolderTree(files, emptyFolders, failed)
+    }
+
+    /**
+     * Shares [node] itself with another app, for a host whose files have no link to share: it's downloaded into the app's
+     * cache (a transfer as any download, which can be cancelled), then handed to the share sheet. The files shared before
+     * are cleared once they're a day old, so the app they went to has had the time to read them.
+     */
+    fun shareFile(node: StorageNode) {
+        val transferId = "share-${node.key}"
+        val provider = provider()
+        val job = scope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+            val folder = File(application.cacheDir, SHARED_FOLDER).apply { mkdirs() }
+            val now = System.currentTimeMillis()
+            folder.listFiles()?.forEach { if (now - it.lastModified() > SHARED_KEEP_MS) it.deleteRecursively() }
+            // A folder of its own, so the file keeps its name even when another of that name is still kept
+            val target = File(File(folder, now.toString()).apply { mkdirs() }, validFileName(node.name))
+            var outcome = TransferOutcome.FAILED
+            var message: String? = null
+            try {
+                val speedTracker = TransferSpeedTracker()
+                val self = coroutineContext[Job]
+                val response = BufferedOutputStream(target.outputStream(), DOWNLOAD_WRITE_BUFFER_BYTES).use { out ->
+                    downloadNode(provider, node, out, application.resources) { read, total ->
+                        if (self?.isActive == false) throw CancellationException(application.getString(R.string.files_the_share_was_cancelled))
+                        val speed = speedTracker.update(read)
+                        transfers.progress(transferId, read, total, speed, estimateEtaSeconds(total ?: node.size, read, speed))
+                    }
+                }
+                ensureActive()
+                when (response) {
+                    is ApiResponse.Success -> {
+                        outcome = TransferOutcome.COMPLETED
+                        message = application.getString(R.string.files_is_ready_to_share, node.name)
+                        val uri = FileProvider.getUriForFile(application, application.packageName + FILE_PROVIDER_SUFFIX, target)
+                        val send = Intent(Intent.ACTION_SEND)
+                            .setType(downloadedFileMimeType(node.name).takeIf { it != "*/*" } ?: "application/octet-stream")
+                            .putExtra(Intent.EXTRA_STREAM, uri)
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        // The share sheet's preview, and the app picked, read it through the grant on the clip
+                        send.clipData = ClipData.newRawUri(node.name, uri)
+                        withContext(Dispatchers.Main) {
+                            application.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }
+                    }
+                    is ApiResponse.Error -> throw IOException(response.error.message.ifBlank { application.getString(R.string.files_the_file_couldn_t_be) })
+                }
+            } catch (e: Exception) {
+                target.parentFile?.deleteRecursively()
+                if (e is CancellationException) {
+                    outcome = TransferOutcome.CANCELLED
+                } else {
+                    Log.e(TAG, "Sharing ${node.name} failed: ${e.message}", e)
+                    val failure = application.getString(R.string.files_couldn_t_share, node.name, e.localizedMessage ?: "Unexpected error")
+                    message = failure
+                    messages.show(failure, long = true)
+                }
+            } finally {
+                transfers.finish(transferId, outcome, message)
+            }
+        }
+        transfers.start(TransferInfo(transferId, TransferKind.DOWNLOAD, node.name, totalBytes = node.size), onCancel = { job.cancel() })
+        job.start()
     }
 }

@@ -5,7 +5,6 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.ServiceCompat
@@ -47,6 +46,7 @@ class TransferService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         latestStartId = startId
         if (intent?.action == ACTION_CANCEL_ALL_TRANSFERS) registry.cancelAll()
+        if (intent?.action == ACTION_RETRY_TRANSFER) registry.retry(intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1))
 
         // Every startForegroundService() call has to be answered with startForeground() quickly
         if (!startAsForeground(notifier.buildProgressNotification(registry.active.value.values.toList()))) {
@@ -77,7 +77,7 @@ class TransferService : Service() {
                 this,
                 PROGRESS_NOTIFICATION_ID,
                 notification,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             )
             true
         } catch (e: Exception) {

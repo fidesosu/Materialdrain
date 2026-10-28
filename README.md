@@ -1,15 +1,28 @@
 # Materialdrain
 
-Materialdrain is a modern Android client for Pixeldrain, built with Jetpack Compose and Material 3. It offers a native interface for uploading, managing, and viewing your Pixeldrain files.
+Materialdrain is an Android file client built with Jetpack Compose and Material 3. It started as a Pixeldrain app and
+still has Pixeldrain built in, but it can also connect to your own storage:
+
+- **Pixeldrain**: uploads, your files and lists, the filesystem, and your account.
+- **WebDAV** (Nextcloud, TrueNAS and others), **S3** (MinIO, TrueNAS and others) and **SMB** shares.
+- **Generic REST** hosts, described by a JSON config.
+
+You can upload, browse, search, preview (pictures, video, music, PDFs, text and archives), download, share, move and
+delete files, on as many hosts as you like.
 
 ## Setup
 
-- Download and install a version from the github 'Releases'
-  page. [Link to Releases page](https://github.com/fidesosu/Materialdrain/releases)
-- after 1.4 version you can go to settings > Account and login there using either a API Key or simply username/email and a password.
+- Download and install a version from the GitHub
+  [Releases page](https://github.com/fidesosu/Materialdrain/releases). It needs Android 10 or newer.
+- To use Pixeldrain, go to Settings → Account and log in with an API key, or with your username or e-mail and password.
+- To add another host, go to Settings → Hosts.
 
-> You can find the settings page by pressing the cog icon at the top right of the screen within the app
+> To open the settings, tap the ⋮ menu at the top right of the screen and choose Settings.
 
-After doing these steps, you should be able to use the app normally.
+## Host configs
 
-I don't have any schedules for app updates especially now that the app only has very minor issues. I'll update it when I feel like it.
+Example configs for other hosts are in [`docs/provider-configs`](docs/provider-configs): one for each kind of host
+(WebDAV, S3, SMB and a REST API), the same as the "New host" templates in Settings → Hosts, and Pixeldrain's own config
+as a full REST host. Paste one into "Or paste a config" there.
+
+I don't have a schedule for updates. I'll update the app when I feel like it.

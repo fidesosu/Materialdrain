@@ -4,12 +4,17 @@
 #   marked the latest. Older releases stay listed.
 # - a push to dev: the same, as the one "Development build" pre-release (tag dev-build), replaced by every push.
 # - a pull request: tests and a debug build only. It never sees the signing key.
-# The version comes from the commit's time (see app/build.gradle.kts); dev builds end in "-dev".
-# The website's download page lists these releases (website branch).
+# The version comes from baseVersion and the release tags (see app/build.gradle.kts): main's builds are the next
+# release, e.g. 1.6.3, and dev's add "-dev." and the commits since the last release, e.g. 1.6.4-dev.5. So the
+# checkouts take the whole history and the tags (fetch-depth: 0).
+# Both carry update.json next to the APK, which the app checks for a newer version (.github/scripts/update_json.py).
+# The website's download page lists these releases (website branch). A 1.X.0 release also takes new screenshots of the
+# app for it (screenshots.yml).
 #
 # Only a change to what goes into the APK builds it: the app, the provider modules it's made of, the example configs
-# it bundles, and the build's own settings. Anything else (the README, this workflow) doesn't, nor do Markdown files
-# anywhere. "Run workflow" on the Actions tab builds anyway.
+# it bundles, and the build's own settings and plugins (build-logic). Anything else (the README, this workflow) doesn't, nor do Markdown files
+# anywhere. "Run workflow" on the Actions tab builds anyway. app/build.gradle.kts has the same list (appPaths), for
+# the number of a dev build: keep the two in step.
 name: Android build
 
 on:
@@ -20,6 +25,7 @@ on:
       - "provider-*/**"
       - "docs/provider-configs/**"
       - "gradle/**"
+      - "build-logic/**"
       - "*.gradle.kts"
       - "gradle.properties"
       - "gradlew"
@@ -33,6 +39,7 @@ on:
       - "provider-*/**"
       - "docs/provider-configs/**"
       - "gradle/**"
+      - "build-logic/**"
       - "*.gradle.kts"
       - "gradle.properties"
       - "gradlew"
@@ -53,6 +60,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:
@@ -74,6 +83,11 @@ jobs:
       - name: Run tests
         run: ./gradlew test
 
+      # Android's own checks, of every module: an error (a call which doesn't exist on some Android version the app runs
+      # on, a wrong constant...) fails the build; the warnings are in the report
+      - name: Lint
+        run: ./gradlew lintDebug
+
       # A pull request gets a debug build to try, kept for a while on the run's page
       - name: Build debug APK
         if: github.event_name == 'pull_request'
@@ -90,11 +104,15 @@ jobs:
     needs: test
     if: github.event_name != 'pull_request' && (github.ref_name == 'main' || github.ref_name == 'dev')
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.apk.outputs.version }}
     permissions:
       # To create the release, and to move the dev-build tag
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:
@@ -140,6 +158,10 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "file=$file" >> "$GITHUB_OUTPUT"
 
+      # What the app reads to offer this release as an update, with the changes it brings (see the script)
+      - name: Describe the update
+        run: python3 .github/scripts/update_json.py "${{ steps.apk.outputs.file }}" app/build/outputs/apk/release/output-metadata.json update.json
+
       - name: Publish the stable release
         if: github.ref_name == 'main'
         env:
@@ -149,12 +171,18 @@ jobs:
         run: |
           tag="v${VERSION}"
           if gh release view "$tag" > /dev/null 2>&1; then
-            # The same commit built again: the same version, so its APK is replaced
-            gh release upload "$tag" "$FILE" --clobber
+            # The same commit built again: the same version, so its APK is replaced. Never another commit's release,
+            # which would have its number only after history was rewritten
+            tagged=$(git rev-parse "refs/tags/$tag^{commit}" 2>/dev/null || true)
+            if [ "$tagged" != "$GITHUB_SHA" ]; then
+              echo "::error::Version ${VERSION} already belongs to another commit (${tagged:-unknown}); its release is left as it is."
+              exit 1
+            fi
+            gh release upload "$tag" "$FILE" update.json --clobber
           else
             # The notes list what changed since the release before, not since the development build
             previous=$(gh release list --exclude-pre-releases --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName // empty')
-            gh release create "$tag" "$FILE" --target "$GITHUB_SHA" --title "Materialdrain ${VERSION}" --latest \
+            gh release create "$tag" "$FILE" update.json --target "$GITHUB_SHA" --title "Materialdrain ${VERSION}" --latest \
               --generate-notes ${previous:+--notes-start-tag "$previous"}
           fi
 
@@ -173,15 +201,24 @@ jobs:
           git push --force origin "refs/tags/$tag"
           if gh release view "$tag" > /dev/null 2>&1; then
             gh release edit "$tag" --title "$title" --notes "$notes" --prerelease
-            gh release upload "$tag" "$FILE" --clobber
+            gh release upload "$tag" "$FILE" update.json --clobber
             # The APKs of the builds before it
-            gh release view "$tag" --json assets --jq '.assets[].name' | grep -vxF "$FILE" | while read -r old; do
+            gh release view "$tag" --json assets --jq '.assets[].name' | grep -vxF -e "$FILE" -e update.json | while read -r old; do
               gh release delete-asset "$tag" "$old" --yes
             done
           else
-            gh release create "$tag" "$FILE" --target "$GITHUB_SHA" --title "$title" --notes "$notes" --prerelease
+            gh release create "$tag" "$FILE" update.json --target "$GITHUB_SHA" --title "$title" --notes "$notes" --prerelease
           fi
 
       - name: Remove the release key
         if: always()
         run: rm -f materialdrain-release.jks
+
+  # A new base version's first release (1.X.0): new screenshots of the app for the website (see screenshots.yml)
+  screenshots:
+    needs: publish
+    if: github.ref_name == 'main' && endsWith(needs.publish.outputs.version, '.0')
+    permissions:
+      contents: write
+      actions: write
+    uses: ./.github/workflows/screenshots.yml

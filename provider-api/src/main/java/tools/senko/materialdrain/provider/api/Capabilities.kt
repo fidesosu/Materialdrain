@@ -43,6 +43,9 @@ enum class HostScreen {
  * [root] is for a Filesystem tab: the folder it opens at, under the host's own top (a config's browse_root, a share's
  * root_path), which it can't go above. Left out, the tab has the whole host.
  *
+ * [icon] is the tab's own icon, by name (the app knows a set of them, e.g. "photo", "music", "backup"; another name
+ * keeps the screen's icon).
+ *
  * Written in a config either as an object, or as just the screen's name when nothing else is set: `"FILESYSTEM"` is
  * `{"screen": "FILESYSTEM"}`. Screen names are read in any case (see [ScreenEntrySerializer]).
  */
@@ -52,7 +55,8 @@ data class ScreenConfig(
     val id: String? = null,
     val name: String? = null,
     val root: String? = null,
-    @SerialName("disabled_capabilities") val disabledCapabilities: Set<ProviderCapability> = emptySet()
+    @SerialName("disabled_capabilities") val disabledCapabilities: Set<ProviderCapability> = emptySet(),
+    val icon: String? = null
 ) {
     /** What tells this tab apart from the others of the host: its own [id], or its kind's name. */
     val tabId: String get() = id?.trim()?.takeIf { it.isNotEmpty() } ?: screen.name.lowercase()
@@ -83,7 +87,8 @@ object ScreenEntrySerializer : JsonTransformingSerializer<ScreenConfig>(ScreenCo
         val obj = element as? JsonObject ?: return element
         val unset = { key: String -> obj[key].let { it == null || it is JsonNull } }
         val nothingDisabled = (obj["disabled_capabilities"] as? JsonArray)?.isEmpty() ?: true
-        return if (unset("id") && unset("name") && unset("root") && nothingDisabled) obj.getValue("screen") else obj
+        val plain = unset("id") && unset("name") && unset("root") && unset("icon") && nothingDisabled
+        return if (plain) obj.getValue("screen") else obj
     }
 }
 
@@ -137,6 +142,9 @@ enum class ProviderCapability {
     USER_QUOTA, RICH_FILE_STATS, LISTS,
     // Several files at once as one zip archive (Pixeldrain: comma separated ids). See FileStoreOps.downloadArchive
     ARCHIVE_DOWNLOAD,
+    // A folder and everything in it as one zip archive, made by the host (Pixeldrain: ?bulk_download). See
+    // BrowseOps.downloadFolderArchive; without it the app makes the zip itself
+    FOLDER_ARCHIVE_DOWNLOAD,
     // Looking inside an archive (zip, 7z, rar...) without downloading it. See ArchiveOps
     ARCHIVE_BROWSE
 }

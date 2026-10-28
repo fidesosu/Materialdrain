@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.provider.webdav
 
+import tools.senko.materialdrain.provider.api.addHttpInterceptors
 import android.content.Context
 import android.net.Uri
 import tools.senko.materialdrain.provider.api.queryContentSize
@@ -80,6 +81,7 @@ internal class WebDavClient(private val rootPath: String) {
         .connectTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(0, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS)
+        .addHttpInterceptors()
         .build()
 
     /** Resolves [path] (relative to [rootPath]) against [baseUrl], percent-encoding each segment. */

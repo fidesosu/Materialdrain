@@ -26,6 +26,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 /**
  * Covers the app while it is locked, and asks for the fingerprint, face or screen lock straight away. The overlay
@@ -36,8 +40,14 @@ fun AppLockOverlay(activity: FragmentActivity, appLock: AppLock) {
     val locked by appLock.locked.collectAsState()
     if (!locked) return
 
-    LaunchedEffect(Unit) { showUnlockPrompt(activity) { appLock.unlock() } }
+    LaunchedEffect(Unit) { showUnlockPrompt(activity, appLock) }
 
+    LockedScreen(onUnlock = { showUnlockPrompt(activity, appLock) })
+}
+
+/** What covers the app while it's locked, taking every touch; [onUnlock] asks for the lock again. */
+@Composable
+fun LockedScreen(onUnlock: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -59,24 +69,40 @@ fun AppLockOverlay(activity: FragmentActivity, appLock: AppLock) {
                 modifier = Modifier.size(64.dp)
             )
             Spacer(Modifier.height(16.dp))
-            Text("Materialdrain is locked", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.app_materialdrain_is_locked), style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(24.dp))
-            Button(onClick = { showUnlockPrompt(activity) { appLock.unlock() } }) { Text("Unlock") }
+            Button(onClick = onUnlock) { Text(stringResource(R.string.app_unlock)) }
         }
     }
 }
 
-/** The system prompt for a fingerprint, face or the screen lock. [onUnlocked] runs when it succeeds. */
-fun showUnlockPrompt(activity: FragmentActivity, onUnlocked: () -> Unit) {
+/**
+ * The system prompt for a fingerprint, face or the screen lock, which unlocks [appLock] when it succeeds. When it can't
+ * be shown at all (the screen lock was removed meanwhile), the lock is checked again rather than left shut for good.
+ */
+fun showUnlockPrompt(activity: FragmentActivity, appLock: AppLock) {
     val callback = object : BiometricPrompt.AuthenticationCallback() {
         override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-            onUnlocked()
+            appLock.unlock()
+        }
+
+        // Closed by the user, or impossible: the locked screen stays, with its Unlock button, unless nothing can open it
+        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+            appLock.promptFailed()
         }
     }
     BiometricPrompt(activity, ContextCompat.getMainExecutor(activity), callback).authenticate(
         BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Materialdrain")
+            .setTitle(activity.getString(R.string.app_unlock_materialdrain))
             .setAllowedAuthenticators(LOCK_AUTHENTICATORS)
             .build()
     )
+}
+
+// ---- Previews ----
+
+@ScreenPreviews
+@Composable
+private fun LockedScreenPreview() {
+    PreviewTheme { LockedScreen(onUnlock = {}) }
 }

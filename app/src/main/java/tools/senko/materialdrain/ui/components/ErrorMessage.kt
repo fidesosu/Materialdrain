@@ -11,6 +11,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
 
 @Composable
 fun ErrorMessage(message: String) {
@@ -28,4 +30,12 @@ fun ErrorMessage(message: String) {
             textAlign = TextAlign.Center
         )
     }
+}
+
+// ---- Previews ----
+
+@ThemePreviews
+@Composable
+private fun ErrorMessagePreview() {
+    PreviewTheme { ErrorMessage("The host couldn't be reached: timeout after 30 seconds.") }
 }

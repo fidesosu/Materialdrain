@@ -7,6 +7,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
 
 @Composable
 fun CenteredLoadingMessage(message: String) {
@@ -21,4 +23,12 @@ fun CenteredLoadingMessage(message: String) {
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = message)
     }
+}
+
+// ---- Previews ----
+
+@ThemePreviews
+@Composable
+private fun CenteredLoadingMessagePreview() {
+    PreviewTheme { CenteredLoadingMessage("Loading files…") }
 }

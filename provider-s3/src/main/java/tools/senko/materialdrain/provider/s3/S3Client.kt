@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.provider.s3
 
+import tools.senko.materialdrain.provider.api.addHttpInterceptors
 import android.content.Context
 import android.net.Uri
 import tools.senko.materialdrain.provider.api.queryContentSize
@@ -66,6 +67,7 @@ internal class S3Client(private val endpoint: String, private val bucket: String
         .connectTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(0, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS)
+        .addHttpInterceptors()
         .build()
 
     /** Resolves [key] (may be empty, for the bucket root) under [bucket]. A trailing slash in [key] (the folder-marker convention) is preserved. */

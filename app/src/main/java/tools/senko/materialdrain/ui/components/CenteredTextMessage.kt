@@ -11,6 +11,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
 
 @Composable
 fun CenteredTextMessage(message: String) {
@@ -27,4 +29,12 @@ fun CenteredTextMessage(message: String) {
             textAlign = TextAlign.Center
         )
     }
+}
+
+// ---- Previews ----
+
+@ThemePreviews
+@Composable
+private fun CenteredTextMessagePreview() {
+    PreviewTheme { CenteredTextMessage("This folder is empty.\nUpload a file or make a folder to fill it.") }
 }

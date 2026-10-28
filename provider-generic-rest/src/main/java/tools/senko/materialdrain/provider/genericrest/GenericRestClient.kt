@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.provider.genericrest
 
+import tools.senko.materialdrain.provider.api.addHttpInterceptors
 import android.content.Context
 import android.net.Uri
 import tools.senko.materialdrain.provider.api.queryContentSize
@@ -99,6 +100,7 @@ internal class GenericRestClient(private val baseUrl: String) {
         .connectTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(0, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS)
+        .addHttpInterceptors()
         .build()
 
     /** Resolves {placeholder} tokens in [endpoint]'s path against [baseUrl], then adds its query parameters. */

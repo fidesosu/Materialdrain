@@ -26,7 +26,14 @@ enum class ApiKeySource { NONE, LOGIN, MANUAL }
  * Single source of the API key used for authenticated requests. A key from a username/password
  * (or e-mail link) login takes precedence over a manually entered API key.
  */
-class SessionManager(context: Context) {
+class SessionManager(
+    context: Context,
+    /**
+     * Only for the previews of the settings (see PreviewSettings): signed in as this user, with a made-up key. Nothing is
+     * read from the device, where a preview has no saved login and no Android Keystore to read one with.
+     */
+    previewUser: String? = null
+) {
 
     private val appContext = context.applicationContext
     private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -34,9 +41,9 @@ class SessionManager(context: Context) {
     private val cipher = KeystoreCipher()
 
     @Volatile
-    private var sessionApiKey: String? = loadSessionApiKey()
+    private var sessionApiKey: String? = if (previewUser != null) "preview" else loadSessionApiKey()
 
-    private val _loggedInUser = MutableStateFlow(if (sessionApiKey != null) securePrefs.getString(SESSION_USER_PREF, "") else null)
+    private val _loggedInUser = MutableStateFlow(previewUser ?: if (sessionApiKey != null) securePrefs.getString(SESSION_USER_PREF, "") else null)
     /** Username used to log in, null when there is no login session. */
     val loggedInUser: StateFlow<String?> = _loggedInUser.asStateFlow()
 

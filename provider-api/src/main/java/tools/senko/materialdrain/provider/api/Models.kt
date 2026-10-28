@@ -38,6 +38,20 @@ data class PixeldrainRichDetails(
     val dateLastView: String? = null
 ) : RichDetails
 
+/**
+ * A download that is a zip archive of several things of the host rather than a file of its own: the folder at
+ * [folderPath] as the host zips it ([hostMade], see BrowseOps.downloadFolderArchive), or else [entries] zipped on the
+ * device as they're downloaded, each at its path inside the archive.
+ */
+data class ZipDownloadDetails(
+    val folderPath: String? = null,
+    val hostMade: Boolean = false,
+    val entries: List<ZipDownloadEntry> = emptyList()
+) : RichDetails
+
+/** One file (or, without [node], an empty folder) of a [ZipDownloadDetails] zipped on the device, at [path] in the archive. */
+data class ZipDownloadEntry(val path: String, val node: StorageNode? = null)
+
 /** One file or directory, normalized across providers. */
 data class StorageNode(
     val ref: StorageRef,

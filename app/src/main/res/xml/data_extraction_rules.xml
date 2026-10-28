@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+   What a backup or a move to a new phone leaves out on Android 12 and up (Android 10 and 11 read backup_rules.xml, which
+   leaves out the same). See https://developer.android.com/about/versions/12/backup-restore#xml-changes
 -->
 <data-extraction-rules>
     <cloud-backup>
@@ -11,11 +10,14 @@
         <!-- The plain copies of the settings which hold the API key and the provider config state are not backed up -->
         <exclude domain="sharedpref" path="pixeldrain_prefs.xml" />
         <exclude domain="sharedpref" path="provider_prefs.xml" />
+        <!-- Where videos were left: only of use on this device -->
+        <exclude domain="sharedpref" path="video_positions.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="pixeldrain_secure_prefs.xml" />
         <exclude domain="sharedpref" path="provider_secure_prefs.xml" />
         <exclude domain="sharedpref" path="pixeldrain_prefs.xml" />
         <exclude domain="sharedpref" path="provider_prefs.xml" />
+        <exclude domain="sharedpref" path="video_positions.xml" />
     </device-transfer>
 </data-extraction-rules>

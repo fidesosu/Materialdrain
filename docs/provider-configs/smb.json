@@ -1,18 +1,35 @@
 {
-  "kind": "smb",
-  "name": "SMB share",
-  "host": "nas.local",
-  "port": 445,
-  "share": "Documents",
-  "root_path": "",
-  "domain": "",
-  "auth": "CREDENTIALS",
-  "min_version": "SMB2",
-  "encrypt": false,
-  "screens": ["UPLOAD", "FILESYSTEM"],
-  "meta": {
-    "id": "tools.senko.materialdrain.examples.smb",
-    "version": 1,
-    "author": "fides"
-  }
+    "kind": "smb",
+    "name": "SMB share",
+    "host": "nas.local",
+    "port": 445,
+    "share": "Documents",
+    "root_path": "",
+    "domain": "",
+    "auth": "CREDENTIALS",
+    "min_version": "SMB2",
+    "encrypt": false,
+    "screens": [
+        {
+            "screen": "UPLOAD",
+            "id": "upload",
+            "name": null,
+            "root": null,
+            "disabled_capabilities": []
+        },
+        {
+            "screen": "FILESYSTEM",
+            "id": "filesystem",
+            "name": null,
+            "root": null,
+            "disabled_capabilities": []
+        }
+    ],
+    "meta": {
+        "id": "example.smb",
+        "version": 1,
+        "update_url": null,
+        "min_app_version": null,
+        "author": ""
+    }
 }

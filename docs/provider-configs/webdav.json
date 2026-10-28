@@ -1,0 +1,39 @@
+{
+    "kind": "webdav",
+    "name": "WebDAV server",
+    "base_url": "https://files.example.com/dav",
+    "auth": {
+        "type": "BASIC",
+        "header_name": "Authorization",
+        "key_username": "",
+        "password_auth": {
+            "mode": "BASIC",
+            "login": null,
+            "logout": null
+        }
+    },
+    "root_path": "/",
+    "screens": [
+        {
+            "screen": "UPLOAD",
+            "id": "upload",
+            "name": null,
+            "root": null,
+            "disabled_capabilities": []
+        },
+        {
+            "screen": "FILESYSTEM",
+            "id": "filesystem",
+            "name": null,
+            "root": null,
+            "disabled_capabilities": []
+        }
+    ],
+    "meta": {
+        "id": "example.webdav",
+        "version": 1,
+        "update_url": null,
+        "min_app_version": null,
+        "author": ""
+    }
+}

@@ -175,7 +175,7 @@ class PixeldrainStorageProvider(
         ProviderCapability.UPLOAD, ProviderCapability.DOWNLOAD, ProviderCapability.DELETE, ProviderCapability.FILE_INFO,
         ProviderCapability.BROWSE, ProviderCapability.MKDIR, ProviderCapability.RENAME,
         ProviderCapability.SHARE_LINK, ProviderCapability.RICH_FILE_STATS, ProviderCapability.LISTS, ProviderCapability.ENUMERATE,
-        ProviderCapability.ARCHIVE_DOWNLOAD, ProviderCapability.ARCHIVE_BROWSE
+        ProviderCapability.ARCHIVE_DOWNLOAD, ProviderCapability.ARCHIVE_BROWSE, ProviderCapability.FOLDER_ARCHIVE_DOWNLOAD
         // Deliberately absent: SEARCH and PERMISSIONS (the pixeldrain API supports both, but nothing in this
         // app calls them yet, so claiming the capability here would be a promise the UI can't keep) and
         // USER_QUOTA (no account-info endpoint is wired up).
@@ -345,6 +345,14 @@ class PixeldrainStorageProvider(
             onProgress: (read: Long, total: Long?) -> Unit
         ): ApiResponse<Long> =
             filesystemApi.downloadFile(apiKeyProvider(), path, outputStream, onProgress).map { it }
+
+        // ?bulk_download: Pixeldrain zips the folder itself
+        override suspend fun downloadFolderArchive(
+            path: String,
+            outputStream: OutputStream,
+            onProgress: (read: Long, total: Long?) -> Unit
+        ): ApiResponse<Long> =
+            filesystemApi.downloadDirectoryZip(apiKeyProvider(), path, outputStream, onProgress).map { it }
 
         override suspend fun createDirectory(path: String, makeParents: Boolean): ApiResponse<Unit> =
             filesystemApi.createDirectory(apiKeyProvider(), path, makeParents).map { }

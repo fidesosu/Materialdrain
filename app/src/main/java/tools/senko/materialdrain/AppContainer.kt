@@ -48,6 +48,7 @@ class AppContainer private constructor(application: Application) {
 
     /** Checks and applies updates of configs that have an update URL. */
     val providerUpdater = ProviderUpdater(
+        resources = application.resources,
         store = providerConfigStore,
         baseClient = okHttpClient,
         appVersion = application.packageManager.getPackageInfo(application.packageName, 0).longVersionCode.toInt()
@@ -56,23 +57,30 @@ class AppContainer private constructor(application: Application) {
     /** Work which belongs to the process rather than to a screen. */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    /** Locks the app behind a fingerprint, face or screen lock, when the setting is on. */
-    val appLock = tools.senko.materialdrain.auth.AppLock(appSettings)
-
-    /** Files another app shared with Materialdrain, waiting for the upload screen to take them. */
-    val pendingShares = kotlinx.coroutines.flow.MutableStateFlow<List<android.net.Uri>>(emptyList())
-
     /** The snackbar messages of the ViewModels, see UiMessages. */
     val uiMessages = UiMessages()
+
+    /** Locks the app behind a fingerprint, face or screen lock, when the setting is on. */
+    val appLock = tools.senko.materialdrain.auth.AppLock(appSettings, uiMessages)
+
+    /** Files another app shared with Materialdrain, waiting for the screen they go into (see App.kt's sharedUpload). */
+    val pendingShares = kotlinx.coroutines.flow.MutableStateFlow<List<android.net.Uri>>(emptyList())
+
+    /** A link, a shortcut or shared text the app was opened with, waiting for the screen (and the unlock), see PendingOpen. */
+    val pendingOpen = kotlinx.coroutines.flow.MutableStateFlow<PendingOpen?>(null)
+
 
     /** Files which were changed, so the screens showing them reload, see ContentChanges. */
     val contentChanges = ContentChanges()
 
     /** Downloads into the device's Downloads folder, for every screen, see DownloadManager. */
-    val downloadManager = DownloadManager(application, providerRegistry, providerConfigStore, transferRegistry, uiMessages)
+    val downloadManager = DownloadManager(application, providerRegistry, providerConfigStore, transferRegistry, uiMessages, appSettings)
 
     /** What the app would load by itself waits to be asked for, when it's on, see DataSaver. */
     val dataSaver = tools.senko.materialdrain.settings.DataSaver(application, appSettings, appScope)
+
+    /** Newer versions of the app, from its GitHub releases (Settings → About, and the check on opening). */
+    val appUpdates = tools.senko.materialdrain.update.AppUpdates(application, appSettings, uiMessages, holdBackground = { dataSaver.active.value })
 
     /** Whether each host answers, for the host switcher. With the data saver, only when asked (see HostHealth.checkAll). */
     val hostHealth = HostHealth(application, providerConfigStore, appScope, holdBackground = { dataSaver.holdHostChecks.value })
@@ -82,6 +90,8 @@ class AppContainer private constructor(application: Application) {
         refreshBundledPixeldrainConfig(application, providerConfigStore)
         // The image loader of the whole app, with album covers and video frames read out of the files as their thumbnails
         // (see MediaCovers), and GIFs and animated WebP moving wherever they're shown (see AnimatedImages)
+        // A thumbnail's read timeout, which the API's client goes without for long downloads, so a stalled one gives up
+        val thumbnailClient = okHttpClient.newBuilder().readTimeout(30, java.util.concurrent.TimeUnit.SECONDS).build()
         coil.Coil.setImageLoader {
             coil.ImageLoader.Builder(application)
                 .components {
@@ -89,13 +99,14 @@ class AppContainer private constructor(application: Application) {
                     add(tools.senko.materialdrain.ui.media.AnimatedImages.Factory())
                 }
                 // The API's own client, sharing its connections and threads: thumbnails reuse the HTTP/2 connection the
-                // app already has open to the host instead of opening their own. With a read timeout of its own, which
-                // the API's client goes without for long downloads, so a stalled thumbnail gives up
-                .okHttpClient { okHttpClient.newBuilder().readTimeout(30, java.util.concurrent.TimeUnit.SECONDS).build() }
+                // app already has open to the host instead of opening their own
+                .okHttpClient { thumbnailClient }
                 .build()
         }
         // Thumbnails of files on SMB shares are made on this device, and kept here between runs
         tools.senko.materialdrain.provider.smb.SmbContentServer.cacheDir = java.io.File(application.cacheDir, "smb-thumbnails")
+        // Song covers and tags and video frames, read by the media framework, come through it too (see HttpMediaDataSource)
+        HostRequestAuth.client = thumbnailClient
         HostRequestAuth.headersFor = { url ->
             providerRegistry.resolve(providerConfigStore.activeProviderId.value).requestHeaders(url)
         }

@@ -1,4 +1,6 @@
 pluginManagement {
+    // The build's own plugins (see build-logic)
+    includeBuild("build-logic")
     repositories {
         google {
             content {
@@ -27,4 +29,5 @@ include(":provider-generic-rest")
 include(":provider-webdav")
 include(":provider-s3")
 include(":provider-smb")
+include(":baselineprofile")
  

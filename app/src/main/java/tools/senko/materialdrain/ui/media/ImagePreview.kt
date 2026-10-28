@@ -1,12 +1,16 @@
 package tools.senko.materialdrain.ui.media
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculateCentroidSize
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -18,7 +22,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.filled.BrokenImage
 import tools.senko.materialdrain.ui.icons.filled.Fullscreen
@@ -45,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -60,6 +64,10 @@ import coil.size.Size
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 import tools.senko.materialdrain.ui.LocalBlurredBackdrop
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 internal const val TAG_COIL = "CoilImageLoaderShared"
 internal fun imageRequest(context: Context, data: Any, configure: ImageRequest.Builder.() -> Unit = {}): ImageRequest {
@@ -178,18 +186,27 @@ fun ClickablePreviewOverlay(onClick: () -> Unit) {
             .padding(8.dp),
         contentAlignment = Alignment.BottomEnd
     ) {
-        Surface(
-            modifier = Modifier.size(28.dp),
-            shape = RoundedCornerShape(4.dp),
-            color = Color.Black.copy(alpha = 0.55f)
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Fullscreen,
-                contentDescription = "View Fullscreen",
-                tint = Color.White,
-                modifier = Modifier.padding(4.dp)
-            )
-        }
+        FullscreenBadge(stringResource(R.string.media_view_fullscreen))
+    }
+}
+
+/**
+ * The badge of a preview which opens something bigger: a picture, a video, a PDF or a text fullscreen, a song's player.
+ * Only the badge itself; what's tapped is up to the preview (all of a picture, only the badge of a text).
+ */
+@Composable
+fun FullscreenBadge(contentDescription: String?, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.size(28.dp),
+        shape = AppShapes.ExtraSmall,
+        color = MediaScrim.Play
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Fullscreen,
+            contentDescription = contentDescription,
+            tint = Color.White,
+            modifier = Modifier.padding(4.dp)
+        )
     }
 }
 @Composable
@@ -303,12 +320,38 @@ internal fun ZoomableBox(
                 }
             }
             .pointerInput(Unit) {
-                detectTransformGestures { centroid, pan, zoom, _ ->
-                    val newScale = (scale * zoom).coerceIn(1f, 8f)
-                    val fromCenter = centroid - Offset(size.width / 2f, size.height / 2f)
-                    // Zooming keeps the point between the fingers where it is
-                    offset = clamp((offset - fromCenter) * (newScale / scale) + fromCenter + pan, newScale)
-                    scale = newScale
+                // Like detectTransformGestures, but one finger on the picture as it fits the screen is left alone: there's
+                // nothing to move yet, and it may be a swipe to the file beside this one (see FullScreenMediaPreviewDialog)
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    var zoomSoFar = 1f
+                    var panSoFar = Offset.Zero
+                    var pastSlop = false
+                    do {
+                        val event = awaitPointerEvent()
+                        if (event.changes.any { it.isConsumed }) break
+                        val fingers = event.changes.count { it.pressed }
+                        if (fingers > 1 || scale > 1.001f) {
+                            val zoom = event.calculateZoom()
+                            val pan = event.calculatePan()
+                            if (!pastSlop) {
+                                zoomSoFar *= zoom
+                                panSoFar += pan
+                                val zoomMotion = abs(1f - zoomSoFar) * event.calculateCentroidSize(useCurrent = false)
+                                pastSlop = zoomMotion > viewConfiguration.touchSlop || panSoFar.getDistance() > viewConfiguration.touchSlop
+                            }
+                            if (pastSlop) {
+                                if (zoom != 1f || pan != Offset.Zero) {
+                                    val newScale = (scale * zoom).coerceIn(1f, 8f)
+                                    val fromCenter = event.calculateCentroid(useCurrent = false) - Offset(size.width / 2f, size.height / 2f)
+                                    // Zooming keeps the point between the fingers where it is
+                                    offset = clamp((offset - fromCenter) * (newScale / scale) + fromCenter + pan, newScale)
+                                    scale = newScale
+                                }
+                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                            }
+                        }
+                    } while (event.changes.any { it.pressed })
                 }
             }
             .graphicsLayer {
@@ -319,4 +362,18 @@ internal fun ZoomableBox(
             },
         content = content
     )
+}
+
+// ---- Previews ----
+
+/**
+ * The picture's frame while it loads, with the badge which opens it fullscreen. Pictures from a host don't load in a
+ * preview (the image loader shows nothing there), so this is all of it the preview can show.
+ */
+@ThemePreviews
+@Composable
+private fun InlineImagePreviewPreview() {
+    PreviewTheme(padding = 16.dp) {
+        InlineImagePreview(imageSource = "https://example.com/beach-sunset.jpg", contentDescription = "Picture", apiKey = null, onFullScreenClick = {})
+    }
 }

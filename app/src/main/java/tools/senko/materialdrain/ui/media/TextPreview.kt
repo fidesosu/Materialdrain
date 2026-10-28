@@ -11,13 +11,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import androidx.compose.foundation.layout.Column
 
 @Composable
 fun InlineTextPreview(
     textContent: String?
 ) {
     textContent?.takeIf { it.isNotBlank() }?.let {
-        Text("Content Preview (4KB Max):", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top=8.dp, bottom=4.dp))
+        Text("Preview", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top=8.dp, bottom=4.dp))
         OutlinedTextField(
             value = it,
             onValueChange = { /* Read-only */ },
@@ -28,5 +32,15 @@ fun InlineTextPreview(
                 .padding(vertical = 8.dp),
             textStyle = MaterialTheme.typography.bodySmall
         )
+    }
+}
+
+// ---- Previews ----
+
+@ThemePreviews
+@Composable
+private fun InlineTextPreviewPreview() {
+    PreviewTheme(padding = 16.dp) {
+        Column { InlineTextPreview(PreviewSamples.CODE) }
     }
 }

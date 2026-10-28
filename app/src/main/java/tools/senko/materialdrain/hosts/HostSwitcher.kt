@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -66,13 +67,27 @@ import tools.senko.materialdrain.ui.components.MenuEdge
 import tools.senko.materialdrain.ui.components.MenuSide
 import tools.senko.materialdrain.ui.components.floatingCardBorder
 import tools.senko.materialdrain.ui.components.floatingCardColor
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.components.AppMenuPreview
+import tools.senko.materialdrain.ui.icons.filled.Storage
+import tools.senko.materialdrain.ui.icons.filled.Dns
+import tools.senko.materialdrain.ui.icons.filled.CloudSync
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
+import androidx.compose.ui.platform.LocalResources
+import androidx.annotation.StringRes
 
 /** Whether a host has a sign-in, shown next to its name in the switcher. */
-enum class HostStatus(val label: String) {
-    SIGNED_IN("Signed in"),
-    NOT_SIGNED_IN("Not signed in"),
-    NO_SIGN_IN_NEEDED("No sign-in needed")
+enum class HostStatus(@StringRes val labelRes: Int) {
+    SIGNED_IN(R.string.app_signed_in),
+    NOT_SIGNED_IN(R.string.app_not_signed_in),
+    NO_SIGN_IN_NEEDED(R.string.app_no_sign_in_needed)
 }
+
+/** The status in the app's language. */
+val HostStatus.label: String
+    @Composable get() = stringResource(labelRes)
 
 /**
  * One host in the switcher. [detail] is the more specific line, e.g. the user the host is signed in as; [address] where
@@ -93,6 +108,7 @@ data class HostOption(
  * Every host the user can switch to: the built-in Pixeldrain first, then the configured ones in the order they were
  * added. Built on each call, so it always reflects the current sign-ins.
  */
+@Composable
 fun hostOptions(
     configStore: ProviderConfigStore,
     sessionManager: SessionManager,
@@ -101,20 +117,21 @@ fun hostOptions(
     val source = sessionManager.activeSource()
     val pixeldrain = HostOption(
         id = PIXELDRAIN_PROVIDER_ID,
-        name = "Pixeldrain",
-        kindLabel = "Pixeldrain",
+        name = stringResource(R.string.app_pixeldrain),
+        kindLabel = stringResource(R.string.app_pixeldrain),
         icon = Icons.Filled.Cloud,
         status = if (source == ApiKeySource.NONE) HostStatus.NOT_SIGNED_IN else HostStatus.SIGNED_IN,
         detail = when (source) {
-            ApiKeySource.LOGIN -> signedInUser?.let { "Signed in as $it" } ?: "Signed in"
-            ApiKeySource.MANUAL -> "API key saved"
-            ApiKeySource.NONE -> "No API key yet"
+            ApiKeySource.LOGIN -> signedInUser?.let { stringResource(R.string.settings_signed_in_as, it) } ?: stringResource(R.string.app_signed_in)
+            ApiKeySource.MANUAL -> stringResource(R.string.app_api_key_saved)
+            ApiKeySource.NONE -> stringResource(R.string.app_no_api_key_yet)
         },
         address = "pixeldrain.com"
     )
-    return listOf(pixeldrain) + configStore.providers.value.map { it.toHostOption(configStore) }
+    return listOf(pixeldrain) + configStore.providers.collectAsState().value.map { it.toHostOption(configStore) }
 }
 
+@Composable
 private fun StoredProvider.toHostOption(configStore: ProviderConfigStore): HostOption {
     val type = hostTypeOf(config)
     val creds = configStore.credentials(id)
@@ -131,7 +148,7 @@ private fun StoredProvider.toHostOption(configStore: ProviderConfigStore): HostO
         icon = type.icon,
         status = status,
         detail = when {
-            status == HostStatus.SIGNED_IN && creds.username.isNotBlank() -> "Signed in as ${creds.username}"
+            status == HostStatus.SIGNED_IN && creds.username.isNotBlank() -> stringResource(R.string.settings_signed_in_as, creds.username)
             else -> status.label
         },
         address = type.address
@@ -159,13 +176,14 @@ private val Reachability.symbol: ImageVector
     }
 
 /** What the switcher says about a host's last check, e.g. "Reachable · 84 ms". */
+@Composable
 private fun HostCheck?.label(): String = when {
-    this == null -> "Checking…"
-    checking && checkedAtMillis == 0L -> "Checking…"
-    reachability == Reachability.REACHABLE -> latencyMillis?.let { "Reachable · $it ms" } ?: "Reachable"
-    reachability == Reachability.UNREACHABLE -> message ?: "Not reachable"
-    reachability == Reachability.OFFLINE -> "This device is offline"
-    else -> message ?: "Not checked yet"
+    this == null -> stringResource(R.string.app_checking)
+    checking && checkedAtMillis == 0L -> stringResource(R.string.app_checking)
+    reachability == Reachability.REACHABLE -> latencyMillis?.let { stringResource(R.string.app_reachable_ms, it) } ?: stringResource(R.string.app_reachable)
+    reachability == Reachability.UNREACHABLE -> message ?: stringResource(R.string.app_not_reachable)
+    reachability == Reachability.OFFLINE -> stringResource(R.string.app_this_device_is_offline)
+    else -> message ?: stringResource(R.string.app_not_checked_yet)
 }
 
 private val SwitcherHeight = 40.dp
@@ -189,9 +207,12 @@ fun HostSwitcher(
     onOpened: () -> Unit,
     onRefresh: () -> Unit,
 ) {
+    // The app's texts, for those its callbacks show
+    val res = LocalResources.current
     var expanded by remember { mutableStateOf(false) }
     val active = hosts.firstOrNull { it.id == activeId } ?: hosts.first()
     val activeCheck = checks[active.id]
+    val activeCheckLabel = activeCheck.label()
     val chevronTurn by animateFloatAsState(if (expanded && !LocalReduceMotion.current) 180f else 0f, label = "chevron")
 
     Box {
@@ -207,7 +228,7 @@ fun HostSwitcher(
             modifier = Modifier
                 .height(SwitcherHeight)
                 .widthIn(min = 150.dp, max = 240.dp)
-                .semantics { contentDescription = "Host: ${active.name}, ${activeCheck.label()}. Tap to switch hosts" }
+                .semantics { contentDescription = res.getString(R.string.app_host_tap_to_switch_hosts, active.name, activeCheckLabel) }
         ) {
             Row(
                 modifier = Modifier.padding(start = 10.dp, end = 8.dp),
@@ -239,33 +260,51 @@ fun HostSwitcher(
             edge = MenuEdge.Center,
             minWidth = MenuWidth
         ) {
-            MenuHeader(checks.values, onRefresh)
-            hosts.forEach { host ->
-                HostRow(
-                    host = host,
-                    check = checks[host.id],
-                    active = host.id == activeId,
-                    onClick = {
-                        expanded = false
-                        onSelect(host.id)
-                    },
-                    onOpenSettings = {
-                        expanded = false
-                        onOpenHostSettings(host.id)
-                    }
-                )
-            }
-            Spacer(Modifier.height(4.dp))
-            AppMenuItem(
-                text = "Manage hosts",
-                leadingIcon = Icons.Filled.Settings,
-                onClick = {
+            HostMenuEntries(
+                hosts = hosts,
+                activeId = activeId,
+                checks = checks,
+                onSelect = {
+                    expanded = false
+                    onSelect(it)
+                },
+                onOpenHostSettings = {
+                    expanded = false
+                    onOpenHostSettings(it)
+                },
+                onManage = {
                     expanded = false
                     onManage()
-                }
+                },
+                onRefresh = onRefresh
             )
         }
     }
+}
+
+/** The entries of the switcher's menu: when the hosts were checked, each host, and Manage hosts. */
+@Composable
+private fun HostMenuEntries(
+    hosts: List<HostOption>,
+    activeId: String,
+    checks: Map<String, HostCheck>,
+    onSelect: (String) -> Unit,
+    onOpenHostSettings: (String) -> Unit,
+    onManage: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    MenuHeader(checks.values, onRefresh)
+    hosts.forEach { host ->
+        HostRow(
+            host = host,
+            check = checks[host.id],
+            active = host.id == activeId,
+            onClick = { onSelect(host.id) },
+            onOpenSettings = { onOpenHostSettings(host.id) }
+        )
+    }
+    Spacer(Modifier.height(4.dp))
+    AppMenuItem(text = stringResource(R.string.app_manage_hosts), leadingIcon = Icons.Filled.Settings, onClick = onManage)
 }
 
 /** "Hosts", when they were last checked, and a button to check them all again now. */
@@ -286,12 +325,12 @@ private fun MenuHeader(checks: Collection<HostCheck>, onRefresh: () -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(start = 12.dp)
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text("Hosts", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.app_hosts), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 when {
-                    checking -> "Checking…"
-                    lastChecked != null -> "Checked ${ago(now - lastChecked)}"
-                    else -> "Not checked yet"
+                    checking -> stringResource(R.string.app_checking)
+                    lastChecked != null -> stringResource(R.string.app_checked, ago(now - lastChecked))
+                    else -> stringResource(R.string.app_not_checked_yet)
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -301,18 +340,19 @@ private fun MenuHeader(checks: Collection<HostCheck>, onRefresh: () -> Unit) {
             if (checking) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             } else {
-                Icon(Icons.Filled.Refresh, contentDescription = "Check the hosts again")
+                Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.app_check_the_hosts_again))
             }
         }
     }
 }
 
+@Composable
 private fun ago(millis: Long): String {
     val minutes = millis / 60_000
     return when {
-        minutes < 1 -> "just now"
-        minutes < 60 -> "$minutes min ago"
-        else -> "${minutes / 60} h ago"
+        minutes < 1 -> stringResource(R.string.app_just_now)
+        minutes < 60 -> stringResource(R.string.app_min_ago, minutes)
+        else -> stringResource(R.string.app_h_ago, minutes / 60)
     }
 }
 
@@ -366,10 +406,10 @@ private fun HostRow(
             )
         }
         if (host.status == HostStatus.NOT_SIGNED_IN) {
-            TextButton(onClick = onOpenSettings) { Text("Sign in") }
+            TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.settings_sign_in)) }
         } else {
             IconButton(onClick = onOpenSettings) {
-                Icon(Icons.Filled.Settings, contentDescription = "Settings of ${host.name}", tint = variant)
+                Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.app_settings_of, host.name), tint = variant)
             }
         }
     }
@@ -424,6 +464,45 @@ private fun StatusBadge(check: HostCheck?, modifier: Modifier = Modifier) {
         }
         if (check == null || check.checking) {
             CircularProgressIndicator(strokeWidth = 1.5.dp, modifier = Modifier.matchParentSize())
+        }
+    }
+}
+
+// ---- Previews ----
+
+/** Made-up hosts: the built-in Pixeldrain, a NAS that answers, one that doesn't and isn't signed in, one being checked. */
+private val PreviewHosts = listOf(
+    HostOption("pixeldrain", "Pixeldrain", "Pixeldrain", Icons.Filled.Cloud, HostStatus.SIGNED_IN, "Signed in as sam", "pixeldrain.com"),
+    HostOption("nas", "Home NAS", "SMB", Icons.Filled.Storage, HostStatus.SIGNED_IN, "Signed in as sam", "192.168.1.20"),
+    HostOption("dav", "Work files", "WebDAV", Icons.Filled.Dns, HostStatus.NOT_SIGNED_IN, "Not signed in", "dav.example.com"),
+    HostOption("s3", "Backups", "S3", Icons.Filled.CloudSync, HostStatus.NO_SIGN_IN_NEEDED, "No sign-in needed", null)
+)
+private val PreviewChecks = mapOf(
+    "pixeldrain" to HostCheck(Reachability.REACHABLE, latencyMillis = 84, checkedAtMillis = 1),
+    "nas" to HostCheck(Reachability.REACHABLE, latencyMillis = 3, checkedAtMillis = 1),
+    "dav" to HostCheck(Reachability.UNREACHABLE, message = "Address not found", checkedAtMillis = 1),
+    "s3" to HostCheck(checking = true)
+)
+
+/** The switcher in the top bar: for a host that answers, and one that doesn't. In the interactive preview it opens. */
+@ThemePreviews
+@Composable
+private fun HostSwitcherPreview() {
+    PreviewTheme(padding = 8.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            HostSwitcher(PreviewHosts, "pixeldrain", PreviewChecks, onSelect = {}, onOpenHostSettings = {}, onManage = {}, onOpened = {}, onRefresh = {})
+            HostSwitcher(PreviewHosts, "dav", PreviewChecks, onSelect = {}, onOpenHostSettings = {}, onManage = {}, onOpened = {}, onRefresh = {})
+        }
+    }
+}
+
+/** Its menu, open: each host with whether it answers and is signed in. */
+@ThemePreviews
+@Composable
+private fun HostMenuPreview() {
+    PreviewTheme(padding = 8.dp) {
+        AppMenuPreview {
+            HostMenuEntries(PreviewHosts, "nas", PreviewChecks, onSelect = {}, onOpenHostSettings = {}, onManage = {}, onRefresh = {})
         }
     }
 }

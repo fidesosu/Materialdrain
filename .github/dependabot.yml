@@ -1,0 +1,22 @@
+# Pull requests for newer versions, once a week, into dev (where the app's changes go first): the libraries in
+# gradle/libs.versions.toml and the actions of the workflows
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    groups:
+      # Released together, so updated together
+      androidx-media3:
+        patterns: ["androidx.media3:*"]
+      ktor:
+        patterns: ["io.ktor:*"]
+      kotlin:
+        patterns: ["org.jetbrains.kotlin*"]
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly

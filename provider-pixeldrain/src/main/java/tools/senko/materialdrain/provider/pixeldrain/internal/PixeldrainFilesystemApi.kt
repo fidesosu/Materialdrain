@@ -45,6 +45,14 @@ interface PixeldrainFilesystemApi {
         onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit
     ): ApiResponse<Long>
 
+    /** ?bulk_download: the directory at [fsPath] and everything in it as one zip archive. */
+    suspend fun downloadDirectoryZip(
+        apiKey: String,
+        fsPath: String,
+        outputStream: OutputStream,
+        onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit
+    ): ApiResponse<Long>
+
     /** PUT: writes (or overwrites) the file at [fsPath], the last path component being the file name. */
     suspend fun uploadFileFromUri(
         apiKey: String,
@@ -109,7 +117,7 @@ class PixeldrainFilesystemApiImpl(private val http: PixeldrainHttpClient) : Pixe
 
     override suspend fun getFilesystemPath(apiKey: String, fsPath: String): ApiResponse<FilesystemListResponse> {
         if (apiKey.isBlank()) {
-            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "API Key is required to browse filesystem."))
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "api_key_missing", message = "Log in first."))
         }
         val actualPath = fsPath.ifBlank { "me" }
 
@@ -134,7 +142,7 @@ class PixeldrainFilesystemApiImpl(private val http: PixeldrainHttpClient) : Pixe
             }
         } catch (e: Exception) {
             Log.e(TAG_FS_API, "Exception for GET filesystem path '$actualPath': ${e.message}", e)
-            val errorMsg = e.message ?: "Network request failed or failed to parse error response"
+            val errorMsg = e.message ?: "Couldn't reach Pixeldrain."
             ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_filesystem_path", message = errorMsg))
         }
     }
@@ -157,6 +165,24 @@ class PixeldrainFilesystemApiImpl(private val http: PixeldrainHttpClient) : Pixe
         return http.downloadToStream(request, outputStream, onProgress)
     }
 
+    override suspend fun downloadDirectoryZip(
+        apiKey: String,
+        fsPath: String,
+        outputStream: OutputStream,
+        onProgress: (bytesRead: Long, totalBytes: Long?) -> Unit
+    ): ApiResponse<Long> {
+        if (fsPath.isBlank()) {
+            return ApiResponse.Error(FileUploadResponse(success = false, value = "path_missing", message = "A path is required to download a folder."))
+        }
+        val request = Request.Builder()
+            .url(http.filesystemUrl(fsPath).addQueryParameter("bulk_download", "").build())
+            .header(HttpHeaders.AcceptEncoding, "identity")
+            .apply { if (apiKey.isNotBlank()) header(HttpHeaders.Authorization, http.basicAuth(apiKey)) }
+            .get()
+            .build()
+        return http.downloadToStream(request, outputStream, onProgress)
+    }
+
     override suspend fun uploadFileFromUri(
         apiKey: String,
         fsPath: String,
@@ -165,7 +191,7 @@ class PixeldrainFilesystemApiImpl(private val http: PixeldrainHttpClient) : Pixe
         makeParents: Boolean,
         onProgress: (bytesSent: Long, totalBytes: Long?) -> Unit
     ): ApiResponse<FileUploadResponse> {
-        if (apiKey.isBlank()) return apiKeyMissing("API Key is required to upload to the filesystem.")
+        if (apiKey.isBlank()) return apiKeyMissing("Log in first.")
 
         val contentResolver = context.contentResolver
         val mimeType = contentResolver.getType(fileUri) ?: ContentType.Application.OctetStream.toString()
@@ -200,7 +226,7 @@ class PixeldrainFilesystemApiImpl(private val http: PixeldrainHttpClient) : Pixe
         )
 
     override suspend fun deleteNode(apiKey: String, fsPath: String, recursive: Boolean): ApiResponse<FileUploadResponse> {
-        if (apiKey.isBlank()) return apiKeyMissing("API Key is required to delete filesystem items.")
+        if (apiKey.isBlank()) return apiKeyMissing("Log in first.")
         val url = http.filesystemUrl(fsPath).apply { if (recursive) addQueryParameter("recursive", "true") }.build()
         val request = Request.Builder().url(url).header(HttpHeaders.Authorization, http.basicAuth(apiKey)).delete().build()
         return execute(request, "Item deleted.", "filesystem_delete", "network_exception_filesystem_delete")
@@ -231,7 +257,7 @@ class PixeldrainFilesystemApiImpl(private val http: PixeldrainHttpClient) : Pixe
         successMessage: String,
         actionName: String
     ): ApiResponse<FileUploadResponse> {
-        if (apiKey.isBlank()) return apiKeyMissing("API Key is required for filesystem operations.")
+        if (apiKey.isBlank()) return apiKeyMissing("Log in first.")
         val form = FormBody.Builder().apply { params.forEach { (name, value) -> add(name, value) } }.build()
         val request = Request.Builder()
             .url(http.filesystemUrl(fsPath).build())

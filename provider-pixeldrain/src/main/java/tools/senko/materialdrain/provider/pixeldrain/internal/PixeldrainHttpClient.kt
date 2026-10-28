@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.provider.pixeldrain.internal
 
+import tools.senko.materialdrain.provider.api.addHttpInterceptors
 import android.content.Context
 import android.net.Uri
 import tools.senko.materialdrain.provider.api.queryContentSize
@@ -86,6 +87,7 @@ class PixeldrainHttpClient {
         .connectTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(0, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS)
+        .addHttpInterceptors()
         .build()
 
     internal val json = Json {
@@ -205,7 +207,7 @@ class PixeldrainHttpClient {
             throw e
         } catch (e: Exception) {
             Log.e(TAG_HTTP, "Exception during download to stream: ${e.message}", e)
-            ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_file_download_stream", message = e.message ?: "Network request failed or failed to parse response"))
+            ApiResponse.Error(FileUploadResponse(success = false, value = "network_exception_file_download_stream", message = e.message ?: "Couldn't reach Pixeldrain."))
         }
     }
 

@@ -17,12 +17,21 @@ import androidx.compose.ui.unit.dp
  * that flips for right-to-left languages (an arrow) goes in AutoMirroredFilledIcons.kt with `autoMirror = true`.
  */
 internal fun icon(name: String, vararg paths: String, autoMirror: Boolean = false): ImageVector =
+    vector(name, 24f, paths, autoMirror)
+
+/**
+ * A Material Symbol from its [paths], on the 960 x 960 grid of the Android XML that fonts.google.com/icons gives for it
+ * ("Material Symbols", its pathData). The tabs' icons are symbols (SymbolIcons.kt), the rest are Material Icons.
+ */
+internal fun symbol(name: String, vararg paths: String): ImageVector = vector(name, 960f, paths, autoMirror = false)
+
+private fun vector(name: String, viewport: Float, paths: Array<out String>, autoMirror: Boolean): ImageVector =
     ImageVector.Builder(
         name = name,
         defaultWidth = 24.dp,
         defaultHeight = 24.dp,
-        viewportWidth = 24f,
-        viewportHeight = 24f,
+        viewportWidth = viewport,
+        viewportHeight = viewport,
         autoMirror = autoMirror
     ).apply {
         paths.forEach { addPath(addPathNodes(it), fill = SolidColor(Color.Black)) }

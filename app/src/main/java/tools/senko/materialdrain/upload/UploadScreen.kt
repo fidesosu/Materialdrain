@@ -1,9 +1,9 @@
 package tools.senko.materialdrain.upload
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
@@ -14,10 +14,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.res.painterResource
-import tools.senko.materialdrain.R
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.filled.*
@@ -26,9 +22,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -42,21 +38,55 @@ import tools.senko.materialdrain.ui.media.FullScreenMediaPreviewDialog
 import tools.senko.materialdrain.ui.media.InlineImagePreview
 import tools.senko.materialdrain.ui.media.InlineTextPreview
 import tools.senko.materialdrain.ui.media.InlineVideoPreview
+import tools.senko.materialdrain.ui.media.rememberDecodedBitmap
 import tools.senko.materialdrain.util.formatDurationMillis
 import tools.senko.materialdrain.util.formatSize
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ScreenPreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 @Composable
 fun UploadScreenContent(
     uploadViewModel: UploadViewModel,
     fabHeight: Dp,
-    isFabVisible: Boolean,
-    /** The experimental navigation has no upload button of its own, so the upload action is a button under the content */
-    inlineUploadButton: Boolean = false
+    isFabVisible: Boolean
 ) {
     val uiState by uploadViewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabTitles = listOf("Upload File", "Upload Text")
+    UploadScreenContent(
+        uiState = uiState,
+        fabHeight = fabHeight,
+        isFabVisible = isFabVisible,
+        onFilesPicked = { uris -> uploadViewModel.onFilesSelected(uris, context) },
+        onClearPickedFile = { uploadViewModel.onFileSelected(null, context) },
+        onTextChange = uploadViewModel::onTextToUploadChanged,
+        onRemoveQueued = uploadViewModel::removeQueuedItem,
+        onClearQueued = uploadViewModel::clearQueuedItems,
+        onCancel = uploadViewModel::cancelUpload,
+        // Text shared from another app (see PendingOpen.Text) is on the text tab
+        initialTab = if (uiState.textToUpload.isNotBlank() && uiState.pickedFile == null && uiState.queuedItems.isEmpty()) 1 else 0
+    )
+}
+
+/** The Upload screen drawn from [uiState], what it does handed to the callbacks; see the previews at the end of the file. */
+@Composable
+fun UploadScreenContent(
+    uiState: UploadUiState,
+    fabHeight: Dp,
+    isFabVisible: Boolean,
+    onFilesPicked: (List<Uri>) -> Unit,
+    onClearPickedFile: () -> Unit,
+    onTextChange: (String) -> Unit,
+    onRemoveQueued: (Int) -> Unit,
+    onClearQueued: () -> Unit,
+    onCancel: () -> Unit,
+    /** The tab it opens on: 0 for a file, 1 for text */
+    initialTab: Int = 0
+) {
+    var selectedTabIndex by remember { mutableIntStateOf(initialTab) }
+    val tabTitles = listOf(stringResource(R.string.upload_upload_file), stringResource(R.string.upload_upload_text))
 
 
     var fullScreenPreviewUri by remember { mutableStateOf<Uri?>(null) }
@@ -78,9 +108,9 @@ fun UploadScreenContent(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents(),
         onResult = { uris: List<Uri> ->
-            uploadViewModel.onFilesSelected(uris, context)
+            onFilesPicked(uris)
             if (uris.isNotEmpty() && selectedTabIndex == 0) {
-                uploadViewModel.onTextToUploadChanged("")
+                onTextChange("")
             }
         }
     )
@@ -96,8 +126,8 @@ fun UploadScreenContent(
                     selected = selectedTabIndex == index,
                     onClick = {
                         selectedTabIndex = index
-                        if (index == 0) uploadViewModel.onTextToUploadChanged("")
-                        else uploadViewModel.onFileSelected(null, context)
+                        if (index == 0) onTextChange("")
+                        else onClearPickedFile()
                     },
                     text = { Text(title) }
                 )
@@ -137,7 +167,7 @@ fun UploadScreenContent(
                             ) {
                                 Icon(Icons.Filled.AttachFile, contentDescription = null)
                                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                                Text(if (uiState.queuedItems.isNotEmpty()) "Choose different files" else "Choose a different file")
+                                Text(if (uiState.queuedItems.isNotEmpty()) stringResource(R.string.upload_choose_different_files) else stringResource(R.string.upload_choose_a_different_file))
                             }
                         }
                         if (uiState.queuedItems.isNotEmpty()) {
@@ -145,27 +175,27 @@ fun UploadScreenContent(
                             QueuedFilesCard(
                                 items = uiState.queuedItems,
                                 isUploading = uiState.isLoading,
-                                onRemove = uploadViewModel::removeQueuedItem,
-                                onClear = uploadViewModel::clearQueuedItems
+                                onRemove = onRemoveQueued,
+                                onClear = onClearQueued
                             )
                         }
                         uiState.pickedFile?.let { file ->
                             Spacer(modifier = Modifier.height(8.dp))
                             Card(modifier = Modifier.fillMaxWidth()){
                                 Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("Selected File:", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
-                                    InfoRow("Name", file.name ?: "N/A")
-                                    file.sizeBytes?.let { s -> InfoRow("Size", formatSize(s)) }
-                                    file.mimeType?.let { mt -> InfoRow("Type", mt) }
+                                    Text(stringResource(R.string.upload_selected_file), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+                                    InfoRow(stringResource(R.string.settings_name), file.name ?: "N/A")
+                                    file.sizeBytes?.let { s -> InfoRow(stringResource(R.string.files_size), formatSize(s)) }
+                                    file.mimeType?.let { mt -> InfoRow(stringResource(R.string.files_type), mt) }
                                     // Each of these is only filled for its own type
-                                    file.audioDurationMillis?.let { d -> InfoRow("Duration", formatDurationMillis(d)) }
-                                    file.audioBitrate?.let { b -> InfoRow("Bitrate", "${b / 1000} kbps") }
-                                    file.audioArtist?.let { a -> InfoRow("Artist", a) }
-                                    file.audioAlbum?.let { al -> InfoRow("Album", al) }
-                                    file.videoDurationMillis?.let { d -> InfoRow("Duration", formatDurationMillis(d)) }
-                                    file.pdfPageCount?.let { pc -> InfoRow("Pages", pc.toString()) }
-                                    file.apkPackageName?.let { pn -> InfoRow("Package", pn) }
-                                    file.apkVersionName?.let { vn -> InfoRow("Version", vn) }
+                                    file.audioDurationMillis?.let { d -> InfoRow(stringResource(R.string.upload_duration), formatDurationMillis(d)) }
+                                    file.audioBitrate?.let { b -> InfoRow(stringResource(R.string.upload_bitrate), "${b / 1000} kbps") }
+                                    file.audioArtist?.let { a -> InfoRow(stringResource(R.string.upload_artist), a) }
+                                    file.audioAlbum?.let { al -> InfoRow(stringResource(R.string.upload_album), al) }
+                                    file.videoDurationMillis?.let { d -> InfoRow(stringResource(R.string.upload_duration), formatDurationMillis(d)) }
+                                    file.pdfPageCount?.let { pc -> InfoRow(stringResource(R.string.upload_pages), pc.toString()) }
+                                    file.apkPackageName?.let { pn -> InfoRow(stringResource(R.string.settings_package), pn) }
+                                    file.apkVersionName?.let { vn -> InfoRow(stringResource(R.string.upload_version), vn) }
                                 }
                             }
                             Spacer(modifier = Modifier.height(8.dp))
@@ -173,7 +203,7 @@ fun UploadScreenContent(
                             if (file.mimeType?.startsWith("image/") == true) {
                                 InlineImagePreview(
                                     imageSource = file.uri,
-                                    contentDescription = "Selected image preview",
+                                    contentDescription = stringResource(R.string.upload_selected_image_preview),
                                     apiKey = null,
                                     onFullScreenClick = {
                                         fullScreenPreviewUri = file.uri
@@ -185,7 +215,7 @@ fun UploadScreenContent(
                             if (file.mimeType?.startsWith("video/") == true) {
                                 InlineVideoPreview(
                                     thumbnailSource = file.videoThumbnail, // Upload screen uses fetched byte array for thumbnail
-                                    contentDescription = "Selected video preview",
+                                    contentDescription = stringResource(R.string.upload_selected_video_preview),
                                     apiKey = null,
                                     onFullScreenClick = {
                                         fullScreenPreviewUri = file.uri
@@ -200,13 +230,13 @@ fun UploadScreenContent(
                                         .fillMaxWidth()
                                         .height(100.dp)
                                         .padding(vertical = 8.dp),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = AppShapes.Medium
                                 ) {
                                     Box(
                                         modifier = Modifier.fillMaxSize(),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(Icons.Filled.PictureAsPdf, contentDescription = "PDF File", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+                                        Icon(Icons.Filled.PictureAsPdf, contentDescription = stringResource(R.string.upload_pdf_file), modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
@@ -217,21 +247,20 @@ fun UploadScreenContent(
                                         .fillMaxWidth()
                                         .heightIn(min = 80.dp)
                                         .padding(vertical = 8.dp),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = AppShapes.Medium
                                 ) {
                                     Box(
                                         modifier = Modifier.fillMaxSize().padding(16.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        file.apkIcon?.let {
-                                            val bitmap = remember(it) { BitmapFactory.decodeByteArray(it, 0, it.size) }
+                                        file.apkIcon?.let { rememberDecodedBitmap(it) }?.let { bitmap ->
                                             Image(
-                                                bitmap = bitmap.asImageBitmap(),
-                                                contentDescription = "APK icon preview",
+                                                bitmap = bitmap,
+                                                contentDescription = stringResource(R.string.upload_apk_icon_preview),
                                                 modifier = Modifier.size(64.dp),
                                                 contentScale = ContentScale.Fit
                                             )
-                                        } ?: Icon(Icons.Filled.Android, contentDescription = "APK File", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+                                        } ?: Icon(Icons.Filled.Android, contentDescription = stringResource(R.string.upload_apk_file), modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
@@ -258,8 +287,8 @@ fun UploadScreenContent(
                     1 -> {
                         OutlinedTextField(
                             value = uiState.textToUpload,
-                            onValueChange = uploadViewModel::onTextToUploadChanged,
-                            label = { Text("Paste text here") },
+                            onValueChange = onTextChange,
+                            label = { Text(stringResource(R.string.upload_paste_text_here)) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .defaultMinSize(minHeight = 240.dp),
@@ -268,7 +297,7 @@ fun UploadScreenContent(
                             supportingText = {
                                 val size = uiState.textToUpload.toByteArray().size.toLong()
                                 Text(
-                                    text = if (size > 0) "${uiState.textToUpload.length} characters · ${formatSize(size)}" else "Uploaded as a .txt file",
+                                    text = if (size > 0) "${uiState.textToUpload.length} characters · ${formatSize(size)}" else stringResource(R.string.upload_uploaded_as_a_txt_file),
                                     modifier = Modifier.fillMaxWidth(),
                                     textAlign = TextAlign.End
                                 )
@@ -279,32 +308,17 @@ fun UploadScreenContent(
 
                 if (uiState.isLoading) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(onClick = uploadViewModel::cancelUpload, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Filled.Close, contentDescription = null)
                         Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                        Text("Cancel upload")
+                        Text(stringResource(R.string.upload_cancel_upload))
                     }
                 }
 
                 if (!uiState.isLoading && uploadResult == null) {
                     val effectiveSize = if (selectedTabIndex == 0) uiState.uploadTotalSizeBytes else uiState.textToUpload.toByteArray().size.toLong().takeIf { it > 0 }
                     if (effectiveSize != null && (uiState.pickedFile != null ||uiState.textToUpload.isNotBlank())) {
-                        Text("Ready to upload. Size: ${formatSize(effectiveSize)}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom=8.dp), textAlign = TextAlign.Center)
-                    }
-                }
-                if (inlineUploadButton && uiState.hasUploadable && !uiState.isLoading) {
-                    Button(
-                        onClick = { uploadViewModel.upload() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                            .height(44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
-                    ) {
-                        Icon(painterResource(R.drawable.icon_upload), contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Upload", style = MaterialTheme.typography.labelLarge)
+                        Text("${formatSize(effectiveSize)}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom=8.dp), textAlign = TextAlign.Center)
                     }
                 }
                 // Add Spacer at the end of the scrollable content if FAB is visible
@@ -329,7 +343,7 @@ private fun UploadDropZone(enabled: Boolean, onClick: () -> Unit) {
         onClick = onClick,
         enabled = enabled,
         color = Color.Transparent,
-        shape = RoundedCornerShape(8.dp),
+        shape = AppShapes.Small,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = contentAlpha)),
         modifier = Modifier
             .fillMaxWidth()
@@ -350,16 +364,9 @@ private fun UploadDropZone(enabled: Boolean, onClick: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                "Tap to choose files",
+                stringResource(R.string.upload_tap_to_choose_files),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = contentAlpha),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                "Anywhere in this area. You can pick more than one file.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
                 textAlign = TextAlign.Center
             )
         }
@@ -368,6 +375,8 @@ private fun UploadDropZone(enabled: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun UploadResultCard(fileId: String?) {
+    // The app's texts, for those its callbacks show
+    val res = LocalResources.current
     val context = LocalContext.current
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -385,10 +394,10 @@ private fun UploadResultCard(fileId: String?) {
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Upload complete", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(stringResource(R.string.upload_upload_complete), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 if (fileId != null) {
                     Text(
-                        "pixeldrain.com/u/$fileId",
+                        stringResource(R.string.upload_pixeldrain_com_u, fileId),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         maxLines = 1,
@@ -397,8 +406,8 @@ private fun UploadResultCard(fileId: String?) {
                 }
             }
             if (fileId != null) {
-                IconButton(onClick = { copyToClipboard(context, pixeldrainLink(fileId), "Link copied to clipboard") }) {
-                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copy link", tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                IconButton(onClick = { copyToClipboard(context, pixeldrainLink(fileId), res.getString(R.string.upload_link_copied_to_clipboard)) }) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(R.string.upload_copy_link), tint = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
         }
@@ -420,6 +429,8 @@ private fun QueuedFilesCard(
     onRemove: (Int) -> Unit,
     onClear: () -> Unit
 ) {
+    // The app's texts, for those its callbacks show
+    val res = LocalResources.current
     val context = LocalContext.current
     val doneCount = items.count { it.status == UploadItemStatus.DONE }
     val totalSize = items.sumOf { it.sizeBytes ?: 0L }
@@ -434,7 +445,7 @@ private fun QueuedFilesCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (doneCount > 0) "$doneCount of ${items.size} uploaded" else "${items.size} files selected",
+                        text = if (doneCount > 0) "$doneCount of ${items.size} uploaded" else stringResource(R.string.upload_files_selected, items.size),
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
@@ -446,10 +457,10 @@ private fun QueuedFilesCard(
                 if (doneCount > 0) {
                     TextButton(onClick = {
                         val links = items.mapNotNull { it.fileId }.joinToString("\n") { pixeldrainLink(it) }
-                        copyToClipboard(context, links, "Links copied to clipboard")
-                    }) { Text("Copy links") }
+                        copyToClipboard(context, links, res.getString(R.string.upload_links_copied_to_clipboard))
+                    }) { Text(stringResource(R.string.upload_copy_links)) }
                 }
-                TextButton(onClick = onClear, enabled = !isUploading) { Text("Clear") }
+                TextButton(onClick = onClear, enabled = !isUploading) { Text(stringResource(R.string.upload_clear)) }
             }
             items.forEach { item ->
                 key(item.id) {
@@ -462,18 +473,20 @@ private fun QueuedFilesCard(
 
 @Composable
 private fun QueuedFileRow(item: UploadItem, isUploading: Boolean, onRemove: (Int) -> Unit) {
+    // The app's texts, for those its callbacks show
+    val res = LocalResources.current
     val context = LocalContext.current
     val size = item.sizeBytes?.takeIf { it > 0 }
     val fraction = size?.let { (item.uploadedBytes.toFloat() / it).coerceIn(0f, 1f) }
     val animatedFraction by animateFloatAsState(targetValue = fraction ?: 0f, label = "queuedItemProgress")
 
     val subtitle = when (item.status) {
-        UploadItemStatus.PENDING -> item.sizeBytes?.let { formatSize(it) } ?: "Unknown size"
+        UploadItemStatus.PENDING -> item.sizeBytes?.let { formatSize(it) } ?: stringResource(R.string.upload_unknown_size)
         UploadItemStatus.UPLOADING ->
             if (size != null) "${((fraction ?: 0f) * 100).toInt()}% · ${formatSize(item.uploadedBytes)} / ${formatSize(size)}"
             else formatSize(item.uploadedBytes)
-        UploadItemStatus.DONE -> "Uploaded" + (item.sizeBytes?.let { " · ${formatSize(it)}" } ?: "")
-        UploadItemStatus.FAILED -> item.errorMessage ?: "Upload failed"
+        UploadItemStatus.DONE -> stringResource(R.string.files_uploaded) + (item.sizeBytes?.let { " · ${formatSize(it)}" } ?: "")
+        UploadItemStatus.FAILED -> item.errorMessage ?: stringResource(R.string.upload_upload_failed)
     }
 
     Row(
@@ -484,12 +497,12 @@ private fun QueuedFileRow(item: UploadItem, isUploading: Boolean, onRemove: (Int
     ) {
         Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
             when (item.status) {
-                UploadItemStatus.PENDING -> Icon(Icons.Filled.Schedule, contentDescription = "Waiting", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                UploadItemStatus.PENDING -> Icon(Icons.Filled.Schedule, contentDescription = stringResource(R.string.upload_waiting), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 UploadItemStatus.UPLOADING ->
                     if (fraction != null) CircularProgressIndicator(progress = { animatedFraction }, modifier = Modifier.size(22.dp), strokeWidth = 3.dp)
                     else CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 3.dp)
-                UploadItemStatus.DONE -> Icon(Icons.Filled.CheckCircle, contentDescription = "Uploaded", tint = MaterialTheme.colorScheme.primary)
-                UploadItemStatus.FAILED -> Icon(Icons.Filled.Error, contentDescription = "Failed", tint = MaterialTheme.colorScheme.error)
+                UploadItemStatus.DONE -> Icon(Icons.Filled.CheckCircle, contentDescription = stringResource(R.string.files_uploaded), tint = MaterialTheme.colorScheme.primary)
+                UploadItemStatus.FAILED -> Icon(Icons.Filled.Error, contentDescription = stringResource(R.string.upload_failed), tint = MaterialTheme.colorScheme.error)
             }
         }
         Spacer(Modifier.width(12.dp))
@@ -505,15 +518,94 @@ private fun QueuedFileRow(item: UploadItem, isUploading: Boolean, onRemove: (Int
         }
         val fileId = item.fileId
         if (item.status == UploadItemStatus.DONE && fileId != null) {
-            IconButton(onClick = { copyToClipboard(context, pixeldrainLink(fileId), "Link copied to clipboard") }) {
-                Icon(Icons.Filled.ContentCopy, contentDescription = "Copy link")
+            IconButton(onClick = { copyToClipboard(context, pixeldrainLink(fileId), res.getString(R.string.upload_link_copied_to_clipboard)) }) {
+                Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(R.string.upload_copy_link))
             }
         } else if (!isUploading) {
             IconButton(onClick = { onRemove(item.id) }) {
-                Icon(Icons.Filled.Close, contentDescription = "Remove from list")
+                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.upload_remove_from_list))
             }
         } else {
             Spacer(Modifier.size(48.dp))
         }
     }
 }
+
+// ---- Previews ----
+
+/** The screen with [uiState], on tab [tab], doing nothing when used. */
+@Composable
+private fun UploadPreview(uiState: UploadUiState, tab: Int = 0) {
+    PreviewTheme {
+        UploadScreenContent(
+            uiState = uiState,
+            fabHeight = 56.dp,
+            isFabVisible = uiState.hasUploadable,
+            onFilesPicked = {},
+            onClearPickedFile = {},
+            onTextChange = {},
+            onRemoveQueued = {},
+            onClearQueued = {},
+            onCancel = {},
+            initialTab = tab
+        )
+    }
+}
+
+@ScreenPreviews
+@Composable
+private fun UploadEmptyPreview() = UploadPreview(UploadUiState())
+
+/** One file picked: its details and its preview (an audio file, whose player shows). */
+@ScreenPreviews
+@Composable
+private fun UploadPickedFilePreview() = UploadPreview(
+    UploadUiState(
+        uploadTotalSizeBytes = PreviewSamples.song.size,
+        pickedFile = PickedFile(
+            uri = Uri.EMPTY,
+            name = PreviewSamples.song.name,
+            sizeBytes = PreviewSamples.song.size,
+            mimeType = "audio/mpeg",
+            audioDurationMillis = 213_000,
+            audioBitrate = 320_000,
+            audioArtist = "Some Artist",
+            audioAlbum = "An Album (2026)"
+        )
+    )
+)
+
+/** Several files uploading: one done, one under way, one failed, one waiting. */
+@ScreenPreviews
+@Composable
+private fun UploadQueuePreview() {
+    val files = PreviewSamples.files.filter { !it.isDirectory }.take(4)
+    UploadPreview(
+        UploadUiState(
+            isLoading = true,
+            queuedItems = files.mapIndexed { index, file ->
+                val status = UploadItemStatus.entries[listOf(2, 1, 3, 0)[index]]
+                UploadItem(
+                    id = index,
+                    uri = Uri.EMPTY,
+                    name = file.name,
+                    sizeBytes = file.size,
+                    mimeType = file.mimeType,
+                    status = status,
+                    uploadedBytes = if (status == UploadItemStatus.UPLOADING) (file.size ?: 0L) / 3 else 0L,
+                    fileId = if (status == UploadItemStatus.DONE) "aBcD1234" else null,
+                    errorMessage = if (status == UploadItemStatus.FAILED) "The host refused the file: it's too big." else null
+                )
+            }
+        )
+    )
+}
+
+@ScreenPreviews
+@Composable
+private fun UploadTextPreview() = UploadPreview(UploadUiState(textToUpload = PreviewSamples.CODE), tab = 1)
+
+/** Uploaded: the result card with the file's link. */
+@ScreenPreviews
+@Composable
+private fun UploadDonePreview() = UploadPreview(UploadUiState(uploadResult = UploadResult(success = true, id = "aBcD1234")))

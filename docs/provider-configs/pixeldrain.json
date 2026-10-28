@@ -1,6 +1,6 @@
 {
   "kind": "generic_rest",
-  "name": "Pixeldrain (generic REST)",
+  "name": "Pixeldrain API",
   "base_url": "https://pixeldrain.com/api",
   "browse_root": "me",
   "account_fallback": true,
@@ -153,6 +153,10 @@
       "method": "GET",
       "path": "/filesystem/{path}"
     },
+    "browse_download_archive": {
+      "method": "GET",
+      "path": "/filesystem/{path}?bulk_download"
+    },
     "browse_thumbnail": {
       "method": "GET",
       "path": "/filesystem/{path}?thumbnail"
@@ -288,7 +292,7 @@
   ],
   "meta": {
     "id": "tools.senko.materialdrain.examples.pixeldrain",
-    "version": 9,
+    "version": 10,
     "author": "fides"
   }
 }

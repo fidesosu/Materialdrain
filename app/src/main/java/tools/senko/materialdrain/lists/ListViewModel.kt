@@ -22,6 +22,8 @@ import tools.senko.materialdrain.provider.api.ProviderKind
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.settings.SavedOpenedList
+import android.content.res.Resources
+import tools.senko.materialdrain.R
 
 data class ListsUiState(
     val isLoading: Boolean = false,
@@ -41,6 +43,8 @@ data class ListsUiState(
 
 /** The lists of files of the active provider: the overview, and the contents of the list which is opened. */
 class ListViewModel(
+    /** The app's texts (its messages) */
+    private val resources: Resources,
     private val registry: ProviderRegistry,
     private val configStore: ProviderConfigStore,
     private val sessionManager: SessionManager,
@@ -116,7 +120,7 @@ class ListViewModel(
 
     private fun loadApiKey() {
         if (needsKeyButMissing()) {
-            _uiState.update { it.copy(apiKeyMissingError = true, errorMessage = "API Key is missing. Please set it in Settings.", lists = emptyList()) }
+            _uiState.update { it.copy(apiKeyMissingError = true, errorMessage = resources.getString(R.string.browser_log_in_or_add_an), lists = emptyList()) }
         } else {
             _uiState.update { it.copy(apiKeyMissingError = false, errorMessage = null) }
             fetchUserLists()
@@ -125,11 +129,11 @@ class ListViewModel(
 
     fun fetchUserLists() {
         val ops = lists() ?: run {
-            _uiState.update { it.copy(errorMessage = "This host has no lists.", isLoading = false) }
+            _uiState.update { it.copy(errorMessage = resources.getString(R.string.files_this_host_has_no_lists), isLoading = false) }
             return
         }
         if (needsKeyButMissing()) {
-            _uiState.update { it.copy(errorMessage = "API Key is required to fetch lists.", isLoading = false) }
+            _uiState.update { it.copy(errorMessage = resources.getString(R.string.browser_log_in_or_add_an), isLoading = false) }
             return
         }
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
@@ -143,7 +147,7 @@ class ListViewModel(
                 is ApiResponse.Error -> {
                     ProviderLog.e("Lists", "loading the lists failed (${response.error.code}): ${response.error.message}")
                     _uiState.update {
-                        it.copy(isLoading = false, errorMessage = response.error.forDisplay().ifBlank { "Unknown error fetching lists" })
+                        it.copy(isLoading = false, errorMessage = response.error.forDisplay(resources).ifBlank { resources.getString(R.string.lists_unknown_error_fetching_lists) })
                     }
                 }
             }
@@ -168,7 +172,7 @@ class ListViewModel(
     private fun fetchOpenedListFiles() {
         val list = _uiState.value.openedList ?: return
         val ops = lists() ?: run {
-            _uiState.update { it.copy(listFilesErrorMessage = "This host has no lists.") }
+            _uiState.update { it.copy(listFilesErrorMessage = resources.getString(R.string.files_this_host_has_no_lists)) }
             return
         }
         _uiState.update { it.copy(isLoadingListFiles = true, listFilesErrorMessage = null) }
@@ -189,7 +193,7 @@ class ListViewModel(
                     if (it.openedList?.id != list.id) it
                     else it.copy(
                         isLoadingListFiles = false,
-                        listFilesErrorMessage = response.error.forDisplay().ifBlank { "Unknown error fetching list." }
+                        listFilesErrorMessage = response.error.forDisplay(resources).ifBlank { resources.getString(R.string.lists_unknown_error_fetching_list) }
                     )
                 }
             }

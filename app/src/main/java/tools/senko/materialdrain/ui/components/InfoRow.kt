@@ -10,6 +10,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import androidx.compose.foundation.layout.Column
 
 @Composable
 fun InfoRow(
@@ -63,6 +67,19 @@ fun InfoRow(
                 color = valueColor, // Apply color here too for non-selectable but clickable items if any in future
                 modifier = valueModifier
             )
+        }
+    }
+}
+
+// ---- Previews ----
+
+@ThemePreviews
+@Composable
+private fun InfoRowPreview() {
+    PreviewTheme(padding = 16.dp) {
+        Column {
+            InfoRow("Name", PreviewSamples.image.name)
+            InfoRow("Link", "pixeldrain.com/u/aBcD1234", isValueSelectable = true, onValueClick = {})
         }
     }
 }

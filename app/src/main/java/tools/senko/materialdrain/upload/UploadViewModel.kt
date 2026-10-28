@@ -1,5 +1,9 @@
 package tools.senko.materialdrain.upload
 
+import tools.senko.materialdrain.provider.api.StorageRef
+import tools.senko.materialdrain.provider.api.StorageNode
+import android.content.ClipboardManager
+import android.content.ClipData
 import android.app.Application
 import android.content.Context
 import android.content.pm.PackageInfo
@@ -9,8 +13,9 @@ import android.graphics.pdf.PdfRenderer
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.ParcelFileDescriptor
-import android.provider.OpenableColumns
 import android.util.Log
+import android.system.OsConstants
+import android.system.Os
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -50,6 +55,8 @@ import tools.senko.materialdrain.transfer.TransferSpeedTracker
 import tools.senko.materialdrain.transfer.estimateEtaSeconds
 import tools.senko.materialdrain.util.readContentUriInfo
 import tools.senko.materialdrain.settings.AppSettings
+import tools.senko.materialdrain.UiMessages
+import tools.senko.materialdrain.R
 
 // SharedPreferences constants
 private const val TAG = "PIXEL_VM_DEBUG" // Tag for Logcat
@@ -146,10 +153,26 @@ class UploadViewModel(
     private val configStore: ProviderConfigStore,
     private val sessionManager: SessionManager,
     private val transfers: TransferRegistry,
-    private val appSettings: AppSettings
+    private val appSettings: AppSettings,
+    private val messages: UiMessages
 ) : ViewModel() {
 
     private fun provider() = registry.resolve(configStore.activeProviderId.value)
+
+    /**
+     * Copies the links of the files just uploaded ([uploaded]: their ids and names), one per line, when the setting is on
+     * (Files and transfers, Copy the link after uploading). Hosts without links of their files copy nothing.
+     */
+    private fun copyLinksOf(uploaded: List<Pair<String, String>>) {
+        if (!appSettings.copyLinkAfterUpload.value || uploaded.isEmpty()) return
+        val provider = provider()
+        val links = uploaded.mapNotNull { (id, name) ->
+            provider.shareUrl(StorageNode(ref = StorageRef(id = id), name = name, isDirectory = false))
+        }
+        if (links.isEmpty()) return
+        application.getSystemService(ClipboardManager::class.java)
+            ?.setPrimaryClip(ClipData.newPlainText(if (links.size == 1) application.getString(R.string.files_link) else application.getString(R.string.upload_links), links.joinToString("\n")))
+    }
 
     /** Pixeldrain uploads need the login; other hosts take their own credentials. */
     private fun missingKey(): Boolean = provider().kind == ProviderKind.PIXELDRAIN && sessionManager.apiKey.value.isBlank()
@@ -167,7 +190,7 @@ class UploadViewModel(
             } else {
                 // No flat storage to upload into (WebDAV, S3, SMB): the Upload screen uploads into the host's root
                 // folder instead, through the same browse the Filesystem screen uses
-                val browse = provider.browse ?: return UploadResult(false, message = "This host can't receive uploads.")
+                val browse = provider.browse ?: return UploadResult(false, message = application.getString(R.string.upload_this_host_can_t_receive))
                 val root = provider.rootPath.trim('/')
                 browse.upload(if (root.isEmpty()) fileName else "$root/$fileName", uri, application, makeParents = false, onProgress)
             }
@@ -176,7 +199,7 @@ class UploadViewModel(
         } catch (e: Exception) {
             currentCoroutineContext().ensureActive()
             Log.e(TAG, "Upload of $fileName failed: ${e.message}", e)
-            return UploadResult(false, message = e.message ?: "The upload failed.")
+            return UploadResult(false, message = e.message ?: application.getString(R.string.filesystem_the_upload_failed))
         }
         return when (response) {
             is ApiResponse.Success -> UploadResult(true, id = response.data.ref.id)
@@ -273,19 +296,10 @@ class UploadViewModel(
 
         try {
             newMimeType = context.contentResolver.getType(uri)
-            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                    newFileName = cursor.getString(nameIndex)
-                    if (!cursor.isNull(sizeIndex)) {
-                        newFileSizeBytes = cursor.getLong(sizeIndex)
-                    } else {
-                        Log.w(TAG, "File size is unavailable for URI: $uri")
-                        newFileSizeBytes = null
-                    }
-                }
-            }
+            // Either may be missing: an app's provider needn't give them
+            val info = readContentUriInfo(context, uri)
+            newFileName = info.displayName
+            newFileSizeBytes = info.sizeBytes
 
             if (isTextFile(newFileName.orEmpty(), newMimeType)) {
                 try {
@@ -300,7 +314,7 @@ class UploadViewModel(
                     }
                 } catch (e: IOException) {
                     Log.e(TAG, "Error reading text content for preview: ${e.message}", e)
-                    newErrorMessage = (newErrorMessage ?: "") + " Could not read file for preview."
+                    newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_could_not_read_file_for)
                 }
             }
 
@@ -319,7 +333,7 @@ class UploadViewModel(
                     newAudioAlbumArt = retriever.embeddedPicture
                 } catch (e: Exception) {
                     Log.e(TAG, "Error extracting audio metadata: ${e.message}", e)
-                    newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve audio metadata."
+                    newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_could_not_retrieve_audio_metadata)
                 } finally {
                     retriever.release()
                 }
@@ -342,7 +356,7 @@ class UploadViewModel(
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error extracting video metadata/thumbnail: ${e.message}", e)
-                    newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve video metadata or thumbnail."
+                    newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_could_not_retrieve_video_metadata)
                 } finally {
                     retriever.release()
                 }
@@ -359,7 +373,7 @@ class UploadViewModel(
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error getting PDF page count: ${e.message}", e)
-                    newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve PDF details."
+                    newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_could_not_retrieve_pdf_details)
                 } finally {
                     renderer?.close()
                     pfd?.close()
@@ -368,19 +382,25 @@ class UploadViewModel(
 
             if (newMimeType == "application/vnd.android.package-archive") {
                 var tempApkFile: File? = null
+                var descriptor: ParcelFileDescriptor? = null
                 try {
-                    // PackageManager needs a file path, so copy from URI to a temp file if it's a content URI
+                    // PackageManager needs a file path. A file opened from the URI has one of its own (/proc/self/fd/…),
+                    // so the APK (often hundreds of MB) needn't be copied; only one which isn't a real file (a stream
+                    // an app writes as it's read) is copied to the cache first
                     val apkPath = if (uri.scheme == "content") {
-                        val tempFileName = "temp_apk_preview_${System.currentTimeMillis()}.apk"
-                        tempApkFile = File(context.cacheDir, tempFileName)
-                        context.contentResolver.openInputStream(uri)?.use { input ->
-                            FileOutputStream(tempApkFile).use { output ->
-                                input.copyTo(output)
+                        descriptor = context.contentResolver.openFileDescriptor(uri, "r")
+                        val opened = descriptor?.let { "/proc/self/fd/${it.fd}" }
+                        if (opened != null && runCatching { OsConstants.S_ISREG(Os.fstat(descriptor.fileDescriptor).st_mode) }.getOrDefault(false)) {
+                            opened
+                        } else {
+                            tempApkFile = File(context.cacheDir, "temp_apk_preview_${System.currentTimeMillis()}.apk")
+                            context.contentResolver.openInputStream(uri)?.use { input ->
+                                FileOutputStream(tempApkFile).use { output -> input.copyTo(output) }
                             }
+                            tempApkFile.absolutePath
                         }
-                        tempApkFile.absolutePath
                     } else {
-                        uri.path // Assume it's already a file path
+                        uri.path // Already a file path
                     }
 
                     apkPath?.let {
@@ -401,22 +421,23 @@ class UploadViewModel(
                                 newApkIcon = baos.toByteArray()
                             }
                         } else {
-                            newErrorMessage = (newErrorMessage ?: "") + " Could not parse APK details."
+                            newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_could_not_parse_apk_details)
                         }
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error extracting APK info: ${e.message}", e)
-                    newErrorMessage = (newErrorMessage ?: "") + " Could not retrieve APK details."
+                    newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_could_not_retrieve_apk_details)
                 } finally {
-                    tempApkFile?.delete() // Clean up temp file
+                    descriptor?.close()
+                    tempApkFile?.delete()
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error querying file details: ${e.message}", e)
-            newFileName = "Error reading file"
+            newFileName = application.getString(R.string.upload_error_reading_file)
             newFileSizeBytes = null
             newMimeType = null
-            newErrorMessage = (newErrorMessage ?: "") + " Error accessing file details."
+            newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_error_accessing_file_details)
         }
 
         // Each of the details is only read for its own type, so the others are still null here
@@ -481,6 +502,31 @@ class UploadViewModel(
         )
     }
 
+    /**
+     * Uploads [uris] right away as new files of the host: the Files screen's Upload (in its ⋮ menu), and files shared to
+     * the app sent there (see SharedUploadBar). Read and queued as picked files are, then sent as [upload] sends them;
+     * how it went is told on the snackbar rather than on the Upload screen, which isn't there. Not while an upload runs.
+     */
+    fun uploadNow(uris: List<Uri>, context: Context) {
+        if (uris.isEmpty() || _uiState.value.isLoading) return
+        pickJob?.cancel()
+        pickJob = viewModelScope.launch {
+            val items = withContext(Dispatchers.IO) { uris.map { uri -> readUploadItem(uri, context) } }
+            _uiState.update {
+                it.copy(
+                    queuedItems = items,
+                    pickedFile = null,
+                    uploadTotalSizeBytes = null,
+                    textToUpload = "",
+                    errorMessage = null,
+                    uploadResult = null,
+                    uploadedBytes = 0L
+                )
+            }
+            uploadQueuedItems(fromScreen = false)
+        }
+    }
+
     fun removeQueuedItem(itemId: Int) {
         if (_uiState.value.isLoading) return
         _uiState.update { it.copy(queuedItems = it.queuedItems.filterNot { item -> item.id == itemId }) }
@@ -531,7 +577,11 @@ class UploadViewModel(
         _uiState.update { it.copy(uploadResult = null, errorMessage = null, isLoading = false, uploadedBytes = 0L) }
     }
 
-    private fun uploadQueuedItems() {
+    /**
+     * Sends the queued files. [fromScreen] false (see [uploadNow]): there's no Upload screen to show how it went, and so
+     * to retry from, so the snackbar says it instead.
+     */
+    private fun uploadQueuedItems(fromScreen: Boolean = true) {
         // In the order the files were last changed, oldest first (files whose date Android doesn't know go last, as
         // they were picked), and one after another, so they reach the host in that order; otherwise several at once
         val ordered = appSettings.uploadInModifiedOrder.value
@@ -605,7 +655,7 @@ class UploadViewModel(
                             updateItem(item.id) { it.copy(status = UploadItemStatus.UPLOADING) }
                             val response = uploadFile(item.name, item.uri) { sent, _ ->
                                 // Called from inside the host's sending loop: a cancelled upload stops there
-                                if (job?.isActive == false) throw CancellationException("The upload was cancelled")
+                                if (job?.isActive == false) throw CancellationException(application.getString(R.string.filesystem_the_upload_was_cancelled))
                                 synchronized(lock) { bytesPerItem[item.id] = sent }
                                 updateItem(item.id) { it.copy(uploadedBytes = sent) }
                             }
@@ -615,27 +665,36 @@ class UploadViewModel(
                                     it.copy(status = UploadItemStatus.DONE, uploadedBytes = item.sizeBytes ?: it.uploadedBytes, fileId = response.id)
                                 }
                             } else {
-                                val message = response.message ?: "Upload failed."
+                                val message = response.message ?: application.getString(R.string.upload_upload_failed_2)
                                 updateItem(item.id) { it.copy(status = UploadItemStatus.FAILED, uploadedBytes = 0L, errorMessage = message) }
                             }
                         }
                     }
                 }.awaitAll()
 
+                copyLinksOf(
+                    _uiState.value.queuedItems
+                        .filter { it.id in batchIds && it.status == UploadItemStatus.DONE }
+                        .mapNotNull { item -> item.fileId?.let { it to item.name } }
+                )
                 val failed = _uiState.value.queuedItems.count { it.id in batchIds && it.status == UploadItemStatus.FAILED }
                 if (failed > 0) {
-                    outcomeMessage = "$failed of ${batch.size} uploads failed."
+                    outcomeMessage = application.getString(R.string.upload_of_uploads_failed, failed, batch.size)
                 } else {
                     outcome = TransferOutcome.COMPLETED
-                    outcomeMessage = if (batch.size == 1) "${batch.first().name} was uploaded." else "${batch.size} files were uploaded."
+                    outcomeMessage = if (batch.size == 1) application.getString(R.string.upload_was_uploaded, batch.first().name) else application.getString(R.string.upload_files_were_uploaded, batch.size)
                 }
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         uploadSpeedBytesPerSec = 0L,
                         uploadEtaSeconds = null,
-                        errorMessage = if (failed > 0) "$failed of ${batch.size} uploads failed. Press Upload to retry the failed files." else null
+                        errorMessage = if (failed > 0 && fromScreen) application.getString(R.string.upload_of_failed_tap_upload_to, failed, batch.size) else null
                     )
+                }
+                if (!fromScreen) {
+                    val firstError = _uiState.value.queuedItems.firstOrNull { it.id in batchIds && it.status == UploadItemStatus.FAILED }?.errorMessage
+                    messages.show(if (failed > 0) "$outcomeMessage ${firstError.orEmpty()}".trim() else outcomeMessage.orEmpty(), long = failed > 0)
                 }
             } catch (e: CancellationException) {
                 outcome = TransferOutcome.CANCELLED
@@ -677,7 +736,7 @@ class UploadViewModel(
             _uiState.update {
                 it.copy(
                     isLoading = false,
-                    errorMessage = "No file selected or text provided.",
+                    errorMessage = application.getString(R.string.upload_pick_a_file_or_enter),
                     pickedFile = null,
                     uploadTotalSizeBytes = null,
                     textToUpload = ""
@@ -721,7 +780,7 @@ class UploadViewModel(
             val job = coroutineContext[Job]
             val progressCallback: (bytesSent: Long, totalBytes: Long?) -> Unit = { bytesSent, receivedTotalBytes ->
                 // Called from inside the host's sending loop: a cancelled upload stops there
-                if (job?.isActive == false) throw CancellationException("The upload was cancelled")
+                if (job?.isActive == false) throw CancellationException(application.getString(R.string.filesystem_the_upload_was_cancelled))
                 val speed = speedTracker.update(bytesSent)
                 val total = receivedTotalBytes ?: _uiState.value.uploadTotalSizeBytes
                 val eta = estimateEtaSeconds(total, bytesSent, speed)
@@ -739,7 +798,7 @@ class UploadViewModel(
 
             val response: UploadResult? = try {
                 if (currentPickedFile != null) {
-                    operationType = "file from URI"
+                    operationType = application.getString(R.string.upload_file_from_uri)
                     val fileName = currentFileNameForUpload ?: "pixeldrain_upload_${System.currentTimeMillis()}"
                     uploadFile(fileName, currentPickedFile.uri, progressCallback)
                 } else if (currentTextToUpload.isNotBlank()) {
@@ -758,13 +817,14 @@ class UploadViewModel(
             } catch (e: Exception) {
                 Log.e(TAG, "Upload failed for $operationType. Exception: ${e.message}", e)
                 _uiState.update {
-                    it.copy(isLoading = false, errorMessage = "Upload failed: ${e.message ?: "Unknown error"}")
+                    it.copy(isLoading = false, errorMessage = application.getString(R.string.upload_upload_failed_3, e.message ?: "Unknown error"))
                 }
                 null
             }
 
             if (response != null) {
                 if (response.success) {
+                    response.id?.let { id -> copyLinksOf(listOf(id to (currentFileNameForUpload ?: "text.txt"))) }
                     _uiState.update {
                         val finalTotalBytes = it.uploadTotalSizeBytes
                         it.copy(
@@ -782,22 +842,22 @@ class UploadViewModel(
                         it.copy(
                             isLoading = false,
                             uploadResult = response,
-                            errorMessage = response.message ?: "Upload failed with no specific message."
+                            errorMessage = response.message ?: application.getString(R.string.upload_upload_failed_2)
                         )
                     }
                 }
             } else { 
                 if (_uiState.value.isLoading) {
                      _uiState.update {
-                        it.copy(isLoading = false, errorMessage = it.errorMessage ?: "Upload did not return a response.")
+                        it.copy(isLoading = false, errorMessage = it.errorMessage ?: application.getString(R.string.upload_no_answer_from_the_host))
                     }
                 }
             }
             _uiState.update { it.copy(uploadSpeedBytesPerSec = 0L, uploadEtaSeconds = null) }
             if (response?.success == true) {
-                transfers.finish(transferId, TransferOutcome.COMPLETED, "${currentFileNameForUpload ?: "Text"} was uploaded.")
+                transfers.finish(transferId, TransferOutcome.COMPLETED, application.getString(R.string.upload_was_uploaded, currentFileNameForUpload ?: "Text"))
             } else {
-                transfers.finish(transferId, TransferOutcome.FAILED, response?.message ?: "The upload failed.")
+                transfers.finish(transferId, TransferOutcome.FAILED, response?.message ?: application.getString(R.string.filesystem_the_upload_failed))
             }
         }
     }

@@ -1,5 +1,6 @@
 package tools.senko.materialdrain.ui.components
 
+import tools.senko.materialdrain.ui.theme.AppShapes
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -29,7 +30,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import tools.senko.materialdrain.ui.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
@@ -54,6 +54,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.provider.api.ApiResponse
 import tools.senko.materialdrain.provider.api.StorageNode
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import tools.senko.materialdrain.ui.preview.PreviewSamples
+import tools.senko.materialdrain.provider.api.StorageRef
+import androidx.compose.ui.res.stringResource
+import tools.senko.materialdrain.R
 
 @Composable
 fun TextInputDialog(
@@ -87,7 +93,7 @@ fun TextInputDialog(
         confirmButton = {
             Button(onClick = { onConfirm(value) }, enabled = value.isNotBlank()) { Text(confirmLabel) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_cancel)) } }
     )
 }
 
@@ -110,7 +116,7 @@ fun ConfirmDialog(
                 colors = if (isDestructive) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error) else ButtonDefaults.buttonColors()
             ) { Text(confirmLabel) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_cancel)) } }
     )
 }
 /**
@@ -163,7 +169,7 @@ fun FolderPickerDialog(
         // Back goes up a folder before it closes the dialog
         BackHandler(enabled = hasParent) { goUp() }
         Surface(
-            shape = RoundedCornerShape(28.dp),
+            shape = AppShapes.ExtraLarge,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 6.dp,
             modifier = Modifier.fillMaxWidth()
@@ -204,7 +210,7 @@ fun FolderPickerDialog(
                                 )
                                 is FolderListing.Loaded -> if (listing.folders.isEmpty()) {
                                     Text(
-                                        "No folders in here",
+                                        stringResource(R.string.common_no_folders_in_here),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.align(Alignment.Center)
@@ -227,7 +233,7 @@ fun FolderPickerDialog(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.browser_cancel)) }
                     Spacer(Modifier.width(8.dp))
                     Button(onClick = { onConfirm(path) }, enabled = listings[path] !is FolderListing.Failed) { Text(confirmLabel) }
                 }
@@ -266,7 +272,7 @@ private fun PickerPath(crumbs: List<Pair<String, String>>, onCrumbClick: (String
                 color = if (last) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(AppShapes.Small)
                     .clickable(enabled = !last) { onCrumbClick(crumbPath) }
                     .padding(horizontal = 4.dp, vertical = 6.dp)
             )
@@ -288,7 +294,7 @@ private fun PickerFolderRow(name: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(AppShapes.Large)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -298,8 +304,63 @@ private fun PickerFolderRow(name: String, onClick: () -> Unit) {
         Text(name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         Icon(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = "Open",
+            contentDescription = stringResource(R.string.browser_open),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+// ---- Previews ----
+
+@ThemePreviews
+@Composable
+private fun TextInputDialogPreview() {
+    PreviewTheme {
+        TextInputDialog(
+            title = "Rename",
+            label = "Name",
+            confirmLabel = "Rename",
+            initialValue = PreviewSamples.image.name,
+            supportingText = "The extension stays as it is.",
+            onConfirm = {},
+            onDismiss = {}
+        )
+    }
+}
+
+@ThemePreviews
+@Composable
+private fun ConfirmDialogPreview() {
+    PreviewTheme {
+        ConfirmDialog(
+            title = "Delete file?",
+            text = "\"${PreviewSamples.image.name}\" will be deleted for good.",
+            confirmLabel = "Delete",
+            isDestructive = true,
+            onConfirm = {},
+            onDismiss = {}
+        )
+    }
+}
+
+/** Inside a folder of the made-up files; in the interactive preview its folders and its path can be tapped. */
+@ThemePreviews
+@Composable
+private fun FolderPickerDialogPreview() {
+    PreviewTheme {
+        FolderPickerDialog(
+            title = "Move to",
+            confirmLabel = "Move here",
+            initialPath = "me/Photos",
+            loadFolders = { path ->
+                ApiResponse.Success(
+                    listOf("2024", "2025", "2026", "Screenshots", "Wallpapers").map {
+                        StorageNode(StorageRef(path = "$path/$it"), name = it, isDirectory = true)
+                    }
+                )
+            },
+            onConfirm = {},
+            onDismiss = {}
         )
     }
 }

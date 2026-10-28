@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -47,18 +46,19 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import tools.senko.materialdrain.navmenu.NavFabPosition
+import tools.senko.materialdrain.ui.preview.PreviewTheme
+import tools.senko.materialdrain.ui.preview.ThemePreviews
+import androidx.compose.material3.SnackbarVisuals
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 
-/** The gap between the snackbar and the navigation button beside it. */
-private val EdgeGap = 8.dp
+/** The snackbar's corner radius, the screens' buttons' (see AppFab). */
+private val Corner = 16.dp
 
-/** The corner radius of the navigation button, which the snackbar copies. */
-private val EdgeCorner = 16.dp
-
-/** The space between the snackbar and the screen's sides and bottom: half the navigation button's own margin. */
+/** The space between the snackbar and the screen's sides and bottom. */
 private val SideMargin = 8.dp
 
-/** How long the snackbar moves and the navigation button lifts. They share it, so they flow together. */
+/** How long the snackbar moves and the screen's button lifts. They share it, so they flow together. */
 private const val SNACKBAR_MOTION_MS = 300
 
 /** How long the snackbar takes to auto-dismiss, as [SnackbarHost] times it. Null for an indefinite one. */
@@ -69,16 +69,15 @@ private fun autoDismissMs(duration: SnackbarDuration): Long? = when (duration) {
 }
 
 /**
- * The motion of everything the snackbar moves: its size, its entrance and exit, the gap beside the button, and the lift of
- * the buttons above it. Instant with reduced motion.
+ * The motion of everything the snackbar moves: its size, its entrance and exit, and the lift of the button above it.
+ * Instant with reduced motion.
  */
 fun <T> snackbarMotion(reduceMotion: Boolean): FiniteAnimationSpec<T> =
     if (reduceMotion) snap() else tween(SNACKBAR_MOTION_MS, easing = FastOutSlowInEasing)
 
 /**
- * The snackbar, with the navigation button's look: rounded corners, the label type, and the button's height ([fabSize]).
- * When the navigation prototype's button sits at the left or right edge ([edgeFab]), the snackbar shares the button's row
- * and leaves the button's space free; otherwise it takes the full width.
+ * The snackbar, with the look of the screens' buttons: rounded corners, the label type, and at least the button's height
+ * ([fabSize]). It takes the full width.
  *
  * The host itself shows and hides the snackbar, so it can animate in and out. It keeps the last message while that one leaves.
  * Its size changes grow upward from the bottom.
@@ -88,7 +87,6 @@ fun <T> snackbarMotion(reduceMotion: Boolean): FiniteAnimationSpec<T> =
 fun AppSnackbarHost(
     hostState: SnackbarHostState,
     modifier: Modifier = Modifier,
-    edgeFab: NavFabPosition? = null,
     fabSize: Dp = 56.dp,
     reduceMotion: Boolean = false,
     onDismiss: () -> Unit = {}
@@ -120,7 +118,6 @@ fun AppSnackbarHost(
             shown?.let { snackbarData -> key(snackbarData) {
                 SnackbarItem(
                     snackbarData = snackbarData,
-                    edgeFab = edgeFab,
                     fabSize = fabSize,
                     reduceMotion = reduceMotion,
                     onDismiss = {
@@ -158,7 +155,6 @@ private fun DismissibleSnackbar(
 @Composable
 private fun SnackbarItem(
     snackbarData: SnackbarData,
-    edgeFab: NavFabPosition?,
     fabSize: Dp,
     reduceMotion: Boolean,
     onDismiss: () -> Unit
@@ -168,33 +164,18 @@ private fun SnackbarItem(
     val actionLabel = snackbarData.visuals.actionLabel
     val message = snackbarData.visuals.message
 
-    val motion = snackbarMotion<Dp>(reduceMotion)
-    // The gap beside the button eases in and out with the button, so the message doesn't jump when the button comes or goes
-    val startGap by animateDpAsState(
-        targetValue = if (edgeFab == NavFabPosition.START) fabSize + EdgeGap else 0.dp,
-        animationSpec = motion,
-        label = "snackbarStartGap"
-    )
-    val endGap by animateDpAsState(
-        targetValue = if (edgeFab == NavFabPosition.END) fabSize + EdgeGap else 0.dp,
-        animationSpec = motion,
-        label = "snackbarEndGap"
-    )
-
     // Grows upward: the box is aligned to its bottom, so a change of height keeps the bottom edge in place
     Box(
         modifier = Modifier.fillMaxWidth().animateContentSize(animationSpec = snackbarMotion<IntSize>(reduceMotion)),
         contentAlignment = Alignment.BottomCenter
     ) {
-        // The row is the button's: the button's space is left free on its side, the message takes the rest
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                // No navigation bar inset here: the snackbar slot already has it, the button's margin doesn't
+                // No navigation bar inset here: the snackbar slot already has it
                 .padding(start = SideMargin, end = SideMargin, bottom = SideMargin),
             verticalAlignment = Alignment.Bottom
         ) {
-            Spacer(Modifier.width(startGap))
             DismissibleSnackbar(onDismiss = onDismiss, modifier = Modifier.weight(1f)) {
                 Surface(
                     // As tall as the button, unless the message is longer and needs more room
@@ -202,7 +183,7 @@ private fun SnackbarItem(
                         if (expanded || fabSize <= 0.dp) Modifier.heightIn(min = fabSize.coerceAtLeast(56.dp))
                         else Modifier.height(fabSize)
                     ),
-                    shape = RoundedCornerShape(EdgeCorner),
+                    shape = RoundedCornerShape(Corner),
                     // The same colours as the standard snackbar, so both look like one kind of message
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     contentColor = MaterialTheme.colorScheme.onSurface,
@@ -230,7 +211,39 @@ private fun SnackbarItem(
                     }
                 }
             }
-            Spacer(Modifier.width(endGap))
+        }
+    }
+}
+
+// ---- Previews ----
+
+/** A made-up message for the previews, as the host hands one to [SnackbarItem]. */
+private class PreviewSnackbarData(message: String, actionLabel: String? = null) : SnackbarData {
+    override val visuals = object : SnackbarVisuals {
+        override val message = message
+        override val actionLabel = actionLabel
+        override val withDismissAction = false
+        override val duration = SnackbarDuration.Long
+    }
+    override fun performAction() {}
+    override fun dismiss() {}
+}
+
+/** A message alone, one with its action (Open), and a long one, cut at two lines. */
+@ThemePreviews
+@Composable
+private fun SnackbarPreview() {
+    PreviewTheme(padding = 8.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SnackbarItem(PreviewSnackbarData("Link copied"), fabSize = 56.dp, reduceMotion = false, onDismiss = {})
+            SnackbarItem(
+                PreviewSnackbarData("File 'beach-sunset.jpg' downloaded (3.3 MB).", actionLabel = "Open"),
+                fabSize = 56.dp, reduceMotion = false, onDismiss = {}
+            )
+            SnackbarItem(
+                PreviewSnackbarData("Download failed: the host couldn't be reached, it took longer than 30 seconds to answer."),
+                fabSize = 56.dp, reduceMotion = false, onDismiss = {}
+            )
         }
     }
 }

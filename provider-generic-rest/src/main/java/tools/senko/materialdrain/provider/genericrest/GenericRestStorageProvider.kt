@@ -53,6 +53,7 @@ private const val ENDPOINT_LIST = "list"
 private const val ENDPOINT_BROWSE_LIST = "browse_list"
 private const val ENDPOINT_BROWSE_UPLOAD = "browse_upload"
 private const val ENDPOINT_BROWSE_DOWNLOAD = "browse_download"
+private const val ENDPOINT_BROWSE_DOWNLOAD_ARCHIVE = "browse_download_archive"
 private const val ENDPOINT_BROWSE_MKDIR = "browse_mkdir"
 private const val ENDPOINT_BROWSE_RENAME = "browse_rename"
 private const val ENDPOINT_BROWSE_DELETE = "browse_delete"
@@ -133,6 +134,7 @@ class GenericRestStorageProvider(
         if (config.endpoints.containsKey(ENDPOINT_FILE_INFO)) add(ProviderCapability.FILE_INFO)
         if (config.endpoints.containsKey(ENDPOINT_DOWNLOAD_ARCHIVE)) add(ProviderCapability.ARCHIVE_DOWNLOAD)
         if (config.endpoints.containsKey(ENDPOINT_ARCHIVE_INFO)) add(ProviderCapability.ARCHIVE_BROWSE)
+        if (config.endpoints.containsKey(ENDPOINT_BROWSE_DOWNLOAD_ARCHIVE)) add(ProviderCapability.FOLDER_ARCHIVE_DOWNLOAD)
         if (config.endpoints.containsKey(ENDPOINT_USER_INFO)) add(ProviderCapability.USER_QUOTA)
         if (config.endpoints.containsKey(ENDPOINT_LIST)) add(ProviderCapability.ENUMERATE)
         if (config.endpoints.containsKey(ENDPOINT_BROWSE_LIST)) add(ProviderCapability.BROWSE)
@@ -573,7 +575,7 @@ class GenericRestStorageProvider(
             val userInfo = config.endpoints[ENDPOINT_USER_INFO]
                 ?: return FieldValidation(
                     "credentials", label, ok = true, inconclusive = true,
-                    message = "Not checked: this config has no user_info endpoint to test them against"
+                    message = "Not checked: no user_info endpoint"
                 )
             val result = client.executeBuffered(userInfo, emptyMap(), auth.header)
                 ?: return FieldValidation("credentials", label, ok = false, message = "The user_info endpoint couldn't be resolved")
@@ -666,6 +668,30 @@ class GenericRestStorageProvider(
                     },
                     { it }
                 ) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "browse download endpoint could not be resolved."))
+                return if (code in 200..299) ApiResponse.Success(totalCopied)
+                else ApiResponse.Error(ProviderError("download_failed_status_$code", "Download failed: HTTP $code"))
+            }
+        }
+
+        // The browse_download_archive endpoint takes the folder as {path}, e.g. "/filesystem/{path}?bulk_download"
+        override suspend fun downloadFolderArchive(
+            path: String,
+            outputStream: OutputStream,
+            onProgress: (read: Long, total: Long?) -> Unit
+        ): ApiResponse<Long> {
+            return reaching {
+                val endpoint = config.endpoints[ENDPOINT_BROWSE_DOWNLOAD_ARCHIVE]
+                    ?: return ApiResponse.Error(ProviderError(ErrorCodes.NOT_SUPPORTED, "This host can't download a folder as one archive."))
+                var totalCopied = 0L
+                val code = authorized(
+                    { auth ->
+                        client.executeDownload(endpoint, mapOf("path" to path.trim('/')), auth, outputStream) { read, total ->
+                            totalCopied = read
+                            onProgress(read, total)
+                        }
+                    },
+                    { it }
+                ) ?: return ApiResponse.Error(ProviderError("bad_endpoint", "browse_download_archive endpoint could not be resolved."))
                 return if (code in 200..299) ApiResponse.Success(totalCopied)
                 else ApiResponse.Error(ProviderError("download_failed_status_$code", "Download failed: HTTP $code"))
             }
