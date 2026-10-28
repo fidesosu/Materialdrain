@@ -217,7 +217,12 @@ class AppDriver {
      */
     fun playSong(name: String) {
         openFile(name, By.desc(java.util.regex.Pattern.compile("Play|Pause")))
-        if (shows(By.desc("Play"), 500)) tapDesc("Play")
+        // Play is tapped only while it's there: a player still going from a test before can turn it into Pause by itself
+        // between being seen and being tapped, and waiting for Play then failed the test
+        repeat(3) {
+            if (shows(By.desc("Pause"), 1_000)) return
+            device.findObject(By.desc("Play"))?.let { play -> runCatching { play.click() } }
+        }
         find(By.desc("Pause"), "playing")
     }
 
