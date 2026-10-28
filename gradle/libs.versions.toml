@@ -3,7 +3,7 @@
 compileSdk = "37"
 minSdk = "29"
 targetSdk = "36"
-agp = "9.4.1"
+agp = "9.5.0"
 coil = "2.7.0"
 coreSplashscreen = "1.2.0"
 # The Kotlin of the build: its compiler plugins, and its Gradle plugin, which build-logic compiles against
