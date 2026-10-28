@@ -70,21 +70,22 @@ internal val VideoControlColor = Color.White
 internal fun TextStyle.tabular() = copy(fontFeatureSettings = "tnum")
 
 /**
- * [content] in [VideoControlColor] over a dark shadow of itself, so it stays clear over any picture: a soft blur from
- * Android 12 on, a copy just below it before (Android 10 and 11 can't blur what's drawn).
+ * [content] in [VideoControlColor] over a small, light drop shadow of itself, a little below it, so its edges stay clear
+ * over a light picture: softened from Android 12 on, sharp before (Android 10 and 11 can't blur what's drawn). The dim,
+ * the shades and [softScrim] do the rest.
  */
 @Composable
 internal fun Shadowed(modifier: Modifier = Modifier, content: @Composable (tint: Color) -> Unit) {
     Box(modifier, contentAlignment = Alignment.Center) {
         Box(
-            modifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                Modifier.graphicsLayer {
-                    val radius = 4.dp.toPx()
+            modifier = Modifier.offset(y = 1.dp).graphicsLayer {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val radius = 1.5.dp.toPx()
                     renderEffect = BlurEffect(radius, radius, TileMode.Decal)
-                    alpha = 0.9f
+                    alpha = 0.5f
+                } else {
+                    alpha = 0.35f
                 }
-            } else {
-                Modifier.offset(1.dp, 1.dp).graphicsLayer { alpha = 0.6f }
             },
             contentAlignment = Alignment.Center
         ) { content(Color.Black) }

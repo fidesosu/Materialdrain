@@ -66,18 +66,16 @@ import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Immutable
 import tools.senko.materialdrain.ui.LocalReduceMotion
 import androidx.compose.animation.Crossfade
 import tools.senko.materialdrain.ui.components.RefreshIndicator
 import androidx.compose.ui.graphics.graphicsLayer
+import tools.senko.materialdrain.ui.components.pageTransition
 
 /**
  * The browser as it's drawn: the header of [mode] (the sorting, the path or the open list), then [entries] or why there
@@ -201,7 +199,7 @@ fun BrowserContent(
             // Body
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             // A folder (or list) opened slides in over the one left, which keeps what it showed as it goes: into a folder
-            // from the right, back up from the left, the way Material's shared axis moves. Its own changes (loaded,
+            // from the right, back up from the left, as the app's screens do. Its own changes (loaded,
             // refreshed) don't slide
             val reduceMotion = LocalReduceMotion.current
             // What each page showed last: the one sliding out keeps showing it. Only which page it is goes to the slide, so
@@ -212,15 +210,10 @@ fun BrowserContent(
             AnimatedContent(
                 targetState = PageSlot(pageKey, pageDepth),
                 contentKey = { it.key },
+                // The same as between the app's screens (see pageTransition): deeper is forward, a page as deep crossfades
                 transitionSpec = {
                     val direction = targetState.depth.compareTo(initialState.depth)
-                    when {
-                        reduceMotion || direction == 0 -> fadeIn(tween(PAGE_FADE_MS)) togetherWith fadeOut(tween(PAGE_FADE_MS))
-                        else -> (slideInHorizontally(tween(PAGE_SLIDE_MS, easing = EaseOutCubic)) { width -> direction * width / 4 } +
-                            fadeIn(tween(PAGE_SLIDE_MS - PAGE_FADE_OUT_MS, delayMillis = PAGE_FADE_OUT_MS))) togetherWith
-                            (slideOutHorizontally(tween(PAGE_SLIDE_MS, easing = EaseOutCubic)) { width -> -direction * width / 4 } +
-                                fadeOut(tween(PAGE_FADE_OUT_MS)))
-                    }
+                    pageTransition(forward = if (direction == 0) null else direction > 0, reduceMotion = reduceMotion)
                 },
                 label = "browserPage",
                 modifier = Modifier.fillMaxSize()
@@ -398,12 +391,6 @@ private enum class PageBody { PLACEHOLDERS, KEY_MISSING, ERROR, EMPTY, LIST }
 /** How long the body of a page takes to fade into another (the rows to come into the files). */
 private const val BODY_FADE_MS = 180
 
-/** How long a page slides for, and how soon the one left has faded out of it. */
-private const val PAGE_SLIDE_MS = 300
-private const val PAGE_FADE_OUT_MS = 90
-
-/** With reduced animations, or to a page as deep as the one left: a crossfade. */
-private const val PAGE_FADE_MS = 100
 
 /** How wide a tile of the grid is about to be; the row gets as many as fit. */
 private val GRID_TILE_WIDTH = 120.dp

@@ -8,7 +8,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -82,9 +81,7 @@ internal fun AppTopBar(
                         if (reduceMotion) {
                             fadeIn(animationSpec = tween(100)) togetherWith fadeOut(animationSpec = tween(100))
                         } else {
-                            (fadeIn(animationSpec = tween(220, delayMillis = 90)) +
-                                    slideInVertically(initialOffsetY = { it / 2 }, animationSpec = tween(220, delayMillis = 90)))
-                                .togetherWith(fadeOut(animationSpec = tween(90)))
+                            fadeIn(animationSpec = tween(220, delayMillis = 90)) togetherWith fadeOut(animationSpec = tween(90))
                         }
                     },
                     label = "topBarTitleAnimation"

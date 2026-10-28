@@ -29,7 +29,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import tools.senko.materialdrain.ui.components.OdometerText
+import tools.senko.materialdrain.ui.components.FadeText
 import tools.senko.materialdrain.ui.icons.symbols.SettingsFilled
 import tools.senko.materialdrain.ui.icons.symbols.Symbols
 import tools.senko.materialdrain.ui.icons.symbols.Upload
@@ -168,7 +168,7 @@ internal fun AppFab(fab: FabDetails?, lift: Dp, reduceMotion: Boolean, onHeightC
                             label = "fabTextAnimation"
                         ) { shown ->
                             shown.text?.let { fabText ->
-                                OdometerText(
+                                FadeText(
                                     text = fabText,
                                     fixedWidth = true,
                                     widthReferenceTexts = shown.reserveTextWidthFor

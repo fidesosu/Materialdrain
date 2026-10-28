@@ -47,8 +47,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.provider.pixeldrain.internal.TimeSeries
 import tools.senko.materialdrain.ui.LocalReduceMotion
-import tools.senko.materialdrain.ui.components.NumberOdometer
-import tools.senko.materialdrain.ui.components.OdometerText
+import tools.senko.materialdrain.ui.components.FadeText
 import tools.senko.materialdrain.util.formatSize
 import tools.senko.materialdrain.util.parseDateTime
 import java.text.NumberFormat
@@ -188,10 +187,9 @@ private fun UsageChart(series: TimeSeries?, statistic: UsageStatistic, range: St
                     style = MaterialTheme.typography.labelMedium,
                     color = colors.onSurfaceVariant
                 )
-                OdometerText(
+                FadeText(
                     if (series == null) "–" else format(if (index != null) amounts.getOrElse(index) { 0L } else total),
-                    style = MaterialTheme.typography.headlineSmall,
-                    spec = NumberOdometer
+                    style = MaterialTheme.typography.headlineSmall
                 )
             }
             Text(

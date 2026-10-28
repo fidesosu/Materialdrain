@@ -80,8 +80,7 @@ import tools.senko.materialdrain.ui.components.isMarkdown
 import tools.senko.materialdrain.ui.components.DotScrollbar
 import tools.senko.materialdrain.ui.components.ExpandableText
 import tools.senko.materialdrain.ui.components.FileIcon
-import tools.senko.materialdrain.ui.components.NumberOdometer
-import tools.senko.materialdrain.ui.components.OdometerText
+import tools.senko.materialdrain.ui.components.FadeText
 import tools.senko.materialdrain.ui.components.fileKindLabel
 import tools.senko.materialdrain.ui.media.AudioPlayerPreview
 import tools.senko.materialdrain.ui.media.BlurredBackdrop
@@ -905,7 +904,7 @@ private fun RowScope.StatTile(icon: ImageVector, value: String, label: String) {
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
         Spacer(Modifier.height(6.dp))
-        OdometerText(value, style = MaterialTheme.typography.titleLarge, spec = NumberOdometer)
+        FadeText(value, style = MaterialTheme.typography.titleLarge)
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

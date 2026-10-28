@@ -142,8 +142,6 @@ import tools.senko.materialdrain.ui.components.AppMenuPreview
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -151,16 +149,16 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.text.font.FontWeight
-import tools.senko.materialdrain.ui.components.NumberOdometer
-import tools.senko.materialdrain.ui.components.OdometerText
+import tools.senko.materialdrain.ui.components.FadeText
 import tools.senko.materialdrain.ui.icons.filled.FastForward
 import androidx.compose.ui.zIndex
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 private const val CONTROLS_HIDE_DELAY_MS = 3_000L
 @Composable
@@ -416,9 +414,8 @@ private const val ZOOM_SNAP_BACK = 1.05f
 /** How long a double tap's ripple takes to spread. */
 private const val SEEK_RIPPLE_MS = 500
 
-/** How long the controls take to fade in or out, and to slide in or out from their edge. */
+/** How long the controls take to fade in or out. */
 private const val CONTROLS_FADE_MS = 180
-private const val CONTROLS_SLIDE_MS = 220
 
 /** How much the video is dimmed while the controls are over it, so they read over a light picture. */
 private const val CONTROLS_DIM = 0.3f
@@ -462,6 +459,16 @@ internal fun FullscreenVideoPlayer(videoUri: Uri, thumbnailUrl: String?, apiKey:
 @Composable
 private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: String?, onBack: () -> Unit, title: String?) {
     val context = LocalContext.current
+    // The whole screen for the video: the status bar goes away (a swipe from the top shows it for a moment), and comes back
+    // when the player closes. On the preview's own window when it has one, else the app's
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val window = (view.parent as? DialogWindowProvider)?.window ?: context.findActivity()?.window
+        val bars = window?.let { WindowCompat.getInsetsController(it, view) }
+        bars?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        bars?.hide(WindowInsetsCompat.Type.statusBars())
+        onDispose { bars?.show(WindowInsetsCompat.Type.statusBars()) }
+    }
     val settings = LocalPlayerSettings.current
     val inPreview = LocalInspectionMode.current
     // Where this video was left, to go on from there (the Media settings' "Resume videos")
@@ -782,11 +789,10 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                     SkipChevrons(feedbackForward)
                     Spacer(Modifier.height(6.dp))
                     Shadowed { tint ->
-                        OdometerText(
+                        FadeText(
                             stringResource(if (feedbackForward) R.string.media_skipped_forward else R.string.media_skipped_back, feedback.seconds),
                             style = MaterialTheme.typography.titleMedium.tabular(),
-                            color = tint,
-                            spec = NumberOdometer
+                            color = tint
                         )
                     }
                 }
@@ -870,8 +876,7 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
             }
         }
 
-        // The controls come and go together over a light dim of the video; with reduced animations at once
-        val slide = !reduceMotion
+        // The controls fade in and out together, over a light dim of the video; with reduced animations at once
         AnimatedVisibility(
             visible = controlsVisible,
             enter = fadeIn(tween(if (reduceMotion) 0 else CONTROLS_FADE_MS)),
@@ -885,10 +890,6 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
-                        .animateEnterExit(
-                            enter = if (slide) slideInVertically(tween(CONTROLS_SLIDE_MS)) { -it / 3 } else EnterTransition.None,
-                            exit = if (slide) slideOutVertically(tween(CONTROLS_SLIDE_MS)) { -it / 3 } else ExitTransition.None
-                        )
                         .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)))
                 ) {
                     Row(
@@ -985,10 +986,6 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                         modifier = Modifier
                             .align(Alignment.Center)
                             .softScrim()
-                            .animateEnterExit(
-                                enter = if (slide) scaleIn(tween(CONTROLS_SLIDE_MS), initialScale = 0.9f) else EnterTransition.None,
-                                exit = if (slide) scaleOut(tween(CONTROLS_SLIDE_MS), targetScale = 0.9f) else ExitTransition.None
-                            )
                     ) {
                         val seconds = (stepMs / 1000).toInt()
                         VideoIconButton(
@@ -1049,10 +1046,6 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .animateEnterExit(
-                            enter = if (slide) slideInVertically(tween(CONTROLS_SLIDE_MS)) { it / 3 } else EnterTransition.None,
-                            exit = if (slide) slideOutVertically(tween(CONTROLS_SLIDE_MS)) { it / 3 } else ExitTransition.None
-                        )
                         .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))))
                 ) {
                     Column(

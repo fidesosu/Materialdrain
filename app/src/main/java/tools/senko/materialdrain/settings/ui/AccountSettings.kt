@@ -88,8 +88,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import tools.senko.materialdrain.auth.ApiKeySource
 import tools.senko.materialdrain.provider.pixeldrain.internal.UserInfo
-import tools.senko.materialdrain.ui.components.NumberOdometer
-import tools.senko.materialdrain.ui.components.OdometerText
+import tools.senko.materialdrain.ui.components.FadeText
 import tools.senko.materialdrain.util.formatSize
 import tools.senko.materialdrain.util.parseDateTime
 import java.text.NumberFormat
@@ -513,7 +512,7 @@ private fun RowScope.CountTile(icon: ImageVector, value: String, label: String) 
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
         Spacer(Modifier.height(6.dp))
-        OdometerText(value, style = MaterialTheme.typography.titleMedium, spec = NumberOdometer)
+        FadeText(value, style = MaterialTheme.typography.titleMedium)
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
