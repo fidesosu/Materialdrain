@@ -1,5 +1,6 @@
 #file: noinspection SpellCheckingInspection
-# Takes the screenshots of the app (app/src/androidTest, see ScreenshotTest) on a Pixel 8 emulator, light and dark, and
+# Takes the screenshots of the app (app/src/androidTest, see ScreenshotTest) on a Pixel 6 emulator (1080 x 2400, as the
+# compat workflow's; the runner's avdmanager has no pixel_8), light and dark, and
 # puts them on the website branch, in docs/images/screenshots/light and dark, where the README and the docs show them
 # from the website. Then builds the website, as a push made here doesn't start its workflow by itself.
 # Run by the build workflow for each new 1.X.0 release (a new base version), and by "Run workflow" on the Actions tab.
@@ -55,7 +56,7 @@ jobs:
           api-level: 34
           target: google_apis
           arch: x86_64
-          profile: pixel_8
+          profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
           script: ./gradlew :app:recordScreenshots

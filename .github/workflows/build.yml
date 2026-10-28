@@ -31,7 +31,8 @@ on:
       - "gradlew"
       - "gradlew.bat"
       - "!**/*.md"
-  # The same list as for push
+  # The same list as for push, and the workflows too: a pull request which only updates the actions they use (Dependabot's)
+  # is then built with them before it's merged. Not on push, where a change of a workflow alone mustn't make a new release
   pull_request:
     branches: [main, dev]
     paths:
@@ -44,6 +45,7 @@ on:
       - "gradle.properties"
       - "gradlew"
       - "gradlew.bat"
+      - ".github/workflows/**"
       - "!**/*.md"
   # A button on the Actions tab: builds (and, on main or dev, publishes) without a new commit
   workflow_dispatch:
