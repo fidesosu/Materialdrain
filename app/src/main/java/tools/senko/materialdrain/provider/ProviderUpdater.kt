@@ -48,7 +48,7 @@ class ProviderUpdater(
 
         try {
             val request = Request.Builder().url(url.trim())
-                .apply { stored.etag?.let { header(resources.getString(R.string.settings_if_none_match), it) } }
+                .apply { stored.etag?.let { header("If-None-Match", it) } }
                 .build()
             client.newCall(request).execute().use { response ->
                 // Unchanged since the last fetch: whatever that fetch found still stands

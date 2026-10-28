@@ -199,8 +199,8 @@ class AppUpdates(
         try {
             // An update downloaded before is installed by now, or not wanted any more
             updatesDir.listFiles()?.forEach { it.delete() }
-            val stable = fetch(appContext.getString(R.string.update_latest_download_update_json, releasesUrl))
-            val dev = if (settings.includeDevUpdates.value) fetch(appContext.getString(R.string.update_download_dev_build_update_json, releasesUrl)) else null
+            val stable = fetch("$releasesUrl/latest/download/update.json")
+            val dev = if (settings.includeDevUpdates.value) fetch("$releasesUrl/download/dev-build/update.json") else null
             settings.lastUpdateCheck = System.currentTimeMillis()
             chooseUpdate(installed, stable, dev, releasesUrl)?.let { UpdateResult.Available(it) } ?: UpdateResult.UpToDate
         } catch (e: CancellationException) {

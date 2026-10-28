@@ -248,9 +248,9 @@ class DeviceZipArchives(private val provider: StorageProvider, private val resou
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000
-        connection.setRequestProperty(resources.getString(R.string.files_range), rangeHeader)
+        connection.setRequestProperty("Range", rangeHeader)
         // The bytes as they are on the host, so the range is of the file itself
-        connection.setRequestProperty(resources.getString(R.string.files_accept_encoding), "identity")
+        connection.setRequestProperty("Accept-Encoding", "identity")
         provider.requestHeaders(url).forEach { (name, value) -> connection.setRequestProperty(name, value) }
         val code = connection.responseCode
         if (code != HttpURLConnection.HTTP_PARTIAL) {

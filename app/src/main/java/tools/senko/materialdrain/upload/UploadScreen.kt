@@ -397,7 +397,7 @@ private fun UploadResultCard(fileId: String?) {
                 Text(stringResource(R.string.upload_upload_complete), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 if (fileId != null) {
                     Text(
-                        stringResource(R.string.upload_pixeldrain_com_u, fileId),
+                        "pixeldrain.com/u/$fileId",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         maxLines = 1,

@@ -203,8 +203,8 @@ class ConfigSchema(private val resources: Resources) {
             "listing_map", resources.getString(R.string.settings_listing_fields), resources.getString(R.string.settings_values_of_the_listing_as),
             kind = FieldKind.KeyValues(
                 listOf(
-                    Suggestion("can_write", resources.getString(R.string.settings_a_folder_can_be_changed), resources.getString(R.string.settings_permissions_write)),
-                    Suggestion("can_delete", resources.getString(R.string.settings_a_folder_s_files_can), resources.getString(R.string.settings_permissions_delete)),
+                    Suggestion("can_write", resources.getString(R.string.settings_a_folder_can_be_changed), "$.permissions.write"),
+                    Suggestion("can_delete", resources.getString(R.string.settings_a_folder_s_files_can), "$.permissions.delete"),
                     Suggestion("title", resources.getString(R.string.settings_a_list_s_title), "$.title"),
                     Suggestion("can_edit", resources.getString(R.string.settings_a_list_can_be_changed), "$.can_edit")
                 ),

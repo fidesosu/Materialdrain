@@ -204,7 +204,6 @@
     <string name="files_1_file_added_to">1 file added to \"%1$s\".</string>
     <string name="files_1_file_removed_from">1 file removed from \"%1$s\".</string>
     <string name="files_a_folder_couldn_t_be">A folder couldn\'t be opened: its files are left out.</string>
-    <string name="files_accept_encoding">Accept-Encoding</string>
     <string name="files_add_here">Add here</string>
     <string name="files_add_to">Add to…</string>
     <string name="files_add_to_2">Add to</string>
@@ -281,7 +280,6 @@
     <string name="files_of_files_downloaded">%1$d of %2$d files downloaded.</string>
     <string name="files_open">Open %1$s</string>
     <string name="files_pixeldrain_list">Pixeldrain List</string>
-    <string name="files_range">Range</string>
     <string name="files_remove_file_from_list">Remove file from list?</string>
     <string name="files_remove_files_from_list">Remove %1$s files from list?</string>
     <string name="files_remove_from_this_list">Remove from this list</string>
@@ -655,7 +653,6 @@
     <string name="settings_https_url_of_the_raw">https URL of the raw config, checked daily.</string>
     <string name="settings_id">Id</string>
     <string name="settings_id_of_an_image_file_on">ID of an image file on your account</string>
-    <string name="settings_if_none_match">If-None-Match</string>
     <string name="settings_if_the_host_asks_for">If the host asks for a code, the sign-in is sent again with it.</string>
     <string name="settings_images_are_files_on_your">Images are files on your account (JPEG, PNG, GIF, WebP, max 10 MB). Copy the ID from their details.</string>
     <string name="settings_images_can_be_at_most">Images can be at most 10 MB.</string>
@@ -835,8 +832,6 @@
     <string name="settings_payment_received_waiting_for_confirmations">Payment received, waiting for confirmations</string>
     <string name="settings_peak">Peak %1$s</string>
     <string name="settings_per_tb_stored_per_tb">%1$s per TB stored · %2$s per TB transferred</string>
-    <string name="settings_permissions_delete">$.permissions.delete</string>
-    <string name="settings_permissions_write">$.permissions.write</string>
     <string name="settings_pick_a_kind_of_host">Pick a kind of host, or paste a shared config. Configs never contain passwords.</string>
     <string name="settings_picking_files_to_upload">Picking files to upload</string>
     <string name="settings_pixeldrain_account_and_billing">Pixeldrain account and billing</string>
@@ -1148,9 +1143,7 @@
     <string name="update_couldn_t_look_for_updates">Couldn\'t look for updates: %1$s</string>
     <string name="update_couldn_t_reach_github">Couldn\'t reach GitHub.</string>
     <string name="update_couldn_t_save_the_update">Couldn\'t save the update.</string>
-    <string name="update_download_dev_build_update_json">%1$s/download/dev-build/update.json</string>
     <string name="update_github_answered_http">GitHub answered HTTP %1$d.</string>
-    <string name="update_latest_download_update_json">%1$s/latest/download/update.json</string>
     <string name="update_materialdrain_is_out">Materialdrain %1$s is out</string>
     <string name="update_materialdrain_is_up_to_date">Materialdrain is up to date.</string>
     <string name="update_tap_to_see_it">Tap to see it</string>
@@ -1198,7 +1191,6 @@
     <string name="upload_paste_text_here">Paste text here</string>
     <string name="upload_pdf_file">PDF File</string>
     <string name="upload_pick_a_file_or_enter">Pick a file or enter text.</string>
-    <string name="upload_pixeldrain_com_u">pixeldrain.com/u/%1$s</string>
     <string name="upload_remove_from_list">Remove from list</string>
     <string name="upload_selected_file">Selected File:</string>
     <string name="upload_selected_image_preview">Selected image preview</string>
