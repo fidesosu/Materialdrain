@@ -1274,8 +1274,6 @@
     <string name="media_hold_speed">%1$s speed</string>
     <string name="media_image_error">The picture couldn\'t be loaded</string>
     <string name="media_play_video">Play video</string>
-    <string name="media_seek_to_back">"%1$s  (−%2$d s)"</string>
-    <string name="media_seek_to_forward">"%1$s  (+%2$d s)"</string>
     <string name="media_skipped_back">− %1$d s</string>
     <string name="media_skipped_forward">+ %1$d s</string>
     <string name="media_video_thumbnail_error">The video thumbnail can\'t be shown</string>
@@ -1343,4 +1341,5 @@
         <item quantity="one">%1$s file · %2$s credit</item>
         <item quantity="other">%1$s files · %2$s credit</item>
     </plurals>
+    <string name="media_percent">%1$d%%</string>
 </resources>

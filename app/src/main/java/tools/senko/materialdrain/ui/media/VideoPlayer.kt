@@ -141,6 +141,26 @@ import tools.senko.materialdrain.ui.preview.ScreenPreviews
 import tools.senko.materialdrain.ui.components.AppMenuPreview
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.text.font.FontWeight
+import tools.senko.materialdrain.ui.components.NumberOdometer
+import tools.senko.materialdrain.ui.components.OdometerText
+import tools.senko.materialdrain.ui.icons.filled.FastForward
+import androidx.compose.ui.zIndex
 
 private const val CONTROLS_HIDE_DELAY_MS = 3_000L
 @Composable
@@ -393,6 +413,16 @@ private const val MAX_VIDEO_ZOOM = 4f
 /** Below this, a pinch lets go of the zoom altogether. */
 private const val ZOOM_SNAP_BACK = 1.05f
 
+/** How long a double tap's ripple takes to spread. */
+private const val SEEK_RIPPLE_MS = 500
+
+/** How long the controls take to fade in or out, and to slide in or out from their edge. */
+private const val CONTROLS_FADE_MS = 180
+private const val CONTROLS_SLIDE_MS = 220
+
+/** How much the video is dimmed while the controls are over it, so they read over a light picture. */
+private const val CONTROLS_DIM = 0.3f
+
 /** How fast the video plays while it's held down. */
 private const val HOLD_SPEED = 2f
 
@@ -404,29 +434,6 @@ private fun clampPan(pan: Offset, zoom: Float, size: IntSize): Offset {
     val maxX = size.width * (zoom - 1f) / 2f
     val maxY = size.height * (zoom - 1f) / 2f
     return Offset(pan.x.coerceIn(-maxX, maxX), pan.y.coerceIn(-maxY, maxY))
-}
-
-/**
- * A round button over the video, [container] behind its [content]; [contentDescription] says what it does, as the
- * icon in it doesn't.
- */
-@Composable
-private fun RoundVideoButton(
-    onClick: () -> Unit,
-    contentDescription: String,
-    size: Dp,
-    container: Color,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        shape = CircleShape,
-        color = container,
-        modifier = modifier.size(size).semantics { this.contentDescription = contentDescription }
-    ) {
-        Box(contentAlignment = Alignment.Center) { content() }
-    }
 }
 
 /**
@@ -481,9 +488,6 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
             save()
         }
     }
-    val colors = MaterialTheme.colorScheme
-    // The buttons over the video, see-through like the app's floating cards
-    val panelColor = colors.surfaceContainer.copy(alpha = 0.82f)
 
     var controlsVisible by remember { mutableStateOf(true) }
     var scrubbing by remember { mutableStateOf(false) }
@@ -492,6 +496,8 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
     var seekFeedback by remember { mutableStateOf<SeekFeedback?>(null) }
     // The last feedback, shown while it fades out once it's gone
     var lastFeedback by remember { mutableStateOf(SeekFeedback(forward = true, seconds = 0)) }
+    // Where the last double tap was, which its ripple spreads from
+    var feedbackOrigin by remember { mutableStateOf(Offset.Zero) }
     var settingsMenuOpen by remember { mutableStateOf(false) }
     var menuPage by remember { mutableStateOf<VideoMenuPage?>(null) }
     // While a swipe changes the brightness or the volume, how much of it there is (see PlayerSettings.gestures)
@@ -634,6 +640,7 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                                     (tap.position - lastTapPosition).getDistance() < viewConfiguration.touchSlop * 8
                                 if (isDoubleTap) {
                                     lastTapUptime = 0L
+                                    feedbackOrigin = tap.position
                                     when {
                                         tap.position.x < size.width / 3f -> {
                                             state.seekBy(-currentStepMs)
@@ -733,16 +740,24 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                 }
         )
 
-        // A half oval against the side that was double tapped (a third of the width, as the taps are told apart), in
-        // the theme's colour, with how far it went
+        // A half oval against the side that was double tapped (a third of the width, as the taps are told apart): a ripple
+        // spreading from where it was tapped, chevrons running the way it skips, and how far it went
         val reduceMotion = LocalReduceMotion.current
         val feedback = seekFeedback ?: lastFeedback
         val feedbackForward = feedback.forward
+        val ripple = remember { Animatable(1f) }
+        LaunchedEffect(seekFeedback) {
+            if (seekFeedback != null && !reduceMotion) {
+                ripple.snapTo(0f)
+                ripple.animateTo(1f, tween(SEEK_RIPPLE_MS))
+            }
+        }
         AnimatedVisibility(
             visible = seekFeedback != null,
             enter = fadeIn(tween(if (reduceMotion) 0 else 100)),
             exit = fadeOut(tween(if (reduceMotion) 0 else 250)),
             modifier = Modifier
+                .zIndex(1f)
                 .align(if (feedbackForward) Alignment.CenterEnd else Alignment.CenterStart)
                 .fillMaxHeight()
                 .fillMaxWidth(1f / 3f)
@@ -751,64 +766,95 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        colors.primary.copy(alpha = 0.18f),
+                    .clip(
                         if (feedbackForward) RoundedCornerShape(topStartPercent = 50, bottomStartPercent = 50)
                         else RoundedCornerShape(topEndPercent = 50, bottomEndPercent = 50)
                     )
+                    .background(VideoControlColor.copy(alpha = 0.12f))
+                    .drawBehind {
+                        // The tap was on the whole player, a third of which this is
+                        val origin = Offset(if (feedbackForward) feedbackOrigin.x - size.width * 2f else feedbackOrigin.x, feedbackOrigin.y)
+                        val p = ripple.value
+                        if (p < 1f) drawCircle(VideoControlColor.copy(alpha = 0.22f * (1f - p)), radius = size.maxDimension * p, center = origin)
+                    }
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    SkipGlyph(feedbackForward, (stepMs / 1000).toInt(), colors.onSurface, size = 32.dp)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        stringResource(if (feedbackForward) R.string.media_skipped_forward else R.string.media_skipped_back, feedback.seconds),
-                        color = colors.onSurface,
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    SkipChevrons(feedbackForward)
+                    Spacer(Modifier.height(6.dp))
+                    Shadowed { tint ->
+                        OdometerText(
+                            stringResource(if (feedbackForward) R.string.media_skipped_forward else R.string.media_skipped_back, feedback.seconds),
+                            style = MaterialTheme.typography.titleMedium.tabular(),
+                            color = tint,
+                            spec = NumberOdometer
+                        )
+                    }
                 }
             }
         }
 
-        // What a gesture is doing, near the top: the brightness or volume, the faster speed, where a swipe seeks to
-        val status = gestureLevel?.let { stringResource(if (it.brightness) R.string.media_brightness_level else R.string.media_volume_level, (it.level * 100).roundToInt()) }
-            ?: swipeSeek?.let { (from, to) ->
-                val seconds = (to - from) / 1000
-                stringResource(if (seconds >= 0) R.string.media_seek_to_forward else R.string.media_seek_to_back, formatDurationMillis(to), abs(seconds))
-            }
-            ?: if (holding) stringResource(R.string.media_hold_speed, speedLabel(HOLD_SPEED)) else null
-        status?.let { text ->
-            Surface(
-                shape = AppShapes.Large,
-                color = panelColor,
+        // What a gesture is doing. The brightness or the volume: a bar on the side swiped
+        gestureLevel?.let { level ->
+            LevelBar(
+                brightness = level.brightness,
+                level = level.level,
+                description = stringResource(if (level.brightness) R.string.media_brightness_level else R.string.media_volume_level, (level.level * 100).roundToInt()),
+                // Over the controls' dim, as are the other gestures' (drawn after them)
                 modifier = Modifier
+                    .zIndex(1f)
+                    .align(if (level.brightness) Alignment.CenterStart else Alignment.CenterEnd)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(horizontal = 40.dp)
+            )
+        }
+        // Where a swipe sideways or the seek bar goes: the time, large in the middle, and how far that is from here
+        val seekingTo = swipeSeek?.second ?: scrubPositionMs.takeIf { scrubbing }
+        seekingTo?.let { to ->
+            val from = swipeSeek?.first ?: state.positionMs
+            val seconds = (to - from) / 1000
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.zIndex(1f).align(Alignment.Center).softScrim()) {
+                Shadowed { tint ->
+                    Text(formatDurationMillis(to), color = tint, style = MaterialTheme.typography.displaySmall.tabular(), fontWeight = FontWeight.Medium)
+                }
+                Shadowed { tint ->
+                    Text(
+                        stringResource(if (seconds >= 0) R.string.media_skipped_forward else R.string.media_skipped_back, abs(seconds)),
+                        color = tint,
+                        style = MaterialTheme.typography.titleMedium.tabular()
+                    )
+                }
+            }
+        }
+        // Held down, faster: near the top
+        if (holding) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .zIndex(1f)
                     .align(Alignment.TopCenter)
                     .windowInsetsPadding(WindowInsets.safeDrawing)
                     .padding(top = 72.dp)
+                    .clip(AppShapes.Large)
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
             ) {
-                Text(
-                    text,
-                    color = colors.onSurface,
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                val pulse by rememberInfiniteTransition(label = "holdPulse").animateFloat(
+                    1f, if (reduceMotion) 1f else 0.4f, infiniteRepeatable(tween(500), RepeatMode.Reverse), label = "holdPulseAlpha"
                 )
+                Icon(Icons.Filled.FastForward, contentDescription = null, tint = VideoControlColor, modifier = Modifier.size(20.dp).graphicsLayer { alpha = pulse })
+                Text(stringResource(R.string.media_hold_speed, speedLabel(HOLD_SPEED)), color = VideoControlColor, style = MaterialTheme.typography.titleSmall)
             }
         }
 
-        // Loading: in the middle, where the play button is, which steps aside for it
+        // Loading: a ring around the play button, which stays
         val loading = (state.isBuffering || !state.firstFrameRendered) && state.error == null
-        if (loading) {
-            CircularProgressIndicator(
-                modifier = Modifier.align(Alignment.Center).size(56.dp),
-                color = colors.primary,
-                trackColor = colors.primary.copy(alpha = 0.24f)
-            )
-        }
 
         state.error?.let { error ->
             Surface(
                 shape = AppShapes.Card,
-                color = colors.errorContainer,
-                contentColor = colors.onErrorContainer,
+                color = Color.Black.copy(alpha = 0.75f),
+                contentColor = VideoControlColor,
                 modifier = Modifier.align(Alignment.Center).padding(24.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -817,48 +863,56 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                     MediaTextButton(
                         stringResource(R.string.media_try_again),
                         onClick = { state.retry() },
-                        container = colors.onErrorContainer.copy(alpha = 0.12f),
-                        contentColor = colors.onErrorContainer
+                        container = VideoControlColor.copy(alpha = 0.16f),
+                        contentColor = VideoControlColor
                     )
                 }
             }
         }
 
+        // The controls come and go together over a light dim of the video; with reduced animations at once
+        val slide = !reduceMotion
         AnimatedVisibility(
             visible = controlsVisible,
-            enter = fadeIn(tween(if (reduceMotion) 0 else 150)),
-            exit = fadeOut(tween(if (reduceMotion) 0 else 150)),
+            enter = fadeIn(tween(if (reduceMotion) 0 else CONTROLS_FADE_MS)),
+            exit = fadeOut(tween(if (reduceMotion) 0 else CONTROLS_FADE_MS)),
             modifier = Modifier.fillMaxSize()
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = CONTROLS_DIM))) {
                 // The preview goes under the status and navigation bars (see FullScreenPreview): the controls keep clear.
                 // Along the top: back, the name, and the buttons for how the video is shown
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
-                        .background(Brush.verticalGradient(listOf(MediaScrim.Top, Color.Transparent)))
+                        .animateEnterExit(
+                            enter = if (slide) slideInVertically(tween(CONTROLS_SLIDE_MS)) { -it / 3 } else EnterTransition.None,
+                            exit = if (slide) slideOutVertically(tween(CONTROLS_SLIDE_MS)) { -it / 3 } else ExitTransition.None
+                        )
+                        .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)))
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier
                             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-                            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp)
+                            .padding(start = 8.dp, end = 8.dp, top = 12.dp, bottom = 36.dp)
                     ) {
-                        RoundVideoButton(onClick = onBack, contentDescription = stringResource(R.string.files_back), size = 44.dp, container = panelColor) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = colors.onSurface)
+                        VideoIconButton(onClick = onBack, contentDescription = stringResource(R.string.files_back)) {
+                            ShadowedIcon(Icons.AutoMirrored.Filled.ArrowBack, 24.dp)
                         }
-                        Text(
-                            title.orEmpty(),
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f).padding(start = 4.dp)
-                        )
+                        Shadowed(Modifier.weight(1f).padding(start = 4.dp)) { tint ->
+                            Text(
+                                title.orEmpty(),
+                                color = tint,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                         // Fill the screen or fit in it; either lets go of a pinch's zoom
-                        RoundVideoButton(
+                        VideoIconButton(
                             onClick = {
                                 fill = !fill
                                 zoom = 1f
@@ -866,51 +920,59 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                                 interactions++
                             },
                             contentDescription = if (fill) stringResource(R.string.media_fit_the_video_in_the) else stringResource(R.string.media_fill_the_screen_with_the),
-                            size = 44.dp,
-                            container = if (fill) colors.primary else panelColor
+                            selected = fill
                         ) {
-                            Icon(Icons.Filled.Crop, contentDescription = null, tint = if (fill) colors.onPrimary else colors.onSurface)
+                            ShadowedIcon(Icons.Filled.Crop, 24.dp)
                         }
                         if (activity != null) {
-                            RoundVideoButton(
+                            VideoIconButton(
                                 onClick = { rotate(); interactions++ },
-                                contentDescription = if (landscape) stringResource(R.string.media_turn_to_portrait) else stringResource(R.string.media_turn_to_landscape),
-                                size = 44.dp,
-                                container = panelColor
+                                contentDescription = if (landscape) stringResource(R.string.media_turn_to_portrait) else stringResource(R.string.media_turn_to_landscape)
                             ) {
-                                Icon(Icons.Filled.ScreenRotation, contentDescription = null, tint = colors.onSurface)
+                                ShadowedIcon(Icons.Filled.ScreenRotation, 24.dp)
                             }
                         }
                         Box {
-                            RoundVideoButton(
+                            VideoIconButton(
                                 onClick = { menuPage = null; settingsMenuOpen = true },
-                                contentDescription = stringResource(R.string.media_playback_settings),
-                                size = 44.dp,
-                                container = panelColor
+                                contentDescription = stringResource(R.string.media_playback_settings)
                             ) {
-                                Icon(Icons.Filled.MoreVert, contentDescription = null, tint = colors.onSurface)
+                                ShadowedIcon(Icons.Filled.MoreVert, 24.dp)
                             }
-                            VideoSettingsMenu(
-                                expanded = settingsMenuOpen,
-                                onDismiss = { settingsMenuOpen = false },
-                                page = menuPage,
-                                onPageChange = { menuPage = it },
-                                choices = VideoMenuChoices(
-                                    loop = videoLoop.enabled,
-                                    onLoop = { videoLoop.onChange(it); interactions++ },
-                                    speed = state.speed,
-                                    onSpeed = { state.changeSpeed(it); interactions++ },
-                                    subtitles = subtitleChoices,
-                                    onSubtitle = { player.selectTrack(C.TRACK_TYPE_TEXT, it); interactions++ },
-                                    audio = audioChoices,
-                                    onAudio = { player.selectTrack(C.TRACK_TYPE_AUDIO, it); interactions++ },
-                                    onOpenElsewhere = {
-                                        settingsMenuOpen = false
-                                        player.pause()
-                                        openVideoElsewhere(context, videoUri)
-                                    }
+                            // Neutral, as the rest of the player: what's on shows in white rather than the theme's colour
+                            val scheme = MaterialTheme.colorScheme
+                            MaterialTheme(
+                                colorScheme = scheme.copy(
+                                    primary = scheme.onSurface,
+                                    onPrimary = scheme.surface,
+                                    primaryContainer = scheme.surfaceContainerHighest,
+                                    onPrimaryContainer = scheme.onSurface,
+                                    secondaryContainer = scheme.surfaceContainerHighest,
+                                    onSecondaryContainer = scheme.onSurface
                                 )
-                            )
+                            ) {
+                                VideoSettingsMenu(
+                                    expanded = settingsMenuOpen,
+                                    onDismiss = { settingsMenuOpen = false },
+                                    page = menuPage,
+                                    onPageChange = { menuPage = it },
+                                    choices = VideoMenuChoices(
+                                        loop = videoLoop.enabled,
+                                        onLoop = { videoLoop.onChange(it); interactions++ },
+                                        speed = state.speed,
+                                        onSpeed = { state.changeSpeed(it); interactions++ },
+                                        subtitles = subtitleChoices,
+                                        onSubtitle = { player.selectTrack(C.TRACK_TYPE_TEXT, it); interactions++ },
+                                        audio = audioChoices,
+                                        onAudio = { player.selectTrack(C.TRACK_TYPE_AUDIO, it); interactions++ },
+                                        onOpenElsewhere = {
+                                            settingsMenuOpen = false
+                                            player.pause()
+                                            openVideoElsewhere(context, videoUri)
+                                        }
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -918,53 +980,66 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                 // In the middle: back a step, play or pause (or play again at the end), on a step. Not over the error's card
                 if (state.error == null) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(32.dp),
+                        horizontalArrangement = Arrangement.spacedBy(40.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.align(Alignment.Center)
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .softScrim()
+                            .animateEnterExit(
+                                enter = if (slide) scaleIn(tween(CONTROLS_SLIDE_MS), initialScale = 0.9f) else EnterTransition.None,
+                                exit = if (slide) scaleOut(tween(CONTROLS_SLIDE_MS), targetScale = 0.9f) else ExitTransition.None
+                            )
                     ) {
                         val seconds = (stepMs / 1000).toInt()
-                        RoundVideoButton(
+                        VideoIconButton(
                             onClick = { state.seekBy(-stepMs); interactions++ },
                             contentDescription = stringResource(R.string.media_back_seconds, seconds),
-                            size = 56.dp,
-                            container = panelColor
+                            touch = 64.dp
                         ) {
-                            SkipGlyph(forward = false, seconds = seconds, tint = colors.onSurface, size = 28.dp)
+                            Shadowed { tint -> SkipGlyph(forward = false, seconds = seconds, tint = tint, size = 36.dp) }
                         }
-                        // Where the loading circle is, while it's there
                         val playing = state.playWhenReady && !state.isEnded
-                        Box(modifier = Modifier.size(72.dp)) {
-                            if (!loading) {
-                                RoundVideoButton(
-                                    onClick = { state.togglePlayPause(); interactions++ },
-                                    contentDescription = when {
-                                        state.isEnded -> stringResource(R.string.media_replay)
-                                        playing -> stringResource(R.string.media_pause)
-                                        else -> stringResource(R.string.media_play)
+                        val playIcon = when {
+                            state.isEnded -> Icons.Filled.Replay
+                            playing -> Icons.Filled.Pause
+                            else -> Icons.Filled.PlayArrow
+                        }
+                        Box(contentAlignment = Alignment.Center) {
+                            // Loading: a ring around it, the button staying where it is
+                            if (loading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(84.dp),
+                                    color = VideoControlColor,
+                                    trackColor = Color.Transparent,
+                                    strokeWidth = 3.dp
+                                )
+                            }
+                            VideoIconButton(
+                                onClick = { state.togglePlayPause(); interactions++ },
+                                contentDescription = when {
+                                    state.isEnded -> stringResource(R.string.media_replay)
+                                    playing -> stringResource(R.string.media_pause)
+                                    else -> stringResource(R.string.media_play)
+                                },
+                                touch = 80.dp
+                            ) {
+                                // Play, pause and replay turn into each other
+                                AnimatedContent(
+                                    targetState = playIcon,
+                                    transitionSpec = {
+                                        if (reduceMotion) fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                                        else (fadeIn(tween(150)) + scaleIn(tween(200), initialScale = 0.7f)) togetherWith (fadeOut(tween(120)) + scaleOut(tween(150), targetScale = 0.7f))
                                     },
-                                    size = 72.dp,
-                                    container = colors.primary
-                                ) {
-                                    Icon(
-                                        when {
-                                            state.isEnded -> Icons.Filled.Replay
-                                            playing -> Icons.Filled.Pause
-                                            else -> Icons.Filled.PlayArrow
-                                        },
-                                        contentDescription = null,
-                                        tint = colors.onPrimary,
-                                        modifier = Modifier.size(36.dp)
-                                    )
-                                }
+                                    label = "playIcon"
+                                ) { icon -> ShadowedIcon(icon, 56.dp) }
                             }
                         }
-                        RoundVideoButton(
+                        VideoIconButton(
                             onClick = { state.seekBy(stepMs); interactions++ },
                             contentDescription = stringResource(R.string.media_forward_seconds, seconds),
-                            size = 56.dp,
-                            container = panelColor
+                            touch = 64.dp
                         ) {
-                            SkipGlyph(forward = true, seconds = seconds, tint = colors.onSurface, size = 28.dp)
+                            Shadowed { tint -> SkipGlyph(forward = true, seconds = seconds, tint = tint, size = 36.dp) }
                         }
                     }
                 }
@@ -974,12 +1049,16 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .background(Brush.verticalGradient(listOf(Color.Transparent, MediaScrim.Top)))
+                        .animateEnterExit(
+                            enter = if (slide) slideInVertically(tween(CONTROLS_SLIDE_MS)) { it / 3 } else EnterTransition.None,
+                            exit = if (slide) slideOutVertically(tween(CONTROLS_SLIDE_MS)) { it / 3 } else ExitTransition.None
+                        )
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))))
                 ) {
                     Column(
                         modifier = Modifier
                             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
-                            .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 12.dp)
+                            .padding(start = 16.dp, end = 16.dp, top = 36.dp, bottom = 12.dp)
                     ) {
                         val shownPosition = when {
                             scrubbing -> scrubPositionMs
@@ -996,30 +1075,24 @@ private fun VideoPlayerContent(videoUri: Uri, thumbnailUrl: String?, apiKey: Str
                                 scrubbing = false
                                 interactions++
                             },
-                            trackColor = Color.White.copy(alpha = 0.25f),
-                            bufferedColor = Color.White.copy(alpha = 0.4f)
+                            activeColor = VideoControlColor,
+                            trackColor = VideoControlColor.copy(alpha = 0.25f),
+                            bufferedColor = VideoControlColor.copy(alpha = 0.45f)
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                formatDurationMillis(shownPosition),
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelMedium,
-                                modifier = Modifier.weight(1f)
-                            )
+                            val timeStyle = MaterialTheme.typography.labelMedium.tabular()
+                            Shadowed(Modifier.weight(1f)) { tint ->
+                                Text(formatDurationMillis(shownPosition), color = tint, style = timeStyle, modifier = Modifier.fillMaxWidth())
+                            }
                             // The speed, when it isn't the usual one
                             if (state.speed != 1f) {
-                                Text(
-                                    speedLabel(state.speed),
-                                    color = colors.primary,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    modifier = Modifier.padding(end = 12.dp)
-                                )
+                                Shadowed(Modifier.padding(end = 12.dp)) { tint ->
+                                    Text(speedLabel(state.speed), color = tint, style = timeStyle, fontWeight = FontWeight.Bold)
+                                }
                             }
-                            Text(
-                                if (state.durationMs > 0) formatDurationMillis(state.durationMs) else "--:--",
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelMedium
-                            )
+                            Shadowed { tint ->
+                                Text(if (state.durationMs > 0) formatDurationMillis(state.durationMs) else "--:--", color = tint, style = timeStyle)
+                            }
                         }
                     }
                 }
