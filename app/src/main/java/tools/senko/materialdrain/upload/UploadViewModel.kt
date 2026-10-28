@@ -57,12 +57,14 @@ import tools.senko.materialdrain.util.readContentUriInfo
 import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.UiMessages
 import tools.senko.materialdrain.R
+import tools.senko.materialdrain.ui.media.MediaCovers
 
 // SharedPreferences constants
 private const val TAG = "PIXEL_VM_DEBUG" // Tag for Logcat
 private const val TEXT_PREVIEW_MAX_LENGTH = 4096 // Max 4KB for text preview
 private const val VIDEO_THUMBNAIL_QUALITY = 75 // JPEG quality for video thumbnails
 private const val VIDEO_THUMBNAIL_TARGET_TIME_US = 1_000_000L // 1 second for thumbnail
+private const val VIDEO_THUMBNAIL_PX = 512 // Longest side a video thumbnail is decoded at, about as big as it's shown
 private const val APK_ICON_SIZE_PX = 192 // APK icons are drawn at this size for the preview
 private const val MAX_PARALLEL_UPLOADS = 3
 
@@ -330,7 +332,8 @@ class UploadViewModel(
                     }
                     newAudioArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
                     newAudioAlbum = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
-                    newAudioAlbumArt = retriever.embeddedPicture
+                    // Scaled down as it's read: the cover in the file is often a few MB, and each picked song would keep it whole
+                    newAudioAlbumArt = retriever.embeddedPicture?.let { runCatching { MediaCovers.scaled(it) }.getOrNull() }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error extracting audio metadata: ${e.message}", e)
                     newErrorMessage = (newErrorMessage ?: "") + application.getString(R.string.upload_could_not_retrieve_audio_metadata)
@@ -345,9 +348,10 @@ class UploadViewModel(
                     retriever.setDataSource(context, uri)
                     newVideoDurationMillis = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
                     // A frame a second in, else the file's own cover picture, else the very first frame
-                    val bitmap = retriever.getFrameAtTime(VIDEO_THUMBNAIL_TARGET_TIME_US, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    // Decoded at the thumbnail's size: a frame of a 4K video is some 33 MB as a full bitmap
+                    val bitmap = retriever.getScaledFrameAtTime(VIDEO_THUMBNAIL_TARGET_TIME_US, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, VIDEO_THUMBNAIL_PX, VIDEO_THUMBNAIL_PX)
                         ?: retriever.primaryImage
-                        ?: retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        ?: retriever.getScaledFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, VIDEO_THUMBNAIL_PX, VIDEO_THUMBNAIL_PX)
                     bitmap?.let {
                         val baos = ByteArrayOutputStream()
                         it.compress(Bitmap.CompressFormat.JPEG, VIDEO_THUMBNAIL_QUALITY, baos)

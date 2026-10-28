@@ -201,8 +201,8 @@ object MediaCovers {
         data object Failed : Read
     }
 
-    /** [bytes] scaled down to [px] and encoded as a JPEG. */
-    private fun scaled(bytes: ByteArray, px: Int = COVER_PX): ByteArray {
+    /** [bytes] (a picture, e.g. a song's cover) scaled down to [px] and encoded as a JPEG. */
+    internal fun scaled(bytes: ByteArray, px: Int = COVER_PX): ByteArray {
         val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, info, _ ->
             val longest = maxOf(info.size.width, info.size.height)
             if (longest > px) {
