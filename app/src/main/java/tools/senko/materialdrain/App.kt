@@ -833,6 +833,7 @@ fun MaterialdrainScreen() {
                                     Screen.Lists -> if (listOpened) listContentsListState else listsListState
                                     else -> filesystemListStates.of("${shown.hostId}:${targetTab?.id}")
                                 },
+                                folderScrollState = { path -> filesystemListStates.of("${shown.hostId}:${targetTab?.id}:$path") },
                                 onFileSelected = { navigateTo(Screen.FileDetail) },
                                 fabHeight = fabHeightDp,
                                 isFabVisible = isFabVisible,

@@ -74,7 +74,6 @@ import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
 import android.content.res.Resources
 
-private const val LOADING_INDICATOR_DELAY_MS = 400L
 private const val LOADING_START_GRACE_MS = 1500L
 
 /** Which of the three views of the account the browser shows; the screen is the same for each, only what it lists and offers differs. */
@@ -105,6 +104,8 @@ fun BrowserScreen(
     onDismissSearchModal: () -> Unit = {},
     onFileSelected: () -> Unit,
     scrollState: LazyListState,
+    /** The scroll position of each folder of the filesystem, by its path; without it, [scrollState] for all of them */
+    folderScrollState: ((path: String) -> LazyListState)? = null,
     fabHeight: Dp,
     isFabVisible: Boolean,
     onSelectingChange: (Boolean) -> Unit,
@@ -131,6 +132,7 @@ fun BrowserScreen(
     val res = LocalResources.current
     val fsState by filesystemViewModel.uiState.collectAsState()
     val fsDisplayedChildren by filesystemViewModel.displayedChildren.collectAsState()
+    val fsDisplayedPath by filesystemViewModel.displayedPath.collectAsState()
     val fileState by fileInfoViewModel.uiState.collectAsState()
     val displayedFiles by fileInfoViewModel.displayedFiles.collectAsState()
     val listState by listViewModel.uiState.collectAsState()
@@ -149,11 +151,19 @@ fun BrowserScreen(
     val sortAscending by appSettings.sortAscending.collectAsState()
     val foldersFirst by appSettings.foldersFirst.collectAsState()
 
+    // A folder just opened, before its files come back sorted (a moment later, off the main thread): sorted here at once,
+    // so the screen goes to it with the path instead of the folder left staying a moment longer. Opening one clears the
+    // filter, so there's nothing to filter
+    val fsCaughtUp = fsDisplayedPath == fsState.currentPath
+    val fsJustOpened = remember(fsCaughtUp, fsState.currentPath, fsState.visibleChildren, sortField, sortAscending, foldersFirst) {
+        if (fsCaughtUp) null else fsState.visibleChildren.sortedWith(fileComparator(sortField, sortAscending, foldersFirst))
+    }
+
     // The lists as folders, sorted again only when the lists change
     val listFolders = remember(listState.lists) { listState.lists.sortedBy { it.title.lowercase() }.map { it.asFolder() } }
     // What this mode lists, and how it loads and fails
     val entries: List<StorageNode> = when (mode) {
-        BrowserMode.FILESYSTEM -> fsDisplayedChildren
+        BrowserMode.FILESYSTEM -> fsJustOpened ?: fsDisplayedChildren
         BrowserMode.FILES -> displayedFiles
         BrowserMode.LISTS -> if (openedList == null) listFolders else listDisplayedFiles
     }
@@ -183,6 +193,22 @@ fun BrowserScreen(
         BrowserMode.FILES -> { { fileInfoViewModel.fetchUserFiles() } }
         BrowserMode.LISTS -> if (openedList == null) { { listViewModel.fetchUserLists() } } else { { listViewModel.refreshOpenedList() } }
     }
+    // What the body shows (a folder, a list, the lists, the files) and how deep it is, for the slide between them: into a
+    // folder from the right, back up from the left (see BrowserContent)
+    val pageKey = when (mode) {
+        BrowserMode.FILESYSTEM -> "folder:" + fsState.currentPath.trim('/')
+        BrowserMode.LISTS -> "list:" + openedList?.id.orEmpty()
+        BrowserMode.FILES -> "files"
+    }
+    val pageDepth = when (mode) {
+        BrowserMode.FILESYSTEM -> fsState.pathSegments.size
+        BrowserMode.LISTS -> if (openedList != null) 1 else 0
+        BrowserMode.FILES -> 0
+    }
+    // Each folder keeps its own scroll position, so going back up is where the folder above was left
+    val scrollStateOf: (String) -> LazyListState = { key ->
+        if (mode == BrowserMode.FILESYSTEM && folderScrollState != null) folderScrollState(key.removePrefix("folder:")) else scrollState
+    }
     // Only the filesystem can be changed here; the files of a list can be removed from it when the list allows
     val canWriteFs = mode == BrowserMode.FILESYSTEM && fsState.canWrite && ProviderCapability.RENAME !in disabledCapabilities
     val canUploadFs = ProviderCapability.UPLOAD !in disabledCapabilities
@@ -190,9 +216,8 @@ fun BrowserScreen(
     val canDelete = ProviderCapability.DELETE !in disabledCapabilities
     val listCanEdit = openedList?.canEdit == true
 
-    // Folders usually load within a fraction of a second, so the loading indicator only appears when it takes longer
-    // (or right away when the user pulls to refresh)
-    var showLoadingIndicator by remember { mutableStateOf(false) }
+    // The circle only when the user pulls to refresh: what's shown is listed again quietly, and a folder or list with
+    // nothing to show yet has its placeholder rows (see BrowserContent)
     var userRefreshing by remember { mutableStateOf(false) }
     val isLoadingNow by rememberUpdatedState(isLoading)
     // The keys shown right before a refresh, so the list can tell whether it came back with something new. Null
@@ -205,13 +230,7 @@ fun BrowserScreen(
         refresh()
     }
     LaunchedEffect(isLoading) {
-        if (isLoading) {
-            delay(LOADING_INDICATOR_DELAY_MS)
-            showLoadingIndicator = true
-        } else {
-            showLoadingIndicator = false
-            userRefreshing = false
-        }
+        if (!isLoading) userRefreshing = false
     }
     LaunchedEffect(userRefreshing) {
         // A refresh which never started loading (e.g. missing API key) must not leave the indicator stuck
@@ -249,7 +268,7 @@ fun BrowserScreen(
     LaunchedEffect(entries) {
         val before = keysBeforeRefresh ?: return@LaunchedEffect
         keysBeforeRefresh = null
-        if (entries.any { it.key !in before }) scrollState.scrollToItem(0)
+        if (entries.any { it.key !in before }) scrollStateOf(pageKey).scrollToItem(0)
     }
 
     // Filesystem dialogs
@@ -673,9 +692,11 @@ fun BrowserScreen(
         mode = mode,
         entries = entries,
         isLoading = isLoading,
-        // Not over the placeholders of a list still empty (see PlaceholderList), which say it already
-        refreshing = userRefreshing || (showLoadingIndicator && entries.isNotEmpty()),
-        showLoadingIndicator = showLoadingIndicator,
+        // Only a pull: a folder or list loading by itself shows its placeholder rows, or the files it had (see PlaceholderList)
+        refreshing = userRefreshing,
+        pageKey = pageKey,
+        pageDepth = pageDepth,
+        scrollStateFor = scrollStateOf,
         onRefresh = {
             userRefreshing = true
             triggerRefresh()
@@ -750,7 +771,6 @@ fun BrowserScreen(
                 }
             }
         ),
-        scrollState = scrollState,
         fabHeight = fabHeight,
         isFabVisible = isFabVisible,
         destinationBar = destinationBar

@@ -46,12 +46,19 @@ import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
 
 /** How long the shine takes to cross the placeholders. */
 private const val SHINE_MS = 1_300
 
 /** The widths of the name and the details of each placeholder row, of the row's width: different, but the same each time. */
 private val NAME_WIDTHS = floatArrayOf(0.62f, 0.44f, 0.71f, 0.52f, 0.38f, 0.66f, 0.48f, 0.57f)
+/** How long the rows take to fade in. */
+private const val FADE_IN_MS = 200
+
 private val DETAIL_WIDTHS = floatArrayOf(0.34f, 0.26f, 0.4f, 0.3f, 0.22f, 0.36f, 0.28f, 0.32f)
 
 /**
@@ -64,9 +71,14 @@ fun PlaceholderList(modifier: Modifier = Modifier) {
     val look = LocalListLook.current
     val brush = placeholderBrush()
     val loading = stringResource(R.string.common_loading)
+    // Faded in, rather than there all at once after the moment a list waits before showing them
+    val reduceMotion = LocalReduceMotion.current
+    val shown = remember { Animatable(if (reduceMotion) 1f else 0f) }
+    LaunchedEffect(Unit) { shown.animateTo(1f, tween(FADE_IN_MS)) }
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
+            .graphicsLayer { alpha = shown.value }
             .semantics { contentDescription = loading }
     ) {
         if (look.grid) {

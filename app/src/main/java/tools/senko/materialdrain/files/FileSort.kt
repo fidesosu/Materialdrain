@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOf
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.util.parseDateTime
@@ -116,13 +117,26 @@ fun filteredAndSorted(
     sortAscending: Flow<Boolean>,
     /** Folders before files (the filesystem's, AppSettings.foldersFirst) */
     directoriesFirst: Flow<Boolean> = flowOf(false)
-): Flow<List<StorageNode>> = combine(
+): Flow<List<StorageNode>> =
+    filteredAndSortedOf(files.map { Unit to it }, filterQuery, sortField, sortAscending, directoriesFirst).map { it.second }
+
+/**
+ * [filteredAndSorted] of lists which each come with what they're the list of ([T], e.g. a folder's path), handed on with
+ * them: what the screen shows is then always of what it says it is, also while the next one is being sorted.
+ */
+fun <T> filteredAndSortedOf(
+    files: Flow<Pair<T, List<StorageNode>>>,
+    filterQuery: Flow<String>,
+    sortField: Flow<SortableField>,
+    sortAscending: Flow<Boolean>,
+    directoriesFirst: Flow<Boolean> = flowOf(false)
+): Flow<Pair<T, List<StorageNode>>> = combine(
     files.distinctUntilChanged(),
     filterQuery.distinctUntilChanged(),
     sortField,
     sortAscending,
     directoriesFirst
-) { list, query, field, ascending, foldersFirst ->
-    list.filter { it.name.contains(query, ignoreCase = true) }
+) { (of, list), query, field, ascending, foldersFirst ->
+    of to list.filter { it.name.contains(query, ignoreCase = true) }
         .sortedWith(fileComparator(field, ascending, foldersFirst))
 }.flowOn(Dispatchers.Default)

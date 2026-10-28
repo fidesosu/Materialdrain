@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import tools.senko.materialdrain.files.previewMimeType
@@ -64,6 +65,17 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.EaseOutCubic
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.runtime.Immutable
+import tools.senko.materialdrain.ui.LocalReduceMotion
+import androidx.compose.animation.Crossfade
 
 /**
  * The browser as it's drawn: the header of [mode] (the sorting, the path or the open list), then [entries] or why there
@@ -77,7 +89,6 @@ fun BrowserContent(
     entries: List<StorageNode>,
     isLoading: Boolean,
     refreshing: Boolean,
-    showLoadingIndicator: Boolean,
     onRefresh: () -> Unit,
     onRetry: () -> Unit,
     errorMessage: String?,
@@ -103,7 +114,11 @@ fun BrowserContent(
     shareUrlFor: (StorageNode) -> String?,
     onOpen: (StorageNode) -> Unit,
     rowActions: BrowserRowActions,
-    scrollState: LazyListState,
+    /** What's shown (a folder, a list), and how deep it is: another one slides in, see the body */
+    pageKey: String = mode.name,
+    pageDepth: Int = 0,
+    /** The scroll position of each page, by its [pageKey] */
+    scrollStateFor: (pageKey: String) -> LazyListState,
     fabHeight: Dp,
     isFabVisible: Boolean,
     /** What waits at the bottom for its place, in the selection bar's place (see DestinationBar) */
@@ -176,28 +191,70 @@ fun BrowserContent(
 
             // Body
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            when {
-                // Rows of the shape of the files to come, until they're there (see PlaceholderList)
-                showLoadingIndicator && entries.isEmpty() && !keyMissing && errorMessage == null -> PullableFill {
+            // A folder (or list) opened slides in over the one left, which keeps what it showed as it goes: into a folder
+            // from the right, back up from the left, the way Material's shared axis moves. Its own changes (loaded,
+            // refreshed) don't slide
+            val reduceMotion = LocalReduceMotion.current
+            // What each page showed last: the one sliding out keeps showing it. Only which page it is goes to the slide, so
+            // the page's own changes while it slides (its listing coming) don't start the slide over
+            val current = BrowserPage(entries, isLoading, errorMessage, keyMissing)
+            val shownLast = remember { HashMap<String, BrowserPage>() }
+            shownLast[pageKey] = current
+            AnimatedContent(
+                targetState = PageSlot(pageKey, pageDepth),
+                contentKey = { it.key },
+                transitionSpec = {
+                    val direction = targetState.depth.compareTo(initialState.depth)
+                    when {
+                        reduceMotion || direction == 0 -> fadeIn(tween(PAGE_FADE_MS)) togetherWith fadeOut(tween(PAGE_FADE_MS))
+                        else -> (slideInHorizontally(tween(PAGE_SLIDE_MS, easing = EaseOutCubic)) { width -> direction * width / 4 } +
+                            fadeIn(tween(PAGE_SLIDE_MS - PAGE_FADE_OUT_MS, delayMillis = PAGE_FADE_OUT_MS))) togetherWith
+                            (slideOutHorizontally(tween(PAGE_SLIDE_MS, easing = EaseOutCubic)) { width -> -direction * width / 4 } +
+                                fadeOut(tween(PAGE_FADE_OUT_MS)))
+                    }
+                },
+                label = "browserPage",
+                modifier = Modifier.fillMaxSize()
+            ) { slot ->
+            // The page's own, not the screen's now: a page sliding out shows what it had
+            val page = if (slot.key == pageKey) current else shownLast[slot.key] ?: current
+            val entries = page.entries
+            val isLoading = page.isLoading
+            val errorMessage = page.errorMessage
+            val keyMissing = page.keyMissing
+            val scrollState = scrollStateFor(slot.key)
+            val body = when {
+                // Rows of the shape of the files to come, until they're there (see PlaceholderList): at once, as the page
+                // fades in, and faded into the files when they come quickly
+                isLoading && entries.isEmpty() && !keyMissing && errorMessage == null -> PageBody.PLACEHOLDERS
+                keyMissing -> PageBody.KEY_MISSING
+                errorMessage != null && entries.isEmpty() -> PageBody.ERROR
+                entries.isEmpty() && !isLoading -> PageBody.EMPTY
+                else -> PageBody.LIST
+            }
+            // The placeholder rows fade into the files when they come (or into why there are none)
+            Crossfade(body, animationSpec = tween(if (reduceMotion) 0 else BODY_FADE_MS), label = "pageBody") { shownBody ->
+            when (shownBody) {
+                PageBody.PLACEHOLDERS -> PullableFill {
                     PlaceholderList()
                 }
-                keyMissing -> PullableFill {
+                PageBody.KEY_MISSING -> PullableFill {
                     ErrorMessage(errorMessage ?: stringResource(R.string.browser_log_in_or_add_an))
                 }
-                errorMessage != null && entries.isEmpty() -> PullableFill {
+                PageBody.ERROR -> PullableFill {
                     Column(
                         modifier = Modifier.padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Text(errorMessage, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge)
+                        Text(errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge)
                         TextButton(onClick = onRetry) { Text(stringResource(R.string.browser_retry)) }
                     }
                 }
-                entries.isEmpty() && !isLoading -> PullableFill {
+                PageBody.EMPTY -> PullableFill {
                     CenteredTextMessage(emptyText(mode, openedList != null, filterQuery))
                 }
-                else -> BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                PageBody.LIST -> BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     // One entry, as a row or as a tile of the grid (Look and feel)
                     val entry: @Composable (StorageNode, Boolean, Modifier) -> Unit = { node, asTile, entryModifier ->
                             BrowserEntry(
@@ -270,6 +327,8 @@ fun BrowserContent(
                     DotScrollbar(state = scrollState)
                 }
             }
+            }
+            }
             // Floating over the end of the list, which shows around them as it does around the miniplayer (the list
             // leaves room for them after its last entry, above)
             Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
@@ -307,6 +366,32 @@ private fun emptyText(mode: BrowserMode, inList: Boolean, filter: String): Strin
     mode == BrowserMode.FILES -> stringResource(R.string.app_no_files)
     else -> stringResource(R.string.app_this_folder_is_empty)
 }
+
+/** Which page the body shows (a folder, a list), and how deep it is: what the slide goes by (see BrowserContent). */
+@Immutable
+private data class PageSlot(val key: String, val depth: Int)
+
+/** What the body shows of one folder or list, as it was: kept by the page while it slides out (see BrowserContent). */
+@Immutable
+private class BrowserPage(
+    val entries: List<StorageNode>,
+    val isLoading: Boolean,
+    val errorMessage: String?,
+    val keyMissing: Boolean
+)
+
+/** What the body of a page is: rows to come, why there's nothing, or the files. */
+private enum class PageBody { PLACEHOLDERS, KEY_MISSING, ERROR, EMPTY, LIST }
+
+/** How long the body of a page takes to fade into another (the rows to come into the files). */
+private const val BODY_FADE_MS = 180
+
+/** How long a page slides for, and how soon the one left has faded out of it. */
+private const val PAGE_SLIDE_MS = 300
+private const val PAGE_FADE_OUT_MS = 90
+
+/** With reduced animations, or to a page as deep as the one left: a crossfade. */
+private const val PAGE_FADE_MS = 100
 
 /** How wide a tile of the grid is about to be; the row gets as many as fit. */
 private val GRID_TILE_WIDTH = 120.dp
@@ -352,7 +437,6 @@ internal fun SampleBrowserContent(
         entries = entries,
         isLoading = isLoading,
         refreshing = isLoading,
-        showLoadingIndicator = isLoading,
         onRefresh = {},
         onRetry = {},
         errorMessage = errorMessage,
@@ -383,7 +467,7 @@ internal fun SampleBrowserContent(
         shareUrlFor = { "https://pixeldrain.com/u/${it.ref.id}" },
         onOpen = {},
         rowActions = BrowserRowActions(),
-        scrollState = rememberLazyListState(),
+        scrollStateFor = rememberLazyListState().let { state -> { state } },
         fabHeight = 0.dp,
         isFabVisible = false
     )

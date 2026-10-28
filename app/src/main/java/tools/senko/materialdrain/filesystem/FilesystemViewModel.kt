@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap
 import tools.senko.materialdrain.ContentChanges
 import tools.senko.materialdrain.UiMessages
 import tools.senko.materialdrain.auth.SessionManager
-import tools.senko.materialdrain.files.filteredAndSorted
+import tools.senko.materialdrain.files.filteredAndSortedOf
 import tools.senko.materialdrain.provider.PIXELDRAIN_PROVIDER_ID
 import tools.senko.materialdrain.provider.ProviderConfigStore
 import tools.senko.materialdrain.provider.ProviderRegistry
@@ -157,6 +157,10 @@ class FilesystemViewModel(
     /** [FilesystemUiState.visibleChildren], filtered and sorted by the shared sort order. Folders always come first. */
     val displayedChildren: StateFlow<List<StorageNode>> = _displayedChildren.asStateFlow()
 
+    private val _displayedPath = MutableStateFlow("")
+    /** The folder [displayedChildren] are of: they come a moment after a folder is opened, as they're sorted first. */
+    val displayedPath: StateFlow<String> = _displayedPath.asStateFlow()
+
     private val _uploadProgress = MutableStateFlow<FilesystemUploadProgress?>(null)
     /**
      * The upload into the current folder, null when none runs. Kept out of [uiState]: it changes with every progress tick,
@@ -175,6 +179,12 @@ class FilesystemViewModel(
     // The listings of the folders seen, by path: a search opened again (or from a folder already crawled) reuses them
     // instead of listing everything again. Of this tab's host only, and dropped whenever something may have changed
     private val folderCache = ConcurrentHashMap<String, List<StorageNode>>()
+
+    /** A folder as it was listed the last time: shown at once when it's opened again, while it's listed anew. */
+    private class ListedFolder(val children: List<StorageNode>, val canWrite: Boolean, val canDelete: Boolean)
+    // By path, of this tab's host; dropped with folderCache, whenever something may have changed
+    private val listedFolders = ConcurrentHashMap<String, ListedFolder>()
+    private var listingJob: Job? = null
     private val speedTracker = TransferSpeedTracker()
     private var nextTransferNumber = 0
 
@@ -244,13 +254,16 @@ class FilesystemViewModel(
 
         // Recomputes displayedChildren whenever the folder's contents, the filter, or the shared sorting changes
         viewModelScope.launch {
-            filteredAndSorted(
-                uiState.map { it.visibleChildren },
+            filteredAndSortedOf(
+                uiState.map { it.currentPath to it.visibleChildren },
                 uiState.map { it.filterQuery },
                 appSettings.sortField,
                 appSettings.sortAscending,
                 directoriesFirst = appSettings.foldersFirst
-            ).collect { sortedAndFiltered -> _displayedChildren.value = sortedAndFiltered }
+            ).collect { (path, sortedAndFiltered) ->
+                _displayedChildren.value = sortedAndFiltered
+                _displayedPath.value = path
+            }
         }
     }
 
@@ -335,8 +348,28 @@ class FilesystemViewModel(
         // Never above the tab's root (a folder saved before the root was set, a move's destination)
         val normalized = normalizePath(path, root).let { if (tabRoot.isEmpty() || isWithinRoot(it, root)) it else normalizePath(root, root) }
         ProviderLog.d("Filesystem", "listing '$normalized' on '${provider.displayName}' (${provider.kind})")
-        _uiState.update { it.copy(isLoading = true, errorMessage = null, apiKeyMissingError = false) }
-        viewModelScope.launch {
+        // Another folder is shown at once: as it was listed the last time, or empty (the screen's placeholder rows) until
+        // its listing comes, instead of the folder left staying on screen until then
+        val opening = normalized != normalizePath(_uiState.value.currentPath, root)
+        val known = if (opening) listedFolders[normalized] else null
+        _uiState.update {
+            if (!opening) it.copy(isLoading = true, errorMessage = null, apiKeyMissingError = false)
+            else it.copy(
+                isLoading = true,
+                errorMessage = null,
+                apiKeyMissingError = false,
+                currentPath = normalized,
+                pathSegments = generatePathSegments(normalized, provider),
+                children = known?.children.orEmpty(),
+                canWrite = known?.canWrite ?: it.canWrite,
+                canDelete = known?.canDelete ?: it.canDelete,
+                // A filter from the folder just left doesn't carry over into this one
+                filterQuery = ""
+            )
+        }
+        // A folder opened while another was still being listed: that one's listing would be of no use any more
+        listingJob?.cancel()
+        listingJob = viewModelScope.launch {
             when (val response = browse.list(normalized)) {
                 is ApiResponse.Success -> {
                     val sortedChildren = response.data.children.sortedWith(
@@ -344,6 +377,7 @@ class FilesystemViewModel(
                             .thenBy { it.name.lowercase() }
                     )
                     folderCache[normalized] = response.data.children
+                    listedFolders[normalized] = ListedFolder(sortedChildren, response.data.canWrite, response.data.canDelete)
                     appSettings.setFilesystemPath(pathKey, normalized)
                     _uiState.update {
                         it.copy(
@@ -475,6 +509,7 @@ class FilesystemViewModel(
         treeIndexJob = null
         _treeIndex.value = null
         folderCache.clear()
+        listedFolders.clear()
     }
 
     /** Stops indexing, keeping what was found and listed so far for the next search. */

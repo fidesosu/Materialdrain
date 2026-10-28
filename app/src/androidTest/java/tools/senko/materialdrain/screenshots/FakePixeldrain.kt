@@ -77,6 +77,10 @@ class FakePixeldrain : Interceptor {
     @Volatile
     var ignoreRanges = false
 
+    /** How long a folder takes to be listed, as on a slow connection (see FolderNavigationTest). */
+    @Volatile
+    var listingDelayMs = 0L
+
     /** The file whose next download (of all of it) stops halfway, as a connection that drops; null for none. */
     @Volatile
     var breakNextDownloadOf: String? = null
@@ -126,7 +130,7 @@ class FakePixeldrain : Interceptor {
             // Inside a zip: its entries, or one entry's text
             "zip_info" in query -> json(ZIP_INFO)
             "zip_file" in query -> Answer(200, "text/plain", NOTES.toByteArray())
-            path in folders -> json(listing(path))
+            path in folders -> json(listing(path)).also { Thread.sleep(listingDelayMs) }
             "stat" in query -> null
             else -> content(name)
         }
