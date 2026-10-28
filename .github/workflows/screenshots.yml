@@ -23,7 +23,7 @@ jobs:
       actions: write
     steps:
       # The whole history and the tags, which the version is worked out from (see app/build.gradle.kts)
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

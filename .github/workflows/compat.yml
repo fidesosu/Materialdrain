@@ -31,7 +31,7 @@ jobs:
     steps:
       # The weekly run is of dev, where the changes go first (a scheduled run is of the default branch otherwise). The
       # whole history and the tags, which the version is worked out from (see app/build.gradle.kts)
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
           fetch-depth: 0
