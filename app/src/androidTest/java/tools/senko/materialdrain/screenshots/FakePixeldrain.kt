@@ -194,8 +194,11 @@ class FakePixeldrain : Interceptor {
         }
     }
 
+    /** The files of the assets, read once: a range of one is asked for many times */
+    private val assets = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
+
     private fun asset(file: String, mime: String): Answer {
-        val bytes = InstrumentationRegistry.getInstrumentation().context.assets.open("fake-pixeldrain/$file").use { it.readBytes() }
+        val bytes = assets.getOrPut(file) { InstrumentationRegistry.getInstrumentation().context.assets.open("fake-pixeldrain/$file").use { it.readBytes() } }
         return Answer(200, mime, bytes)
     }
 

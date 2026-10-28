@@ -58,6 +58,13 @@ object MediaCovers {
     /** But never further in than this, so a long video doesn't need a read from deep inside it. */
     private const val FRAME_AT_MOST_US = 30_000_000L
 
+    /**
+     * The most of a video read for its thumbnail's frame. Usually a few hundred KB do (the header, the index and a key
+     * frame), but a video with its index at the end of a long file, or big key frames, could take much more of the
+     * host's transfer, which Pixeldrain counts; then the host's own thumbnail stands in.
+     */
+    private const val MAX_FRAME_READ_BYTES = 4L * 1024 * 1024
+
     /** Reading a thumbnail takes a decoder and a few requests to the host: only a couple at once. */
     private val permits = Semaphore(2)
 
@@ -167,9 +174,10 @@ object MediaCovers {
         /**
          * Reads a frame of the video at [src] over the network, the nearest key frame to a tenth of the way in (see
          * [FRAME_AT_FRACTION]): a key frame decodes on its own, so only the ranges around it are fetched. Some videos give
-         * nothing for that (a very short one, an odd index); then the key frame before it, then the very first frame.
+         * nothing for that (a very short one, an odd index); then the key frame before it, then the very first frame. One
+         * which would take more than [MAX_FRAME_READ_BYTES] of the host's transfer has none (the host's thumbnail stands in).
          */
-        private fun readFrame(src: String): Read = withRetriever(src) { retriever ->
+        private fun readFrame(src: String): Read = withRetriever(src, MAX_FRAME_READ_BYTES) { retriever ->
             val durationUs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.times(1000)
             val atUs = durationUs?.let { (it * FRAME_AT_FRACTION).toLong().coerceAtMost(FRAME_AT_MOST_US) } ?: 0L
             val frame = retriever.getScaledFrameAtTime(atUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, COVER_PX, COVER_PX)
@@ -180,15 +188,18 @@ object MediaCovers {
             frame?.let { jpeg(it) }
         }
 
-        private fun withRetriever(src: String, read: (MediaMetadataRetriever) -> ByteArray?): Read {
+        private fun withRetriever(src: String, maxBytes: Long = Long.MAX_VALUE, read: (MediaMetadataRetriever) -> ByteArray?): Read {
             val retriever = MediaMetadataRetriever()
+            var source: HttpMediaDataSource? = null
             return try {
-                retriever.setHostDataSource(src)
+                source = retriever.setHostDataSource(src, maxBytes)
+                // What's read past the most fails, which the retriever takes as there being no frame: so it's remembered
                 read(retriever)?.let { Read.Found(it) } ?: Read.Nothing
             } catch (e: Exception) {
                 Log.w(TAG, "nothing read from $src: ${e.message}")
                 Read.Failed
             } finally {
+                source?.let { Log.d(TAG, "${if (video) "frame" else "cover"} read with ${it.fetchedBytes / 1024} KB of $src") }
                 retriever.release()
             }
         }

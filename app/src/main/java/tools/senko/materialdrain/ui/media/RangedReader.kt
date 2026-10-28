@@ -8,16 +8,26 @@ import java.io.IOException
  * A file on a host read in blocks of [blockSize], each fetched with a range when something first reads in it, and the
  * [blocksKept] read last kept: what reads a file here and there (the media framework, another app through the file
  * picker) gets it without the whole file being fetched first. Through the app's own HTTP client, with the host's login
- * ([headers]). A host that sends the whole file instead of a range fails it, as a file of gigabytes could come.
+ * ([headers]). A host that sends the whole file instead of a range fails it, as a file of gigabytes could come. Past
+ * [maxBytes] fetched, it fetches no more and fails what reads further ([TooMuchToRead]).
  */
 class RangedReader(
     private val client: OkHttpClient,
     private val url: String,
     private val headers: Map<String, String>,
     private val blockSize: Int,
-    private val blocksKept: Int
+    private val blocksKept: Int,
+    private val maxBytes: Long = Long.MAX_VALUE
 ) {
+    /** What reading on would fetch more than the reader may. */
+    class TooMuchToRead(fetched: Long) : IOException("$fetched bytes read already")
+
     private var size = -1L
+
+    /** How much has been fetched from the host so far. */
+    @Volatile
+    var fetchedBytes = 0L
+        private set
     private val blocks = object : LinkedHashMap<Long, ByteArray>(blocksKept, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, ByteArray>) = size > blocksKept
     }
@@ -50,6 +60,7 @@ class RangedReader(
 
     private fun block(index: Long): ByteArray {
         blocks[index]?.let { return it }
+        if (fetchedBytes >= maxBytes) throw TooMuchToRead(fetchedBytes)
         val start = index * blockSize
         val request = Request.Builder()
             .url(url)
@@ -62,7 +73,7 @@ class RangedReader(
             // Not the address in the message, which goes to the log: on some hosts it opens the file (see SmbContentServer)
             if (response.code != 206) throw IOException("HTTP ${response.code} instead of a range from ${request.url.host}")
             size = response.header("Content-Range")?.substringAfter('/')?.toLongOrNull() ?: size
-            return response.body.bytes().also { blocks[index] = it }
+            return response.body.bytes().also { blocks[index] = it; fetchedBytes += it.size }
         }
     }
 
