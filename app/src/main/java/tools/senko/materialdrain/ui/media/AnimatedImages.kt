@@ -1,16 +1,17 @@
 package tools.senko.materialdrain.ui.media
 
 import android.util.Log
-import coil.ImageLoader
-import coil.decode.BitmapFactoryDecoder
-import coil.decode.DecodeResult
-import coil.decode.Decoder
-import coil.decode.GifDecoder
-import coil.decode.ImageDecoderDecoder
-import coil.decode.ImageSource
-import coil.fetch.SourceResult
-import coil.request.Options
+import coil3.ImageLoader
+import coil3.decode.BitmapFactoryDecoder
+import coil3.decode.DecodeResult
+import coil3.decode.Decoder
+import coil3.decode.ImageSource
+import coil3.fetch.SourceFetchResult
+import coil3.gif.AnimatedImageDecoder
+import coil3.gif.GifDecoder
+import coil3.request.Options
 import okio.Buffer
+import okio.FileSystem
 import okio.BufferedSource
 import okio.ByteString.Companion.encodeUtf8
 import kotlin.coroutines.cancellation.CancellationException
@@ -20,7 +21,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * Added to the app's image loader by AppContainer, so whichever screen loads a picture, an animated one moves.
  *
  * They're told apart by their first bytes, not by the type the host reports, which is often missing or generic.
- * Android's own decoder ([ImageDecoderDecoder]) handles nearly all of them, but turns some GIFs down (slightly broken
+ * Android's own decoder ([AnimatedImageDecoder]) handles nearly all of them, but turns some GIFs down (slightly broken
  * ones, which browsers still play); those are decoded by the older GIF decoder ([GifDecoder]) instead, and failing that,
  * their first frame is shown as a still picture rather than nothing.
  */
@@ -32,7 +33,7 @@ object AnimatedImages {
     private const val MAX_BUFFERED_BYTES = 64L * 1024 * 1024
 
     class Factory : Decoder.Factory {
-        override fun create(result: SourceResult, options: Options, imageLoader: ImageLoader): Decoder? {
+        override fun create(result: SourceFetchResult, options: Options, imageLoader: ImageLoader): Decoder? {
             val source = result.source.source()
             val kind = when {
                 isGif(source) -> Kind.GIF
@@ -45,15 +46,15 @@ object AnimatedImages {
 
     private enum class Kind { GIF, WEBP }
 
-    private class AnimatedDecoder(private val result: SourceResult, private val options: Options, private val kind: Kind) : Decoder {
+    private class AnimatedDecoder(private val result: SourceFetchResult, private val options: Options, private val kind: Kind) : Decoder {
         override suspend fun decode(): DecodeResult {
             val source = result.source.source()
             // Big files: Android's decoder only, it reads them as it goes
             if (!source.request(MAX_BUFFERED_BYTES)) {
                 val bytes = source.readByteString()
-                fun fresh() = ImageSource(Buffer().write(bytes), options.context)
+                fun fresh() = ImageSource(Buffer().write(bytes), FileSystem.SYSTEM)
                 val decoders = buildList<Pair<String, () -> Decoder>> {
-                    add("ImageDecoder" to { ImageDecoderDecoder(fresh(), options) })
+                    add("ImageDecoder" to { AnimatedImageDecoder(fresh(), options) })
                     if (kind == Kind.GIF) add("GifDecoder" to { GifDecoder(fresh(), options) })
                     add("first frame" to { BitmapFactoryDecoder(fresh(), options) })
                 }
@@ -70,7 +71,7 @@ object AnimatedImages {
                 }
                 throw lastError ?: IllegalStateException("No decoder could read this image")
             }
-            return ImageDecoderDecoder(result.source, options).decode()
+            return AnimatedImageDecoder(result.source, options).decode()
         }
     }
 

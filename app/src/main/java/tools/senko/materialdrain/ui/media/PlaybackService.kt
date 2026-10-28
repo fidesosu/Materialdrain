@@ -15,11 +15,10 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.core.graphics.drawable.toBitmap
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.util.BitmapLoader
-import coil.imageLoader
-import coil.request.SuccessResult
+import coil3.imageLoader
+import coil3.request.SuccessResult
 import com.google.common.util.concurrent.SettableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +63,8 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import tools.senko.materialdrain.R
+import coil3.request.allowHardware
+import coil3.toBitmap
 
 /**
  * The player of songs which go on in the background (the Media setting "Play songs in the background"): it outlives the
@@ -359,7 +360,7 @@ private class CoverBitmapLoader(private val context: Context, private val scope:
             size(ART_PX)
             allowHardware(false)
         }
-        return (context.imageLoader.execute(request) as? SuccessResult)?.drawable?.toBitmap()
+        return (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
     }
 }
 

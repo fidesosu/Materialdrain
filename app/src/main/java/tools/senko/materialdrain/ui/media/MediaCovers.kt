@@ -6,17 +6,21 @@ import android.graphics.ImageDecoder
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
-import coil.ImageLoader
-import coil.decode.DataSource
-import coil.decode.ImageSource
-import coil.fetch.FetchResult
-import coil.fetch.Fetcher
-import coil.fetch.SourceResult
-import coil.request.Options
+import coil3.Extras
+import coil3.ImageLoader
+import coil3.decode.DataSource
+import coil3.decode.ImageSource
+import coil3.fetch.FetchResult
+import coil3.fetch.Fetcher
+import coil3.fetch.SourceFetchResult
+import coil3.network.httpHeaders
+import coil3.request.Options
+import coil3.toAndroidUri
+import coil3.toUri
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import okhttp3.Headers.Companion.toHeaders
 import okio.Buffer
+import okio.FileSystem
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer
@@ -91,9 +95,9 @@ object MediaCovers {
             .build().toString()
 
     /** Loads `audiocover://` thumbnails for Coil. Added to the app's image loader by AppContainer. */
-    class Factory(private val context: Context) : Fetcher.Factory<Uri> {
-        override fun create(data: Uri, options: Options, imageLoader: ImageLoader): Fetcher? =
-            if (data.scheme == SCHEME) CoverFetcher(context.applicationContext, data, options, imageLoader) else null
+    class Factory(private val context: Context) : Fetcher.Factory<coil3.Uri> {
+        override fun create(data: coil3.Uri, options: Options, imageLoader: ImageLoader): Fetcher? =
+            if (data.scheme == SCHEME) CoverFetcher(context.applicationContext, data.toAndroidUri(), options, imageLoader) else null
     }
 
     private class CoverFetcher(
@@ -110,13 +114,13 @@ object MediaCovers {
             val px = data.getQueryParameter("px")?.toIntOrNull()?.takeIf { !video }?.coerceIn(COVER_PX, LARGE_COVER_PX) ?: COVER_PX
             val cover = coverOf(src, data.getQueryParameter("v").orEmpty(), px)
             if (cover != null) {
-                return SourceResult(ImageSource(Buffer().write(cover), context), mimeType = null, dataSource = DataSource.DISK)
+                return SourceFetchResult(ImageSource(Buffer().write(cover), FileSystem.SYSTEM), mimeType = null, dataSource = DataSource.DISK)
             }
             // Nothing in the file: the host's own thumbnail, fetched as any other, with the login it needs. Without one,
             // the load fails, and the file's tile underneath stays (see FileIcon)
             val fallback = data.getQueryParameter("fallback") ?: throw NoCoverException()
-            val fallbackOptions = options.copy(headers = HostRequestAuth.headersFor(fallback).toHeaders())
-            val fetcher = imageLoader.components.newFetcher(Uri.parse(fallback), fallbackOptions, imageLoader)?.first ?: return null
+            val fallbackOptions = options.copy(extras = options.extras.newBuilder().set(Extras.Key.httpHeaders, hostHeaders(fallback)).build())
+            val fetcher = imageLoader.components.newFetcher(fallback.toUri(), fallbackOptions, imageLoader)?.first ?: return null
             return fetcher.fetch()
         }
 

@@ -63,8 +63,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
-import coil.compose.AsyncImage
-import coil.imageLoader
+import coil3.compose.AsyncImage
+import coil3.imageLoader
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import tools.senko.materialdrain.provider.api.PixeldrainRichDetails
@@ -111,6 +111,7 @@ import tools.senko.materialdrain.ui.preview.LongScreenPreviews
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
 import android.content.res.Resources
+import coil3.request.crossfade
 
 /** The corners of the cards on this page, the same as the app's other floating cards. */
 private val DetailCardShape = AppShapes.Card
@@ -398,7 +399,13 @@ fun FileInfoDetailsCard(
                         }
                     }
                 } else if (actualThumbnailUrl != null) {
-                    val request = imageRequest(localContext, actualThumbnailUrl) { crossfade(true) }
+                    // The same cache entry as the list's thumbnail of the file (see FileIcon), so it's there already
+                    val version = fileInfo.modifiedAt ?: fileInfo.createdAt
+                    val request = imageRequest(localContext, actualThumbnailUrl) {
+                        crossfade(true)
+                        diskCacheKey(version?.let { "$actualThumbnailUrl#$it" })
+                        memoryCacheKeyExtra("version", version)
+                    }
 
                     Card(
                         modifier = Modifier

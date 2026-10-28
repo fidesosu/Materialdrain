@@ -54,13 +54,13 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import coil.ImageLoader
+import coil3.ImageLoader
 import kotlin.math.abs
-import coil.compose.AsyncImage
-import coil.compose.AsyncImagePainter
-import coil.imageLoader
-import coil.request.ImageRequest
-import coil.size.Size
+import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
+import coil3.imageLoader
+import coil3.request.ImageRequest
+import coil3.size.Size
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 import tools.senko.materialdrain.ui.LocalBlurredBackdrop
@@ -68,11 +68,18 @@ import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ThemePreviews
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import coil3.request.crossfade
+import coil3.network.NetworkHeaders
+import coil3.network.httpHeaders
 
 internal const val TAG_COIL = "CoilImageLoaderShared"
+/** The login [url]'s host needs (see HostRequestAuth), as the headers of an image request. */
+internal fun hostHeaders(url: String): NetworkHeaders =
+    NetworkHeaders.Builder().apply { HostRequestAuth.headersFor(url).forEach { (name, value) -> set(name, value) } }.build()
+
 internal fun imageRequest(context: Context, data: Any, configure: ImageRequest.Builder.() -> Unit = {}): ImageRequest {
     val builder = ImageRequest.Builder(context).data(data).apply(configure)
-    HostRequestAuth.headersFor(data.toString()).forEach { (name, value) -> builder.addHeader(name, value) }
+    builder.httpHeaders(hostHeaders(data.toString()))
     return builder.build()
 }
 

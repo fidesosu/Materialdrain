@@ -271,7 +271,7 @@ private fun SearchResultCard(
                 .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            FileIcon(name = node.name, isDirectory = node.isDirectory, thumbnailUrl = thumbnailUrl, size = 40.dp, cornerRadius = 12.dp)
+            FileIcon(name = node.name, isDirectory = node.isDirectory, thumbnailUrl = thumbnailUrl, thumbnailVersion = node.modifiedAt ?: node.createdAt, size = 40.dp, cornerRadius = 12.dp)
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(

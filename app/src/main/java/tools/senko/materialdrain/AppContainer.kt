@@ -92,15 +92,17 @@ class AppContainer private constructor(application: Application) {
         // (see MediaCovers), and GIFs and animated WebP moving wherever they're shown (see AnimatedImages)
         // A thumbnail's read timeout, which the API's client goes without for long downloads, so a stalled one gives up
         val thumbnailClient = okHttpClient.newBuilder().readTimeout(30, java.util.concurrent.TimeUnit.SECONDS).build()
-        coil.Coil.setImageLoader {
-            coil.ImageLoader.Builder(application)
+        coil3.SingletonImageLoader.setSafe {
+            coil3.ImageLoader.Builder(application)
                 .components {
+                    // The API's own client, sharing its connections and threads: thumbnails reuse the HTTP/2 connection the
+                    // app already has open to the host instead of opening their own. A thumbnail on disk is shown from
+                    // there, whatever the host's cache headers say (Coil's default): a file's thumbnail doesn't change
+                    // unless the file does, and a changed file has its own cache key (see FileIcon)
+                    add(coil3.network.okhttp.OkHttpNetworkFetcherFactory(callFactory = { thumbnailClient }))
                     add(tools.senko.materialdrain.ui.media.MediaCovers.Factory(application))
                     add(tools.senko.materialdrain.ui.media.AnimatedImages.Factory())
                 }
-                // The API's own client, sharing its connections and threads: thumbnails reuse the HTTP/2 connection the
-                // app already has open to the host instead of opening their own
-                .okHttpClient { thumbnailClient }
                 .build()
         }
         // Thumbnails of files on SMB shares are made on this device, and kept here between runs

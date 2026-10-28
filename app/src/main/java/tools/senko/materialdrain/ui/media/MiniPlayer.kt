@@ -66,12 +66,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.drawable.toBitmap
 import androidx.media3.common.Player
-import coil.compose.AsyncImage
-import coil.imageLoader
-import coil.memory.MemoryCache
-import coil.request.SuccessResult
+import coil3.compose.AsyncImage
+import coil3.imageLoader
+import coil3.memory.MemoryCache
+import coil3.request.SuccessResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -101,6 +100,9 @@ import kotlin.math.exp
 import kotlin.math.sign
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
+import coil3.request.crossfade
+import coil3.request.allowHardware
+import coil3.toBitmap
 
 /** How far a swipe on the miniplayer has to go sideways to skip, when it isn't quick. */
 private val SwipeDistance = 72.dp
@@ -570,7 +572,7 @@ internal fun rememberCoverAccent(art: Any?, enabled: Boolean): Color? {
                             allowHardware(false)
                             size(ACCENT_SAMPLE_PX)
                         }
-                        (context.imageLoader.execute(request) as? SuccessResult)?.drawable?.toBitmap()
+                        (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
                     }
                 }
                 bitmap?.let(::accentOf)

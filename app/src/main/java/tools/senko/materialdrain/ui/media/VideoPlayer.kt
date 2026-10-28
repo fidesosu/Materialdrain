@@ -122,7 +122,7 @@ import kotlin.math.abs
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import coil.imageLoader
+import coil3.imageLoader
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 import tools.senko.materialdrain.ui.LocalBlurredBackdrop

@@ -39,8 +39,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
-import coil.compose.AsyncImagePainter
-import coil.imageLoader
+import coil3.compose.AsyncImagePainter
+import coil3.imageLoader
 import tools.senko.materialdrain.files.PdfPreviewState
 import tools.senko.materialdrain.files.SourceLanguage
 import tools.senko.materialdrain.files.languageFor

@@ -57,9 +57,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import coil.decode.DataSource
-import coil.request.ImageRequest
+import coil3.compose.AsyncImage
+import coil3.decode.DataSource
+import coil3.request.ImageRequest
 import tools.senko.materialdrain.settings.LocalDataSaver
 import tools.senko.materialdrain.ui.media.HostRequestAuth
 import tools.senko.materialdrain.ui.preview.PreviewSamples
@@ -69,6 +69,9 @@ import tools.senko.materialdrain.util.formatSize
 import androidx.compose.ui.res.stringResource
 import tools.senko.materialdrain.R
 import androidx.annotation.StringRes
+import coil3.request.crossfade
+import coil3.network.httpHeaders
+import tools.senko.materialdrain.ui.media.hostHeaders
 
 /** How long a thumbnail fades in over its tile (Coil's own default). */
 private const val THUMBNAIL_CROSSFADE_MS = 100
@@ -85,6 +88,8 @@ fun FileListItem(
     fileSize: Long? = null,
     modified: String? = null,
     thumbnailUrl: String? = null,
+    /** Which version of the file the thumbnail is of (when it was changed), so a changed file gets a new one */
+    thumbnailVersion: String? = null,
     trailingContent: (@Composable () -> Unit)? = null,
     selectionMode: Boolean = false,
     selected: Boolean = false,
@@ -102,7 +107,7 @@ fun FileListItem(
             .padding(start = 16.dp, end = 4.dp, top = if (compact) 4.dp else 8.dp, bottom = if (compact) 4.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        FileIcon(name = name, isDirectory = type == "dir", thumbnailUrl = thumbnailUrl, size = if (compact) 40.dp else 56.dp, loadOnTap = !selectionMode)
+        FileIcon(name = name, isDirectory = type == "dir", thumbnailUrl = thumbnailUrl, thumbnailVersion = thumbnailVersion, size = if (compact) 40.dp else 56.dp, loadOnTap = !selectionMode)
 
         Spacer(modifier = Modifier.width(if (compact) 12.dp else 16.dp))
 
@@ -156,6 +161,8 @@ fun FileGridItem(
     fileSize: Long? = null,
     modified: String? = null,
     thumbnailUrl: String? = null,
+    /** Which version of the file the thumbnail is of (when it was changed), so a changed file gets a new one */
+    thumbnailVersion: String? = null,
     trailingContent: (@Composable () -> Unit)? = null,
     selectionMode: Boolean = false,
     selected: Boolean = false,
@@ -176,6 +183,7 @@ fun FileGridItem(
                 name = name,
                 isDirectory = type == "dir",
                 thumbnailUrl = thumbnailUrl,
+                thumbnailVersion = thumbnailVersion,
                 size = maxWidth,
                 cornerRadius = 12.dp,
                 loadOnTap = !selectionMode
@@ -211,7 +219,7 @@ fun FileGridItem(
  * the thumbnail when tapped, unless [loadOnTap] is off (while files are being selected, a tap selects).
  */
 @Composable
-fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp, cornerRadius: Dp = size / 4, loadOnTap: Boolean = true) {
+fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp, thumbnailVersion: String? = null, cornerRadius: Dp = size / 4, loadOnTap: Boolean = true) {
     val shape = RoundedCornerShape(cornerRadius)
     val kind = remember(name, isDirectory) { FileKind.of(name, isDirectory) }
     val (container, content) = kind.colors()
@@ -248,14 +256,19 @@ fun FileIcon(name: String, isDirectory: Boolean, thumbnailUrl: String?, size: Dp
         if (!held && thumbnailUrl != null && !isDirectory) {
             val context = LocalContext.current
             // Built once per URL and login: a new request on every recomposition makes Coil load the thumbnail again
-            val headers = HostRequestAuth.headersFor(thumbnailUrl)
+            val headers = remember(thumbnailUrl) { hostHeaders(thumbnailUrl) }
             val thumbnailPx = with(LocalDensity.current) { size.roundToPx() }
-            val request = remember(thumbnailUrl, headers, thumbnailPx) {
+            val request = remember(thumbnailUrl, thumbnailVersion, headers, thumbnailPx) {
+                // Kept on disk whatever the host's cache headers say (see AppContainer): under the file's version, so a
+                // changed file at the same address doesn't keep the old picture
+                val cacheKey = thumbnailVersion?.let { "$thumbnailUrl#$it" }
                 ImageRequest.Builder(context)
                     .data(thumbnailUrl)
+                    .diskCacheKey(cacheKey)
+                    .memoryCacheKeyExtra("version", thumbnailVersion)
                     .size(thumbnailPx)
                     .crossfade(THUMBNAIL_CROSSFADE_MS)
-                    .apply { headers.forEach { (name, value) -> addHeader(name, value) } }
+                    .httpHeaders(headers)
                     .build()
             }
             // No placeholder or error picture: the tile underneath is both

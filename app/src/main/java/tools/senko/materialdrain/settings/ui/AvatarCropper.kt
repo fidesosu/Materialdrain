@@ -46,8 +46,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import kotlin.math.min
 import tools.senko.materialdrain.ui.preview.PreviewTheme
 import tools.senko.materialdrain.ui.preview.ScreenPreviews
@@ -76,7 +76,7 @@ internal fun AvatarCropper(picture: AvatarPicture, onKeep: (AvatarCrop) -> Unit,
             .data(image.file)
             .memoryCacheKey("${image.file.path}@${image.version}#crop")
             // Sharp when zoomed in: the whole picture, not the size it first takes on the screen
-            .size(coil.size.Size.ORIGINAL)
+            .size(coil3.size.Size.ORIGINAL)
             .build()
     }
 

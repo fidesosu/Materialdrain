@@ -205,6 +205,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
+    implementation(libs.coil.network.okhttp)
     implementation(libs.androidx.core.ktx)
     // The window's theme (themes.xml) and the colour utilities the app's own colours are made with (see ui/theme/Color.kt)
     implementation(libs.google.android.material)
