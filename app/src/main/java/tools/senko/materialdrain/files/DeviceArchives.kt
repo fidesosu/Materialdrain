@@ -12,14 +12,17 @@ import tools.senko.materialdrain.provider.api.ProviderError
 import tools.senko.materialdrain.provider.api.StorageNode
 import tools.senko.materialdrain.provider.api.StorageProvider
 import tools.senko.materialdrain.provider.api.StorageRef
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import tools.senko.materialdrain.ui.media.HostRequestAuth
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.Charset
+import java.util.concurrent.TimeUnit
 import java.util.zip.Inflater
 import java.util.zip.InflaterInputStream
 import kotlin.coroutines.cancellation.CancellationException
@@ -48,6 +51,11 @@ private const val ZIP64_LOCATOR_SIGNATURE = 0x07064b50
 private const val ZIP64_END_SIGNATURE = 0x06064b50
 private const val ENTRY_SIGNATURE = 0x02014b50
 private const val LOCAL_SIGNATURE = 0x04034b50
+
+/** For reading before the app's own client is there (see HostRequestAuth.client), with the timeouts reading had before. */
+private val fallbackClient: OkHttpClient by lazy {
+    OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).build()
+}
 
 /** One file (or folder, its path ending in "/") in a zip's directory, with where its data is. */
 internal class ZipItem(
@@ -120,9 +128,8 @@ class DeviceZipArchives(private val provider: StorageProvider, private val resou
             onProgress(0L, 0L)
             return@reading ApiResponse.Success(0L)
         }
-        val connection = open(url, dataStart, dataStart + item.compressedSize - 1)
-        try {
-            val raw = connection.inputStream
+        open(url, dataStart, dataStart + item.compressedSize - 1).use { response ->
+            val raw = response.body.byteStream()
             val data: InputStream = if (item.method == 8) InflaterInputStream(raw, Inflater(true), 64 * 1024) else raw
             val buffer = ByteArray(64 * 1024)
             var written = 0L
@@ -136,8 +143,6 @@ class DeviceZipArchives(private val provider: StorageProvider, private val resou
                 }
             }
             ApiResponse.Success(written)
-        } finally {
-            connection.disconnect()
         }
     }
 
@@ -219,46 +224,45 @@ class DeviceZipArchives(private val provider: StorageProvider, private val resou
 
     /** The last [count] bytes of the file at [url], and the file's whole size. */
     private fun tail(url: String, count: Int): Pair<ByteBuffer, Long> {
-        val connection = open(url, rangeHeader = "bytes=-$count")
-        try {
-            val total = connection.getHeaderField("Content-Range")?.substringAfterLast('/')?.toLongOrNull()
+        open(url, rangeHeader = "bytes=-$count").use { response ->
+            val total = response.header("Content-Range")?.substringAfterLast('/')?.toLongOrNull()
                 ?: throw noRanges()
-            return ByteBuffer.wrap(connection.inputStream.use { it.readBytes() }) to total
-        } finally {
-            connection.disconnect()
+            return ByteBuffer.wrap(response.body.bytes()) to total
         }
     }
 
     /** [count] bytes of the file at [url] from [start]. */
     private fun range(url: String, start: Long, count: Int): ByteBuffer {
-        val connection = open(url, start, start + count - 1)
-        try {
-            val bytes = connection.inputStream.use { it.readBytes() }
+        open(url, start, start + count - 1).use { response ->
+            val bytes = response.body.bytes()
             if (bytes.size < count) throw ArchiveFailure(broken().error)
             return ByteBuffer.wrap(bytes, 0, count).slice()
-        } finally {
-            connection.disconnect()
         }
     }
 
-    private fun open(url: String, first: Long, last: Long): HttpURLConnection = open(url, "bytes=$first-$last")
+    private fun open(url: String, first: Long, last: Long): Response = open(url, "bytes=$first-$last")
 
-    /** A request for the part [rangeHeader] of [url], with the host's login; one that isn't answered with that part fails. */
-    private fun open(url: String, rangeHeader: String): HttpURLConnection {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 30_000
-        connection.setRequestProperty("Range", rangeHeader)
-        // The bytes as they are on the host, so the range is of the file itself
-        connection.setRequestProperty("Accept-Encoding", "identity")
-        provider.requestHeaders(url).forEach { (name, value) -> connection.setRequestProperty(name, value) }
-        val code = connection.responseCode
-        if (code != HttpURLConnection.HTTP_PARTIAL) {
-            connection.disconnect()
-            throw if (code == HttpURLConnection.HTTP_OK) noRanges() else ArchiveFailure(ProviderError(ErrorCodes.NETWORK_ERROR, resources.getString(R.string.files_the_host_answered_with_http, code)))
+    /**
+     * A request for the part [rangeHeader] of [url], with the host's login; one that isn't answered with that part fails.
+     * Through the app's own client, so it reuses the connection the app has open to the host (HTTP/2) instead of a new one.
+     */
+    private fun open(url: String, rangeHeader: String): Response {
+        val request = Request.Builder().url(url)
+            .apply { provider.requestHeaders(url).forEach { (name, value) -> header(name, value) } }
+            .header("Range", rangeHeader)
+            // The bytes as they are on the host, so the range is of the file itself
+            .header("Accept-Encoding", "identity")
+            .build()
+        val response = client.newCall(request).execute()
+        if (response.code != 206) {
+            response.close()
+            throw if (response.code == 200) noRanges() else ArchiveFailure(ProviderError(ErrorCodes.NETWORK_ERROR, resources.getString(R.string.files_the_host_answered_with_http, response.code)))
         }
-        return connection
+        return response
     }
+
+    /** The app's client (see HostRequestAuth); one of its own before the app has set that up. */
+    private val client: OkHttpClient get() = HostRequestAuth.client ?: fallbackClient
 
     /** Runs [block] off the main thread, with what goes wrong in it as an [ApiResponse.Error]. */
     private suspend fun <T> reading(block: suspend () -> ApiResponse<T>): ApiResponse<T> = withContext(Dispatchers.IO) {

@@ -18,6 +18,7 @@ import tools.senko.materialdrain.ui.media.HostRequestAuth
 import tools.senko.materialdrain.provider.ProviderRegistry
 import tools.senko.materialdrain.provider.ProviderUpdater
 import tools.senko.materialdrain.provider.pixeldrain.PixeldrainStorageProvider
+import tools.senko.materialdrain.provider.pixeldrain.internal.PixeldrainHttpClient
 import tools.senko.materialdrain.provider.pixeldrain.internal.PixeldrainUserApi
 import tools.senko.materialdrain.settings.AppSettings
 import tools.senko.materialdrain.transfer.TransferRegistry
@@ -30,7 +31,11 @@ class AppContainer private constructor(application: Application) {
     val sessionManager = SessionManager(application)
 
     /** Pixeldrain stays the hardcoded default. This is the one place its HTTP client is created. */
-    val pixeldrainProvider = PixeldrainStorageProvider(apiKeyProvider = { sessionManager.currentApiKey() })
+    val pixeldrainProvider = PixeldrainStorageProvider(
+        apiKeyProvider = { sessionManager.currentApiKey() },
+        // The headers of its calls in the log, in a debug build only
+        httpClient = PixeldrainHttpClient(logRequests = BuildConfig.DEBUG)
+    )
 
     // Login is the one thing that stays Pixeldrain-only (it's the account of the built-in host), everything else
     // goes through the active StorageProvider

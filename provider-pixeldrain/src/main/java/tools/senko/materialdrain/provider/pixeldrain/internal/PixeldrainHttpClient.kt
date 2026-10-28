@@ -78,9 +78,10 @@ internal class RawResponse(val code: Int, val body: String) {
 
 /**
  * Shared networking used by the core, filesystem and user API implementations: one OkHttp
- * connection pool, one Ktor client for JSON calls, and the streaming/error helpers.
+ * connection pool, one Ktor client for JSON calls, and the streaming/error helpers. With [logRequests] the JSON calls'
+ * headers are written to the log (without the login), for a debug build; otherwise nothing is made of them.
  */
-class PixeldrainHttpClient {
+class PixeldrainHttpClient(private val logRequests: Boolean = false) {
 
     internal val okHttpClient: OkHttpClient = OkHttpClient.Builder()
         .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
@@ -113,7 +114,7 @@ class PixeldrainHttpClient {
             connectTimeoutMillis = 30000L
             socketTimeoutMillis = 900000L
         }
-        install(Logging) {
+        if (logRequests) install(Logging) {
             logger = object : Logger {
                 override fun log(message: String) {
                     Log.d("KTOR_HTTP_CLIENT", message)
