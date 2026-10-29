@@ -59,7 +59,8 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
-          script: ./gradlew :app:recordScreenshots
+          # Only the screenshots' tests: the security and compat ones are the compat workflow's, set up for them
+          script: ./gradlew :app:recordScreenshots -Pandroid.testInstrumentationRunnerArguments.package=tools.senko.materialdrain.screenshots
 
       - name: Keep the screenshots with the run
         if: always()
