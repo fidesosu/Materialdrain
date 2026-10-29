@@ -68,6 +68,17 @@ jobs:
           name: screenshots
           path: app/build/screenshots
 
+      # What failed, when a test did: the report (each test's error and stack trace) and the results, with the device's
+      # logcat for each test
+      - name: Keep the test reports with the run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            app/build/reports/androidTests/connected
+            app/build/outputs/androidTest-results/connected
+
       - name: Put them on the website branch
         env:
           GH_TOKEN: ${{ github.token }}
