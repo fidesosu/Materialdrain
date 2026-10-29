@@ -32,6 +32,14 @@ object Screenshots {
     fun leaveDemoMode() = shell("am broadcast -a com.android.systemui.demo -e command exit")
 
     /**
+     * No "isn't responding" or "keeps stopping" dialogs of other apps: on the CI's slow emulator the launcher stalls now
+     * and then, and its dialog over the app hid the texts the tests wait for.
+     */
+    fun hideErrorDialogs() {
+        shell("settings put global hide_error_dialogs 1")
+    }
+
+    /**
      * Saves the screen as [name].png in the test's output (TestStorage), which Gradle copies to
      * app/build/outputs/connected_android_test_additional_output after the run (and recordScreenshots on from there).
      */

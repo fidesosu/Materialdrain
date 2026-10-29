@@ -56,6 +56,7 @@ class AppDriver {
 
     /** Signs in to the made-up account and sets [setup], without starting the app (see [launch]). */
     fun prepare(setup: AppSettings.() -> Unit = {}) {
+        Screenshots.hideErrorDialogs()
         unlockDevice()
         // Before the first HTTP client is built, which AppContainer does
         HttpInterceptors.all = listOf(sharedFake)
@@ -106,11 +107,24 @@ class AppDriver {
 
     /** Waits for [selector] (the first start on an emulator takes a while), failing with a picture of the screen. */
     fun find(selector: BySelector, what: String, timeoutMs: Long = 30_000): UiObject2 =
-        device.wait(Until.findObject(selector), timeoutMs) ?: run {
+        device.wait(Until.findObject(selector), timeoutMs)
+            ?: (if (dismissNotResponding()) device.wait(Until.findObject(selector), timeoutMs) else null)
+            ?: run {
             val name = "failed-" + what.replace(Regex("[^A-Za-z0-9]+"), "-")
             Screenshots.capture(name)
             error("$what didn't show (see $name.png)")
         }
+
+    /**
+     * Waits out another app's "isn't responding" dialog over the app (the launcher's, on a slow emulator, if
+     * [Screenshots.hideErrorDialogs] came too late for it), which UiAutomator reads instead of the app. Whether there was one.
+     */
+    private fun dismissNotResponding(): Boolean {
+        if (device.findObject(By.textContains("isn't responding")) == null) return false
+        device.findObject(By.text("Wait"))?.let { runCatching { it.click() } } ?: device.pressBack()
+        Thread.sleep(1_000)
+        return true
+    }
 
     fun waitText(text: String) = find(By.textContains(text), text)
 
