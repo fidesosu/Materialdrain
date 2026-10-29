@@ -1,0 +1,2648 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="How to use Materialdrain, how to add any host to it, and how the app is built and why.">
+      
+      
+      
+        <link rel="canonical" href="https://materialdrain.senko.tools/docs/development/interface/">
+      
+      
+        <link rel="prev" href="../providers/">
+      
+      
+        <link rel="next" href="../transfers/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="/icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>The interface - Materialdrain docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#the-interface" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Materialdrain docs" class="md-header__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  <img src="/icon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Materialdrain docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              The interface
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Using the app
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../hosts/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Hosts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Materialdrain docs" class="md-nav__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  <img src="/icon.svg" alt="logo">
+
+    </a>
+    Materialdrain docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../user-guide/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the app
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using the app
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/screens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/what-you-get/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    What you're installing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../hosts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hosts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/config-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kinds of host
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kinds of host
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/webdav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebDAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    S3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/smb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SMB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/rest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sign-in/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign-in
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sharing-and-updates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and updates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts in code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The interface
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The interface
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-shell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The shell
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The shell">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tabs-come-from-the-host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tabs come from the host
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-screen-hides-the-bar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One screen hides the bar
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-three-kinds-of-tabs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three kinds of tabs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-host-switcher" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The host switcher
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-menu-of-a-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The ⋮ menu of a screen
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#browserscreen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BrowserScreen
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BrowserScreen">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-status-cards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The status cards
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-a-list-looks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a list looks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-selection-bar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The selection bar
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-files-and-moves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared files and moves
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File details
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-design-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The design system
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The design system">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#floatingcard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FloatingCard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#appmenu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AppMenu
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filelistitem-and-fileicon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FileListItem and FileIcon
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dialogs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dialogs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sharedsnackbar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SharedSnackbar
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dotscrollbar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DotScrollbar
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#odometertext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OdometerText
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transferstatusbar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TransferStatusBar
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reduced-motion-and-the-other-locals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reduced motion and the other locals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-theme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The theme
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-app-lock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The app lock
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uploads and downloads
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../media/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thumbnails and previews
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../search-and-sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search and sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-and-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data and security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common tasks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    This website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-shell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The shell
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The shell">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tabs-come-from-the-host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tabs come from the host
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-screen-hides-the-bar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One screen hides the bar
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-three-kinds-of-tabs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three kinds of tabs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-host-switcher" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The host switcher
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-menu-of-a-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The ⋮ menu of a screen
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#browserscreen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BrowserScreen
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BrowserScreen">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-status-cards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The status cards
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-a-list-looks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a list looks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-selection-bar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The selection bar
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-files-and-moves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared files and moves
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File details
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-design-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The design system
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The design system">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#floatingcard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FloatingCard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#appmenu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AppMenu
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filelistitem-and-fileicon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FileListItem and FileIcon
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dialogs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dialogs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sharedsnackbar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SharedSnackbar
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dotscrollbar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DotScrollbar
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#odometertext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OdometerText
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transferstatusbar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TransferStatusBar
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reduced-motion-and-the-other-locals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reduced motion and the other locals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-theme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The theme
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-app-lock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The app lock
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="the-interface">The interface<a class="headerlink" href="#the-interface" title="Permanent link">&para;</a></h1>
+<p>The whole interface is Jetpack Compose with Material 3, in one activity. This page walks through it from the outside
+in: the shell that holds the screens, the one browser screen behind three tabs, and the small design system every
+screen is built from. Paths are under <code>app/src/main/java/tools/senko/materialdrain/</code> unless they say otherwise.</p>
+<h2 id="the-shell">The shell<a class="headerlink" href="#the-shell" title="Permanent link">&para;</a></h2>
+<p><code>MainActivity</code> sets the content once. It turns off the overscroll stretch everywhere (<code>LocalOverscrollFactory provides
+null</code>), wraps everything in <code>MaterialdrainTheme</code>, and puts the app lock over the app:</p>
+<div class="highlight"><pre><span></span><code><span class="n">MaterialdrainTheme</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">Box</span><span class="p">(</span><span class="n">modifier</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Modifier</span><span class="p">.</span><span class="na">fillMaxSize</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">MaterialdrainScreen</span><span class="p">()</span>
+<span class="w">        </span><span class="n">AppLockOverlay</span><span class="p">(</span><span class="k">this</span><span class="nd">@MainActivity</span><span class="p">,</span><span class="w"> </span><span class="n">AppContainer</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="n">application</span><span class="p">).</span><span class="na">appLock</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>MaterialdrainScreen()</code> in <code>App.kt</code> is the shell. It owns the current screen, the ViewModels, the top bar, the bottom
+bar, the FAB, the snackbars and the app-wide dialogs. There is no navigation library: the current screen is a
+<code>rememberSaveable</code> value of the <code>Screen</code> enum (<code>Navigation.kt</code>), and <code>navigateTo</code> swaps it, remembering the previous one
+for back.</p>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Where</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Screen</code></td>
+<td><code>Navigation.<wbr>kt</code></td>
+<td>Every screen: <code>Upload</code>, <code>Files</code>, <code>Filesystem</code>, <code>File<wbr>Detail</code>, <code>Lists</code>, <code>Settings</code></td>
+</tr>
+<tr>
+<td><code>Host<wbr>Screen.<wbr>to<wbr>Screen()</code></td>
+<td><code>Navigation.<wbr>kt</code></td>
+<td>Maps provider-api's <code>Host<wbr>Screen</code> to the app's <code>Screen</code>. The one place the two meet, as provider-api can't see the app module</td>
+</tr>
+<tr>
+<td><code>Tab</code></td>
+<td><code>Navigation.<wbr>kt</code></td>
+<td>One tab of the host: a <code>Screen</code> of its kind and its entry in the config (<code>Screen<wbr>Config</code>), with its <code>id</code>, <code>title</code> and icon (<code>Tab<wbr>Icons</code>)</td>
+</tr>
+<tr>
+<td><code>remember<wbr>Host<wbr>Tabs</code></td>
+<td><code>Host<wbr>Tabs.<wbr>kt</code></td>
+<td>The tabs of the active host, worked out again when a config changes</td>
+</tr>
+<tr>
+<td><code>Bottom<wbr>Navigation<wbr>Bar</code>, <code>App<wbr>Navigation<wbr>Rail</code>, <code>Tab<wbr>Strip</code></td>
+<td><code>Navigation.<wbr>kt</code></td>
+<td>The three ways of showing the tabs: a bar, a rail at the side of a wide screen, and the dots of the swipe navigation</td>
+</tr>
+<tr>
+<td><code>Fab<wbr>Details</code>, <code>screen<wbr>Fab</code>, <code>App<wbr>Fab</code></td>
+<td><code>App<wbr>Fab.<wbr>kt</code></td>
+<td>The screen's floating button: Upload on the Upload screen, Save in the settings categories that have it</td>
+</tr>
+<tr>
+<td><code>App<wbr>Dialog</code></td>
+<td><code>App<wbr>Dialogs.<wbr>kt</code></td>
+<td>The app-wide dialogs: a big download to confirm, the delete confirmation</td>
+</tr>
+<tr>
+<td><code>Transfer<wbr>Bar<wbr>Slot</code></td>
+<td><code>App.<wbr>kt</code></td>
+<td>The progress bar under the top bar (see <a href="#transferstatusbar">TransferStatusBar</a>)</td>
+</tr>
+<tr>
+<td><code>last<wbr>Screen</code>, <code>last<wbr>Tab<wbr>Id</code></td>
+<td><code>settings/<wbr>App<wbr>Settings.<wbr>kt</code></td>
+<td>The screen and tab the app was on, so it opens there again (unless <strong>Open on</strong> names one)</td>
+</tr>
+</tbody>
+</table>
+<p>Screen changes animate with <code>AnimatedContent</code>: a vertical slide in tab order, or a quick crossfade with reduced motion
+(see <a href="#reduced-motion-and-the-other-locals">Reduced motion</a>). Its state is a <code>Shown</code>: the screen, the tab and the host.
+A page sliding out keeps its own host and tab, so it goes on showing its own browser; <code>contentKey</code> leaves the host out,
+so switching hosts on the same tab changes the page in place instead of sliding.</p>
+<p>The bottom bar rises out of the bottom edge and sinks back into it, its icons with it: it expands and shrinks with its
+top kept on the space (<code>expandFrom</code> / <code>shrinkTowards = Alignment.Top</code>), so the page above follows it.</p>
+<h3 id="tabs-come-from-the-host">Tabs come from the host<a class="headerlink" href="#tabs-come-from-the-host" title="Permanent link">&para;</a></h3>
+<p>Which tabs exist is decided by the active host, not by the app. <code>rememberHostTabs</code> (<code>HostTabs.kt</code>) works it out each
+time the configs change:</p>
+<pre class="mermaid"><code>flowchart LR
+    A[Active host] --&gt; B{Built-in Pixeldrain?}
+    B -- yes --&gt; C["Capabilities:&lt;br/&gt;ENUMERATE → Files,&lt;br/&gt;LISTS → Lists, BROWSE → Filesystem"]
+    B -- no --&gt; D["resolveScreens(config.screens, capabilities)"]
+    C --&gt; E{"Files or Filesystem?"}
+    D --&gt; E
+    E -- yes --&gt; F[Upload left out]
+    E -- no --&gt; G[Upload kept]
+    F --&gt; H[navBarOrder]
+    G --&gt; H</code></pre>
+<ul>
+<li><strong>A config</strong> picks its screens with <code>screens</code> (see <a href="../../hosts/config-format/#screens">Screens</a>).
+  <code>resolveScreens</code> in provider-api keeps them in the config's order and drops the ones the host can't back.</li>
+<li><strong>The built-in Pixeldrain host</strong> isn't a config, so it gets whatever its capabilities allow.</li>
+<li><strong>The Upload tab</strong> is only kept on a host with nowhere else to upload to. The Files and Filesystem screens upload from
+  their ⋮ menu (<strong>New → Upload</strong>) and take shared files (see <a href="#shared-files-and-moves">Shared files and moves</a>).</li>
+<li><strong>A screen's config entry</strong> can rename the tab (<code>Tab.title</code>), give it an icon (<code>TabIcons</code>, by name) and take
+  capabilities away from it (<code>disabledCapabilities</code>, passed to <code>BrowserScreen</code>, and to the file details through
+  <code>FileInfoViewModel.setTabLimits</code>).</li>
+<li><strong>Several tabs of one kind</strong> are told apart by <code>Tab.id</code>. The bar selects a <code>Tab</code>, not a <code>Screen</code>: <code>currentTabId</code>
+  says which tab of the current screen's kind is shown (<code>tabOf(screen)</code>), and falls back to the first of that kind.</li>
+<li><strong>A screen the new host doesn't offer</strong> falls back to the first one it does. This runs when the host changes and when
+  the screen changes, since a host switched to from Settings only meets its tabs when you leave Settings.</li>
+<li><strong>No screens at all</strong> (<code>"screens": []</code>, or only ones the host can't back) shows a message saying so instead of a
+  screen.</li>
+</ul>
+<h3 id="one-screen-hides-the-bar">One screen hides the bar<a class="headerlink" href="#one-screen-hides-the-bar" title="Permanent link">&para;</a></h3>
+<p>With a single screen there is nothing to switch between, so the bar would only take space. The bottom bar (or the tab
+strip) is shown only when <code>navBarOrder.size &gt; 1</code>, not on the file details, and not where the rail is.</p>
+<p>Without the bottom bar, the file screens and the details are drawn down to the screen's edge, under the see-through
+system navigation bar. <code>LocalBottomInset</code> tells the lists how much room to leave after their last item, so it can still
+be scrolled clear of the bar.</p>
+<h3 id="the-three-kinds-of-tabs">The three kinds of tabs<a class="headerlink" href="#the-three-kinds-of-tabs" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>BottomNavigationBar</code></strong>: up to five tabs (<code>MAX_BAR_TABS</code>); with more, the fifth place is <strong>More</strong>, a menu of the
+  rest, which shows the one of them that's open. <strong>Tab labels</strong> off shows only the chosen tab's name.</li>
+<li><strong><code>AppNavigationRail</code></strong>: the tabs at the side, where the screen is at least 600 dp wide (<code>isWideScreen</code>), as a bar
+  along the bottom would stretch its few tabs far apart. It scrolls when there are more than fit.</li>
+<li><strong><code>TabStrip</code></strong>, with <strong>Look and feel → Navigation → Swipes</strong> (<code>AppSettings.gestureNavigation</code>): no bar, only a thin
+  row with a dot per tab, the shown one wider and in the accent colour. Tabs change with a swipe sideways across the
+  page (<code>Modifier.sidewaysSwipe</code>, <code>ui/components/SidewaysSwipe.kt</code>), along the row (a tab for every <code>StripStep</code>, with a
+  light vibration each), or a tap on a dot. Every dot has the same room (<code>DotPitch</code>), so the shown one grows and
+  shrinks from its middle without moving the others. <strong>Swipe between tabs</strong> gives the bottom bar the same sideways
+  swipe.</li>
+</ul>
+<h3 id="the-host-switcher">The host switcher<a class="headerlink" href="#the-host-switcher" title="Permanent link">&para;</a></h3>
+<p>On the browse screens (Files, Lists, Filesystem, and Upload where it's a tab) the top bar has no title. <code>HostSwitcher</code>
+(<code>hosts/HostSwitcher.kt</code>) sits in its place: a floating card with the active host's icon, a status badge and its name.
+Tapping it opens an <a href="#appmenu"><code>AppMenu</code></a> of every host (<code>hostOptions</code>: the built-in Pixeldrain first, then the configs
+in the order they were added), each with its address, whether it answers and whether it's signed in.</p>
+<ul>
+<li>Whether each host answers is known before the menu opens: <code>HostHealth</code> checks them every three minutes while the app
+  is in front (<code>HOST_RECHECK_MILLIS</code>), when the configs change, and when the network changes. Opening the menu checks
+  only hosts not checked in the last half minute; the header's refresh button checks all of them now.</li>
+<li>The badge shows the state with a symbol as well as a colour (tick, cross, question mark, crossed-out cloud), so it
+  doesn't hang on colour alone.</li>
+<li>Choosing a host calls <code>ProviderConfigStore.setActive</code>. The gear, or <strong>Sign in</strong>, opens that host's settings;
+  <strong>Manage hosts</strong> opens <strong>Settings → Hosts</strong>.</li>
+</ul>
+<h3 id="the-menu-of-a-screen">The ⋮ menu of a screen<a class="headerlink" href="#the-menu-of-a-screen" title="Permanent link">&para;</a></h3>
+<p>The top bar's ⋮ (in <code>App.kt</code>) is the same menu on every screen but a file's details and the settings, which have
+none. <code>ScreenMenuEntries</code> (<code>browser/BrowserControls.kt</code>) lays it out in the order its entries are reached for:</p>
+<ol>
+<li>what's done with the page shown: the screen's <code>ScreenAction</code>s of <code>ScreenActionGroup.PAGE</code> (an open list's
+   <strong>Download all</strong>, a folder's <strong>Download this folder</strong>, <strong>Select</strong>);</li>
+<li><strong>New</strong>, a page of the <code>ScreenActionGroup.NEW</code> ones (the Files screen's <strong>Upload</strong>; the Filesystem's <strong>Upload</strong>,
+   <strong>New folder</strong> and <strong>Import files by ID</strong>, each where the host and the tab's config allow it);</li>
+<li><strong>Sort by</strong>, for a sortable list: <code>SortMenuEntries</code>, the field it's sorted on with its direction. Choosing the field
+   already sorted on flips it (<code>AppSettings.changeSortOrder</code>);</li>
+<li><strong>View</strong>: <code>ViewMenuEntries</code>, from the screen's <code>ViewChoice</code> (rows, grid or Smart, compact rows, for its subfolders
+   too, and back to the defaults; see <a href="#how-a-list-looks">How a list looks</a>);</li>
+<li><strong>Settings</strong>.</li>
+</ol>
+<p>A <code>ScreenAction</code> with <code>choices</code> (Download: <strong>Separately</strong> or <strong>As one ZIP</strong>) opens a page of those instead of acting.
+The pages are <code>AppMenuPages</code>; every page is measured even while another is shown, so the menu keeps one width and
+only its height changes. Sort by and View stay open while choosing, so the change can be seen. <code>BrowserScreen</code> hands
+its actions and view up through <code>onActionsChange</code>, keyed by the page shown.</p>
+<h2 id="browserscreen">BrowserScreen<a class="headerlink" href="#browserscreen" title="Permanent link">&para;</a></h2>
+<p><code>browser/BrowserScreen.kt</code> is the one screen behind the Files, Lists and Filesystem tabs. <code>App.kt</code> passes a
+<code>BrowserMode</code>, and the mode decides what the screen lists and offers:</p>
+<table>
+<thead>
+<tr>
+<th><code>Browser<wbr>Mode</code></th>
+<th>Lists</th>
+<th>Above the list</th>
+<th>Opening an entry</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FILES</code></td>
+<td>The account's files, flat (<code>File<wbr>Info<wbr>View<wbr>Model.<wbr>displayed<wbr>Files</code>)</td>
+<td>Status cards</td>
+<td>Its details</td>
+</tr>
+<tr>
+<td><code>LISTS</code></td>
+<td>The lists as folders, one level deep; inside one, its files (<code>List<wbr>View<wbr>Model</code>)</td>
+<td>Inside a list: its title</td>
+<td>A list opens it; a file opens its details</td>
+</tr>
+<tr>
+<td><code>FILESYSTEM</code></td>
+<td>Folders and files (<code>Filesystem<wbr>View<wbr>Model.<wbr>displayed<wbr>Children</code>), folders first unless that's off</td>
+<td>The path, status cards</td>
+<td>A folder goes into it; a file opens its details</td>
+</tr>
+</tbody>
+</table>
+<p>Everything that differs between the modes is a <code>when (mode)</code> near the top of the function: the entries, the loading
+and error state, the refresh, the search candidates, the selection actions and the ⋮ menu's actions. The list itself,
+pull to refresh, the empty and error states and the <code>DotScrollbar</code> are shared.</p>
+<p>Details worth knowing before changing it:</p>
+<ul>
+<li><strong>The loading spinner waits.</strong> Folders usually load within a fraction of a second, so it shows only after
+  <code>LOADING_INDICATOR_DELAY_MS</code> (400 ms), or at once on a pull to refresh.</li>
+<li><strong>A refresh keeps the scroll position</strong>, unless it turned up a file that wasn't listed before: then it jumps to the
+  top, where the new file is.</li>
+<li><strong>Back</strong> leaves the selection first, then the open list, then goes up a folder.</li>
+<li><strong>Scroll positions survive</strong> visits to other screens: the <code>LazyListState</code>s live in <code>App.kt</code> (<code>TabScrollStates</code>), not
+  in the screen.</li>
+</ul>
+<h3 id="the-status-cards">The status cards<a class="headerlink" href="#the-status-cards" title="Permanent link">&para;</a></h3>
+<p><code>StatusCards</code> in <code>browser/BrowserControls.kt</code> is the row of floating cards above the list, for what's going on:
+<strong>Cancel</strong>, while a transfer the bar above shows runs, and <strong>Thumbnails</strong>, while the data saver holds them back. The
+row is only there while one of them is, and grows out of the header and shrinks back into it as they come and go.</p>
+<p>The cards size themselves. <code>statusCardNeeds()</code> measures what each card needs to show all of itself, from its text as
+it's drawn (with <code>rememberTextMeasurer</code>) plus its icon and padding. Each shown card then gets a share of the row as big
+as its share of what they both need, so one alone fills the row, and one appearing beside it makes room for itself.</p>
+<h3 id="how-a-list-looks">How a list looks<a class="headerlink" href="#how-a-list-looks" title="Permanent link">&para;</a></h3>
+<p>A list is rows, a grid of big pictures (<code>FileGridItem</code> in <code>ui/components/FileListItem.kt</code>), or Smart: the grid when
+more than half of its files are pictures or videos (<code>smartLayoutIsGrid</code>). Rows can be compact. <strong>Look and feel → Grid</strong>
+and <strong>Compact rows</strong> are the defaults; a folder, screen or open list can have its own (<code>ViewLook</code>, chosen in the ⋮
+menu's View page), kept in <code>AppSettings.viewLooks</code> by its <code>viewKey</code> (the host, the tab and the folder or list). A
+Filesystem folder's look can be for its subfolders too: those without their own take the nearest such folder's above
+them (<code>inheritedPath</code>). A look is kept as a short string: the layout's name, then <code>1</code>, <code>0</code> or <code>-</code> for compact, then <code>r</code>
+for the subfolders.</p>
+<h3 id="the-selection-bar">The selection bar<a class="headerlink" href="#the-selection-bar" title="Permanent link">&para;</a></h3>
+<p>A long-press (or <em>Select</em> in the ⋮ menu) starts selecting. <code>BrowserScreen</code> keeps the selected keys, in the order they
+were selected, and <code>SelectionActionBar</code> (<code>files/SelectionBar.kt</code>) is the bar at the bottom while selecting:</p>
+<ul>
+<li>It takes a list of <code>SelectionAction</code>s (label, icon, action, <code>enabled</code>, <code>destructive</code>, <code>choices</code>). The first three
+  (<code>ICON_ACTIONS</code>) are icons, the rest go into an <code>AppMenu</code> behind a ⋮. An action with <code>choices</code> is a menu of them.</li>
+<li>It's a <code>FloatingBottomBar</code>: a card in the snackbar's look, kept off the sides and above the system navigation bar or
+  the miniplayer. <code>SelectionBarHeight</code> is public so the FAB and the snackbar can rise by the same amount.</li>
+<li>Entries that disappear (deleted, moved, filtered out) are dropped from the selection.</li>
+</ul>
+<p>Which actions there are is built per mode in <code>BrowserScreen</code>: download (one file on its own; several, or a folder,
+<strong>Separately</strong> or <strong>As one ZIP</strong>), move and delete on the Filesystem; download, delete, add to a list, add to the
+filesystem and remove from this list on Files and Lists; and everywhere, while songs play in the background, <strong>Add to
+queue</strong> in the order they were selected, and <strong>Select all</strong>. Each is left out when the host or the screen's config
+doesn't allow it.</p>
+<h3 id="shared-files-and-moves">Shared files and moves<a class="headerlink" href="#shared-files-and-moves" title="Permanent link">&para;</a></h3>
+<p><code>DestinationBar</code> (<code>browser/SharedUploadBar.kt</code>) is a bar in the selection bar's place for something waiting for the
+folder it goes into, which the user browses to. It takes a <code>DestinationRequest</code>: what waits, where it would go from
+here (or why it can't), and the button that sends it there.</p>
+<ul>
+<li><strong>Shared files</strong> (<code>AppContainer.pendingShares</code>, from <code>MainActivity</code>'s share intents, the Upload shortcut and the
+  tile): <code>App.kt</code> turns them into a <code>SharedUpload</code>, which every browse screen shows. <strong>Upload here</strong> uploads them into
+  the open folder, or as new files of the host on the Files screen. A host with only an Upload tab takes them there as
+  picked files instead. Nothing uploads before the button is pressed, nor while the app is locked.</li>
+<li><strong>Moves</strong> (<code>FilesystemViewModel.pendingMove</code>, from <em>Move</em> in a menu or the selection bar): <strong>Move here</strong> moves them
+  into the open folder, which can't be one of those being moved.</li>
+<li><strong>Links and text</strong> (<code>AppContainer.pendingOpen</code>, a <code>PendingOpen</code> from <code>AppIntents.kt</code>): a Pixeldrain file or list link
+  opens it on the built-in Pixeldrain, a shortcut opens its screen, and other shared text becomes a text file that
+  waits like a shared one. They wait for the unlock too.</li>
+</ul>
+<h3 id="file-details">File details<a class="headerlink" href="#file-details" title="Permanent link">&para;</a></h3>
+<p><code>FileInfoDetailsCard</code> in <code>files/FileDetailsScreen.kt</code> is the details page. From the top:</p>
+<ul>
+<li><strong>The preview</strong>, chosen by <code>StorageNode.previewMimeType()</code>: an image, a video, a song, a text (<code>CodePreview</code>, or
+  <code>MarkdownPreview</code> for Markdown), a PDF, or an archive's contents (<code>ArchiveContents</code>). See
+  <a href="../media/">Thumbnails and previews</a>.</li>
+<li><strong>The header</strong>: the whole name (selectable), after the tile of the file's kind, which stays when the preview shows
+  the file's own picture.</li>
+<li><strong>The actions</strong> (<code>ActionRow</code>): the download button (tap twice to start, shows progress while it runs, opens the file
+  when done), then Share (the link, or the file itself where it has none) and Delete as buttons of their own.</li>
+<li><strong>The details</strong>: size, type, dates, Pixeldrain's views and downloads (<code>StatsRow</code>), ids and links, each copyable.</li>
+</ul>
+<p>The details have no ⋮ menu: their own buttons do what's done with the file. With <strong>Swipe between files</strong>, a swipe
+sideways goes to the next file of the list they were opened from (<code>FileInfoViewModel.hasNeighbour</code>); the page that's
+left is a picture of itself (<code>PageSwap</code>, <code>ui/components/PageTransition.kt</code>), which slides out under the next one.</p>
+<h2 id="the-design-system">The design system<a class="headerlink" href="#the-design-system" title="Permanent link">&para;</a></h2>
+<p>The shared look lives in <code>ui/components/</code>. Use these instead of a Material component with the same purpose, so a change
+made in one place reaches every screen.</p>
+<h3 id="floatingcard">FloatingCard<a class="headerlink" href="#floatingcard" title="Permanent link">&para;</a></h3>
+<p><code>FloatingCard.kt</code> is three tokens, not a composable:</p>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Value</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Floating<wbr>Card<wbr>Shape</code></td>
+<td><code>Rounded<wbr>Corner<wbr>Shape(20.<wbr>dp)</code></td>
+<td>The corners of every floating card</td>
+</tr>
+<tr>
+<td><code>floating<wbr>Card<wbr>Color()</code></td>
+<td><code>surface<wbr>Container<wbr>High</code> at 72% alpha</td>
+<td>Translucent, so what's behind (the blur, in the search) shows through</td>
+</tr>
+<tr>
+<td><code>floating<wbr>Card<wbr>Border()</code></td>
+<td>0.5 dp, <code>outline<wbr>Variant</code> at 50% alpha</td>
+<td>A hairline edge that keeps the card apart from what's behind it</td>
+</tr>
+</tbody>
+</table>
+<p>They're used by the sort row's cards (<code>FloatingCardButton</code> in <code>BrowserControls.kt</code>), the search result cards
+(<code>SearchResults.kt</code>), the host switcher, and every <code>AppMenu</code> (shape and border; menus are opaque). Put them on a
+<code>Surface</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">Surface</span><span class="p">(</span>
+<span class="w">    </span><span class="n">shape</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">FloatingCardShape</span><span class="p">,</span>
+<span class="w">    </span><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">floatingCardColor</span><span class="p">(),</span>
+<span class="w">    </span><span class="n">border</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">floatingCardBorder</span><span class="p">(),</span>
+<span class="w">    </span><span class="n">contentColor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MaterialTheme</span><span class="p">.</span><span class="na">colorScheme</span><span class="p">.</span><span class="na">onSurface</span>
+<span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* … */</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>The file details' cards use their own values in the same spirit (<code>DetailCardShape</code> at 20 dp).</p>
+<h3 id="appmenu">AppMenu<a class="headerlink" href="#appmenu" title="Permanent link">&para;</a></h3>
+<p><code>AppMenu.kt</code> is the app's one menu. The ⋮ menus of files, <em>Sort by</em>, <em>New</em>, the host switcher, the selection bar's
+overflow, the video player's settings and the config editor's choices are all an <code>AppMenu</code> with <code>AppMenuItem</code>s. There
+is no <code>DropdownMenu</code> in the app.</p>
+<p><strong>Why every menu goes through it:</strong> menus then look and behave alike, and a change made in <code>AppMenu.kt</code> reaches all of
+them. What differs between two menus is a parameter, never a copy. A menu built some other way would drift from the rest
+the next time the look changes.</p>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>App<wbr>Menu</code></td>
+<td>The popup. A <code>Box<wbr>Scope</code> extension: call it inside the <code>Box</code> that holds its button, and it takes its size and place from that box</td>
+</tr>
+<tr>
+<td><code>App<wbr>Menu<wbr>Defaults</code></td>
+<td>Every measure: <code>Gap</code>, <code>Screen<wbr>Margin</code>, <code>Min<wbr>Width</code> (168 dp), <code>Max<wbr>Width</code> (400 dp), <code>MAX_<wbr>HEIGHT_<wbr>FRACTION</code> (0.6), <code>Item<wbr>Height</code>, <code>Item<wbr>Shape</code>, <code>Shadow<wbr>Room</code>, <code>ANIMATION_<wbr>MS</code> (200)</td>
+</tr>
+<tr>
+<td><code>Menu<wbr>Side</code></td>
+<td><code>Below</code>, <code>Above</code> or <code>Auto</code> (below, unless it only fits above)</td>
+</tr>
+<tr>
+<td><code>Menu<wbr>Edge</code></td>
+<td>Which edge of the button it lines up with: <code>Start</code>, <code>Center</code>, <code>End</code> or <code>Auto</code> (start, or end for a button in the end half of the screen)</td>
+</tr>
+<tr>
+<td><code>App<wbr>Menu<wbr>Item</code></td>
+<td>An entry: <code>text</code>, optional <code>leading<wbr>Icon</code>, <code>supporting<wbr>Text</code>, <code>trailing<wbr>Text</code>, <code>trailing<wbr>Icon</code>. <code>active</code> marks the current choice in the accent colour; <code>destructive</code> is in the error colour; <code>enabled</code></td>
+</tr>
+<tr>
+<td><code>App<wbr>Menu<wbr>Divider</code></td>
+<td>A hairline between groups, e.g. before a destructive entry</td>
+</tr>
+<tr>
+<td><code>App<wbr>Menu<wbr>Pages</code></td>
+<td>Two levels in one menu: <code>secondary</code> entries replace <code>primary</code> ones while <code>show<wbr>Secondary</code> is true, sliding sideways</td>
+</tr>
+<tr>
+<td><code>Overflow<wbr>Menu<wbr>Button</code></td>
+<td>The usual ⋮ button with its menu. Its content gets <code>close</code></td>
+</tr>
+</tbody>
+</table>
+<p>How it behaves:</p>
+<ul>
+<li>It's as wide as its widest entry, between <code>minWidth</code> and <code>maxWidth</code>, and never wider than the screen. With
+  <code>matchAnchorWidth</code> it's at least as wide as its button (the sort row's menus use this).</li>
+<li>Taller than <code>maxHeight</code> (by default 60% of the screen) it scrolls. Long entries end in an ellipsis.</li>
+<li>It's kept on screen, and grows out of the side of the menu its button is on. With reduced motion it appears at once.</li>
+<li>A tap outside or back calls <code>onDismiss</code>. <strong>Choosing an entry doesn't close it</strong>: that's up to the entry, so a choice
+  like a sort order can stay open to show its effect.</li>
+</ul>
+<p>The usual ⋮ menu, from <code>FilesystemMenu</code> in <code>BrowserScreen.kt</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">OverflowMenuButton</span><span class="p">(</span><span class="n">contentDescription</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"More options for </span><span class="si">${</span><span class="n">node</span><span class="p">.</span><span class="na">name</span><span class="si">}</span><span class="s">"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">close</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w">    </span><span class="n">AppMenuItem</span><span class="p">(</span><span class="s">"Rename"</span><span class="p">,</span><span class="w"> </span><span class="n">leadingIcon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Icons</span><span class="p">.</span><span class="na">Filled</span><span class="p">.</span><span class="na">Edit</span><span class="p">,</span><span class="w"> </span><span class="n">onClick</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">close</span><span class="p">();</span><span class="w"> </span><span class="n">onRename</span><span class="p">()</span><span class="w"> </span><span class="p">})</span>
+<span class="w">    </span><span class="n">AppMenuItem</span><span class="p">(</span><span class="s">"Select"</span><span class="p">,</span><span class="w"> </span><span class="n">leadingIcon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Icons</span><span class="p">.</span><span class="na">Filled</span><span class="p">.</span><span class="na">CheckBox</span><span class="p">,</span><span class="w"> </span><span class="n">onClick</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">close</span><span class="p">();</span><span class="w"> </span><span class="n">onSelect</span><span class="p">()</span><span class="w"> </span><span class="p">})</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">canDelete</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">AppMenuDivider</span><span class="p">()</span>
+<span class="w">        </span><span class="n">AppMenuItem</span><span class="p">(</span><span class="s">"Delete"</span><span class="p">,</span><span class="w"> </span><span class="n">leadingIcon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Icons</span><span class="p">.</span><span class="na">Filled</span><span class="p">.</span><span class="na">Delete</span><span class="p">,</span><span class="w"> </span><span class="n">destructive</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="n">onClick</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">close</span><span class="p">();</span><span class="w"> </span><span class="n">onDelete</span><span class="p">()</span><span class="w"> </span><span class="p">})</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>A menu on a button of your own, from the <em>New</em> card in <code>BrowserControls.kt</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">Box</span><span class="p">(</span><span class="n">modifier</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">modifier</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">FloatingCardButton</span><span class="p">(</span><span class="n">onClick</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">expanded</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w"> </span><span class="p">})</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* the card */</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="n">AppMenu</span><span class="p">(</span><span class="n">expanded</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">expanded</span><span class="p">,</span><span class="w"> </span><span class="n">onDismiss</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">expanded</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="w"> </span><span class="p">},</span>
+<span class="w">        </span><span class="n">side</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MenuSide</span><span class="p">.</span><span class="na">Below</span><span class="p">,</span><span class="w"> </span><span class="n">edge</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MenuEdge</span><span class="p">.</span><span class="na">End</span><span class="p">,</span><span class="w"> </span><span class="n">matchAnchorWidth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">actions</span><span class="p">.</span><span class="na">forEach</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">action</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w">            </span><span class="n">AppMenuItem</span><span class="p">(</span><span class="n">action</span><span class="p">.</span><span class="na">description</span><span class="p">,</span><span class="w"> </span><span class="n">leadingIcon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">action</span><span class="p">.</span><span class="na">icon</span><span class="p">,</span><span class="w"> </span><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">action</span><span class="p">.</span><span class="na">enabled</span><span class="p">,</span>
+<span class="w">                </span><span class="n">onClick</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">expanded</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span><span class="w"> </span><span class="n">action</span><span class="p">.</span><span class="na">onClick</span><span class="p">()</span><span class="w"> </span><span class="p">})</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The <code>Box</code> should hold only the button: the menu measures that box to place itself. <code>VideoSettingsMenu</code> in
+<code>ui/media/VideoPlayer.kt</code> shows <code>AppMenuPages</code> (Loop and Speed, with the speeds on a second page).</p>
+<h3 id="filelistitem-and-fileicon">FileListItem and FileIcon<a class="headerlink" href="#filelistitem-and-fileicon" title="Permanent link">&para;</a></h3>
+<p><code>FileListItem.kt</code> has the row of a file or folder, and the picture used wherever a file is shown.</p>
+<ul>
+<li><strong><code>FileListItem</code></strong> is a plain <code>Row</code>, not a Material <code>ListItem</code>, whose trailing area reserves far more width than the
+  small menu button needs and takes it from the name. It shows the icon, the name, a details line (<code>fileDetails</code>: size,
+  extension in capitals, date) and a trailing slot. While selecting, the trailing slot becomes a checkbox.</li>
+<li><strong><code>FileIcon</code></strong> is a soft tile in the colour of the file's kind with a glyph, and the thumbnail over it when there is
+  one. The kind comes from the extension (<code>FileKind</code>: folder, image, video, audio, archive, PDF, code, document, app,
+  other), and its colours from the theme, so they follow dynamic colour and dark mode.</li>
+<li><strong>Thumbnails</strong> load with Coil's <code>AsyncImage</code>, decoded at the tile's size rather than the original's, and fade in over
+  the tile. There's no placeholder or error picture: the tile underneath is both. The request is remembered per URL and
+  login, as a new request on every recomposition would load it again. The sign-in headers come from
+  <code>HostRequestAuth.headersFor</code>; see <a href="../media/">Thumbnails and previews</a> for where thumbnail URLs come from.</li>
+</ul>
+<p><code>fileKindLabel</code> and <code>fileDetails</code> are shared with the search result cards, so a match reads like its row.</p>
+<h3 id="dialogs">Dialogs<a class="headerlink" href="#dialogs" title="Permanent link">&para;</a></h3>
+<p><code>Dialogs.kt</code> has the app's three dialogs:</p>
+<table>
+<thead>
+<tr>
+<th>Dialog</th>
+<th>For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Text<wbr>Input<wbr>Dialog</code></td>
+<td>One text field (new folder, rename, import by id). Confirm is off while the text is blank</td>
+</tr>
+<tr>
+<td><code>Confirm<wbr>Dialog</code></td>
+<td>A yes or no; <code>is<wbr>Destructive</code> makes the confirm button the error colour</td>
+</tr>
+<tr>
+<td><code>Folder<wbr>Picker<wbr>Dialog</code></td>
+<td>Browsing to a folder (move). A fixed-height list, so the dialog never changes size; each listing is kept while it's open; back goes up a folder before it closes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sharedsnackbar">SharedSnackbar<a class="headerlink" href="#sharedsnackbar" title="Permanent link">&para;</a></h3>
+<p><code>AppSnackbarHost</code> in <code>SharedSnackbar.kt</code> replaces Material's <code>SnackbarHost</code>. It shows and hides the snackbar itself so
+it can animate in and out, keeps the last message while that one leaves, and grows upward. Every snackbar has one look:
+rounded corners, the label type and the FAB's height, at full width. Each message gets its own <code>SwipeToDismissBox</code>
+(<code>DismissibleSnackbar</code>), as a swipe state handed to an already laid-out box crashes in the lookahead pass.
+<code>snackbarMotion(reduceMotion)</code> is the one motion for the snackbar and for the buttons that lift above it, so they move
+together; it's instant with reduced motion.</p>
+<h3 id="dotscrollbar">DotScrollbar<a class="headerlink" href="#dotscrollbar" title="Permanent link">&para;</a></h3>
+<p><code>DotScrollbar</code> is a small dot at the right edge showing where a list is. Dragging it scrolls and stretches it into a
+line; letting go stops the content dead. Only the dot and a little around it take touches, so rows beside it stay
+clickable. It has two overloads, for a <code>LazyListState</code> and for a <code>ScrollState</code>, and is a <code>BoxScope</code> extension: put it in
+the <code>Box</code> around the list.</p>
+<h3 id="odometertext">OdometerText<a class="headerlink" href="#odometertext" title="Permanent link">&para;</a></h3>
+<p><code>OdometerText</code> rolls each changed character to the new one like an odometer wheel, along the alphabet, the digits or
+the code table. Use it only where the same text element changes its text (the Save Settings button, a stat on the file
+details). <code>fixedWidth</code> with <code>widthReferenceTexts</code> reserves the width of the widest text, so the container never changes
+size. It doesn't animate with reduced motion (<code>animate = !LocalReduceMotion.current</code>). The timing lives in
+<code>OdometerSpec</code>.</p>
+<h3 id="transferstatusbar">TransferStatusBar<a class="headerlink" href="#transferstatusbar" title="Permanent link">&para;</a></h3>
+<p><code>TransferStatusBar</code> draws a <code>TransferProgress</code> (bytes, total, speed, time left, a label) as the bar under the top bar.
+The percentage has a fixed-width slot, so a change of digits never moves the other texts. <code>TransferBarSlot</code> in <code>App.kt</code>
+picks what it shows for the current screen, and reads the transfer state itself, so a progress tick recomposes only the
+bar and not the whole screen. See <a href="../transfers/">Uploads and downloads</a>.</p>
+<h2 id="reduced-motion-and-the-other-locals">Reduced motion and the other locals<a class="headerlink" href="#reduced-motion-and-the-other-locals" title="Permanent link">&para;</a></h2>
+<p><code>ui/LocalSettings.kt</code> holds the settings that composables deep in the tree need, as <code>CompositionLocal</code>s. Each is
+provided once, in <code>App.kt</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Local</th>
+<th>Default</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Local<wbr>Reduce<wbr>Motion</code></td>
+<td><code>false</code></td>
+<td>Whether animations are reduced</td>
+</tr>
+<tr>
+<td><code>Local<wbr>Blurred<wbr>Backdrop</code></td>
+<td><code>true</code></td>
+<td>Whether previews show the file's thumbnail, blurred, as a backdrop</td>
+</tr>
+<tr>
+<td><code>Local<wbr>Text<wbr>Wrap</code></td>
+<td><code>true</code></td>
+<td>Whether long lines of a text preview wrap or scroll sideways</td>
+</tr>
+<tr>
+<td><code>Local<wbr>Bottom<wbr>Inset</code></td>
+<td><code>0.<wbr>dp</code></td>
+<td>How far the system navigation bar reaches over the content, while the app's bottom bar is hidden</td>
+</tr>
+<tr>
+<td><code>Local<wbr>Video<wbr>Loop</code></td>
+<td>off</td>
+<td><code>Video<wbr>Loop<wbr>Setting</code>: whether videos loop, and how to change it</td>
+</tr>
+</tbody>
+</table>
+<p><code>LocalReduceMotion</code> is on when the user turned on <strong>Settings → Accessibility → Reduce animations</strong>, <em>or</em> when animations
+are off in the Android settings (<code>AppSettings.systemAnimationsDisabled()</code>, the animator duration scale is 0).</p>
+<p><strong>Why every animation must respect it:</strong> people turn animations off because motion makes them unwell, distracts them, or
+because their device is slow. The rule, from <code>LocalSettings.kt</code>: decorative motion is left out (sliding, scaling,
+spinning, growing, rolling text and animated scrolling); fades and changes that give feedback, like a transfer's
+progress, stay. Read it wherever something moves, and give the reduced case a short fade or nothing:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">val</span><span class="w"> </span><span class="nv">reduceMotion</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LocalReduceMotion</span><span class="p">.</span><span class="na">current</span>
+<span class="n">AnimatedVisibility</span><span class="p">(</span>
+<span class="w">    </span><span class="n">visible</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">visible</span><span class="p">,</span>
+<span class="w">    </span><span class="n">enter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">reduceMotion</span><span class="p">)</span><span class="w"> </span><span class="n">fadeIn</span><span class="p">(</span><span class="n">tween</span><span class="p">(</span><span class="m">100</span><span class="p">))</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="n">slideInVertically</span><span class="p">(</span><span class="n">tween</span><span class="p">(</span><span class="m">200</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nb">it</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">fadeIn</span><span class="p">(</span><span class="n">tween</span><span class="p">(</span><span class="m">200</span><span class="p">)),</span>
+<span class="w">    </span><span class="n">exit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">reduceMotion</span><span class="p">)</span><span class="w"> </span><span class="n">fadeOut</span><span class="p">(</span><span class="n">tween</span><span class="p">(</span><span class="m">100</span><span class="p">))</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="n">slideOutVertically</span><span class="p">(</span><span class="n">tween</span><span class="p">(</span><span class="m">200</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nb">it</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">fadeOut</span><span class="p">(</span><span class="n">tween</span><span class="p">(</span><span class="m">150</span><span class="p">))</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>The shared components already do this (<code>AppMenu</code>, <code>AppMenuPages</code>, <code>OdometerText</code>, <code>SelectionActionBar</code>,
+<code>snackbarMotion</code>), so building from them gets it for free.</p>
+<h2 id="the-theme">The theme<a class="headerlink" href="#the-theme" title="Permanent link">&para;</a></h2>
+<p><code>ui/theme/Theme.kt</code> has <code>MaterialdrainTheme</code>. On Android 12 and newer it uses dynamic colour (the colours of the
+wallpaper, <code>dynamicDarkColorScheme</code> / <code>dynamicLightColorScheme</code>); before that, a fixed purple scheme from <code>Color.kt</code>.
+Dark or light follows the system (<code>isSystemInDarkTheme()</code>). <code>Type.kt</code> sets <code>bodyLarge</code> and keeps Material's other text
+styles.</p>
+<p>Take colours from <code>MaterialTheme.colorScheme</code>, never as fixed values: then a screen follows the wallpaper and dark mode
+like the rest. The file tiles, the selection bar (<code>secondaryContainer</code>) and the menus' highlights all do.</p>
+<h2 id="the-app-lock">The app lock<a class="headerlink" href="#the-app-lock" title="Permanent link">&para;</a></h2>
+<p><code>AppLockOverlay</code> (<code>auth/AppLockOverlay.kt</code>) covers the app and takes every touch while it's locked, asking for the
+fingerprint, face or screen lock straight away; see <a href="../data-and-security/">Data and security</a>.</p>
+
+
+  <aside class="md-source-file">
+    <span class="md-source-file__fact">
+      <span class="md-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg></span>
+      Last updated <time datetime="2026-10-25">25 October 2026</time>
+    </span>
+    
+      <span class="md-source-file__fact" title="The newest stable release when this page was last changed">
+        <span class="md-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 1H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2m0 18H7V5h10zm-1-6h-3V8h-2v5H8l4 4z"/></svg></span>
+        For Materialdrain 1.5.20261014.1558
+      </span>
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../providers/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Hosts in code">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Hosts in code
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../transfers/" class="md-footer__link md-footer__link--next" aria-label="Next: Uploads and downloads">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Uploads and downloads
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

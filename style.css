@@ -1,0 +1,270 @@
+/* The home page's look. The same palette as the documentation (docs/stylesheets/extra.css): a dark rose. */
+:root {
+  color-scheme: dark;
+
+  /* Backgrounds */
+  --bg-main: #1a1617;
+  --bg-surface: #251f21;
+  --bg-soft: #362d30;
+
+  /* Borders */
+  --border-subtle: #453a3d;
+  --border-focus: #8c6a74;
+
+  /* Accents */
+  --accent-highlight: #eec1c8;
+  --accent-primary: #d4a5b2;
+  --accent-muted: #a3818a;
+  --accent-deep: #7f5f68;
+  --accent-glow: rgba(212, 165, 178, 0.15);
+
+  /* Typography */
+  --text-main: #f2ecee;
+  --text-muted: #b0a2a6;
+  --text-inverse: #1a1617;
+
+  /* Links */
+  --link-color: #e2b2be;
+  --link-hover: #fcd7dd;
+
+  /* Semantic colors */
+  --blue: #6a6ca6;
+  --red: #ba465b;
+  --green: #6aa694;
+  --yellow: #e0b06b;
+
+  /* Made from the ones above: a short, sharp shadow (no blur to speak of), only under a card being pointed at */
+  --shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg-main);
+  color: var(--text-main);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+::selection { background: var(--accent-deep); color: var(--text-main); }
+
+/* One screen on a computer: as wide as reads well, and centred top to bottom when there's room to spare */
+main {
+  max-width: 1200px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 28px;
+}
+
+/* The title, with the links to the documentation and the source at its side, level with the title */
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+}
+
+/* The title's side takes what the links leave, so they stay beside it until there's no room for both */
+.top > div { flex: 1 1 420px; }
+.top-links { display: flex; gap: 8px; flex-wrap: wrap; flex: none; margin-top: 4px; }
+.top-links a {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  text-decoration: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.top-links a:hover { background: var(--bg-soft); border-color: var(--border-focus); }
+
+/* A section's title, with a link at the other end of its line */
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin: 0 0 16px;
+}
+.section-head h2 { margin: 0; }
+
+h1 {
+  font-size: 2.75rem;
+  line-height: 1.15;
+  margin: 0 0 12px;
+  color: var(--accent-highlight);
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* The app's icon before its name, as tall as the letters */
+.logo { width: 1em; height: 1em; flex: none; }
+
+h2 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-muted);
+  margin: 0 0 16px;
+}
+
+.lead { font-size: 1.15rem; color: var(--text-muted); margin: 0; }
+
+/* A few things the app does, as one line of plain text under the line about it with a dot between each (on a phone,
+   one a line): there's nothing to click, so nothing that looks like a button */
+.features {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  font-size: 0.95rem;
+  color: var(--accent-muted);
+}
+.features li + li::before { content: "·"; margin-right: 10px; }
+.small { font-size: 0.9rem; color: var(--text-muted); }
+
+a { color: var(--link-color); text-underline-offset: 3px; }
+a:hover { color: var(--link-hover); }
+
+a:focus-visible, button:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 22px 28px;
+  border-radius: 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  text-decoration: none;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.card:hover {
+  color: var(--text-main);
+  background: var(--bg-soft);
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+.card.primary {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--text-inverse);
+}
+
+.card.primary:hover {
+  background: var(--accent-highlight);
+  border-color: var(--accent-highlight);
+  color: var(--text-inverse);
+}
+
+/* A build that isn't published yet: there's nothing to download */
+.card.empty { opacity: 0.6; pointer-events: none; }
+
+/* A card with its release notes and checksum under it; the card takes the height the line leaves */
+.build { display: flex; flex-direction: column; gap: 8px; }
+.build .card { flex: 1; }
+/* Holds its line's height while it's empty, so nothing below moves when the notes and checksum come in */
+.build-extra { margin: 0 4px; min-height: 1.6em; }
+.build-extra code { font-size: 0.85rem; color: var(--text-main); }
+
+/* Copying a checksum: a small button, the size of the line's text */
+.copy {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 1px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--link-color);
+  cursor: pointer;
+}
+.copy:hover { background: var(--bg-soft); border-color: var(--border-focus); color: var(--link-hover); }
+
+/* How to install, under the cards */
+.install { margin: 12px 0 0; }
+
+/* The build's name, and what pressing the card does at the other end of its line */
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.card-title { font-size: 1.3rem; font-weight: 650; }
+.card-action { font-size: 0.9rem; font-weight: 600; white-space: nowrap; }
+.card.empty .card-action { display: none; }
+.card-version { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.card-text { font-size: 0.9rem; opacity: 0.8; }
+/* What the build is, which stays once the date has come in */
+.card-note { font-size: 0.9rem; opacity: 0.8; margin-top: 4px; }
+
+/* The older versions side by side, a small tile each: the version, then when it was made and how big it is */
+.versions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
+.versions li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+}
+.version-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+/* Muted, and underlined only when pointed at: one on every tile is a lot of underlines */
+.version-head .small { color: var(--text-muted); text-decoration: none; }
+.version-head .small:hover { color: var(--link-hover); text-decoration: underline; }
+.versions .version-head > a:first-child { font-weight: 600; font-variant-numeric: tabular-nums; }
+.version-meta { color: var(--text-muted); font-size: 0.9rem; }
+.versions li.version-meta { background: none; border: none; padding: 0; }
+
+/* Wide enough: four a row, so the four shown (see releases.js) make one full row */
+@media (min-width: 960px) {
+  .versions { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* A phone: the page scrolls, with less room around it */
+@media (max-width: 640px) {
+  main { padding: 32px 20px; justify-content: flex-start; gap: 32px; }
+  h1 { font-size: 2.25rem; }
+  /* The things it does, one a line: wrapped, the dots between them would start the lines */
+  .features { flex-direction: column; gap: 2px; }
+  .features li + li::before { content: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .top-links a { transition: none; }
+  .card:hover, .card.primary:hover { transform: none; }
+}
+
+/* Nothing to say about the builds: no empty line for it */
+#releases-status:empty { display: none; }
+#releases-status { margin: 12px 0 0; color: var(--yellow); }
+
+/* Counts down every second: the digits keep their width so the line doesn't shift */
+#releases-refreshed { font-variant-numeric: tabular-nums; }

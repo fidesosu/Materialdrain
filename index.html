@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Only the page's own files, and GitHub for the releases when the server's list isn't there (releases.js) -->
+    <meta http-equiv="Content-Security-Policy"
+     content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self' https://api.github.com; base-uri 'none'; form-action 'none'">
+    <title>Materialdrain</title>
+    <meta name="description"
+     content="Materialdrain: an Android app for Pixeldrain, WebDAV, S3, SMB and other file hosts.">
+    <link rel="canonical" href="https://materialdrain.senko.tools/">
+    <meta name="theme-color" content="#1a1617">
+    <!-- The app's launcher icon (icon.svg); favicon.ico and apple-touch-icon.png are made from it -->
+    <link rel="icon" href="/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <!-- What a link to the site shows when it's shared in a chat -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Materialdrain">
+    <meta property="og:title" content="Materialdrain">
+    <meta property="og:description"
+     content="An Android app for Pixeldrain and your other file hosts: WebDAV, S3, SMB shares and any REST API.">
+    <meta property="og:url" content="https://materialdrain.senko.tools/">
+    <meta property="og:image" content="https://materialdrain.senko.tools/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="/style.css">
+    <script src="/releases.js" defer></script>
+  </head>
+
+  <body>
+    <main>
+      <!-- The page fits one screen on a computer: the title with its links beside it, the two builds side by side, and
+         the older versions as a grid underneath. A phone stacks them and scrolls -->
+      <header class="top">
+        <div>
+          <h1><img class="logo" src="/icon.svg" alt="" width="44" height="44">Materialdrain</h1>
+          <p class="lead">An Android app for Pixeldrain and your other file hosts: WebDAV, S3, SMB shares and any REST
+            API.</p>
+          <!-- A few of the things in the documentation's "What it can do" (docs/index.md), as plain text: they aren't
+               links -->
+          <ul class="features" aria-label="What it can do">
+            <li>Search through every subfolder</li>
+            <li>Previews of images, video, audio, text and archives</li>
+            <li>Background transfers</li>
+          </ul>
+        </div>
+        <nav class="top-links" aria-label="More">
+          <a href="/docs/" title="How to use the app, how to add a host to it, and how it is built">Documentation</a>
+          <a href="https://github.com/fidesosu/Materialdrain">Source code</a>
+        </nav>
+      </header>
+
+      <section class="downloads" aria-labelledby="downloads-title">
+        <div class="section-head">
+          <h2 id="downloads-title">Download</h2>
+          <!-- When the server last read the builds from GitHub; set by releases.js -->
+          <span class="small" id="releases-refreshed"></span>
+        </div>
+        <!-- Filled in by releases.js from GitHub's releases; these links are what's left if that can't be reached.
+             Under each card, its release notes and the APK's checksum -->
+        <div class="cards">
+          <div class="build" id="stable">
+            <a class="card primary" href="https://github.com/fidesosu/Materialdrain/releases/latest">
+              <span class="card-head">
+                <span class="card-title">Stable</span>
+                <span class="card-action">Download APK</span>
+              </span>
+              <span class="card-version" data-field="version">The latest release</span>
+              <span class="card-text" data-field="meta">&nbsp;</span>
+              <span class="card-note">The tested version, from the main branch.</span>
+            </a>
+            <p class="build-extra small" data-field="extra"></p>
+          </div>
+          <div class="build" id="dev">
+            <a class="card" href="https://github.com/fidesosu/Materialdrain/releases/tag/dev-build">
+              <span class="card-head">
+                <span class="card-title">Nightly</span>
+                <span class="card-action">Download APK</span>
+              </span>
+              <span class="card-version" data-field="version">The newest build</span>
+              <span class="card-text" data-field="meta">&nbsp;</span>
+              <span class="card-note">Rebuilt with every change to the dev branch: the newest features, and maybe
+                bugs.</span>
+            </a>
+            <p class="build-extra small" data-field="extra"></p>
+          </div>
+        </div>
+        <p class="small" id="releases-status"></p>
+        <p class="small install">Android 10 or newer: open the APK on your phone to install it. A newer build installs
+          over an older one, and keeps your settings. <a href="/docs/user-guide/#installing">How to install</a> ·
+          <a href="/docs/user-guide/what-you-get/">What you're installing</a></p>
+      </section>
+
+      <section class="older" aria-labelledby="older-title">
+        <div class="section-head">
+          <h2 id="older-title">Older versions</h2>
+          <a class="small" href="https://github.com/fidesosu/Materialdrain/releases">All releases on GitHub</a>
+        </div>
+        <ul class="versions" id="older-list"></ul>
+      </section>
+    </main>
+  </body>
+
+</html>

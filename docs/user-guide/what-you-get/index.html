@@ -1,0 +1,2006 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="How to use Materialdrain, how to add any host to it, and how the app is built and why.">
+      
+      
+      
+        <link rel="canonical" href="https://materialdrain.senko.tools/docs/user-guide/what-you-get/">
+      
+      
+        <link rel="prev" href="../troubleshooting/">
+      
+      
+        <link rel="next" href="../../hosts/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="/icon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>What you're installing - Materialdrain docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#what-youre-installing" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Materialdrain docs" class="md-header__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  <img src="/icon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Materialdrain docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              What you're installing
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Using the app
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../hosts/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Hosts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../development/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Materialdrain docs" class="md-nav__button md-logo" aria-label="Materialdrain docs" data-md-component="logo">
+      
+  <img src="/icon.svg" alt="logo">
+
+    </a>
+    Materialdrain docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/fidesosu/Materialdrain" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    fidesosu/Materialdrain
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the app
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using the app
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../screens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    What you're installing
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    What you're installing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#in-short" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In short
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-the-apk-comes-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the APK comes from
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-a-download" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking a download
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-asks-your-phone-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it asks your phone for
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What it asks your phone for">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-else-it-adds-to-your-phone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What else it adds to your phone
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-connects-to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it connects to
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-keeps-on-your-phone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it keeps on your phone
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-inside" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's inside
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stable-or-nightly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stable or Nightly
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../hosts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hosts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/config-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kinds of host
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Kinds of host
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/webdav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    WebDAV
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/s3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    S3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/smb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SMB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/rest-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sign-in/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sign-in
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The config editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/sharing-and-updates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sharing and updates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hosts/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../development/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/providers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosts in code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/interface/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The interface
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/transfers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uploads and downloads
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/media/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thumbnails and previews
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/search-and-sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search and sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/data-and-security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data and security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/common-tasks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common tasks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/website/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    This website
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#in-short" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In short
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-the-apk-comes-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the APK comes from
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-a-download" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking a download
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-asks-your-phone-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it asks your phone for
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What it asks your phone for">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-else-it-adds-to-your-phone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What else it adds to your phone
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-connects-to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it connects to
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-keeps-on-your-phone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it keeps on your phone
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-inside" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's inside
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stable-or-nightly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stable or Nightly
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="what-youre-installing">What you're installing<a class="headerlink" href="#what-youre-installing" title="Permanent link">&para;</a></h1>
+<p>Everything the app asks your phone for, everything it connects to, what it keeps, and how to check that the APK you
+downloaded is the real one. All of it can be checked in the <a href="https://github.com/fidesosu/Materialdrain">source code</a>,
+and the parts about the APK in the APK itself.</p>
+<h2 id="in-short">In short<a class="headerlink" href="#in-short" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>No ads, no analytics, no crash reports, no tracking.</strong> The app has none of the libraries for them, and sends
+  nothing about you or your use of it to anyone.</li>
+<li><strong>It only connects to your hosts</strong>: the ones you add, and Pixeldrain, which is built in. It doesn't check for
+  updates of itself; you do that, on the <a href="https://materialdrain.senko.tools/">home page</a>.</li>
+<li><strong>It can't read your files on its own.</strong> It has no storage permission: it only sees the files you pick or share
+  with it, and writes downloads to your Download folder.</li>
+<li><strong>Your passwords and keys stay on the phone, encrypted</strong>, and never go into Android's backups.</li>
+<li><strong>Free and open source.</strong> The APKs are built from the public code by GitHub, not on someone's computer.</li>
+</ul>
+<h2 id="where-the-apk-comes-from">Where the APK comes from<a class="headerlink" href="#where-the-apk-comes-from" title="Permanent link">&para;</a></h2>
+<p>Every APK since 1.5 is built by the app's <a href="../../development/#the-build-workflow">build workflow</a> on GitHub
+Actions, from the code as it is on GitHub:</p>
+<ul>
+<li>A push to <code>main</code> builds a <strong>stable</strong> release; a push to <code>dev</code> builds the <strong>development build</strong> (Nightly on the home
+  page). The tests run first, and a build whose tests fail isn't published.</li>
+<li>The APK is signed with the app's release key, which GitHub keeps as a secret, and published to the repository's
+  <a href="https://github.com/fidesosu/Materialdrain/releases">releases</a>. The home page only lists those: every download
+  comes straight from GitHub.</li>
+<li>Each release says which commit it was built from, and <strong>Settings → About</strong> in the app shows its version and kind of
+  build, and when that commit was made.</li>
+</ul>
+<p>The releases before 1.5 were built by hand, before the workflow existed.</p>
+<h2 id="checking-a-download">Checking a download<a class="headerlink" href="#checking-a-download" title="Permanent link">&para;</a></h2>
+<p>There are two checks: the checksum says the file is the one GitHub published, and the signature says who made it.</p>
+<p><strong>The checksum.</strong> The home page shows each APK's SHA-256 under its card (<strong>Copy</strong> copies all of it), and hovering over
+an older version shows its own. Compare it with the file you downloaded:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Windows</label><label for="__tabbed_1_2">Linux</label><label for="__tabbed_1_3">macOS</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="n">certutil</span> <span class="n">-hashfile</span> <span class="n">Materialdrain</span><span class="p">-</span><span class="n">1</span><span class="p">.</span><span class="n">5</span><span class="p">.</span><span class="n">20261014</span><span class="p">.</span><span class="n">1558</span><span class="p">.</span><span class="n">apk</span> <span class="n">SHA256</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code>sha256sum<span class="w"> </span>Materialdrain-1.5.20261014.1558.apk
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code>shasum<span class="w"> </span>-a<span class="w"> </span><span class="m">256</span><span class="w"> </span>Materialdrain-1.5.20261014.1558.apk
+</code></pre></div>
+</div>
+</div>
+</div>
+<p><strong>The signature.</strong> Stable and development builds are signed with the same key, whose certificate is:</p>
+<ul>
+<li><strong>Package:</strong> <code>tools.senko.materialdrain</code></li>
+<li><strong>Certificate SHA-256:</strong> <code>d2:49:9e:b4:96:0b:01:d4:36:a9:5e:c8:01:3d:b8:1d:ea:ad:a2:ea:e0:36:e3:90:86:a5:34:ba:32:60:85:a6</code></li>
+<li><strong>Issued to:</strong> <code>CN=fides, OU=senko.tools, O=senko.tools</code></li>
+</ul>
+<p>With the Android SDK's <code>apksigner</code>:</p>
+<div class="highlight"><pre><span></span><code>apksigner<span class="w"> </span>verify<span class="w"> </span>--print-certs<span class="w"> </span>Materialdrain-1.5.20261014.1558.apk
+</code></pre></div>
+<p>It prints <code>certificate SHA-256 digest: d2499eb4960b01d436a95ec8013db81deaada2eae036e39086a534ba326085a6</code>. Android checks
+this too, by itself: an update signed with any other key won't install over the app, so once it's installed, nobody
+else can replace it.</p>
+<h2 id="what-it-asks-your-phone-for">What it asks your phone for<a class="headerlink" href="#what-it-asks-your-phone-for" title="Permanent link">&para;</a></h2>
+<p>These are the permissions in the APK, all of them. None of them is a "dangerous" one that Android asks you about,
+except notifications.</p>
+<table>
+<thead>
+<tr>
+<th>Permission</th>
+<th>What for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Internet</strong> (<code>INTERNET</code>)</td>
+<td>Reaching your hosts</td>
+</tr>
+<tr>
+<td><strong>Network state</strong> (<code>ACCESS_<wbr>NETWORK_<wbr>STATE</code>)</td>
+<td>Knowing when the phone is offline, and checking the hosts again when the network changes</td>
+</tr>
+<tr>
+<td><strong>Notifications</strong> (<code>POST_<wbr>NOTIFICATIONS</code>)</td>
+<td>The progress of uploads and downloads, and when they finish or fail. Android asks you first</td>
+</tr>
+<tr>
+<td><strong>Foreground service</strong> (<code>FOREGROUND_<wbr>SERVICE</code>, <code>FOREGROUND_<wbr>SERVICE_<wbr>DATA_<wbr>SYNC</code>)</td>
+<td>Transfers keep going with the app closed, with a notification for as long as they run</td>
+</tr>
+<tr>
+<td><strong>Install apps</strong> (<code>REQUEST_<wbr>INSTALL_<wbr>PACKAGES</code>)</td>
+<td>Opening an APK you downloaded with the app hands it to Android's installer, which won't open for the app without this. Android asks you once whether to allow it. The app never installs anything by itself</td>
+</tr>
+<tr>
+<td><strong>Biometrics</strong> (<code>USE_<wbr>BIOMETRIC</code>, <code>USE_<wbr>FINGERPRINT</code>)</td>
+<td>The optional app lock, with your fingerprint, face or screen lock. Added by Android's own biometric library</td>
+</tr>
+<tr>
+<td><strong>Keep awake</strong> (<code>WAKE_<wbr>LOCK</code>)</td>
+<td>Keeping a video playing with the screen on. Added by the video player (Media3)</td>
+</tr>
+<tr>
+<td><code>tools.<wbr>senko.<wbr>materialdrain.<wbr>DYNAMIC_<wbr>RECEIVER_<wbr>NOT_<wbr>EXPORTED_<wbr>PERMISSION</code></td>
+<td>Not a permission over anything of yours: the app's own, which Android's support library adds so that only the app can send messages to itself</td>
+</tr>
+</tbody>
+</table>
+<p>The development build adds two, for features not in a stable release yet:</p>
+<table>
+<thead>
+<tr>
+<th>Permission</th>
+<th>What for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Media playback</strong> (<code>FOREGROUND_<wbr>SERVICE_<wbr>MEDIA_<wbr>PLAYBACK</code>)</td>
+<td>Songs going on in the background, with controls in the notification and on the lock screen</td>
+</tr>
+<tr>
+<td><strong>Vibrate</strong> (<code>VIBRATE</code>)</td>
+<td>The app's own vibrations, with the strength you choose in the settings</td>
+</tr>
+</tbody>
+</table>
+<p><strong>What it doesn't ask for:</strong> your files and photos (storage), contacts, location, camera, microphone, phone, SMS,
+accounts or the list of your apps.</p>
+<h3 id="what-else-it-adds-to-your-phone">What else it adds to your phone<a class="headerlink" href="#what-else-it-adds-to-your-phone" title="Permanent link">&para;</a></h3>
+<ul>
+<li>A <strong>share target</strong>: "Share" from another app can send files to Materialdrain, to upload them, and in the Nightly
+  build <span class="nightly" title="Only in the Nightly build so far, not in a stable release yet">Nightly</span> text, with a Pixeldrain link opened in the app.</li>
+<li>Pixeldrain's <strong>file and list links</strong> (<code>pixeldrain.com/u/…</code>, <code>/l/…</code>) <span class="nightly" title="Only in the Nightly build so far, not in a stable release yet">Nightly</span> can open in the app. Android asks, or
+  you turn it on in the app's system settings under <em>Open by default</em>. The app doesn't claim them as its own.</li>
+<li><strong>Shortcuts</strong> on its icon <span class="nightly" title="Only in the Nightly build so far, not in a stable release yet">Nightly</span> (Upload, Files, Filesystem), and a <strong>Quick Settings tile</strong> <span class="nightly" title="Only in the Nightly build so far, not in a stable release yet">Nightly</span> that opens
+  the upload, if you add it.</li>
+<li>Your hosts in the <strong>system's file picker</strong> <span class="nightly" title="Only in the Nightly build so far, not in a stable release yet">Nightly</span>, read only, if you turn that on in the settings. Only the system
+  can reach it, for an app you're picking a file in, and it shows nothing while the app lock is on.</li>
+<li><strong>Media controls</strong> <span class="nightly" title="Only in the Nightly build so far, not in a stable release yet">Nightly</span> for a song playing in the background, in the notification and on the lock screen. Other
+  apps that control music (a watch, a car) can play, pause, skip and seek it, but can't choose what it plays.</li>
+<li><strong>Shared files</strong> <span class="nightly" title="Only in the Nightly build so far, not in a stable release yet">Nightly</span>: <em>Share file</em>, for a file without a link, downloads it into the app's cache and hands only
+  that one file to the app you pick. Those copies are cleared after a day.</li>
+</ul>
+<h2 id="what-it-connects-to">What it connects to<a class="headerlink" href="#what-it-connects-to" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pixeldrain</strong></td>
+<td>When you use it. And, since it's built in, even if you don't: the host switcher checks whether each host answers, with one request to <code>pixeldrain.<wbr>com</code> without signing in, when the app starts, when the network changes, and every few minutes while the app is open (the data saver can make it wait until you ask)</td>
+</tr>
+<tr>
+<td><strong>The hosts you add</strong></td>
+<td>When you use them, and the same check</td>
+</tr>
+<tr>
+<td><strong>A config's update URL</strong></td>
+<td>Only for a host whose config has one, to look for a newer version of the config. See <a href="../../hosts/sharing-and-updates/">Sharing and updates</a></td>
+</tr>
+<tr>
+<td><strong>127.0.0.1</strong></td>
+<td>The app's own small server on the phone, for SMB files to its image viewer and players. That traffic never leaves the phone</td>
+</tr>
+</tbody>
+</table>
+<p>And nothing else. The links in <strong>Settings → About</strong> (this site, the releases, the source, reporting a problem) open in
+your browser, and only when you tap them.</p>
+<p>Everything goes over HTTPS: Android refuses a plain <code>http://</code> address before anything is sent. SMB shares can encrypt
+their traffic too (see <a href="../../hosts/smb/">SMB</a>).</p>
+<h2 id="what-it-keeps-on-your-phone">What it keeps on your phone<a class="headerlink" href="#what-it-keeps-on-your-phone" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Your settings and your hosts' configs.</strong> A config never holds a password or key.</li>
+<li><strong>Your sign-ins</strong>: passwords, API keys and session tokens, encrypted with a key in Android's Keystore, which never
+  leaves the phone. Your Pixeldrain password isn't kept at all, only the session it signs in to.</li>
+<li><strong>Caches</strong>: thumbnails, media, songs' tags and the last few PDFs, which Android may clear when it needs the space.</li>
+<li><strong>Where you left each video</strong> <span class="nightly" title="Only in the Nightly build so far, not in a stable release yet">Nightly</span>, for the last 200, and <strong>your account's picture</strong> <span class="nightly" title="Only in the Nightly build so far, not in a stable release yet">Nightly</span>, if you chose
+  one.</li>
+<li><strong>Downloads</strong> go to your Download folder (or <span class="nightly" title="Only in the Nightly build so far, not in a stable release yet">Nightly</span> a folder of the app's own in it), like a browser's.</li>
+</ul>
+<p>Your settings, hosts, sign-ins and video positions don't go into Android's own backups (to your Google account, or to
+a new phone): the sign-ins couldn't be decrypted anywhere else, and the rest would be half a setup without them. The
+account picture <span class="nightly" title="Only in the Nightly build so far, not in a stable release yet">Nightly</span> isn't left out of them yet, nor a note that the built-in Pixeldrain config was set up once. On a new phone, export your hosts' configs
+from the old one and import them. The app doesn't log passwords or keys either, so a bug report can't leak them.
+Uninstalling the app removes all of it, except the files you downloaded. And with <strong>Block screenshots</strong> <span class="nightly" title="Only in the Nightly build so far, not in a stable release yet">Nightly</span>
+on, the app comes out black in screenshots and screen recordings, and blank in the recent apps.</p>
+<p>The details, for each file: <a href="../../development/data-and-security/">Data and security</a>.</p>
+<h2 id="whats-inside">What's inside<a class="headerlink" href="#whats-inside" title="Permanent link">&para;</a></h2>
+<p>The app is written in Kotlin, with Jetpack Compose and Material 3. Besides Android's own libraries (AndroidX), it's
+built with:</p>
+<table>
+<thead>
+<tr>
+<th>Library</th>
+<th>For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://square.github.io/okhttp/">OkHttp</a> and <a href="https://ktor.io/">Ktor</a></td>
+<td>Talking to the hosts</td>
+</tr>
+<tr>
+<td><a href="https://developer.android.com/media/media3">Media3 / ExoPlayer</a></td>
+<td>Playing video and audio</td>
+</tr>
+<tr>
+<td><a href="https://coil-kt.github.io/coil/">Coil</a></td>
+<td>Loading images and thumbnails</td>
+</tr>
+<tr>
+<td><a href="https://github.com/AgNO3/jcifs-ng">jcifs-ng</a></td>
+<td>SMB shares</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Kotlin/kotlinx.serialization">kotlinx.serialization</a> and coroutines</td>
+<td>Reading configs and answers, and doing things in the background</td>
+</tr>
+</tbody>
+</table>
+<p>The only native code in the APK is a small part of Compose (<code>libandroidx.graphics.path.so</code>), in a version for each kind
+of phone processor.</p>
+<h2 id="stable-or-nightly">Stable or Nightly<a class="headerlink" href="#stable-or-nightly" title="Permanent link">&para;</a></h2>
+<p>Both are the same app, with the same signature, so either installs over the other and keeps your settings and
+sign-ins. Nightly has the newest changes as soon as they're made, and the bugs that come with them; stable releases
+are the tested ones. Going back to an older version means uninstalling first, which removes your sign-ins.</p>
+
+
+  <aside class="md-source-file">
+    <span class="md-source-file__fact">
+      <span class="md-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg></span>
+      Last updated <time datetime="2026-10-25">25 October 2026</time>
+    </span>
+    
+      <span class="md-source-file__fact" title="The newest stable release when this page was last changed">
+        <span class="md-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 1H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2m0 18H7V5h10zm-1-6h-3V8h-2v5H8l4 4z"/></svg></span>
+        For Materialdrain 1.5.20261014.1558, and the Nightly build where it says so
+      </span>
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../troubleshooting/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Troubleshooting">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Troubleshooting
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../hosts/" class="md-footer__link md-footer__link--next" aria-label="Next: Hosts">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Hosts
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
