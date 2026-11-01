@@ -20,7 +20,7 @@ androidxTestServices = "1.6.0"
 uiautomator = "2.4.0"
 kotlinxSerializationJson = "1.12.0"
 # Only the Pixeldrain host's client (provider-pixeldrain) is made with Ktor; the others use OkHttp itself
-ktor = "3.6.0"
+ktor = "3.6.1"
 lifecycleRuntimeKtx = "2.11.0"
 activityCompose = "1.13.0"
 composeBom = "2026.09.00"
