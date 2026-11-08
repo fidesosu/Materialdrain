@@ -38,7 +38,7 @@ work = "2.12.0"
 # Renders the @Preview functions to images on the computer (see app/build.gradle.kts, roborazzi)
 roborazzi = "1.77.0"
 robolectric = "4.17"
-composablePreviewScanner = "0.9.3"
+composablePreviewScanner = "0.10.0"
 
 [libraries]
 androidx-compose-material-icons-core = { module = "androidx.compose.material:material-icons-core", version.ref = "materialIcons" }
